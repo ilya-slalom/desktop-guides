@@ -1,15 +1,18 @@
 ﻿{
     "fixture":  "txt-bom",
-    "observedAt":  "2026-09-25T08:59:01.3384333Z",
+    "observedAt":  "2026-09-25T09:18:17.7898274Z",
     "osBuild":  "10.0.26200.0",
     "cpuArchitecture":  "ARM64",
-    "processWorkingSetBytes":  148242432,
-    "processPeakWorkingSetBytes":  151007232,
+    "processWorkingSetBytes":  148938752,
+    "processPeakWorkingSetBytes":  151130112,
     "passwordEntryMode":  null,
-    "openToVisibleMilliseconds":  686,
+    "openToVisibleMilliseconds":  609,
     "scrollCallsMilliseconds":  [
 
                                 ],
+    "uiResponseMaxMilliseconds":  null,
+    "uiResponseSamples":  null,
+    "uiResponseTimeouts":  null,
     "phases":  [
                    {
                        "action":  "open",
@@ -20,9 +23,9 @@
                        "taggedTextInAutomation":  false,
                        "marker":  null,
                        "realizedListItems":  3,
-                       "elapsedMilliseconds":  707,
-                       "workingSetBytes":  148402176,
-                       "peakWorkingSetBytes":  151007232
+                       "elapsedMilliseconds":  639,
+                       "workingSetBytes":  149442560,
+                       "peakWorkingSetBytes":  151130112
                    },
                    {
                        "action":  "capture",
@@ -33,9 +36,9 @@
                        "taggedTextInAutomation":  false,
                        "marker":  null,
                        "realizedListItems":  3,
-                       "elapsedMilliseconds":  1028,
-                       "workingSetBytes":  148635648,
-                       "peakWorkingSetBytes":  151007232
+                       "elapsedMilliseconds":  963,
+                       "workingSetBytes":  149692416,
+                       "peakWorkingSetBytes":  151130112
                    },
                    {
                        "action":  "resize",
@@ -46,9 +49,9 @@
                        "taggedTextInAutomation":  false,
                        "marker":  null,
                        "realizedListItems":  3,
-                       "elapsedMilliseconds":  1856,
-                       "workingSetBytes":  148131840,
-                       "peakWorkingSetBytes":  151007232
+                       "elapsedMilliseconds":  1813,
+                       "workingSetBytes":  148828160,
+                       "peakWorkingSetBytes":  151130112
                    },
                    {
                        "action":  "larger",
@@ -59,9 +62,9 @@
                        "taggedTextInAutomation":  false,
                        "marker":  null,
                        "realizedListItems":  3,
-                       "elapsedMilliseconds":  2157,
-                       "workingSetBytes":  147955712,
-                       "peakWorkingSetBytes":  151007232
+                       "elapsedMilliseconds":  2113,
+                       "workingSetBytes":  148606976,
+                       "peakWorkingSetBytes":  151130112
                    },
                    {
                        "action":  "restore",
@@ -72,9 +75,9 @@
                        "taggedTextInAutomation":  false,
                        "marker":  null,
                        "realizedListItems":  3,
-                       "elapsedMilliseconds":  2465,
-                       "workingSetBytes":  147992576,
-                       "peakWorkingSetBytes":  151007232
+                       "elapsedMilliseconds":  2415,
+                       "workingSetBytes":  148701184,
+                       "peakWorkingSetBytes":  151130112
                    }
                ]
 }

@@ -1,5 +1,5 @@
 {
-  "observedAt": "2026-09-25T08:58:29.3281523Z",
+  "observedAt": "2026-09-25T09:17:39.9148269Z",
   "osBuild": "10.0.26200.0",
   "cpuArchitecture": "ARM64",
   "packageArchitecture": "arm64",
@@ -13,13 +13,13 @@
     "SetupMetrics"
   ],
   "dotnetSdk": "10.0.401",
-  "sourcePackageSha256": "4CF9A62B68A94E1B8D7981669A84CCE77197395D531EEAD4D71855A36B514304",
-  "certificateThumbprint": "FE0A3E0B2F663E7F68BF522ABF606C71C97A0BA4",
-  "signedPackageSha256": "44C319E38F92D92CCB9C950A944AF17E48C288C3975E94C98F7D41542EA659E1",
+  "sourcePackageSha256": "CC31F474C22AE783E714B0C2C53F8E58438DC2A0229836EBBB9F13789D8BFE06",
+  "certificateThumbprint": "6BE9DE9161FE5E88C59D34BF38E7D26D24F5D48F",
+  "signedPackageSha256": "7C8BEE698ED32F7C7C9AB6A8FBB70C286023FAC875BEB2DD086E5BDCA4401189",
   "packageFullName": "DesktopGuides.ReaderSpike_0.1.0.0_arm64__en8r599z3n35j",
   "packageFamilyName": "DesktopGuides.ReaderSpike_en8r599z3n35j",
   "installLocation": "C:\\Program Files\\WindowsApps\\DesktopGuides.ReaderSpike_0.1.0.0_arm64__en8r599z3n35j",
-  "launchedProcessId": 7912,
+  "launchedProcessId": 1208,
   "launchedSessionId": 2,
   "fixtureResults": [
     {

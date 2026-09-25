@@ -1,15 +1,18 @@
 ﻿{
     "fixture":  "pdf-locked",
-    "observedAt":  "2026-09-25T08:59:47.2720744Z",
+    "observedAt":  "2026-09-25T09:19:06.1358988Z",
     "osBuild":  "10.0.26200.0",
     "cpuArchitecture":  "ARM64",
-    "processWorkingSetBytes":  370270208,
-    "processPeakWorkingSetBytes":  371798016,
+    "processWorkingSetBytes":  344567808,
+    "processPeakWorkingSetBytes":  354390016,
     "passwordEntryMode":  "UI Automation ValuePattern",
     "openToVisibleMilliseconds":  null,
     "scrollCallsMilliseconds":  [
 
                                 ],
+    "uiResponseMaxMilliseconds":  null,
+    "uiResponseSamples":  null,
+    "uiResponseTimeouts":  null,
     "phases":  [
                    {
                        "action":  "open",
@@ -20,35 +23,35 @@
                        "taggedTextInAutomation":  false,
                        "marker":  null,
                        "realizedListItems":  0,
-                       "elapsedMilliseconds":  634,
-                       "workingSetBytes":  365748224,
-                       "peakWorkingSetBytes":  371798016
+                       "elapsedMilliseconds":  796,
+                       "workingSetBytes":  340623360,
+                       "peakWorkingSetBytes":  354390016
                    },
                    {
                        "action":  "wrong-password",
                        "status":  "pdf-locked: Password required. Enter the PDF password and choose Unlock PDF.",
-                       "page":  "Could not unlock PDF. Check the password or file, then try again. P0 diagnostic: input length 5, HRESULT 0x8007052B.",
+                       "page":  "Could not unlock PDF. Check the password or file, then try again.",
                        "image":  null,
                        "imageHasTextPattern":  false,
                        "taggedTextInAutomation":  false,
                        "marker":  null,
                        "realizedListItems":  0,
-                       "elapsedMilliseconds":  1025,
-                       "workingSetBytes":  362356736,
-                       "peakWorkingSetBytes":  371798016
+                       "elapsedMilliseconds":  1194,
+                       "workingSetBytes":  336617472,
+                       "peakWorkingSetBytes":  354390016
                    },
                    {
                        "action":  "unlock",
                        "status":  "pdf-locked: Password required. Enter the PDF password and choose Unlock PDF.",
-                       "page":  "page 1/1; zoom 1.00 fit width; fraction 0.00; width 704/704; cache 5.5 MiB in 1 pages (peak 5.5); open 0 ms; render 31 ms; restore none.",
+                       "page":  "page 1/1; zoom 1.00 fit width; fraction 0.00; width 704/704; cache 5.5 MiB in 1 pages (peak 5.5); open 0 ms; render 30 ms; restore none.",
                        "image":  "Rendered image of PDF page 1 of 1",
                        "imageHasTextPattern":  false,
                        "taggedTextInAutomation":  false,
                        "marker":  null,
                        "realizedListItems":  0,
-                       "elapsedMilliseconds":  1469,
-                       "workingSetBytes":  370270208,
-                       "peakWorkingSetBytes":  371798016
+                       "elapsedMilliseconds":  1641,
+                       "workingSetBytes":  344567808,
+                       "peakWorkingSetBytes":  354390016
                    }
                ]
 }

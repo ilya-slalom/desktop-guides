@@ -1,80 +1,83 @@
 ﻿{
     "fixture":  "pdf-short",
-    "observedAt":  "2026-09-25T08:59:33.9716013Z",
+    "observedAt":  "2026-09-25T09:18:52.3098449Z",
     "osBuild":  "10.0.26200.0",
     "cpuArchitecture":  "ARM64",
-    "processWorkingSetBytes":  305192960,
-    "processPeakWorkingSetBytes":  307732480,
+    "processWorkingSetBytes":  310603776,
+    "processPeakWorkingSetBytes":  312868864,
     "passwordEntryMode":  null,
     "openToVisibleMilliseconds":  null,
     "scrollCallsMilliseconds":  [
 
                                 ],
+    "uiResponseMaxMilliseconds":  null,
+    "uiResponseSamples":  null,
+    "uiResponseTimeouts":  null,
     "phases":  [
                    {
                        "action":  "open",
-                       "status":  "pdf-short: page 1/2; zoom 1.00 fit width; fraction 0.00; width 704/704; cache 5.5 MiB in 1 pages (peak 5.5); open 683 ms; render 206 ms; restore none.",
-                       "page":  "page 1/2; zoom 1.00 fit width; fraction 0.00; width 704/704; cache 8.8 MiB in 2 pages (peak 8.8); open 683 ms; render 206 ms; restore none.",
+                       "status":  "pdf-short: page 1/2; zoom 1.00 fit width; fraction 0.00; width 704/704; cache 5.5 MiB in 1 pages (peak 5.5); open 797 ms; render 229 ms; restore none.",
+                       "page":  "page 1/2; zoom 1.00 fit width; fraction 0.00; width 704/704; cache 8.8 MiB in 2 pages (peak 8.8); open 797 ms; render 229 ms; restore none.",
                        "image":  "Rendered image of PDF page 1 of 2",
                        "imageHasTextPattern":  false,
                        "taggedTextInAutomation":  false,
                        "marker":  null,
                        "realizedListItems":  0,
-                       "elapsedMilliseconds":  1376,
-                       "workingSetBytes":  293523456,
-                       "peakWorkingSetBytes":  293523456
+                       "elapsedMilliseconds":  1351,
+                       "workingSetBytes":  297132032,
+                       "peakWorkingSetBytes":  297132032
                    },
                    {
                        "action":  "capture",
-                       "status":  "Position captured. page 1/2; zoom 1.00 fit width; fraction 0.00; width 704/704; cache 8.8 MiB in 2 pages (peak 8.8); open 683 ms; render 206 ms; restore none.",
-                       "page":  "page 1/2; zoom 1.00 fit width; fraction 0.00; width 704/704; cache 8.8 MiB in 2 pages (peak 8.8); open 683 ms; render 206 ms; restore none.",
+                       "status":  "Position captured. page 1/2; zoom 1.00 fit width; fraction 0.00; width 704/704; cache 8.8 MiB in 2 pages (peak 8.8); open 797 ms; render 229 ms; restore none.",
+                       "page":  "page 1/2; zoom 1.00 fit width; fraction 0.00; width 704/704; cache 8.8 MiB in 2 pages (peak 8.8); open 797 ms; render 229 ms; restore none.",
                        "image":  "Rendered image of PDF page 1 of 2",
                        "imageHasTextPattern":  false,
                        "taggedTextInAutomation":  false,
                        "marker":  null,
                        "realizedListItems":  0,
-                       "elapsedMilliseconds":  1691,
-                       "workingSetBytes":  291749888,
-                       "peakWorkingSetBytes":  293675008
+                       "elapsedMilliseconds":  1668,
+                       "workingSetBytes":  297439232,
+                       "peakWorkingSetBytes":  297439232
                    },
                    {
                        "action":  "resize",
-                       "status":  "Position captured. page 1/2; zoom 1.00 fit width; fraction 0.00; width 704/704; cache 8.8 MiB in 2 pages (peak 8.8); open 683 ms; render 206 ms; restore none.",
-                       "page":  "page 1/2; zoom 1.00 fit width; fraction 0.00; width 586/586; cache 14.9 MiB in 4 pages (peak 14.9); open 683 ms; render 20 ms; restore none.",
+                       "status":  "Position captured. page 1/2; zoom 1.00 fit width; fraction 0.00; width 704/704; cache 8.8 MiB in 2 pages (peak 8.8); open 797 ms; render 229 ms; restore none.",
+                       "page":  "page 1/2; zoom 1.00 fit width; fraction 0.00; width 586/586; cache 14.9 MiB in 4 pages (peak 14.9); open 797 ms; render 21 ms; restore none.",
                        "image":  "Rendered image of PDF page 1 of 2",
                        "imageHasTextPattern":  false,
                        "taggedTextInAutomation":  false,
                        "marker":  null,
                        "realizedListItems":  0,
-                       "elapsedMilliseconds":  2517,
-                       "workingSetBytes":  298340352,
-                       "peakWorkingSetBytes":  299720704
+                       "elapsedMilliseconds":  2501,
+                       "workingSetBytes":  302006272,
+                       "peakWorkingSetBytes":  305381376
                    },
                    {
                        "action":  "zoom",
-                       "status":  "page 1/2; zoom 1.10 fit width; fraction 0.00; width 645/586; cache 19.5 MiB in 5 pages (peak 19.5); open 683 ms; render 24 ms; restore none.",
-                       "page":  "page 1/2; zoom 1.10 fit width; fraction 0.00; width 645/586; cache 22.3 MiB in 6 pages (peak 22.3); open 683 ms; render 24 ms; restore none.",
+                       "status":  "page 1/2; zoom 1.10 fit width; fraction 0.00; width 645/586; cache 19.5 MiB in 5 pages (peak 19.5); open 797 ms; render 24 ms; restore none.",
+                       "page":  "page 1/2; zoom 1.10 fit width; fraction 0.00; width 645/586; cache 22.3 MiB in 6 pages (peak 22.3); open 797 ms; render 24 ms; restore none.",
                        "image":  "Rendered image of PDF page 1 of 2",
                        "imageHasTextPattern":  false,
                        "taggedTextInAutomation":  false,
                        "marker":  null,
                        "realizedListItems":  0,
-                       "elapsedMilliseconds":  2822,
-                       "workingSetBytes":  304697344,
-                       "peakWorkingSetBytes":  307732480
+                       "elapsedMilliseconds":  2812,
+                       "workingSetBytes":  311672832,
+                       "peakWorkingSetBytes":  312868864
                    },
                    {
                        "action":  "restore",
-                       "status":  "Position restored. page 1/2; zoom 1.10 fit width; fraction 0.00; width 645/586; cache 22.3 MiB in 6 pages (peak 22.3); open 683 ms; render 0 ms; restore exact page.",
-                       "page":  "page 1/2; zoom 1.10 fit width; fraction 0.00; width 645/586; cache 22.3 MiB in 6 pages (peak 22.3); open 683 ms; render 0 ms; restore exact page.",
+                       "status":  "Position restored. page 1/2; zoom 1.10 fit width; fraction 0.00; width 645/586; cache 22.3 MiB in 6 pages (peak 22.3); open 797 ms; render 0 ms; restore exact page.",
+                       "page":  "page 1/2; zoom 1.10 fit width; fraction 0.00; width 645/586; cache 22.3 MiB in 6 pages (peak 22.3); open 797 ms; render 0 ms; restore exact page.",
                        "image":  "Rendered image of PDF page 1 of 2",
                        "imageHasTextPattern":  false,
                        "taggedTextInAutomation":  false,
                        "marker":  null,
                        "realizedListItems":  0,
-                       "elapsedMilliseconds":  3138,
-                       "workingSetBytes":  304873472,
-                       "peakWorkingSetBytes":  307732480
+                       "elapsedMilliseconds":  3131,
+                       "workingSetBytes":  310247424,
+                       "peakWorkingSetBytes":  312868864
                    }
                ]
 }

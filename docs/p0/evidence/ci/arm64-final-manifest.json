@@ -1,5 +1,5 @@
 {
-  "commit": "a9bdd212f1935e7485bf55c1e201bacf05f04aa2",
+  "commit": "33f6ac082f88b28b2d4cb0175f3dfc043bd79fc7",
   "architecture": "ARM64",
   "runnerImage": "win25-vs2026 20260922.246.2",
   "osBuild": "10.0.26100.0",
@@ -17,6 +17,6 @@
   ],
   "package": "DesktopGuides.App_0.1.0.0_arm64.msix",
   "packageVersion": "0.1.0.0",
-  "packageBytes": 62571484,
-  "packageSha256": "4CF9A62B68A94E1B8D7981669A84CCE77197395D531EEAD4D71855A36B514304"
+  "packageBytes": 62571386,
+  "packageSha256": "CC31F474C22AE783E714B0C2C53F8E58438DC2A0229836EBBB9F13789D8BFE06"
 }

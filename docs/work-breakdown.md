@@ -1,7 +1,7 @@
 # Desktop Guides: work breakdown
 
 Status: P0 verified on the available Windows 11 x64 host, with the clean-VM
-prerequisite gate still open, 25 September 2026. Source:
+prerequisite gate deferred by the user, 25 September 2026. Source:
 [initial requirements and high-level design](initial-design.md). The backlog
 defines the acceptance gates; [Windows results](p0/results.md) record
 which checks have been performed. Windows 10 is deferred; native ARM64 CI
