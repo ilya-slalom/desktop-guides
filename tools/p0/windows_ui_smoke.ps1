@@ -22,7 +22,6 @@ trap {
 }
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
-Add-Type -AssemblyName System.Windows.Forms
 Add-Type @'
 using System;
 using System.Runtime.InteropServices;
@@ -75,6 +74,19 @@ function Invoke-Button([string] $name) {
     }
     $pattern = $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
     $pattern.Invoke()
+}
+
+function Enter-Password(
+    [System.Windows.Automation.AutomationElement] $box,
+    [string] $password
+) {
+    $value = $null
+    if (-not $box.TryGetCurrentPattern(
+            [System.Windows.Automation.ValuePattern]::Pattern, [ref] $value) -or
+        $value.Current.IsReadOnly) {
+        throw 'The PDF password field has no writable UI Automation ValuePattern.'
+    }
+    $value.SetValue($password)
 }
 
 function Status {
@@ -323,8 +335,7 @@ elseif ($FixtureId -like 'pdf-*') {
         if ($null -eq $box) {
             throw 'Password field is unavailable.'
         }
-        $box.SetFocus()
-        [System.Windows.Forms.SendKeys]::SendWait('wrong')
+        Enter-Password $box 'wrong'
         Invoke-Button 'Unlock PDF'
         $deadline = (Get-Date).AddSeconds(10)
         do {
@@ -336,8 +347,7 @@ elseif ($FixtureId -like 'pdf-*') {
             throw "Wrong password did not return an error: $wrongStatus"
         }
         Record-Phase 'wrong-password'
-        $box.SetFocus()
-        [System.Windows.Forms.SendKeys]::SendWait('guide')
+        Enter-Password $box 'guide'
         Invoke-Button 'Unlock PDF'
         Wait-Page 1
         Record-Phase 'unlock'
@@ -420,6 +430,9 @@ $result = [ordered] @{
     cpuArchitecture = $env:PROCESSOR_ARCHITECTURE
     processWorkingSetBytes = $process.WorkingSet64
     processPeakWorkingSetBytes = $process.PeakWorkingSet64
+    passwordEntryMode = if ($FixtureId -eq 'pdf-locked') {
+        'UI Automation ValuePattern'
+    } else { $null }
     openToVisibleMilliseconds = $openToVisibleMilliseconds
     scrollCallsMilliseconds = $scrollCalls
     phases = $phases
