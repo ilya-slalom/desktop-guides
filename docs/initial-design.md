@@ -1,7 +1,8 @@
 # Desktop Guides: initial requirements and high-level design
 
-Status: proposal, 25 September 2026. This document describes an initial product
-scope and architecture; it is not an implementation specification.
+Status: product scope updated after the P0 merge on 25 September 2026. This
+document describes the high-level product and architecture; the [P1 technical
+design](p1-technical-design.md) is the implementation specification.
 
 ## 1. Product intent and assumptions
 
@@ -47,7 +48,7 @@ or to match every feature.
 | R5 | Resume accurately | Reopen each guide near its last visible position after closing the guide, restarting the app, changing window size, or changing text size. |
 | R6 | Track completion | Show approximate read percentage and allow `Mark complete` / `Mark in progress` independently of the saved position. |
 | R7 | Basic reader controls | Provide previous/next page or scroll, jump to location where appropriate, a remembered TXT/HTML font size per guide, a light/dark reading theme, and PDF fit-to-width. Preserve TXT whitespace for ASCII maps and diagrams. |
-| R8 | Library integrity | A failed import leaves no half-created guide; removing a guide requires confirmation and removes its managed copy and reading state. |
+| R8 | Library integrity | A failed import leaves no half-created guide; removing a guide requires confirmation and removes its managed copy and reading state. A user-initiated backup saved outside app data can restore the managed library after uninstall or machine loss. |
 | R9 | Windows usability | Support mouse, keyboard, touch, scaling, high contrast, labeled controls, and clear focus order. TXT and HTML text should be screen-reader readable; validate PDF text accessibility during the reader spike. Show an actionable message if a needed runtime is missing. |
 
 ### Later candidates, in priority order
@@ -62,7 +63,6 @@ or to match every feature.
    lawful offline capture, controller shortcuts, multi-window reading,
    annotations, and optional device sync. Each online source
    needs a separate terms, attribution, and failure-handling review.
-   Prioritize a manual backup/export before sync.
 
 ## 3. Key user flows and UI
 
@@ -70,6 +70,8 @@ The WinUI 3 shell uses a `NavigationView` with a **Library** destination and a
 settings entry. The library offers a game list/grid, title search, and an
 `Add game` action. A game detail view shows its guides with format, reading
 percentage, completion state, and `Import guide`.
+Settings offers manual library export and restore. After the first import, the
+app explains that uninstall removes its live library and points to Export.
 
 Opening a guide shows a reader with a compact top bar (game and guide title,
 back, appearance controls, and `Mark complete`) and a collapsible navigation
@@ -133,7 +135,7 @@ stage files before one database transaction publishes a new guide.
 | --- | --- | --- | --- |
 | TXT | Decode into a normalized text model and render through a bounded/virtualized native WinUI text view. Preserve fixed-width layout by default. Offer an encoding choice when detection is uncertain. | Character offset in normalized text plus a small surrounding text fingerprint. | Smart reflow and reliable automatic section detection need separate work. |
 | HTML | Render a managed local copy in WinUI 3 `WebView2`; retain supported relative images/CSS. The host reads the current visible element/text position through controlled DOM calls. | Document-relative path, element/text context, and offset; scroll ratio as fallback. | Dynamic scripts and remote resources are outside the offline MVP. Some live-site layouts may look different. |
-| PDF | Use `Windows.Data.Pdf` to render pages into a WinUI viewer with page caching, fit-to-width, and zoom. | Zero-based page index plus fractional vertical offset within the page. | This API renders page images. PDF text selection, search, and screen-reader access to document text require a different or additional text-capable engine. |
+| PDF | Retain the P0 `Windows.Data.Pdf` page preview only while P1 validates a text-capable path; do not ship a raster-only PDF reader as complete. | Zero-based page index plus fractional vertical offset within the page. | The P0 page image exposed no tagged document text to UI Automation. S10 requires a tested accessible text path. |
 
 For HTML, treat every imported document as untrusted. Disable document
 JavaScript, host objects, web messages, and unneeded browser features. Allow
@@ -173,22 +175,20 @@ percentage is an estimate for display, not a source of truth for completion.
 
 | Stage | Deliverable | Exit check |
 | --- | --- | --- |
-| 0. Reader spike | Small WinUI 3 project opening one sample of each format | Confirm TXT whitespace/large-file behavior, HTML offline assets and safe DOM location capture, PDF page rendering and resume, PDF document accessibility needs, plus clean-machine runtime setup. |
-| 1. MVP | Library, import, three readers, resume, completion toggle, settings, and packaged build | Reopen position across restarts and layout changes; imported guides work offline; failed imports leave no partial records; keyboard, controls, and TXT/HTML accessibility pass a manual check. |
-| 2. Reader depth | Search, TOCs, bookmarks, TXT reflow, manual backup/export, and additional formats | Format-specific tests include ASCII art, varied old TXT encodings, large HTML, image assets, and long PDFs; a backup can be restored into a clean library. |
+| 0. Reader spike | Small WinUI 3 project opening one sample of each format | TXT whitespace/large-file behavior, HTML offline assets and safe DOM location, and PDF page preview were measured. The clean-machine prerequisite check was deferred. |
+| 1. MVP | Library, import, three readers, resume, completion toggle, backup/restore, settings, and packaged build | Reopen position across restarts and layout changes; imported guides work offline; failed imports leave no partial records; a backup restores into a clean library; keyboard, controls, and TXT/HTML accessibility pass a manual check; tagged PDF text access passes the selected engine gate. |
+| 2. Reader depth | Search, TOCs, bookmarks, TXT reflow, and additional formats | Format-specific tests include ASCII art, varied old TXT encodings, large HTML, image assets, and long PDFs. |
 | 3. Connected features | Optional discovery, downloads, sync, and integrations | Preserve local-first behavior, review source rights/terms, and define conflict recovery before sync ships. |
 
-## 6. Decisions to validate during the spike
+## 6. P0 decisions carried into P1
 
-1. Can the native TXT view keep navigation smooth for very large legacy guides
-   while maintaining a stable character anchor?
-2. Does static HTML with disabled page scripts cover the guides users actually
-   import? If not, define an explicitly trusted mode instead of silently
-   allowing active content.
-3. Is page-rendered PDF sufficient for the first release, or do PDF text
-   accessibility, selection, and search call for a text-capable engine immediately?
-4. Should the initial release include a manual library export/backup before
-   introducing any sync mechanism?
+The [P0 reader decisions](p0/reader-decisions.md) selected a native virtualized
+TXT view and restricted static WebView2 HTML. The raster PDF probe did not
+expose tagged document text, so P1 must validate a text-capable path before
+S10 and the first release can be complete. Manual backup/restore moved into
+P1 because managed copies in package local data would otherwise be lost on
+uninstall after the original source is removed. Dynamic sites, OCR, sync, and
+extra formats remain outside the first release.
 
 ## Sources
 

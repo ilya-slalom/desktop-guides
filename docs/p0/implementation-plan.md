@@ -1,6 +1,6 @@
 # P0 implementation plan and exit gates
 
-Status: available Windows 11 x64 work verified on 25 September 2026; native Windows 11 ARM64 Core and installed UI fixtures also passed in CI. The user deferred the clean-machine absent-prerequisite gate because the available x64 host has Windows App Runtime and WebView2 installed and no disposable VM is enabled. Windows 10 x64 is also deferred. The [technical design](../p0-technical-design.md), [results](results.md) and [reader decisions](reader-decisions.md) explain the evidence and limits.
+Status: P0 merged into `main` in [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1) on 25 September 2026. Available Windows 11 x64 work was verified; native Windows 11 ARM64 Core and installed UI fixtures also passed in CI. The user deferred the clean-machine absent-prerequisite gate because the available x64 host has Windows App Runtime and WebView2 installed and no disposable VM is enabled. Windows 10 x64 is also deferred. The [technical design](../p0-technical-design.md), [results](results.md), [reader decisions](reader-decisions.md), and [project progress](../progress.md) explain the evidence and limits.
 
 The macOS repository is the source checkout. Windows verification uses `E:\work\desktop-guides` on `pcsx2-win`. Copy source there before each build or UI run.
 
