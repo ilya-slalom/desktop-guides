@@ -1,0 +1,118 @@
+﻿{
+    "fixture":  "html-hostile",
+    "observedAt":  "2026-09-25T07:59:34.5714445Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "AMD64",
+    "processWorkingSetBytes":  170987520,
+    "processPeakWorkingSetBytes":  170987520,
+    "openToVisibleMilliseconds":  null,
+    "scrollCallsMilliseconds":  [
+
+                                ],
+    "phases":  [
+                   {
+                       "action":  "open",
+                       "status":  "html-hostile: assets 2, blocked 1, popups 0; open 1359 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  1889,
+                       "workingSetBytes":  168820736,
+                       "peakWorkingSetBytes":  168820736
+                   },
+                   {
+                       "action":  "try-links",
+                       "status":  "html-hostile: assets 2, blocked 1, popups 0; open 1359 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2193,
+                       "workingSetBytes":  169426944,
+                       "peakWorkingSetBytes":  169426944
+                   },
+                   {
+                       "action":  "jump",
+                       "status":  "html-hostile: assets 2, blocked 1, popups 0; open 1359 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "Marker: ",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2486,
+                       "workingSetBytes":  169545728,
+                       "peakWorkingSetBytes":  169545728
+                   },
+                   {
+                       "action":  "capture",
+                       "status":  "Position captured. assets 2, blocked 3, popups 1; open 1359 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "Marker: ",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2767,
+                       "workingSetBytes":  170221568,
+                       "peakWorkingSetBytes":  170221568
+                   },
+                   {
+                       "action":  "top",
+                       "status":  "Position captured. assets 2, blocked 3, popups 1; open 1359 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "At top.",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  3046,
+                       "workingSetBytes":  170446848,
+                       "peakWorkingSetBytes":  170446848
+                   },
+                   {
+                       "action":  "resize",
+                       "status":  "Position captured. assets 2, blocked 3, popups 1; open 1359 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "At top.",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  3852,
+                       "workingSetBytes":  170602496,
+                       "peakWorkingSetBytes":  170602496
+                   },
+                   {
+                       "action":  "larger",
+                       "status":  "assets 2, blocked 3, popups 1; open 1359 ms; zoom 1.10; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "At top.",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  4132,
+                       "workingSetBytes":  170704896,
+                       "peakWorkingSetBytes":  170704896
+                   },
+                   {
+                       "action":  "restore",
+                       "status":  "Position restored. assets 2, blocked 3, popups 1; open 1359 ms; zoom 1.10; restore text context.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "Restored text context: ",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  4429,
+                       "workingSetBytes":  170987520,
+                       "peakWorkingSetBytes":  170987520
+                   }
+               ]
+}

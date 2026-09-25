@@ -1,0 +1,13 @@
+{
+  "observedAtUtc": "2026-09-25T07:59:44Z",
+  "osBuild": "10.0.26200.0",
+  "architecture": "x64",
+  "server": "127.0.0.1:8765",
+  "healthRequestStatus": 204,
+  "fixtures": ["html-hostile", "redirect"],
+  "guideRequestsLogged": 0,
+  "canaryLogBytes": 0,
+  "htmlHostileBlockedRequests": 3,
+  "htmlHostileBlockedPopups": 1,
+  "redirectBlockedRequests": 3
+}

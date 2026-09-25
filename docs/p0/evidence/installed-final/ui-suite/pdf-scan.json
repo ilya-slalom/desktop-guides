@@ -1,0 +1,79 @@
+﻿{
+    "fixture":  "pdf-scan",
+    "observedAt":  "2026-09-25T08:31:12.1691513Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "AMD64",
+    "processWorkingSetBytes":  674549760,
+    "processPeakWorkingSetBytes":  717422592,
+    "openToVisibleMilliseconds":  null,
+    "scrollCallsMilliseconds":  [
+
+                                ],
+    "phases":  [
+                   {
+                       "action":  "open",
+                       "status":  "pdf-scan: page 1/1; zoom 1.00 fit width; fraction 0.00; width 1856/1856; cache 38.3 MiB in 1 pages (peak 38.3); open 137 ms; render 132 ms; restore none.",
+                       "page":  "page 1/1; zoom 1.00 fit width; fraction 0.00; width 1856/1856; cache 38.3 MiB in 1 pages (peak 38.3); open 137 ms; render 132 ms; restore none.",
+                       "image":  "Rendered image of PDF page 1 of 1",
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  676,
+                       "workingSetBytes":  667320320,
+                       "peakWorkingSetBytes":  717422592
+                   },
+                   {
+                       "action":  "capture",
+                       "status":  "Position captured. page 1/1; zoom 1.00 fit width; fraction 0.00; width 1856/1856; cache 38.3 MiB in 1 pages (peak 38.3); open 137 ms; render 132 ms; restore none.",
+                       "page":  "page 1/1; zoom 1.00 fit width; fraction 0.00; width 1856/1856; cache 38.3 MiB in 1 pages (peak 38.3); open 137 ms; render 132 ms; restore none.",
+                       "image":  "Rendered image of PDF page 1 of 1",
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  978,
+                       "workingSetBytes":  667414528,
+                       "peakWorkingSetBytes":  717422592
+                   },
+                   {
+                       "action":  "resize",
+                       "status":  "Position captured. page 1/1; zoom 1.00 fit width; fraction 0.00; width 1856/1856; cache 38.3 MiB in 1 pages (peak 38.3); open 137 ms; render 132 ms; restore none.",
+                       "page":  "page 1/1; zoom 1.00 fit width; fraction 0.00; width 1606/1606; cache 66.9 MiB in 2 pages (peak 66.9); open 137 ms; render 103 ms; restore none.",
+                       "image":  "Rendered image of PDF page 1 of 1",
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  1801,
+                       "workingSetBytes":  667652096,
+                       "peakWorkingSetBytes":  717422592
+                   },
+                   {
+                       "action":  "zoom",
+                       "status":  "page 1/1; zoom 1.10 fit width; fraction 0.00; width 1767/1606; cache 63.3 MiB in 2 pages (peak 66.9); open 137 ms; render 122 ms; restore none.",
+                       "page":  "page 1/1; zoom 1.10 fit width; fraction 0.00; width 1767/1606; cache 63.3 MiB in 2 pages (peak 66.9); open 137 ms; render 122 ms; restore none.",
+                       "image":  "Rendered image of PDF page 1 of 1",
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2096,
+                       "workingSetBytes":  674496512,
+                       "peakWorkingSetBytes":  717422592
+                   },
+                   {
+                       "action":  "restore",
+                       "status":  "Position restored. page 1/1; zoom 1.10 fit width; fraction 0.00; width 1767/1606; cache 63.3 MiB in 2 pages (peak 66.9); open 137 ms; render 0 ms; restore exact page.",
+                       "page":  "page 1/1; zoom 1.10 fit width; fraction 0.00; width 1767/1606; cache 63.3 MiB in 2 pages (peak 66.9); open 137 ms; render 0 ms; restore exact page.",
+                       "image":  "Rendered image of PDF page 1 of 1",
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2405,
+                       "workingSetBytes":  674525184,
+                       "peakWorkingSetBytes":  717422592
+                   }
+               ]
+}

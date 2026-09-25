@@ -1,0 +1,54 @@
+﻿{
+    "fixture":  "pdf-locked",
+    "observedAt":  "2026-09-25T08:53:45.8908305Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "AMD64",
+    "processWorkingSetBytes":  232402944,
+    "processPeakWorkingSetBytes":  271839232,
+    "passwordEntryMode":  "UI Automation ValuePattern",
+    "openToVisibleMilliseconds":  null,
+    "scrollCallsMilliseconds":  [
+
+                                ],
+    "phases":  [
+                   {
+                       "action":  "open",
+                       "status":  "pdf-locked: Password required. Enter the PDF password and choose Unlock PDF.",
+                       "page":  "Password required. Enter the PDF password and choose Unlock PDF.",
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  851,
+                       "workingSetBytes":  170549248,
+                       "peakWorkingSetBytes":  170549248
+                   },
+                   {
+                       "action":  "wrong-password",
+                       "status":  "pdf-locked: Password required. Enter the PDF password and choose Unlock PDF.",
+                       "page":  "Could not unlock PDF. Check the password or file, then try again.",
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  1185,
+                       "workingSetBytes":  172621824,
+                       "peakWorkingSetBytes":  172621824
+                   },
+                   {
+                       "action":  "unlock",
+                       "status":  "pdf-locked: Password required. Enter the PDF password and choose Unlock PDF.",
+                       "page":  "page 1/1; zoom 1.00 fit width; fraction 0.00; width 1856/1856; cache 38.3 MiB in 1 pages (peak 38.3); open 0 ms; render 168 ms; restore none.",
+                       "image":  "Rendered image of PDF page 1 of 1",
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  1763,
+                       "workingSetBytes":  232402944,
+                       "peakWorkingSetBytes":  271839232
+                   }
+               ]
+}

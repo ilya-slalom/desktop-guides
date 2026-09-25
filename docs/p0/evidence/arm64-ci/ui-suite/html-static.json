@@ -1,0 +1,109 @@
+﻿{
+    "fixture":  "html-static",
+    "observedAt":  "2026-09-25T09:18:34.8267570Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "ARM64",
+    "processWorkingSetBytes":  250261504,
+    "processPeakWorkingSetBytes":  250585088,
+    "passwordEntryMode":  null,
+    "openToVisibleMilliseconds":  null,
+    "scrollCallsMilliseconds":  [
+
+                                ],
+    "uiResponseMaxMilliseconds":  null,
+    "uiResponseSamples":  null,
+    "uiResponseTimeouts":  null,
+    "phases":  [
+                   {
+                       "action":  "open",
+                       "status":  "html-static: assets 4, blocked 1, popups 0; open 731 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  1386,
+                       "workingSetBytes":  249167872,
+                       "peakWorkingSetBytes":  250490880
+                   },
+                   {
+                       "action":  "jump",
+                       "status":  "html-static: assets 4, blocked 1, popups 0; open 731 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "Marker: boss",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  1713,
+                       "workingSetBytes":  249413632,
+                       "peakWorkingSetBytes":  250490880
+                   },
+                   {
+                       "action":  "capture",
+                       "status":  "Position captured. assets 4, blocked 1, popups 0; open 731 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "Marker: boss",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2009,
+                       "workingSetBytes":  249409536,
+                       "peakWorkingSetBytes":  250490880
+                   },
+                   {
+                       "action":  "top",
+                       "status":  "Position captured. assets 4, blocked 1, popups 0; open 731 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "At top.",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2316,
+                       "workingSetBytes":  249466880,
+                       "peakWorkingSetBytes":  250490880
+                   },
+                   {
+                       "action":  "resize",
+                       "status":  "Position captured. assets 4, blocked 1, popups 0; open 731 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "At top.",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  3140,
+                       "workingSetBytes":  250519552,
+                       "peakWorkingSetBytes":  250519552
+                   },
+                   {
+                       "action":  "larger",
+                       "status":  "assets 4, blocked 1, popups 0; open 731 ms; zoom 1.10; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "At top.",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  3457,
+                       "workingSetBytes":  250122240,
+                       "peakWorkingSetBytes":  250585088
+                   },
+                   {
+                       "action":  "restore",
+                       "status":  "Position restored. assets 4, blocked 1, popups 0; open 731 ms; zoom 1.10; restore element.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "Restored element: boss",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  3770,
+                       "workingSetBytes":  249987072,
+                       "peakWorkingSetBytes":  250585088
+                   }
+               ]
+}

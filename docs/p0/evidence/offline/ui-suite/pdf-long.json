@@ -1,0 +1,131 @@
+﻿{
+    "fixture":  "pdf-long",
+    "observedAt":  "2026-09-25T08:03:53.9948637Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "AMD64",
+    "processWorkingSetBytes":  627888128,
+    "processPeakWorkingSetBytes":  642166784,
+    "openToVisibleMilliseconds":  null,
+    "scrollCallsMilliseconds":  [
+
+                                ],
+    "phases":  [
+                   {
+                       "action":  "open",
+                       "status":  "pdf-long: page 1/200; zoom 1.00 fit width; fraction 0.00; width 1856/1856; cache 38.3 MiB in 1 pages (peak 38.3); open 124 ms; render 119 ms; restore none.",
+                       "page":  "page 1/200; zoom 1.00 fit width; fraction 0.00; width 1856/1856; cache 61.1 MiB in 2 pages (peak 61.1); open 124 ms; render 119 ms; restore none.",
+                       "image":  "Rendered image of PDF page 1 of 200",
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  667,
+                       "workingSetBytes":  495591424,
+                       "peakWorkingSetBytes":  511356928
+                   },
+                   {
+                       "action":  "rapid-next",
+                       "status":  "pdf-long: page 1/200; zoom 1.00 fit width; fraction 0.00; width 1856/1856; cache 38.3 MiB in 1 pages (peak 38.3); open 124 ms; render 119 ms; restore none.",
+                       "page":  "page 6/200; zoom 1.00 fit width; fraction 0.00; width 1856/1856; cache 84.0 MiB in 3 pages (peak 84.0); open 124 ms; render 457 ms; restore none.",
+                       "image":  "Rendered image of PDF page 6 of 200",
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  1547,
+                       "workingSetBytes":  421994496,
+                       "peakWorkingSetBytes":  642166784
+                   },
+                   {
+                       "action":  "scroll-page",
+                       "status":  "pdf-long: page 1/200; zoom 1.00 fit width; fraction 0.00; width 1856/1856; cache 38.3 MiB in 1 pages (peak 38.3); open 124 ms; render 119 ms; restore none.",
+                       "page":  "page 6/200; zoom 1.00 fit width; fraction 0.33; width 1856/1856; cache 84.0 MiB in 3 pages (peak 84.0); open 124 ms; render 457 ms; restore none.",
+                       "image":  "Rendered image of PDF page 6 of 200",
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  1838,
+                       "workingSetBytes":  422047744,
+                       "peakWorkingSetBytes":  642166784
+                   },
+                   {
+                       "action":  "capture",
+                       "status":  "Position captured. page 6/200; zoom 1.00 fit width; fraction 0.33; width 1856/1856; cache 84.0 MiB in 3 pages (peak 84.0); open 124 ms; render 457 ms; restore none.",
+                       "page":  "page 6/200; zoom 1.00 fit width; fraction 0.33; width 1856/1856; cache 84.0 MiB in 3 pages (peak 84.0); open 124 ms; render 457 ms; restore none.",
+                       "image":  "Rendered image of PDF page 6 of 200",
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2135,
+                       "workingSetBytes":  422187008,
+                       "peakWorkingSetBytes":  642166784
+                   },
+                   {
+                       "action":  "resize",
+                       "status":  "Position captured. page 6/200; zoom 1.00 fit width; fraction 0.33; width 1856/1856; cache 84.0 MiB in 3 pages (peak 84.0); open 124 ms; render 457 ms; restore none.",
+                       "page":  "page 6/200; zoom 1.00 fit width; fraction 0.28; width 1606/1606; cache 84.0 MiB in 3 pages (peak 84.0); open 124 ms; render 61 ms; restore none.",
+                       "image":  "Rendered image of PDF page 6 of 200",
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2951,
+                       "workingSetBytes":  470454272,
+                       "peakWorkingSetBytes":  642166784
+                   },
+                   {
+                       "action":  "zoom",
+                       "status":  "page 6/200; zoom 1.10 fit width; fraction 0.25; width 1767/1606; cache 66.5 MiB in 3 pages (peak 84.0); open 124 ms; render 71 ms; restore none.",
+                       "page":  "page 6/200; zoom 1.10 fit width; fraction 0.28; width 1767/1606; cache 84.0 MiB in 3 pages (peak 84.0); open 124 ms; render 71 ms; restore none.",
+                       "image":  "Rendered image of PDF page 6 of 200",
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  3247,
+                       "workingSetBytes":  529334272,
+                       "peakWorkingSetBytes":  642166784
+                   },
+                   {
+                       "action":  "previous",
+                       "status":  "page 6/200; zoom 1.10 fit width; fraction 0.25; width 1767/1606; cache 66.5 MiB in 3 pages (peak 84.0); open 124 ms; render 71 ms; restore none.",
+                       "page":  "page 5/200; zoom 1.10 fit width; fraction 0.00; width 1767/1606; cache 90.1 MiB in 3 pages (peak 90.1); open 124 ms; render 116 ms; restore none.",
+                       "image":  "Rendered image of PDF page 5 of 200",
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  3682,
+                       "workingSetBytes":  565624832,
+                       "peakWorkingSetBytes":  642166784
+                   },
+                   {
+                       "action":  "restore",
+                       "status":  "Position restored. page 6/200; zoom 1.10 fit width; fraction 0.00; width 1767/1606; cache 90.1 MiB in 3 pages (peak 90.1); open 124 ms; render 0 ms; restore exact page.",
+                       "page":  "page 6/200; zoom 1.10 fit width; fraction 0.31; width 1767/1606; cache 90.1 MiB in 3 pages (peak 90.1); open 124 ms; render 0 ms; restore exact page.",
+                       "image":  "Rendered image of PDF page 6 of 200",
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  3984,
+                       "workingSetBytes":  565788672,
+                       "peakWorkingSetBytes":  642166784
+                   },
+                   {
+                       "action":  "repeated-turns",
+                       "status":  "Position restored. page 6/200; zoom 1.10 fit width; fraction 0.00; width 1767/1606; cache 90.1 MiB in 3 pages (peak 90.1); open 124 ms; render 0 ms; restore exact page.",
+                       "page":  "page 6/200; zoom 1.10 fit width; fraction 0.00; width 1767/1606; cache 90.1 MiB in 3 pages (peak 90.1); open 124 ms; render 0 ms; restore exact page.",
+                       "image":  "Rendered image of PDF page 6 of 200",
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  4335,
+                       "workingSetBytes":  627851264,
+                       "peakWorkingSetBytes":  642166784
+                   }
+               ]
+}

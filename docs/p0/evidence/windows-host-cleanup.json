@@ -1,0 +1,26 @@
+{
+    "observedAt":  "2026-09-25T09:13:03.1500166Z",
+    "osBuild":  "10.0.26200.0",
+    "p0Tasks":  [
+
+                ],
+    "appProcesses":  [
+
+                     ],
+    "notepadProcesses":  [
+
+                         ],
+    "appPackages":  [
+
+                    ],
+    "testTrustCertificates":  [
+
+                              ],
+    "privateTestCertificates":  [
+
+                                ],
+    "narratorProcesses":  [
+
+                          ],
+    "wifi2Status":  "Up"
+}

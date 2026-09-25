@@ -1,0 +1,99 @@
+﻿{
+    "fixture":  "txt-long",
+    "observedAt":  "2026-09-25T08:03:31.9435370Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "AMD64",
+    "processWorkingSetBytes":  248279040,
+    "processPeakWorkingSetBytes":  248434688,
+    "openToVisibleMilliseconds":  934,
+    "scrollCallsMilliseconds":  [
+                                    2,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    0
+                                ],
+    "phases":  [
+                   {
+                       "action":  "open",
+                       "status":  "txt-long: 197845 lines; first visible 0; 0 realized visuals; prepare 52 ms; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  72,
+                       "elapsedMilliseconds":  820,
+                       "workingSetBytes":  247615488,
+                       "peakWorkingSetBytes":  247615488
+                   },
+                   {
+                       "action":  "scroll",
+                       "status":  "txt-long: 197845 lines; first visible 0; 0 realized visuals; prepare 52 ms; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  98,
+                       "elapsedMilliseconds":  1494,
+                       "workingSetBytes":  247013376,
+                       "peakWorkingSetBytes":  248328192
+                   },
+                   {
+                       "action":  "capture",
+                       "status":  "Position captured. 197845 lines; first visible 20; 98 realized visuals; prepare 52 ms; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  98,
+                       "elapsedMilliseconds":  2025,
+                       "workingSetBytes":  247353344,
+                       "peakWorkingSetBytes":  248328192
+                   },
+                   {
+                       "action":  "resize",
+                       "status":  "Position captured. 197845 lines; first visible 20; 98 realized visuals; prepare 52 ms; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  98,
+                       "elapsedMilliseconds":  3058,
+                       "workingSetBytes":  247705600,
+                       "peakWorkingSetBytes":  248328192
+                   },
+                   {
+                       "action":  "larger",
+                       "status":  "197845 lines; first visible 20; 98 realized visuals; prepare 52 ms; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  98,
+                       "elapsedMilliseconds":  3574,
+                       "workingSetBytes":  248074240,
+                       "peakWorkingSetBytes":  248328192
+                   },
+                   {
+                       "action":  "restore",
+                       "status":  "Position restored. 197845 lines; first visible 20; 98 realized visuals; prepare 52 ms; restore Exact.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  98,
+                       "elapsedMilliseconds":  4081,
+                       "workingSetBytes":  248238080,
+                       "peakWorkingSetBytes":  248434688
+                   }
+               ]
+}

@@ -1,0 +1,11 @@
+.DS_Store
+.vs/
+**/bin/
+**/obj/
+**/AppPackages/
+**/TestResults/
+artifacts/
+tests/fixtures/p0/generated/
+docs/p0/traces/
+*.user
+*.pfx

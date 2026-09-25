@@ -1,0 +1,90 @@
+﻿{
+    "observedAt":  "2026-09-25T08:03:07.5971522Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "AMD64",
+    "success":  true,
+    "windowsAppRuntime":  [
+                              "2.2.0.0",
+                              "2.3.1.0",
+                              "2.4.0.0",
+                              "2.5.1.0"
+                          ],
+    "webView2Versions":  [
+                             "153.0.4234.32",
+                             "153.0.4234.48",
+                             "SetupMetrics"
+                         ],
+    "dotnetSdk":  "10.0.401",
+    "sourcePackageSha256":  "5F7CCB60B87F9A9D4B5473B6082C1594FF87826958DF4E77E7BAE7792B952C17",
+    "certificateThumbprint":  "2168B279BF52FF3F33776F7C8315720F92AAE89C",
+    "signedPackageSha256":  "8ECC11921FF565959CBDBEE10CDB1178ACDFBED258E30177C5C5AC36805ABB2D",
+    "packageFullName":  "DesktopGuides.ReaderSpike_0.1.0.0_x64__en8r599z3n35j",
+    "packageFamilyName":  "DesktopGuides.ReaderSpike_en8r599z3n35j",
+    "installLocation":  "C:\\Program Files\\WindowsApps\\DesktopGuides.ReaderSpike_0.1.0.0_x64__en8r599z3n35j",
+    "launchedProcessId":  55176,
+    "launchedSessionId":  1,
+    "offlineStartedAt":  "2026-09-25T08:03:13.4620391Z",
+    "offlineAdapter":  "Wi-Fi 2",
+    "offlineRelaunchedProcessId":  43596,
+    "fixtureResults":  [
+                           {
+                               "fixture":  "txt-utf8",
+                               "passed":  true
+                           },
+                           {
+                               "fixture":  "txt-bom",
+                               "passed":  true
+                           },
+                           {
+                               "fixture":  "txt-legacy",
+                               "passed":  true
+                           },
+                           {
+                               "fixture":  "txt-ascii",
+                               "passed":  true
+                           },
+                           {
+                               "fixture":  "txt-long",
+                               "passed":  true
+                           },
+                           {
+                               "fixture":  "html-static",
+                               "passed":  true
+                           },
+                           {
+                               "fixture":  "html-layout",
+                               "passed":  true
+                           },
+                           {
+                               "fixture":  "html-hostile",
+                               "passed":  true
+                           },
+                           {
+                               "fixture":  "redirect",
+                               "passed":  true
+                           },
+                           {
+                               "fixture":  "pdf-short",
+                               "passed":  true
+                           },
+                           {
+                               "fixture":  "pdf-long",
+                               "passed":  true
+                           },
+                           {
+                               "fixture":  "pdf-access",
+                               "passed":  true
+                           },
+                           {
+                               "fixture":  "pdf-scan",
+                               "passed":  true
+                           },
+                           {
+                               "fixture":  "pdf-locked",
+                               "passed":  true
+                           }
+                       ],
+    "offlineEndedAt":  "2026-09-25T08:04:12.4743287Z",
+    "packageStillInstalled":  false,
+    "certificateStillTrusted":  false
+}

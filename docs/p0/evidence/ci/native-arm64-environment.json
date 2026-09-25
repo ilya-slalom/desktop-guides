@@ -1,0 +1,14 @@
+{
+  "commit": "33f6ac082f88b28b2d4cb0175f3dfc043bd79fc7",
+  "runnerImage": "win11-vs2026-arm64 20260920.164.1",
+  "osBuild": "10.0.26200.0",
+  "processArchitecture": "Arm64",
+  "cpuArchitecture": "ARM64",
+  "sessionId": 2,
+  "explorerProcesses": 1,
+  "ramBytes": 17169387520,
+  "dotnetSdk": "10.0.401",
+  "windowsAppRuntime": [
+    "2.5.1.0"
+  ]
+}

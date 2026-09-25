@@ -1,0 +1,84 @@
+{
+  "observedAt": "2026-09-25T09:17:39.9148269Z",
+  "osBuild": "10.0.26200.0",
+  "cpuArchitecture": "ARM64",
+  "packageArchitecture": "arm64",
+  "success": true,
+  "windowsAppRuntime": [
+    "2.5.1.0"
+  ],
+  "webView2Versions": [
+    "153.0.4234.48",
+    "PlatformExperiencesHelper",
+    "SetupMetrics"
+  ],
+  "dotnetSdk": "10.0.401",
+  "sourcePackageSha256": "CC31F474C22AE783E714B0C2C53F8E58438DC2A0229836EBBB9F13789D8BFE06",
+  "certificateThumbprint": "6BE9DE9161FE5E88C59D34BF38E7D26D24F5D48F",
+  "signedPackageSha256": "7C8BEE698ED32F7C7C9AB6A8FBB70C286023FAC875BEB2DD086E5BDCA4401189",
+  "packageFullName": "DesktopGuides.ReaderSpike_0.1.0.0_arm64__en8r599z3n35j",
+  "packageFamilyName": "DesktopGuides.ReaderSpike_en8r599z3n35j",
+  "installLocation": "C:\\Program Files\\WindowsApps\\DesktopGuides.ReaderSpike_0.1.0.0_arm64__en8r599z3n35j",
+  "launchedProcessId": 1208,
+  "launchedSessionId": 2,
+  "fixtureResults": [
+    {
+      "fixture": "txt-utf8",
+      "passed": true
+    },
+    {
+      "fixture": "txt-bom",
+      "passed": true
+    },
+    {
+      "fixture": "txt-legacy",
+      "passed": true
+    },
+    {
+      "fixture": "txt-ascii",
+      "passed": true
+    },
+    {
+      "fixture": "txt-long",
+      "passed": true
+    },
+    {
+      "fixture": "html-static",
+      "passed": true
+    },
+    {
+      "fixture": "html-layout",
+      "passed": true
+    },
+    {
+      "fixture": "html-hostile",
+      "passed": true
+    },
+    {
+      "fixture": "redirect",
+      "passed": true
+    },
+    {
+      "fixture": "pdf-short",
+      "passed": true
+    },
+    {
+      "fixture": "pdf-long",
+      "passed": true
+    },
+    {
+      "fixture": "pdf-access",
+      "passed": true
+    },
+    {
+      "fixture": "pdf-scan",
+      "passed": true
+    },
+    {
+      "fixture": "pdf-locked",
+      "passed": true
+    }
+  ],
+  "packageStillInstalled": false,
+  "certificateStillTrusted": false
+}
