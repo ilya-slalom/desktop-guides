@@ -1,0 +1,81 @@
+{
+  "fixture": "txt-bom",
+  "observedAt": "2026-09-25T15:59:12.6920940Z",
+  "osBuild": "10.0.26200.0",
+  "cpuArchitecture": "ARM64",
+  "processWorkingSetBytes": 148787200,
+  "processPeakWorkingSetBytes": 151195648,
+  "passwordEntryMode": null,
+  "openToVisibleMilliseconds": 610,
+  "scrollCallsMilliseconds": [],
+  "uiResponseMaxMilliseconds": null,
+  "uiResponseSamples": null,
+  "uiResponseTimeouts": null,
+  "phases": [
+    {
+      "action": "open",
+      "status": "txt-bom: 3 lines; first visible 0; 0 realized visuals; prepare 0 ms; restore none.",
+      "page": null,
+      "image": null,
+      "imageHasTextPattern": false,
+      "taggedTextInAutomation": false,
+      "marker": null,
+      "realizedListItems": 3,
+      "elapsedMilliseconds": 638,
+      "workingSetBytes": 149291008,
+      "peakWorkingSetBytes": 151195648
+    },
+    {
+      "action": "capture",
+      "status": "Position captured. 3 lines; first visible 1; 3 realized visuals; prepare 0 ms; restore none.",
+      "page": null,
+      "image": null,
+      "imageHasTextPattern": false,
+      "taggedTextInAutomation": false,
+      "marker": null,
+      "realizedListItems": 3,
+      "elapsedMilliseconds": 985,
+      "workingSetBytes": 149499904,
+      "peakWorkingSetBytes": 151195648
+    },
+    {
+      "action": "resize",
+      "status": "Position captured. 3 lines; first visible 1; 3 realized visuals; prepare 0 ms; restore none.",
+      "page": null,
+      "image": null,
+      "imageHasTextPattern": false,
+      "taggedTextInAutomation": false,
+      "marker": null,
+      "realizedListItems": 3,
+      "elapsedMilliseconds": 1814,
+      "workingSetBytes": 148725760,
+      "peakWorkingSetBytes": 151195648
+    },
+    {
+      "action": "larger",
+      "status": "3 lines; first visible 1; 3 realized visuals; prepare 0 ms; restore none.",
+      "page": null,
+      "image": null,
+      "imageHasTextPattern": false,
+      "taggedTextInAutomation": false,
+      "marker": null,
+      "realizedListItems": 3,
+      "elapsedMilliseconds": 2112,
+      "workingSetBytes": 148439040,
+      "peakWorkingSetBytes": 151195648
+    },
+    {
+      "action": "restore",
+      "status": "Position restored. 3 lines; first visible 1; 3 realized visuals; prepare 0 ms; restore Exact.",
+      "page": null,
+      "image": null,
+      "imageHasTextPattern": false,
+      "taggedTextInAutomation": false,
+      "marker": null,
+      "realizedListItems": 3,
+      "elapsedMilliseconds": 2411,
+      "workingSetBytes": 148500480,
+      "peakWorkingSetBytes": 151195648
+    }
+  ]
+}

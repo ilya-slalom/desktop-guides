@@ -1,7 +1,7 @@
 # P1 implementation results
 
-Status: M0 implemented on `feat/p1-m0` for review, 25 September 2026.
-The P1 first usable release remains in progress. The
+Status: M0 implemented on `feat/p1-m0` in [PR #3](https://github.com/ilya-slalom/desktop-guides/pull/3)
+for review, 25 September 2026. The P1 first usable release remains in progress. The
 [dependency plan](implementation-plan.md) defines all 49 task exit gates;
 this file records checks actually run.
 
@@ -35,8 +35,32 @@ this file records checks actually run.
   tagged document text or a validated locator in its restricted prototype.
 - After testing, no candidate firewall rule, scheduled task, or app process
   remained. The stale temporary directory from the earlier junction test
-  was removed. Windows package CI and native ARM64 CI checks are pending the
-  review branch.
+  was removed.
+
+## PR CI evidence
+
+[PR CI run 36157085242](https://github.com/ilya-slalom/desktop-guides/actions/runs/36157085242)
+passed all five jobs for code head `6c6deb8527e271e4398d6d833d3bb77698776e22`:
+locked Core/Infrastructure tests on Windows x64, native Windows 11 ARM64
+Core/Infrastructure tests, x64 and ARM64 unsigned MSIX builds, and the
+installed ARM64 P0 fixture regression. GitHub's `pull_request` checkout used
+synthetic merge commit `c6b09d302d2c9a15bfb2417a6ecd1c674616dbd2`,
+recorded by the [native environment](evidence/ci/native-arm64-environment.json).
+
+The retained [x64 Core](evidence/ci/core-tests.trx) and
+[Infrastructure](evidence/ci/infrastructure-tests.trx) results report
+**61/61** and **10/10** passes. The [native ARM64 Core](evidence/ci/native-arm64-core-tests.trx)
+and [Infrastructure](evidence/ci/native-arm64-infrastructure-tests.trx)
+results report the same counts, with OS build `10.0.26200.0`, native `Arm64`
+process, and SDK `10.0.401`.
+
+The [installed ARM64 record](evidence/ci/native-arm64-signed-install.json)
+reports **14/14** P0 fixture workflows passed in interactive session 2 and
+confirms that its test package and trust certificate were removed. The
+[suite traces](evidence/ci/native-arm64-ui-suite/suite.json) are retained.
+This verifies the diagnostic P0 package on ARM64; the M0 PDF text candidate
+was exercised interactively on Windows 11 x64, and the production P1 reader
+has not been installed or tested.
 
 P0's 14-fixture installed result remains [P0 evidence](../p0/results.md);
 these M0 prototype results do not claim that the production shell, import,

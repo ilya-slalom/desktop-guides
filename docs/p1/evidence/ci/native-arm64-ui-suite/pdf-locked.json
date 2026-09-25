@@ -1,0 +1,55 @@
+{
+  "fixture": "pdf-locked",
+  "observedAt": "2026-09-25T16:00:00.5162811Z",
+  "osBuild": "10.0.26200.0",
+  "cpuArchitecture": "ARM64",
+  "processWorkingSetBytes": 341483520,
+  "processPeakWorkingSetBytes": 357683200,
+  "passwordEntryMode": "UI Automation ValuePattern",
+  "openToVisibleMilliseconds": null,
+  "scrollCallsMilliseconds": [],
+  "uiResponseMaxMilliseconds": null,
+  "uiResponseSamples": null,
+  "uiResponseTimeouts": null,
+  "phases": [
+    {
+      "action": "open",
+      "status": "pdf-locked: Password required. Enter the PDF password and choose Unlock PDF.",
+      "page": "Password required. Enter the PDF password and choose Unlock PDF.",
+      "image": null,
+      "imageHasTextPattern": false,
+      "taggedTextInAutomation": false,
+      "marker": null,
+      "realizedListItems": 0,
+      "elapsedMilliseconds": 766,
+      "workingSetBytes": 337461248,
+      "peakWorkingSetBytes": 357683200
+    },
+    {
+      "action": "wrong-password",
+      "status": "pdf-locked: Password required. Enter the PDF password and choose Unlock PDF.",
+      "page": "Could not unlock PDF. Check the password or file, then try again.",
+      "image": null,
+      "imageHasTextPattern": false,
+      "taggedTextInAutomation": false,
+      "marker": null,
+      "realizedListItems": 0,
+      "elapsedMilliseconds": 1145,
+      "workingSetBytes": 333553664,
+      "peakWorkingSetBytes": 357683200
+    },
+    {
+      "action": "unlock",
+      "status": "pdf-locked: Password required. Enter the PDF password and choose Unlock PDF.",
+      "page": "page 1/1; zoom 1.00 fit width; fraction 0.00; width 704/704; cache 5.5 MiB in 1 pages (peak 5.5); open 0 ms; render 29 ms; restore none.",
+      "image": "Rendered image of PDF page 1 of 1",
+      "imageHasTextPattern": false,
+      "taggedTextInAutomation": false,
+      "marker": null,
+      "realizedListItems": 0,
+      "elapsedMilliseconds": 1607,
+      "workingSetBytes": 341483520,
+      "peakWorkingSetBytes": 357683200
+    }
+  ]
+}

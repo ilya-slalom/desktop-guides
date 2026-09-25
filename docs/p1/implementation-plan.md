@@ -39,7 +39,9 @@ in parallel with storage contracts.
 
 Implementation of T03.1, T03.3, T11.2, T12.1, and the T10.0 candidate decision
 is on `feat/p1-m0`. The Windows x64 checks are in [M0 results](results.md).
-The branch still needs review and CI before M0 is integrated into `main`.
+[PR #3](https://github.com/ilya-slalom/desktop-guides/pull/3) passed its
+five-job Windows CI run and still needs review before M0 is integrated into
+`main`.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
@@ -154,7 +156,7 @@ evidence. Publish only targets with complete target-specific results.
 
 | Lane | Required result | Current status |
 | --- | --- | --- |
-| Headless Core/Infrastructure | Schema/migration, locator, path, transaction recovery, archive, import-security, and fault-injection tests on locked Windows CI; NTFS link/junction checks on Windows. | M0 local Windows x64 Core and Infrastructure tests passed, including NTFS links/junctions. CI and later-task suites are pending. |
+| Headless Core/Infrastructure | Schema/migration, locator, path, transaction recovery, archive, import-security, and fault-injection tests on locked Windows CI; NTFS link/junction checks on Windows. | M0 x64 and native ARM64 Core 61/61 and Infrastructure 10/10 passed in [PR CI](results.md#pr-ci-evidence), including Windows NTFS link/junction checks. Later-task suites are pending. |
 | Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | P1 pending; P0 fixture evidence exists only for the probe app. |
 | Runtime-free Windows 11 x64 VM | Actual absent Windows App Runtime and WebView2 failures, prerequisite setup, recovery, and clean restore. | Deferred by user until a disposable VM is available. Do not claim clean-machine support before this lane passes. |
 | Windows 11 ARM64 | Native complete P1 installed workflow, backup, accessibility, and offline evidence before advertising ARM64. | P1 pending; P0 native Core/UI fixtures passed. |
