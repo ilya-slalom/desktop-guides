@@ -153,7 +153,7 @@ public sealed class HtmlProbe : IReaderProbe
                     }
                 }
                 return {
-                    id: selected ? selected.id : null,
+                    id: selected && selected.id ? selected.id : null,
                     quote: selected ? selected.textContent.trim().replace(/\s+/g, ' ').slice(0, 96) : null,
                     delta: selected ? -selected.getBoundingClientRect().top : 0,
                     fraction: y / Math.max(1, document.documentElement.scrollHeight - window.innerHeight)

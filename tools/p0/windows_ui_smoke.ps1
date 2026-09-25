@@ -5,7 +5,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $ResultPath,
 
-    [string] $Password
+    [switch] $ExpectWebViewUnavailable
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,9 +27,18 @@ public static class SmokeWindow {
 }
 '@
 
-$process = Get-Process DesktopGuides.App | Select-Object -First 1
-if ($null -eq $process -or $process.MainWindowHandle -eq 0) {
-    throw 'Run this script in the interactive Windows session with Desktop Guides open.'
+$deadline = (Get-Date).AddSeconds(15)
+do {
+    $process = Get-Process DesktopGuides.App -ErrorAction SilentlyContinue |
+        Where-Object { $_.MainWindowHandle -ne 0 } |
+        Select-Object -First 1
+    if ($null -ne $process) { break }
+    Start-Sleep -Milliseconds 250
+} while ((Get-Date) -lt $deadline)
+if ($null -eq $process) {
+    $details = Get-Process DesktopGuides.App -ErrorAction SilentlyContinue |
+        ForEach-Object { "id=$($_.Id) session=$($_.SessionId) window=$($_.MainWindowHandle)" }
+    throw "Desktop Guides has no interactive window. Processes: $details"
 }
 $root = [System.Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
 $scope = [System.Windows.Automation.TreeScope]::Descendants
@@ -193,6 +202,13 @@ do {
     $openStatus = Status
 } while ($openStatus -like 'Opening*' -and (Get-Date) -lt $deadline)
 Record-Phase 'open'
+$expectedFailure = $false
+if ($ExpectWebViewUnavailable) {
+    if ($openStatus -notlike 'Could not open html-static: HTML requires Microsoft Edge WebView2 Runtime*') {
+        throw "Missing-WebView2 simulation did not produce an actionable error: $openStatus"
+    }
+    $expectedFailure = $true
+}
 $openToVisibleMilliseconds = $null
 if ($FixtureId -eq 'txt-legacy' -and $openStatus -like 'Could not open txt-legacy:*') {
     Record-Phase 'strict-utf8-error'
@@ -228,11 +244,14 @@ if ($FixtureId -like 'txt-*' -and $openStatus -like "$($FixtureId):*") {
         Start-Sleep -Milliseconds 50
     } while ((Get-Date) -lt $deadline)
 }
-if ($openStatus -notlike "$($FixtureId):*") {
+if (-not $expectedFailure -and $openStatus -notlike "$($FixtureId):*") {
     throw "Opening failed: $openStatus"
 }
 
-if ($FixtureId -like 'txt-*') {
+if ($expectedFailure) {
+    # The normal result writer below records the opening error as a passing negative test.
+}
+elseif ($FixtureId -like 'txt-*') {
     if ($FixtureId -eq 'txt-long') {
         $list = $root.FindFirst(
             $scope,
