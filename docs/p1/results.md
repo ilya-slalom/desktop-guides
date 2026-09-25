@@ -20,8 +20,9 @@ this file records checks actually run.
 - Host: Windows 11 x64, build `10.0.26200.0`; source staged under
   `E:\work\desktop-guides`; .NET SDK `10.0.401`. Locked restores passed for
   Core tests, Infrastructure tests, the WinUI app, and the PDF tool.
-- Release headless tests: **55/55 Core and 9/9 Infrastructure passed**,
-  including the final two-guide completion-state assertion.
+- Release headless tests: **61/61 Core and 9/9 Infrastructure passed**,
+  including the two-guide completion-state assertion and Windows reserved
+  device-name path cases.
 - Unpackaged WinUI x64 publish and `PdfTextSpike` Release build passed, with
   zero PDF-tool build warnings or errors. An unsigned x64 MSIX build passed;
   its sole warning was that `mspdbcmf.exe` was unavailable, so no symbols
