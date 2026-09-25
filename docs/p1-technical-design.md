@@ -1,7 +1,8 @@
 # P1 technical design: local library and first usable reader
 
-Status: design for S03–S17 and S20, 25 September 2026. No P1 implementation
-is claimed. The [high-level design](initial-design.md) defines R1–R9;
+Status: design for S03–S17 and S20, 25 September 2026. The M0 contracts and
+PDF decision are implemented for review; see [P1 results](p1/results.md).
+The [high-level design](initial-design.md) defines R1–R9;
 the [work breakdown](work-breakdown.md) owns story, task, and TR IDs; the
 [implementation plan](p1/implementation-plan.md) orders the work. P0 was
 merged in [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
@@ -33,7 +34,7 @@ are inputs, including the PDF text-accessibility blocker.
 | Files plus database | Assume one SQLite transaction covers files, or journal cross-boundary operations | Stage and rename app-owned directories, record pending file operations in SQLite, then reconcile on startup. A database transaction cannot roll back a filesystem rename. |
 | Content ownership | Package local data alone, or add user export/restore | Use package `LocalFolder` for the live library and promote S20 to P1. Package local data persists through updates but is removed on uninstall; an archive saved outside app data provides recovery when the user exports it. |
 | HTML | Reuse a broad virtual-host folder, or explicitly serve verified assets | Extend the P0 per-request allowlist and use a unique synthetic origin per guide. Preview discovers missing local assets before publication; every served byte comes from the managed copy. |
-| PDF | Ship the P0 raster viewer with a note, or validate a text path first | T10.0 must prove tagged document text in Windows UI Automation and keyboard selection before S10/S17 pass. Keep the P0 renderer as a page-preview candidate, never as proof of text access. |
+| PDF | Ship the P0 raster viewer with a note, or validate a text path first | The [T10.0 decision](p1/pdf-decision.md) selected a native `Windows.Data.Pdf` preview plus PdfPig text path after the tagged fixture appeared in Windows UI Automation and keyboard selection. T10.1–T10.3 must implement and verify the production adapter before S10/S17 pass. |
 | Search | SQLite `LOWER`/`LIKE`, or compare title metadata in Core | Filter loaded title metadata using invariant, case-insensitive comparison, then sort and virtualize the view. No guide bytes are opened for library search. |
 
 The new portable `DesktopGuides.Core` types describe games, guides, locators,
@@ -100,7 +101,7 @@ invoke deletes because files need separate coordination.
 | Table | Required fields and constraints |
 | --- | --- |
 | `Games` | `Id` primary key, trimmed `Title` (1–160), optional `Platform` (up to 80) and `Notes` (up to 2,000), `CreatedUtcMs`, `UpdatedUtcMs`. |
-| `Guides` | `Id` primary key, `GameId` foreign key to Games, title (1–200), format enum, unique `ManagedRelativeRoot`, `PrimaryRelativePath`, `ContentSha256`, `ContentBytes`, optional source label, `ImportedUtcMs`, `UpdatedUtcMs`. |
+| `Guides` | `Id` primary key, `GameId` foreign key to Games, title (1–200), format enum, unique `ManagedRelativeRoot`, `PrimaryRelativePath`, `ContentSha256`, `ContentBytes`, optional source label, nullable TXT-only `TextCodePage` (437 or 1252), `ImportedUtcMs`, `UpdatedUtcMs`. |
 | `ReadingStates` | `GuideId` primary/foreign key, nullable versioned locator JSON, nullable estimated fraction in `[0,1]`, nullable `LastOpenedUtcMs`, nullable `CompletedUtcMs`. A new guide has no estimated fraction. |
 | `ReaderPreferences` | `GuideId` primary/foreign key, nullable TXT/HTML font scale within the permitted range. |
 | `Settings` | Key/value rows for system/light/dark theme and last active guide ID; a stale guide ID is ignored at launch. |
@@ -247,7 +248,7 @@ reader regressions and add a production-mode library/import workflow lane.
   gives one action, such as Retry, Choose encoding, Remove broken guide,
   Repair WebView2, or Export recovery copy. Logs omit guide text, passwords,
   original absolute paths, and WebView2 profile contents.
-- T10.0 compares a WebView2 PDF surface and a separately licensed text
+- [T10.0](p1/pdf-decision.md) compares a WebView2 PDF surface and a separately licensed text
   extraction/rendering path against `pdf-access`, `pdf-scan`, `pdf-locked`,
   `pdf-long`, offline use, page-fraction restore, selection, Narrator/UIA text,
   and redistribution. A hybrid P0 raster preview plus a selectable native
@@ -452,10 +453,11 @@ reader regressions and add a production-mode library/import workflow lane.
   build-time diagnostic probe mode for P0 CI without shipping fixtures in
   the production package.
 - **T11.2** Define the typed reader adapter/capabilities in section 3 and
-  adapt TXT/HTML/PDF behind it. Only the active adapter knows its control
-  tree; the shell receives commands, locations, progress, errors, and
-  capability changes as typed values. Unit-test shell command visibility
-  against fake adapters with different capabilities.
+  test command dispatch with fake adapters. Only the active adapter knows
+  its control tree; the shell receives commands, locations, progress, errors,
+  and capability changes as typed values. The production TXT/HTML/PDF
+  adapters implement this contract in M3; P0 diagnostic probes retain their
+  existing interface until T11.1 separates the production shell.
 - **T11.3** Build a compact reader title/back bar, collapsible navigation
   area, reader content host, status/approximate-restore announcement, and
   capability-based command slots. Narrow windows move secondary commands

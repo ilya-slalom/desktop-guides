@@ -1,4 +1,4 @@
-name: Windows P0
+name: Windows
 
 on:
   push:
@@ -38,8 +38,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git diff --exit-code -- tests/fixtures/p0
           exit $LASTEXITCODE
-      - name: Restore locked dependencies
-        run: dotnet restore tests/DesktopGuides.Core.Tests/DesktopGuides.Core.Tests.csproj --locked-mode
+      - name: Restore locked headless test dependencies
+        shell: pwsh
+        run: |
+          dotnet restore tests/DesktopGuides.Core.Tests/DesktopGuides.Core.Tests.csproj --locked-mode
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet restore tests/DesktopGuides.Infrastructure.Tests/DesktopGuides.Infrastructure.Tests.csproj --locked-mode
+          exit $LASTEXITCODE
       - name: Inject deliberate failing Core test
         if: ${{ inputs.verify-test-gate }}
         shell: pwsh
@@ -57,6 +62,14 @@ jobs:
           dotnet test tests/DesktopGuides.Core.Tests/DesktopGuides.Core.Tests.csproj `
             -c Release --no-restore `
             --logger "trx;LogFileName=core-tests.trx" `
+            --results-directory artifacts/test-results
+          exit $LASTEXITCODE
+      - name: Run infrastructure tests
+        shell: pwsh
+        run: |
+          dotnet test tests/DesktopGuides.Infrastructure.Tests/DesktopGuides.Infrastructure.Tests.csproj `
+            -c Release --no-restore `
+            --logger "trx;LogFileName=infrastructure-tests.trx" `
             --results-directory artifacts/test-results
           exit $LASTEXITCODE
       - name: Upload test result
@@ -191,14 +204,27 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git diff --exit-code -- tests/fixtures/p0
           exit $LASTEXITCODE
-      - name: Restore locked dependencies
-        run: dotnet restore tests/DesktopGuides.Core.Tests/DesktopGuides.Core.Tests.csproj --locked-mode
+      - name: Restore locked headless test dependencies
+        shell: pwsh
+        run: |
+          dotnet restore tests/DesktopGuides.Core.Tests/DesktopGuides.Core.Tests.csproj --locked-mode
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet restore tests/DesktopGuides.Infrastructure.Tests/DesktopGuides.Infrastructure.Tests.csproj --locked-mode
+          exit $LASTEXITCODE
       - name: Run Core tests natively
         shell: pwsh
         run: |
           dotnet test tests/DesktopGuides.Core.Tests/DesktopGuides.Core.Tests.csproj `
             -c Release --no-restore `
             --logger "trx;LogFileName=native-arm64.trx" `
+            --results-directory artifacts/native-arm64
+          exit $LASTEXITCODE
+      - name: Run Infrastructure tests natively
+        shell: pwsh
+        run: |
+          dotnet test tests/DesktopGuides.Infrastructure.Tests/DesktopGuides.Infrastructure.Tests.csproj `
+            -c Release --no-restore `
+            --logger "trx;LogFileName=native-arm64-infrastructure.trx" `
             --results-directory artifacts/native-arm64
           exit $LASTEXITCODE
       - name: Upload native result

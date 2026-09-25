@@ -60,6 +60,10 @@ public sealed partial class MainWindow : Window
         {
             "txt" => new TextProbe(),
             "html" => new HtmlProbe(fixtures.Entries.Select(item => fixtures.Resolve(item.Id))),
+            "pdf" when Environment.GetEnvironmentVariable(
+                "DESKTOP_GUIDES_PDF_CANDIDATE") == "native" => new PdfTextCandidateProbe(),
+            "pdf" when Environment.GetEnvironmentVariable(
+                "DESKTOP_GUIDES_PDF_CANDIDATE") == "web" => new PdfWebCandidateProbe(),
             "pdf" => new PdfProbe(),
             _ => null
         };

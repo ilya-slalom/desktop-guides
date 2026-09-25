@@ -1,11 +1,13 @@
 # P1 implementation plan and exit gates
 
-Status: planned, 25 September 2026. P0 was merged into `main` through
-[PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1); no P1 task is
-marked implemented. This plan orders all **16 P1 stories and 49 tasks** in the
+Status: M0 implemented for review, M1–M6 planned, 25 September 2026.
+P0 was merged into `main` through
+[PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
+This plan orders all **16 P1 stories and 49 tasks** in the
 [work breakdown](../work-breakdown.md). The [technical design](../p1-technical-design.md)
 defines the architecture, data contracts, failure protocols, and reader
-behavior. Record implementation evidence in `docs/p1/results.md` as work lands.
+behavior. [M0 results](results.md) and the [PDF decision](pdf-decision.md)
+record tested output; reviewed integration and remaining M1–M6 work are open.
 
 ## Delivery rules
 
@@ -34,6 +36,10 @@ testable requirements in the work breakdown; a range means every listed TR.
 Exit: portable models and path rules are reviewed; a failing tagged-PDF
 candidate cannot be treated as a completed reader. The PDF experiment may run
 in parallel with storage contracts.
+
+Implementation of T03.1, T03.3, T11.2, T12.1, and the T10.0 candidate decision
+is on `feat/p1-m0`. The Windows x64 checks are in [M0 results](results.md).
+The branch still needs review and CI before M0 is integrated into `main`.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
@@ -148,7 +154,7 @@ evidence. Publish only targets with complete target-specific results.
 
 | Lane | Required result | Current status |
 | --- | --- | --- |
-| Headless Core/Infrastructure | Schema/migration, locator, path, transaction recovery, archive, import-security, and fault-injection tests on locked Windows CI; NTFS link/junction checks on Windows. | P1 pending. |
+| Headless Core/Infrastructure | Schema/migration, locator, path, transaction recovery, archive, import-security, and fault-injection tests on locked Windows CI; NTFS link/junction checks on Windows. | M0 local Windows x64 Core and Infrastructure tests passed, including NTFS links/junctions. CI and later-task suites are pending. |
 | Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | P1 pending; P0 fixture evidence exists only for the probe app. |
 | Runtime-free Windows 11 x64 VM | Actual absent Windows App Runtime and WebView2 failures, prerequisite setup, recovery, and clean restore. | Deferred by user until a disposable VM is available. Do not claim clean-machine support before this lane passes. |
 | Windows 11 ARM64 | Native complete P1 installed workflow, backup, accessibility, and offline evidence before advertising ARM64. | P1 pending; P0 native Core/UI fixtures passed. |
