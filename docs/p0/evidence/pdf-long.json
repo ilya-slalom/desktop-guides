@@ -1,0 +1,37 @@
+{
+  "fixture": "pdf-long",
+  "observedAt": "2026-09-25T07:17:23.6445124Z",
+  "osBuild": "10.0.26200.0",
+  "cpuArchitecture": "AMD64",
+  "processWorkingSetBytes": 205889536,
+  "phases": [
+    {
+      "action": "open",
+      "status": "pdf-long: page 1/200; zoom 1.00; raster 7.4 MiB (peak 7.4); open 125 ms; restore none.",
+      "page": "page 1/200; zoom 1.00; raster 7.4 MiB (peak 7.4); open 125 ms; restore none.",
+      "marker": null,
+      "realizedListItems": 0
+    },
+    {
+      "action": "capture-next",
+      "status": "Position captured. page 2/200; zoom 1.00; raster 7.4 MiB (peak 7.4); open 125 ms; restore none.",
+      "page": "page 2/200; zoom 1.00; raster 7.4 MiB (peak 7.4); open 125 ms; restore none.",
+      "marker": null,
+      "realizedListItems": 0
+    },
+    {
+      "action": "previous",
+      "status": "Position captured. page 2/200; zoom 1.00; raster 7.4 MiB (peak 7.4); open 125 ms; restore none.",
+      "page": "page 1/200; zoom 1.00; raster 7.4 MiB (peak 7.4); open 125 ms; restore none.",
+      "marker": null,
+      "realizedListItems": 0
+    },
+    {
+      "action": "restore",
+      "status": "Position restored. page 2/200; zoom 1.00; raster 7.4 MiB (peak 7.4); open 125 ms; restore exact page.",
+      "page": "page 2/200; zoom 1.00; raster 7.4 MiB (peak 7.4); open 125 ms; restore exact page.",
+      "marker": null,
+      "realizedListItems": 0
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+﻿BOM heading
+Second line

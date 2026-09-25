@@ -1,0 +1,5 @@
+tests/fixtures/p0/** -text
+tests/fixtures/p0/*.pdf -diff
+tests/fixtures/p0/*.txt -diff
+tests/fixtures/p0/generated/*.pdf -diff
+tests/fixtures/p0/generated/*.txt -diff

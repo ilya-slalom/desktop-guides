@@ -1,0 +1,58 @@
+{
+  "fixture": "html-hostile",
+  "observedAt": "2026-09-25T07:09:01.8873795Z",
+  "osBuild": "10.0.26200.0",
+  "cpuArchitecture": "AMD64",
+  "processWorkingSetBytes": 169766912,
+  "phases": [
+    {
+      "action": "open",
+      "status": "html-hostile: assets 2, blocked 1, popups 0; open 1330 ms; zoom 1.00; restore none.",
+      "page": null,
+      "marker": null,
+      "realizedListItems": 0
+    },
+    {
+      "action": "try-links",
+      "status": "html-hostile: assets 2, blocked 1, popups 0; open 1330 ms; zoom 1.00; restore none.",
+      "page": null,
+      "marker": null,
+      "realizedListItems": 0
+    },
+    {
+      "action": "jump",
+      "status": "html-hostile: assets 2, blocked 1, popups 0; open 1330 ms; zoom 1.00; restore none.",
+      "page": null,
+      "marker": "Marker: ",
+      "realizedListItems": 0
+    },
+    {
+      "action": "capture",
+      "status": "Position captured. assets 2, blocked 3, popups 1; open 1330 ms; zoom 1.00; restore none.",
+      "page": null,
+      "marker": "Marker: ",
+      "realizedListItems": 0
+    },
+    {
+      "action": "top",
+      "status": "Position captured. assets 2, blocked 3, popups 1; open 1330 ms; zoom 1.00; restore none.",
+      "page": null,
+      "marker": "At top.",
+      "realizedListItems": 0
+    },
+    {
+      "action": "larger",
+      "status": "assets 2, blocked 3, popups 1; open 1330 ms; zoom 1.10; restore none.",
+      "page": null,
+      "marker": "At top.",
+      "realizedListItems": 0
+    },
+    {
+      "action": "restore",
+      "status": "Position restored. assets 2, blocked 3, popups 1; open 1330 ms; zoom 1.10; restore fraction.",
+      "page": null,
+      "marker": "At top.",
+      "realizedListItems": 0
+    }
+  ]
+}

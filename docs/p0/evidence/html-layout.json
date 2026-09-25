@@ -1,0 +1,51 @@
+{
+  "fixture": "html-layout",
+  "observedAt": "2026-09-25T07:04:35.8103682Z",
+  "osBuild": "10.0.26200.0",
+  "cpuArchitecture": "AMD64",
+  "processWorkingSetBytes": 169603072,
+  "phases": [
+    {
+      "action": "open",
+      "status": "html-layout: assets 2, blocked 1; open 1310 ms; zoom 1.00; restore none.",
+      "page": null,
+      "marker": null,
+      "realizedListItems": 0
+    },
+    {
+      "action": "jump",
+      "status": "html-layout: assets 2, blocked 1; open 1310 ms; zoom 1.00; restore none.",
+      "page": null,
+      "marker": "Marker: resume",
+      "realizedListItems": 0
+    },
+    {
+      "action": "capture",
+      "status": "Position captured. assets 2, blocked 1; open 1310 ms; zoom 1.00; restore none.",
+      "page": null,
+      "marker": "Marker: resume",
+      "realizedListItems": 0
+    },
+    {
+      "action": "top",
+      "status": "Position captured. assets 2, blocked 1; open 1310 ms; zoom 1.00; restore none.",
+      "page": null,
+      "marker": "At top.",
+      "realizedListItems": 0
+    },
+    {
+      "action": "larger",
+      "status": "assets 2, blocked 1; open 1310 ms; zoom 1.10; restore none.",
+      "page": null,
+      "marker": "At top.",
+      "realizedListItems": 0
+    },
+    {
+      "action": "restore",
+      "status": "Position restored. assets 2, blocked 1; open 1310 ms; zoom 1.10; restore element.",
+      "page": null,
+      "marker": "At top.",
+      "realizedListItems": 0
+    }
+  ]
+}
