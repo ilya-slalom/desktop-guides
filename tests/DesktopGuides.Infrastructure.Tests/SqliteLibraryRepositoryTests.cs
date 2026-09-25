@@ -77,7 +77,22 @@ public sealed class SqliteLibraryRepositoryTests
             repository.SaveReadingLocationAsync(Guid.NewGuid(), "{}", 0.5));
     }
 
-    private static void InsertGuide(string databasePath, Guid guideId, Guid gameId)
+    [Fact]
+    public async Task RejectsGuideRootThatIsNotBoundToItsId()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Example", null, null);
+
+        Assert.Throws<SqliteException>(() =>
+            InsertGuide(directory.Paths.DatabasePath, Guid.NewGuid(), game.Id,
+                "content/wrong-guide"));
+        Assert.Empty(await repository.ListGuidesAsync(game.Id));
+    }
+
+    private static void InsertGuide(
+        string databasePath, Guid guideId, Guid gameId, string? managedRoot = null)
     {
         using SqliteConnection connection = OpenWithForeignKeys(databasePath);
         using SqliteCommand command = connection.CreateCommand();
@@ -95,7 +110,8 @@ public sealed class SqliteLibraryRepositoryTests
             """;
         command.Parameters.AddWithValue("$id", guideId.ToString("N"));
         command.Parameters.AddWithValue("$game", gameId.ToString("N"));
-        command.Parameters.AddWithValue("$root", "content/" + guideId.ToString("N"));
+        command.Parameters.AddWithValue(
+            "$root", managedRoot ?? "content/" + guideId.ToString("N"));
         command.Parameters.AddWithValue("$hash", new string('a', 64));
         command.Parameters.AddWithValue("$now", Now.ToUnixTimeMilliseconds());
         command.ExecuteNonQuery();

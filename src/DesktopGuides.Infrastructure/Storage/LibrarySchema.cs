@@ -17,8 +17,9 @@ internal static class LibrarySchema
             GameId TEXT NOT NULL REFERENCES Games(Id) ON DELETE CASCADE,
             Title TEXT NOT NULL CHECK (length(Title) BETWEEN 1 AND 200),
             Format TEXT NOT NULL CHECK (Format IN ('Txt', 'Html', 'Pdf')),
-            ManagedRelativeRoot TEXT NOT NULL UNIQUE,
-            PrimaryRelativePath TEXT NOT NULL,
+            ManagedRelativeRoot TEXT NOT NULL UNIQUE
+                CHECK (ManagedRelativeRoot = 'content/' || Id),
+            PrimaryRelativePath TEXT NOT NULL CHECK (length(PrimaryRelativePath) > 0),
             ContentSha256 TEXT NOT NULL CHECK (length(ContentSha256) = 64),
             ContentBytes INTEGER NOT NULL CHECK (ContentBytes >= 0),
             SourceLabel TEXT CHECK (SourceLabel IS NULL OR length(SourceLabel) <= 255),

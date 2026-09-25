@@ -9,7 +9,7 @@ this file records checks actually run.
 
 | Task | Implemented output | Verification and remaining scope |
 | --- | --- | --- |
-| T03.1 | Portable Game, Guide, ReadingState, ReaderPreferences, and Settings records; repository contract; SQLite v1 schema and repository. IDs are generated, timestamps use an injected UTC clock, and foreign keys are enabled on each connection. `TextCodePage` is stored only for TXT. | Windows integration tests reopen two guides under one game with independent locators, estimates, completion timestamps, and preferences; reject an orphan state. The v1→v2 migration and public guide publication belong to T03.2 and T06.3. |
+| T03.1 | Portable Game, Guide, ReadingState, ReaderPreferences, and Settings records; repository contract; SQLite v1 schema and repository. IDs are generated, timestamps use an injected UTC clock, foreign keys are enabled on each connection, and a stored guide root must match its ID. `TextCodePage` is stored only for TXT. | Windows integration tests reopen two guides under one game with independent locators, estimates, completion timestamps, and preferences; reject an orphan state and a mismatched guide root. The v1→v2 migration and public guide publication belong to T03.2 and T06.3. |
 | T03.3 | `ILibraryPaths`, strict forward-slash managed relative paths, and an injected-root resolver under generated guide IDs. | Windows tests accept a nested CSS asset and reject traversal, absolute/UNC paths, percent escapes, symlinks, and an NTFS junction. |
 | T11.2 | Portable reader session, typed actions and capability policy, plus the WinUI view adapter contract. | Fake-reader tests show supported commands dispatch and unsupported commands stop at the policy. Production TXT/HTML/PDF adapters and shell command controls are later M3 work. |
 | T12.1 | Versioned bounded JSON codecs for TXT, HTML, and PDF, with fingerprint checks and exact/context/approximate restore candidates. | Core tests cover round trips, changed bytes, future versions, invalid JSON/numbers, duplicate fields, oversized text, wrong format, and HTML entry-document mismatch. The codecs do not alter completion. Actual readers use them in M3. |
@@ -20,7 +20,7 @@ this file records checks actually run.
 - Host: Windows 11 x64, build `10.0.26200.0`; source staged under
   `E:\work\desktop-guides`; .NET SDK `10.0.401`. Locked restores passed for
   Core tests, Infrastructure tests, the WinUI app, and the PDF tool.
-- Release headless tests: **61/61 Core and 9/9 Infrastructure passed**,
+- Release headless tests: **61/61 Core and 10/10 Infrastructure passed**,
   including the two-guide completion-state assertion and Windows reserved
   device-name path cases.
 - Unpackaged WinUI x64 publish and `PdfTextSpike` Release build passed, with
