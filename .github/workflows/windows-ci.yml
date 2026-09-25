@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      verify-test-gate:
+        description: Inject one failing Core test to verify CI stops packaging
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -35,6 +40,17 @@ jobs:
           exit $LASTEXITCODE
       - name: Restore locked dependencies
         run: dotnet restore tests/DesktopGuides.Core.Tests/DesktopGuides.Core.Tests.csproj --locked-mode
+      - name: Inject deliberate failing Core test
+        if: ${{ inputs.verify-test-gate }}
+        shell: pwsh
+        run: |
+          @'
+          using Xunit;
+          namespace DesktopGuides.Core.Tests;
+          public sealed class DeliberateCiGateTest {
+              [Fact] public void FailsToVerifyTheGate() => Assert.True(false, "Deliberate CI gate test");
+          }
+          '@ | Set-Content tests/DesktopGuides.Core.Tests/DeliberateCiGateTest.cs
       - name: Run core tests
         shell: pwsh
         run: |
@@ -97,6 +113,10 @@ jobs:
             throw "Expected one ${{ matrix.architecture }} app MSIX, found $($packages.Count)."
           }
           $package = $packages[0]
+          if ($package.BaseName -notmatch '^DesktopGuides\.App_(?<Version>[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)_(x64|arm64)$') {
+            throw "Unexpected app package name: $($package.Name)"
+          }
+          $packageVersion = $Matches.Version
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $visualStudio = if (Test-Path $vswhere) {
             (& $vswhere -latest -products '*' -property installationVersion)
@@ -115,6 +135,7 @@ jobs:
             visualStudio = $visualStudio
             windowsSdkBins = $windowsSdkBins
             package = $package.Name
+            packageVersion = $packageVersion
             packageBytes = $package.Length
             packageSha256 = (Get-FileHash $package.FullName -Algorithm SHA256).Hash
           } | ConvertTo-Json | Set-Content artifacts/build/manifest.json -Encoding utf8

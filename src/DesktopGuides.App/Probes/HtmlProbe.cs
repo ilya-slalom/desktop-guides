@@ -23,6 +23,8 @@ public sealed class HtmlProbe : IReaderProbe
     private HtmlAssetPolicy? policy;
     private CoreWebView2Environment? environment;
     private string? contentSha256;
+    private string? relativeDocument;
+    private string? stagingRoot;
     private int allowedRequests;
     private int blockedRequests;
     private int blockedPopups;
@@ -64,18 +66,37 @@ public sealed class HtmlProbe : IReaderProbe
         string root = Path.GetDirectoryName(path) ??
             throw new InvalidDataException("HTML fixture has no directory.");
         string rootPrefix = root + Path.DirectorySeparatorChar;
-        policy = new HtmlAssetPolicy(
-            root,
-            verifiedPaths.Where(item => item.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase)));
+        string[] originals = verifiedPaths
+            .Where(item => item.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        _ = new HtmlAssetPolicy(root, originals);
         contentSha256 = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(path)));
+        relativeDocument = Path.GetFileName(root) + "/" + Path.GetFileName(path);
+        stagingRoot = Path.Combine(Path.GetTempPath(), "DesktopGuides-P0", Guid.NewGuid().ToString("N"));
+        List<string> staged = [];
+        foreach (string original in originals)
+        {
+            string destination = Path.Combine(stagingRoot, Path.GetRelativePath(root, original));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(original, destination);
+            staged.Add(destination);
+        }
+        policy = new HtmlAssetPolicy(stagingRoot, staged);
 
-        string userData = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "DesktopGuides", "P0-WebView");
+        string userData = Path.Combine(stagingRoot, "profile");
         Directory.CreateDirectory(userData);
-        environment = await CoreWebView2Environment.CreateWithOptionsAsync(
-            null, userData, new CoreWebView2EnvironmentOptions());
-        await browser.EnsureCoreWebView2Async(environment);
+        try
+        {
+            environment = await CoreWebView2Environment.CreateWithOptionsAsync(
+                null, userData, new CoreWebView2EnvironmentOptions());
+            await browser.EnsureCoreWebView2Async(environment);
+        }
+        catch (Exception exception)
+        {
+            throw new InvalidOperationException(
+                "HTML requires Microsoft Edge WebView2 Runtime. Install or repair the runtime and retry.",
+                exception);
+        }
         CoreWebView2 core = browser.CoreWebView2;
         core.Settings.IsScriptEnabled = false;
         core.Settings.IsWebMessageEnabled = false;
@@ -122,7 +143,7 @@ public sealed class HtmlProbe : IReaderProbe
                 const y = window.scrollY;
                 let selected = null;
                 let nearest = Infinity;
-                for (const element of document.querySelectorAll('[id]')) {
+                for (const element of document.querySelectorAll('h1,h2,h3,h4,p,li,pre,blockquote')) {
                     const box = element.getBoundingClientRect();
                     if (box.bottom < 0 || box.top > window.innerHeight) continue;
                     const distance = Math.abs(box.top);
@@ -133,6 +154,7 @@ public sealed class HtmlProbe : IReaderProbe
                 }
                 return {
                     id: selected ? selected.id : null,
+                    quote: selected ? selected.textContent.trim().replace(/\s+/g, ' ').slice(0, 96) : null,
                     delta: selected ? -selected.getBoundingClientRect().top : 0,
                     fraction: y / Math.max(1, document.documentElement.scrollHeight - window.innerHeight)
                 };
@@ -141,11 +163,15 @@ public sealed class HtmlProbe : IReaderProbe
         using JsonDocument result = JsonDocument.Parse(raw);
         JsonElement data = result.RootElement;
         HtmlLocation location = new(
-            1,
+            2,
+            relativeDocument ?? throw new InvalidOperationException("Missing document path."),
             contentSha256 ?? throw new InvalidOperationException("Missing content hash."),
             data.GetProperty("id").ValueKind == JsonValueKind.Null
                 ? null
                 : data.GetProperty("id").GetString(),
+            data.GetProperty("quote").ValueKind == JsonValueKind.Null
+                ? null
+                : data.GetProperty("quote").GetString(),
             data.GetProperty("delta").GetDouble(),
             Math.Clamp(data.GetProperty("fraction").GetDouble(), 0, 1));
         return JsonSerializer.Serialize(location);
@@ -157,28 +183,57 @@ public sealed class HtmlProbe : IReaderProbe
             throw new InvalidOperationException("Open an HTML guide first.");
         HtmlLocation location = JsonSerializer.Deserialize<HtmlLocation>(locationJson) ??
             throw new InvalidDataException("Invalid HTML location.");
-        if (location.SchemaVersion != 1 || !string.Equals(
-                location.ContentSha256, contentSha256, StringComparison.OrdinalIgnoreCase))
+        if (location.SchemaVersion != 2 ||
+            !string.Equals(location.RelativeDocument, relativeDocument, StringComparison.Ordinal) ||
+            location.ElementId?.Length > 128 || location.TextContext?.Length > 96 ||
+            !double.IsFinite(location.Delta) || !double.IsFinite(location.Fraction))
         {
-            throw new InvalidDataException("This position belongs to a different HTML guide.");
+            throw new InvalidDataException("Invalid position or different HTML guide.");
         }
 
         string id = JsonSerializer.Serialize(location.ElementId);
+        string quote = JsonSerializer.Serialize(location.TextContext);
         string delta = location.Delta.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
         string fraction = location.Fraction.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
-        string raw = await core.ExecuteScriptAsync(
+        string restoreScript =
             $$"""
             (() => {
-                const element = document.getElementById({{id}});
+                let element = document.getElementById({{id}});
+                let kind = element ? 'element' : 'fraction';
+                const quote = {{quote}};
+                if (!element && quote) {
+                    element = Array.from(document.querySelectorAll('h1,h2,h3,h4,p,li,pre,blockquote'))
+                        .find(candidate => candidate.textContent.trim().replace(/\s+/g, ' ').includes(quote));
+                    if (element) kind = 'text context';
+                }
                 const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
                 const target = element
                     ? window.scrollY + element.getBoundingClientRect().top + {{delta}}
                     : max * {{fraction}};
                 window.scrollTo(0, Math.max(0, Math.min(target, max)));
-                return element ? 'element' : 'fraction';
+                return kind;
             })()
+            """;
+        string raw = await core.ExecuteScriptAsync(restoreScript);
+        await core.ExecuteScriptAsync(
+            """
+            Promise.race([
+                Promise.all(Array.from(document.images).map(image => image.complete
+                    ? Promise.resolve()
+                    : new Promise(resolve => {
+                        image.addEventListener('load', resolve, {once: true});
+                        image.addEventListener('error', resolve, {once: true});
+                    }))),
+                new Promise(resolve => setTimeout(resolve, 1500))
+            ])
             """);
+        raw = await core.ExecuteScriptAsync(restoreScript);
         restoreKind = JsonSerializer.Deserialize<string>(raw) ?? "unknown";
+        if (!string.Equals(location.ContentSha256, contentSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            restoreKind = "approximate " + restoreKind;
+        }
+        markerStatus.Text = $"Restored {restoreKind}: {location.ElementId ?? location.TextContext ?? "page"}";
     }
 
     public async Task ChangeScaleAsync(double factor)
@@ -194,6 +249,20 @@ public sealed class HtmlProbe : IReaderProbe
     public ValueTask DisposeAsync()
     {
         browser.Close();
+        if (stagingRoot is not null)
+        {
+            try
+            {
+                Directory.Delete(stagingRoot, true);
+            }
+            catch (IOException)
+            {
+                // WebView2 can keep its profile open briefly after the control closes.
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
         return ValueTask.CompletedTask;
     }
 
@@ -285,5 +354,6 @@ public sealed class HtmlProbe : IReaderProbe
     }
 
     private sealed record HtmlLocation(
-        int SchemaVersion, string ContentSha256, string? ElementId, double Delta, double Fraction);
+        int SchemaVersion, string RelativeDocument, string ContentSha256,
+        string? ElementId, string? TextContext, double Delta, double Fraction);
 }

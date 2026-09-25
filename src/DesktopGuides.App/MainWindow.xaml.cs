@@ -1,6 +1,7 @@
 using DesktopGuides.App.Probes;
 using DesktopGuides.Core.Fixtures;
 using Microsoft.UI.Xaml;
+using Microsoft.Web.WebView2.Core;
 
 namespace DesktopGuides.App;
 
@@ -22,7 +23,17 @@ public sealed partial class MainWindow : Window
                 .Where(entry => entry.Format is "txt" or "html" or "pdf")
                 .ToList();
             FixturePicker.SelectedIndex = 0;
-            StatusText.Text = $"{FixturePicker.Items.Count} guide fixtures verified.";
+            try
+            {
+                _ = CoreWebView2Environment.GetAvailableBrowserVersionString();
+                StatusText.Text = $"{FixturePicker.Items.Count} guide fixtures verified.";
+            }
+            catch (Exception)
+            {
+                StatusText.Text = $"{FixturePicker.Items.Count} guide fixtures verified. " +
+                    "HTML requires Microsoft Edge WebView2 Runtime; install or repair it to read HTML guides. " +
+                    "TXT and PDF remain available.";
+            }
         }
         catch (Exception exception)
         {

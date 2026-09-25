@@ -41,6 +41,27 @@ public sealed class HtmlAssetPolicyTests
         Assert.Null(policy.Resolve("GET", "https://guide.invalid/styles/main.css"));
     }
 
+    [Fact]
+    public void RejectsAnAssetReachedThroughADirectoryLink()
+    {
+        using AssetDirectory assets = new();
+        string outside = Path.Combine(Path.GetTempPath(), "desktop-guides-html-outside-" + Guid.NewGuid());
+        Directory.CreateDirectory(outside);
+        try
+        {
+            File.WriteAllText(Path.Combine(outside, "secret.html"), "Guide text");
+            string linked = Path.Combine(assets.Root, "linked");
+            Directory.CreateSymbolicLink(linked, outside);
+
+            Assert.Throws<InvalidDataException>(() =>
+                new HtmlAssetPolicy(assets.Root, [Path.Combine(linked, "secret.html")]));
+        }
+        finally
+        {
+            Directory.Delete(outside, true);
+        }
+    }
+
     private sealed class AssetDirectory : IDisposable
     {
         public AssetDirectory()

@@ -36,6 +36,25 @@ public sealed class FixtureCatalogTests
         Assert.Throws<InvalidDataException>(() => FixtureCatalog.Load(fixtures.Root));
     }
 
+    [Fact]
+    public void RejectsAFixtureThatLinksOutsideTheManifestRoot()
+    {
+        using FixtureDirectory fixtures = new("sample.txt", "Guide text", "linked");
+        string outside = Path.Combine(Path.GetTempPath(), "desktop-guides-outside-" + Guid.NewGuid());
+        try
+        {
+            File.WriteAllText(outside, "Guide text");
+            File.Delete(Path.Combine(fixtures.Root, "sample.txt"));
+            File.CreateSymbolicLink(Path.Combine(fixtures.Root, "sample.txt"), outside);
+
+            Assert.Throws<InvalidDataException>(() => FixtureCatalog.Load(fixtures.Root));
+        }
+        finally
+        {
+            File.Delete(outside);
+        }
+    }
+
     private sealed class FixtureDirectory : IDisposable
     {
         public FixtureDirectory(string relativePath, string content, string id)

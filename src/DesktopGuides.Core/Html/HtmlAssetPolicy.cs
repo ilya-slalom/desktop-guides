@@ -10,6 +10,10 @@ public sealed class HtmlAssetPolicy
     public HtmlAssetPolicy(string root, IEnumerable<string> allowedPaths)
     {
         this.root = Path.GetFullPath(root);
+        if ((File.GetAttributes(this.root) & FileAttributes.ReparsePoint) != 0)
+        {
+            throw new InvalidDataException("HTML asset root cannot be a filesystem link.");
+        }
         foreach (string path in allowedPaths)
         {
             string fullPath = Path.GetFullPath(path);

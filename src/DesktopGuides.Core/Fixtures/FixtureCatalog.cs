@@ -51,6 +51,18 @@ public sealed class FixtureCatalog
             {
                 throw new InvalidDataException($"Fixture escapes root: {entry.Path}");
             }
+            for (string? current = filePath; current is not null; current = System.IO.Path.GetDirectoryName(current))
+            {
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                {
+                    throw new InvalidDataException($"Fixture contains a link: {entry.Path}");
+                }
+                if (string.Equals(current, fullRoot, OperatingSystem.IsWindows()
+                        ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                {
+                    break;
+                }
+            }
             byte[] contents = File.ReadAllBytes(filePath);
             if (contents.LongLength != entry.Bytes ||
                 !string.Equals(
