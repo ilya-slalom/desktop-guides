@@ -11,6 +11,13 @@ param(
 $ErrorActionPreference = 'Stop'
 trap {
     $_ | Out-String | Set-Content ($ResultPath + '.error.txt') -Encoding UTF8
+    if ($null -ne $phases) {
+        [ordered]@{
+            fixture = $FixtureId
+            phases = $phases
+        } | ConvertTo-Json -Depth 8 |
+            Set-Content ($ResultPath + '.partial.json') -Encoding UTF8
+    }
     exit 1
 }
 Add-Type -AssemblyName UIAutomationClient

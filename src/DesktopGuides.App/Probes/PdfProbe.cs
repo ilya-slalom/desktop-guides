@@ -217,10 +217,11 @@ public sealed class PdfProbe : IReaderProbe
             await RenderPageAsync();
             UpdateStatus();
         }
-        catch (Exception)
+        catch (Exception error)
         {
             passwordBox.Password = "";
-            pageStatus.Text = "Could not unlock PDF. Check the password or file, then try again.";
+            pageStatus.Text = "Could not unlock PDF. Check the password or file, then try again. " +
+                $"P0 diagnostic: input length {password.Length}, HRESULT 0x{error.HResult:X8}.";
         }
         finally
         {
