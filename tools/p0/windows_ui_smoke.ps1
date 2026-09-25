@@ -319,9 +319,17 @@ elseif ($FixtureId -like 'pdf-*') {
         $box.SetFocus()
         [System.Windows.Forms.SendKeys]::SendWait('wrong')
         Invoke-Button 'Unlock PDF'
+        $deadline = (Get-Date).AddSeconds(10)
+        do {
+            $wrongStatus = Page-Status
+            if ($wrongStatus -like 'Could not unlock PDF.*') { break }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+        if ($wrongStatus -notlike 'Could not unlock PDF.*') {
+            throw "Wrong password did not return an error: $wrongStatus"
+        }
         Record-Phase 'wrong-password'
         $box.SetFocus()
-        [System.Windows.Forms.SendKeys]::SendWait('^a')
         [System.Windows.Forms.SendKeys]::SendWait('guide')
         Invoke-Button 'Unlock PDF'
         Wait-Page 1

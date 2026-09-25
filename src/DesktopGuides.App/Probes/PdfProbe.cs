@@ -197,13 +197,15 @@ public sealed class PdfProbe : IReaderProbe
 
     private async void UnlockClicked(object sender, RoutedEventArgs args)
     {
-        if (storageFile is null)
+        if (storageFile is null || !unlockButton.IsEnabled)
         {
             return;
         }
+        string password = passwordBox.Password;
+        unlockButton.IsEnabled = false;
         try
         {
-            document = await PdfDocument.LoadFromFileAsync(storageFile, passwordBox.Password);
+            document = await PdfDocument.LoadFromFileAsync(storageFile, password);
             if (document.PageCount == 0)
             {
                 throw new InvalidDataException("PDF has no pages.");
@@ -217,7 +219,12 @@ public sealed class PdfProbe : IReaderProbe
         }
         catch (Exception)
         {
+            passwordBox.Password = "";
             pageStatus.Text = "Could not unlock PDF. Check the password or file, then try again.";
+        }
+        finally
+        {
+            unlockButton.IsEnabled = true;
         }
     }
 
