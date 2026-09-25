@@ -1,7 +1,9 @@
 # Desktop Guides: work breakdown
 
-Status: P0 verified on the available Windows 11 x64 host, with the clean-VM
-prerequisite gate deferred by the user, 25 September 2026. Source:
+Status: P0 merged in [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1)
+on 25 September 2026. The clean-VM prerequisite gate and Windows 10 check
+remain deferred. P1 is designed in the [technical design](p1-technical-design.md)
+and [implementation plan](p1/implementation-plan.md). Source:
 [initial requirements and high-level design](initial-design.md). The backlog
 defines the acceptance gates; [Windows results](p0/results.md) record
 which checks have been performed. Windows 10 is deferred; native ARM64 CI
@@ -41,7 +43,7 @@ blocks S10 until a text-capable engine is validated.
 | R5 Per-guide resume | S02, S08, S09, S10, S12 |
 | R6 Reading and completion state | S12, S13 |
 | R7 Reader controls and appearance | S08, S09, S10, S11, S14 |
-| R8 Safe import and removal | S03, S04, S06, S07, S15 |
+| R8 Safe import, removal, and recovery | S03, S04, S06, S07, S15, S20 |
 | R9 Windows usability and accessibility | S01, S02, S10, S16, S17 |
 
 ## P0 — answer architectural questions
@@ -185,9 +187,9 @@ remain usable offline without giving imported pages access to app data.
 **Traces:** R2, R4. **Depends on:** S02, S06.
 
 **Acceptance:** An HTML guide with relative images and CSS displays offline;
-missing assets are reported during import. Scripts, remote images, CSS imports,
-forms, new windows, and off-root file paths cannot initiate embedded reader
-activity.
+missing assets are reported during import. Scripts, remote images, remote CSS
+imports, forms, new windows, and off-root file paths cannot initiate embedded
+reader activity. Supported local nested CSS imports remain inside the guide.
 
 - **T07.1** Resolve relative asset references against the selected import root
   and stage supported static images and CSS while preserving safe paths.
@@ -231,10 +233,10 @@ font-size or window-size change returns near the same text.
 with its layout and resume near the last text I saw. **Traces:** R2, R4, R5,
 R7. **Depends on:** S02, S07, S11.
 
-**Acceptance:** Local links within a guide work where their targets were
-imported; remote links require an explicit browser action. Resume works after
-reflow or theme/font changes, with a visible approximate fallback if the
-document changed.
+**Acceptance:** Fragment links within the imported entry document work;
+links to other HTML documents are unavailable in P1, and remote links require
+an explicit browser action. Resume works after reflow or theme/font changes,
+with a visible approximate fallback if the document changed.
 
 - **T09.1** Embed a restricted WebView2 reader for managed local content.
 - **T09.2** Apply host-owned theme/font styling without requiring page scripts.
@@ -249,13 +251,15 @@ document changed.
 
 **Story:** As a reader, I want a PDF manual to fit my window and reopen on the
 same page and part of that page. **Traces:** R2, R4, R5, R7, R9. **Depends on:**
-S02, S06, S11; PDF engine choice is a P0 decision.
+S02, S06, S11; the P0 raster-only result requires a P1 text-engine decision.
 
 **Acceptance:** Page jump, previous/next page, zoom, and fit-to-width work on
 short and long PDFs. Resume returns to the saved page and approximate vertical
-point after resizing. The release notes state any PDF text-accessibility
-limitation found in S02.
+point after resizing. A tagged PDF exposes usable document text to keyboard
+selection and a screen reader; a scanned PDF is labeled image-only.
 
+- **T10.0** Select and validate a distributable text-capable PDF path against
+  tagged and scanned fixtures, offline behavior, page location, and licensing.
 - **T10.1** Render and recycle pages with bounded cache/memory use.
 - **T10.2** Add page count, page jump, fit-to-width, zoom, and keyboard commands.
 - **T10.3** Persist zero-based page index and within-page fraction.
@@ -263,8 +267,9 @@ limitation found in S02.
   out-of-range saved value recovers without a crash.
 - **TR10.2** PDF bytes are read from the managed copy and no online viewer is
   required.
-- **TR10.3** If S02 finds PDF text accessibility is required for MVP, choose and
-  test a text-capable engine before treating this story as complete.
+- **TR10.3** A tested text-capable PDF path exposes document text from the tagged
+  fixture through Windows UI Automation before this story or the release is
+  complete. A raster-only image does not satisfy this requirement.
 
 ### S11 — Provide a consistent reading shell
 
@@ -387,7 +392,7 @@ reader, and the UI remains usable with Windows scaling and high contrast.
 ### S17 — Package and verify the MVP
 
 **Story:** As a Windows user, I want an installable app whose imported guides
-still work when I am offline. **Traces:** R4, R9. **Depends on:** S03–S16.
+still work when I am offline. **Traces:** R4, R9. **Depends on:** S03–S16, S20.
 
 **Acceptance:** A signed release candidate installs on the promised Windows
 targets. Import, restart, offline read, resume, and removal pass on a clean
@@ -403,6 +408,27 @@ machine. Missing WebView2 Runtime produces an actionable setup message.
   HTML, or PDF guide after prerequisites are installed.
 - **TR17.2** No OS or architecture is advertised without a recorded install and
   reader smoke result.
+
+### S20 — Export and restore a local backup
+
+**Story:** As a reader, I want a portable copy of my library so uninstall,
+machine loss, or an unsuccessful upgrade does not leave my only guide copies
+unrecoverable. **Traces:** R8. **Depends on:** S03, S15.
+
+**Acceptance:** An archive saved outside app data restores games, guides,
+preferences, and reading state into a clean installation. Restore validates
+its integrity before replacing an existing library. Export and restore are
+user initiated. After the first import, the app explains that uninstall
+removes its live library and points to Export in Settings.
+
+- **T20.1** Define a versioned manifest and archive of a consistent SQLite
+  snapshot and managed guide files.
+- **T20.2** Build export, validation, and restore flows with cancel/replace
+  conflict handling.
+- **TR20.1** Restore validates checksums and paths in staging before modifying
+  the active library.
+- **TR20.2** The export includes no credentials, transient WebView2 data, or
+  unrelated user files.
 
 ## P2 — reader depth and local ownership
 
@@ -436,22 +462,6 @@ a clear way back to the original formatting.
   preformatted fallback.
 - **TR19.1** Reflow never modifies imported source bytes or the canonical
   normalized-text locator.
-
-### S20 — Export and restore a local backup
-
-**Story:** As a reader, I want a portable backup of my library before trying
-sync or moving machines. **Depends on:** S03, S15.
-
-**Acceptance:** An exported archive restores games, guides, preferences, and
-reading state into a clean installation and passes an integrity check before
-any existing library is replaced.
-
-- **T20.1** Define a versioned manifest and archive of the SQLite snapshot and
-  managed guide files.
-- **T20.2** Build export, validation, and restore flows with conflict handling.
-- **TR20.1** Restore validates checksums and paths in staging before modifying
-  the active library.
-- **TR20.2** The export includes no credentials or transient WebView2 data.
 
 ### S21 — Add selected local material formats
 
@@ -522,13 +532,14 @@ keyboard-accessible, and can be disabled without affecting the base reader.
 
 1. Finish **S01–S02** and write down TXT, HTML, and PDF engine decisions.
    PDF accessibility can change S10, S16, and the release promise.
-2. Build **S03** and **S11** as the core framework. S04–S05 can then proceed
-   together. Build **S06** after S04, followed by S07–S10 where dependencies
-   allow.
-3. Integrate **S12–S16**, then run the clean-machine and offline gate in
-   **S17**. Keep P2/P3 outside the first-release completion claim.
-4. Revisit whether **S20** should move into P1 once the storage spike shows
-   how users can recover their library from uninstall or machine loss.
+2. Build **S03** and **S11** as the core framework while validating T10.0.
+   S04–S05 can then proceed together. Build **S06** after S04, followed by
+   S07–S10 where dependencies allow.
+3. Integrate **S12–S16** and **S20**, then run the clean-machine and offline
+   gate in **S17**. Keep P2/P3 outside the first-release completion claim.
+4. S20 moved into P1 because the managed library is the user's only copy
+   after an original is removed, and MSIX local app data is removed on
+   uninstall. Reassess archive size and restore usability during T20.1.
 
 The first release is ready only when R1–R9 have passing evidence on a tested
 Windows target and all P0 decisions affecting the MVP are resolved.

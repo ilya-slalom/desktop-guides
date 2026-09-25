@@ -9,6 +9,10 @@ The [work breakdown](docs/work-breakdown.md) maps those requirements to user
 stories, implementation tasks, and testable technical requirements.
 The [P0 technical design](docs/p0-technical-design.md) details the Windows
 baseline and TXT, HTML, and PDF reader experiments.
+The [progress record](docs/progress.md) distinguishes merged P0 work from
+deferred environment checks. The [P1 technical design](docs/p1-technical-design.md)
+and [implementation plan](docs/p1/implementation-plan.md) cover the first
+usable library release.
 
 The P0 implementation includes a WinUI 3 reader probe for TXT, static HTML,
 and PDF, a portable core library, self-authored fixtures, unit tests, and
