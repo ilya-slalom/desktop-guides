@@ -24,12 +24,65 @@ Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 Add-Type @'
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Threading;
 public static class SmokeWindow {
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr handle, out Rect rect);
     [DllImport("user32.dll")] public static extern bool MoveWindow(
         IntPtr handle, int x, int y, int width, int height, bool repaint);
     public struct Rect { public int Left, Top, Right, Bottom; }
+}
+// Sample window-message dispatch while UI Automation scrolls the long TXT view.
+public sealed class WindowResponseMonitor {
+    private const uint WmNull = 0;
+    private const uint SmtoAbortIfHung = 2;
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SendMessageTimeout(
+        IntPtr handle, uint message, IntPtr wParam, IntPtr lParam,
+        uint flags, uint timeoutMilliseconds, out IntPtr result);
+    private readonly IntPtr handle;
+    private Thread worker;
+    private volatile bool running;
+    private long maximumMilliseconds;
+    private long samples;
+    private long timeouts;
+    public WindowResponseMonitor(IntPtr handle) { this.handle = handle; }
+    public long MaximumMilliseconds { get { return Interlocked.Read(ref maximumMilliseconds); } }
+    public long Samples { get { return Interlocked.Read(ref samples); } }
+    public long Timeouts { get { return Interlocked.Read(ref timeouts); } }
+    public void Start() {
+        running = true;
+        worker = new Thread(Run);
+        worker.IsBackground = true;
+        worker.Start();
+    }
+    public void Stop() {
+        running = false;
+        if (worker != null && !worker.Join(3000)) {
+            throw new TimeoutException("UI response monitor did not stop.");
+        }
+    }
+    private void Run() {
+        while (running) {
+            Stopwatch timer = Stopwatch.StartNew();
+            IntPtr result;
+            IntPtr status = SendMessageTimeout(
+                handle, WmNull, IntPtr.Zero, IntPtr.Zero, SmtoAbortIfHung, 1000, out result);
+            timer.Stop();
+            Interlocked.Increment(ref samples);
+            if (status == IntPtr.Zero) Interlocked.Increment(ref timeouts);
+            long duration = timer.ElapsedMilliseconds;
+            long previous = Interlocked.Read(ref maximumMilliseconds);
+            while (duration > previous) {
+                long actual = Interlocked.CompareExchange(
+                    ref maximumMilliseconds, duration, previous);
+                if (actual == previous) break;
+                previous = actual;
+            }
+            Thread.Sleep(25);
+        }
+    }
 }
 '@
 
@@ -196,6 +249,9 @@ function Record-Phase([string] $action) {
 $clock = [System.Diagnostics.Stopwatch]::StartNew()
 $phases = [System.Collections.Generic.List[object]]::new()
 $scrollCalls = [System.Collections.Generic.List[long]]::new()
+$uiResponseMaxMilliseconds = $null
+$uiResponseSamples = $null
+$uiResponseTimeouts = $null
 $picker = Find-ById 'FixturePicker'
 if ($null -eq $picker) {
     throw 'Fixture picker is unavailable.'
@@ -280,12 +336,26 @@ elseif ($FixtureId -like 'txt-*') {
         $scroll = $null
         if ($null -ne $list -and $list.TryGetCurrentPattern(
                 [System.Windows.Automation.ScrollPattern]::Pattern, [ref] $scroll)) {
-            for ($index = 0; $index -lt 8; $index++) {
-                $callClock = [System.Diagnostics.Stopwatch]::StartNew()
-                $scroll.Scroll(
-                    [System.Windows.Automation.ScrollAmount]::NoAmount,
-                    [System.Windows.Automation.ScrollAmount]::LargeIncrement)
-                $scrollCalls.Add($callClock.ElapsedMilliseconds)
+            $monitor = [WindowResponseMonitor]::new($process.MainWindowHandle)
+            $monitor.Start()
+            try {
+                for ($index = 0; $index -lt 8; $index++) {
+                    $callClock = [System.Diagnostics.Stopwatch]::StartNew()
+                    $scroll.Scroll(
+                        [System.Windows.Automation.ScrollAmount]::NoAmount,
+                        [System.Windows.Automation.ScrollAmount]::LargeIncrement)
+                    $scrollCalls.Add($callClock.ElapsedMilliseconds)
+                }
+                Start-Sleep -Milliseconds 500
+            }
+            finally {
+                $monitor.Stop()
+            }
+            $uiResponseMaxMilliseconds = $monitor.MaximumMilliseconds
+            $uiResponseSamples = $monitor.Samples
+            $uiResponseTimeouts = $monitor.Timeouts
+            if ($uiResponseSamples -lt 5) {
+                throw 'UI response monitor took too few samples.'
             }
             Record-Phase 'scroll'
         }
@@ -435,6 +505,9 @@ $result = [ordered] @{
     } else { $null }
     openToVisibleMilliseconds = $openToVisibleMilliseconds
     scrollCallsMilliseconds = $scrollCalls
+    uiResponseMaxMilliseconds = $uiResponseMaxMilliseconds
+    uiResponseSamples = $uiResponseSamples
+    uiResponseTimeouts = $uiResponseTimeouts
     phases = $phases
 }
 $directory = Split-Path $ResultPath
