@@ -89,8 +89,13 @@ jobs:
       - name: Record build manifest
         shell: pwsh
         run: |
-          $packages = @(Get-ChildItem src/DesktopGuides.App/AppPackages -Recurse -Filter *.msix)
-          if ($packages.Count -ne 1) { throw "Expected one MSIX, found $($packages.Count)." }
+          $packages = @(
+            Get-ChildItem src/DesktopGuides.App/AppPackages -Recurse -Filter 'DesktopGuides.App_*.msix' |
+              Where-Object { $_.BaseName.EndsWith('_${{ matrix.architecture }}', [StringComparison]::OrdinalIgnoreCase) }
+          )
+          if ($packages.Count -ne 1) {
+            throw "Expected one ${{ matrix.architecture }} app MSIX, found $($packages.Count)."
+          }
           $package = $packages[0]
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $visualStudio = if (Test-Path $vswhere) {
