@@ -1,9 +1,12 @@
 # Desktop Guides: work breakdown
 
-Status: P0 implementation in progress, 25 September 2026. Source:
+Status: P0 verified on the available Windows 11 x64 host, with the clean-VM
+prerequisite gate still open, 25 September 2026. Source:
 [initial requirements and high-level design](initial-design.md). The backlog
-defines the acceptance gates; [initial Windows results](p0/results.md) record
-which checks have been performed.
+defines the acceptance gates; [Windows results](p0/results.md) record
+which checks have been performed. Windows 10 is deferred; native ARM64 CI
+passed the installed reader fixtures. [The PDF decision](p0/reader-decisions.md)
+blocks S10 until a text-capable engine is validated.
 
 ## How to use this backlog
 

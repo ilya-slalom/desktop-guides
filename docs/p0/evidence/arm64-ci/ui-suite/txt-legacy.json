@@ -1,0 +1,106 @@
+﻿{
+    "fixture":  "txt-legacy",
+    "observedAt":  "2026-09-25T08:59:05.2019969Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "ARM64",
+    "processWorkingSetBytes":  138899456,
+    "processPeakWorkingSetBytes":  152580096,
+    "passwordEntryMode":  null,
+    "openToVisibleMilliseconds":  1376,
+    "scrollCallsMilliseconds":  [
+
+                                ],
+    "phases":  [
+                   {
+                       "action":  "open",
+                       "status":  "Could not open txt-legacy: The text is not valid UTF-8. Choose its original encoding.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  578,
+                       "workingSetBytes":  149778432,
+                       "peakWorkingSetBytes":  152580096
+                   },
+                   {
+                       "action":  "strict-utf8-error",
+                       "status":  "Could not open txt-legacy: The text is not valid UTF-8. Choose its original encoding.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  855,
+                       "workingSetBytes":  149786624,
+                       "peakWorkingSetBytes":  152580096
+                   },
+                   {
+                       "action":  "open-cp437",
+                       "status":  "txt-legacy: 3 lines; first visible 0; 0 realized visuals; prepare 8 ms; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  3,
+                       "elapsedMilliseconds":  1411,
+                       "workingSetBytes":  150507520,
+                       "peakWorkingSetBytes":  152580096
+                   },
+                   {
+                       "action":  "capture",
+                       "status":  "Position captured. 3 lines; first visible 1; 3 realized visuals; prepare 8 ms; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  3,
+                       "elapsedMilliseconds":  1729,
+                       "workingSetBytes":  150585344,
+                       "peakWorkingSetBytes":  152580096
+                   },
+                   {
+                       "action":  "resize",
+                       "status":  "Position captured. 3 lines; first visible 1; 3 realized visuals; prepare 8 ms; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  3,
+                       "elapsedMilliseconds":  2555,
+                       "workingSetBytes":  150138880,
+                       "peakWorkingSetBytes":  152580096
+                   },
+                   {
+                       "action":  "larger",
+                       "status":  "3 lines; first visible 1; 3 realized visuals; prepare 8 ms; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  3,
+                       "elapsedMilliseconds":  2856,
+                       "workingSetBytes":  141066240,
+                       "peakWorkingSetBytes":  152580096
+                   },
+                   {
+                       "action":  "restore",
+                       "status":  "Position restored. 3 lines; first visible 1; 3 realized visuals; prepare 8 ms; restore Exact.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  3,
+                       "elapsedMilliseconds":  3157,
+                       "workingSetBytes":  138657792,
+                       "peakWorkingSetBytes":  152580096
+                   }
+               ]
+}

@@ -1,0 +1,80 @@
+﻿{
+    "fixture":  "txt-utf8",
+    "observedAt":  "2026-09-25T08:58:57.5891932Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "ARM64",
+    "processWorkingSetBytes":  147640320,
+    "processPeakWorkingSetBytes":  148824064,
+    "passwordEntryMode":  null,
+    "openToVisibleMilliseconds":  798,
+    "scrollCallsMilliseconds":  [
+
+                                ],
+    "phases":  [
+                   {
+                       "action":  "open",
+                       "status":  "txt-utf8: 5 lines; first visible 0; 0 realized visuals; prepare 9 ms; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  5,
+                       "elapsedMilliseconds":  1200,
+                       "workingSetBytes":  146235392,
+                       "peakWorkingSetBytes":  147255296
+                   },
+                   {
+                       "action":  "capture",
+                       "status":  "Position captured. 5 lines; first visible 1; 5 realized visuals; prepare 9 ms; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  5,
+                       "elapsedMilliseconds":  1545,
+                       "workingSetBytes":  147570688,
+                       "peakWorkingSetBytes":  147570688
+                   },
+                   {
+                       "action":  "resize",
+                       "status":  "Position captured. 5 lines; first visible 1; 5 realized visuals; prepare 9 ms; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  5,
+                       "elapsedMilliseconds":  2387,
+                       "workingSetBytes":  146939904,
+                       "peakWorkingSetBytes":  148824064
+                   },
+                   {
+                       "action":  "larger",
+                       "status":  "5 lines; first visible 1; 5 realized visuals; prepare 9 ms; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  5,
+                       "elapsedMilliseconds":  2707,
+                       "workingSetBytes":  147206144,
+                       "peakWorkingSetBytes":  148824064
+                   },
+                   {
+                       "action":  "restore",
+                       "status":  "Position restored. 5 lines; first visible 1; 5 realized visuals; prepare 9 ms; restore Exact.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  5,
+                       "elapsedMilliseconds":  3021,
+                       "workingSetBytes":  147386368,
+                       "peakWorkingSetBytes":  148824064
+                   }
+               ]
+}

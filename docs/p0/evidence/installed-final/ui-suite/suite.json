@@ -1,0 +1,72 @@
+﻿[
+    {
+        "fixture":  "txt-utf8",
+        "passed":  true,
+        "result":  "E:\\work\\desktop-guides\\artifacts\\signed-final-x64\\ui-suite\\txt-utf8.json"
+    },
+    {
+        "fixture":  "txt-bom",
+        "passed":  true,
+        "result":  "E:\\work\\desktop-guides\\artifacts\\signed-final-x64\\ui-suite\\txt-bom.json"
+    },
+    {
+        "fixture":  "txt-legacy",
+        "passed":  true,
+        "result":  "E:\\work\\desktop-guides\\artifacts\\signed-final-x64\\ui-suite\\txt-legacy.json"
+    },
+    {
+        "fixture":  "txt-ascii",
+        "passed":  true,
+        "result":  "E:\\work\\desktop-guides\\artifacts\\signed-final-x64\\ui-suite\\txt-ascii.json"
+    },
+    {
+        "fixture":  "txt-long",
+        "passed":  true,
+        "result":  "E:\\work\\desktop-guides\\artifacts\\signed-final-x64\\ui-suite\\txt-long.json"
+    },
+    {
+        "fixture":  "html-static",
+        "passed":  true,
+        "result":  "E:\\work\\desktop-guides\\artifacts\\signed-final-x64\\ui-suite\\html-static.json"
+    },
+    {
+        "fixture":  "html-layout",
+        "passed":  true,
+        "result":  "E:\\work\\desktop-guides\\artifacts\\signed-final-x64\\ui-suite\\html-layout.json"
+    },
+    {
+        "fixture":  "html-hostile",
+        "passed":  true,
+        "result":  "E:\\work\\desktop-guides\\artifacts\\signed-final-x64\\ui-suite\\html-hostile.json"
+    },
+    {
+        "fixture":  "redirect",
+        "passed":  true,
+        "result":  "E:\\work\\desktop-guides\\artifacts\\signed-final-x64\\ui-suite\\redirect.json"
+    },
+    {
+        "fixture":  "pdf-short",
+        "passed":  true,
+        "result":  "E:\\work\\desktop-guides\\artifacts\\signed-final-x64\\ui-suite\\pdf-short.json"
+    },
+    {
+        "fixture":  "pdf-long",
+        "passed":  true,
+        "result":  "E:\\work\\desktop-guides\\artifacts\\signed-final-x64\\ui-suite\\pdf-long.json"
+    },
+    {
+        "fixture":  "pdf-access",
+        "passed":  true,
+        "result":  "E:\\work\\desktop-guides\\artifacts\\signed-final-x64\\ui-suite\\pdf-access.json"
+    },
+    {
+        "fixture":  "pdf-scan",
+        "passed":  true,
+        "result":  "E:\\work\\desktop-guides\\artifacts\\signed-final-x64\\ui-suite\\pdf-scan.json"
+    },
+    {
+        "fixture":  "pdf-locked",
+        "passed":  true,
+        "result":  "E:\\work\\desktop-guides\\artifacts\\signed-final-x64\\ui-suite\\pdf-locked.json"
+    }
+]

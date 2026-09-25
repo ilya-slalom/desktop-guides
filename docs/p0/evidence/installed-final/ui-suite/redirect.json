@@ -1,0 +1,105 @@
+﻿{
+    "fixture":  "redirect",
+    "observedAt":  "2026-09-25T08:30:58.5150436Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "AMD64",
+    "processWorkingSetBytes":  263319552,
+    "processPeakWorkingSetBytes":  263397376,
+    "openToVisibleMilliseconds":  null,
+    "scrollCallsMilliseconds":  [
+
+                                ],
+    "phases":  [
+                   {
+                       "action":  "open",
+                       "status":  "redirect: assets 1, blocked 0, popups 0; open 1370 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2020,
+                       "workingSetBytes":  263036928,
+                       "peakWorkingSetBytes":  263397376
+                   },
+                   {
+                       "action":  "jump",
+                       "status":  "redirect: assets 1, blocked 0, popups 0; open 1370 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "Marker: ",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2322,
+                       "workingSetBytes":  263004160,
+                       "peakWorkingSetBytes":  263397376
+                   },
+                   {
+                       "action":  "capture",
+                       "status":  "Position captured. assets 1, blocked 3, popups 0; open 1370 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "Marker: ",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2619,
+                       "workingSetBytes":  263159808,
+                       "peakWorkingSetBytes":  263397376
+                   },
+                   {
+                       "action":  "top",
+                       "status":  "Position captured. assets 1, blocked 3, popups 0; open 1370 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "At top.",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2916,
+                       "workingSetBytes":  263184384,
+                       "peakWorkingSetBytes":  263397376
+                   },
+                   {
+                       "action":  "resize",
+                       "status":  "Position captured. assets 1, blocked 3, popups 0; open 1370 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "At top.",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  3738,
+                       "workingSetBytes":  263118848,
+                       "peakWorkingSetBytes":  263397376
+                   },
+                   {
+                       "action":  "larger",
+                       "status":  "assets 1, blocked 3, popups 0; open 1370 ms; zoom 1.10; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "At top.",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  4033,
+                       "workingSetBytes":  263151616,
+                       "peakWorkingSetBytes":  263397376
+                   },
+                   {
+                       "action":  "restore",
+                       "status":  "Position restored. assets 1, blocked 3, popups 0; open 1370 ms; zoom 1.10; restore fraction.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "Restored fraction: page",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  4325,
+                       "workingSetBytes":  263307264,
+                       "peakWorkingSetBytes":  263397376
+                   }
+               ]
+}

@@ -1,45 +1,22 @@
-# P0 implementation plan
+# P0 implementation plan and exit gates
 
-Status: in progress, 25 September 2026. The solution, WinUI 3 launch, core
-tests, fixture generator, reader adapters, and package builds have initial
-Windows results. CI execution, a clean MSIX installation, offline operation,
-and PDF document-text accessibility remain open. Implements
-[P0 technical design](../p0-technical-design.md) and S01–S02 in the
-[work breakdown](../work-breakdown.md).
+Status: available Windows 11 x64 work verified on 25 September 2026; native Windows 11 ARM64 Core and installed UI fixtures also passed in CI. The clean-machine absent-prerequisite gate remains open because the available x64 host has Windows App Runtime and WebView2 installed and no disposable VM is enabled. Windows 10 x64 is deferred. The [technical design](../p0-technical-design.md), [results](results.md) and [reader decisions](reader-decisions.md) explain the evidence and limits.
 
-The immediate path is to make the core and test runner build on Windows, then
-add the packaged WinUI probe and format adapters. The Windows workspace is
-`E:\work\desktop-guides` on the SSH host `pcsx2-win`. The macOS checkout is the
-source of truth; copy it to that path before each Windows verification run.
+The macOS repository is the source checkout. Windows verification uses `E:\work\desktop-guides` on `pcsx2-win`. Copy source there before each build or UI run.
 
-## Steps
+| Task | State | Verified outcome or remaining gate |
+| --- | --- | --- |
+| T01.1 WinUI solution and contracts | Done | WinUI 3 window, separate Core and probe adapters, locked toolchain, Windows 11 x64 launch. |
+| T01.2 Windows CI | Done | Fresh runner 23/23 tests, native ARM64 Core 23/23 tests, architecture-labeled x64 and ARM64 packages with SHA-256 manifests; deliberate failing Core test failed CI and skipped packaging. |
+| T01.3 Signed installation and prerequisites | **Partial** | Development-signed x64 MSIX installed/launched on Windows 11; 14/14 fixture workflows passed online and during a physically disconnected relaunch. Native ARM64 CI installed/launched and passed 14/14 UI fixtures. Temporary cert/package cleanup verified. Missing WebView2 was simulated without removing the shared runtime and recovery passed. A **clean Windows 11 VM** must still prove actual missing Windows App Runtime/WebView2 failure and offline-installer recovery. |
+| T02.1 Fixture corpus | Done | Deterministic generator and 19-entry CC0 manifest, including tagged, scanned and encrypted PDFs; SHA-256 verified on macOS and Windows. Filesystem-link escape tests ran on Windows. |
+| T02.2 Native TXT probe | Done for P0 | Strict UTF-8 and explicit CP437, newline/whitespace tests, 10 MiB first-text and realized-item metrics, exact restore after resize/font change and a tested edited-context fallback. |
+| T02.3 Restricted HTML probe | Done for P0 | Fresh staged assets/profile, blocked navigation/resources/popups, canary zero guide requests, online/offline local assets, ID and text-context restore after reflow. |
+| T02.4 PDF probe and engine decision | Done with S10 blocker | Fit-width page preview, bounded neighbor cache, rapid-turn generation checks, fractional restore, locked-PDF password flow and accessibility tree/Narrator keyboard observations. Native raster rendering is rejected as the final text-accessible PDF reader; S10 awaits a text-capable engine. |
+| Evidence and choices | Done | Fixture-linked [online](evidence/installed-final/ui-suite/suite.json) and [offline](evidence/offline/ui-suite/suite.json) traces, CI manifests, signed install record and format decisions are preserved. |
 
-- [x] **T01.1:** Pin .NET/Windows App SDK packages; create `DesktopGuides.sln`,
-  `src/DesktopGuides.Core`, `src/DesktopGuides.App`, and
-  `tests/DesktopGuides.Core.Tests`. Verify Core tests run and a WinUI window
-  builds and launches on Windows 11 x64.
-- [ ] **T02.1:** Add self-authored TXT/HTML/PDF fixtures, generator, and hash
-  manifest. Verify hashes on both hosts before probing.
-- [ ] **T02.2:** Write failing tests for strict TXT decoding, newline
-  normalization, line indexing, and locator restoration. Implement the native
-  bounded TXT view and measure it on the generated 10 MiB guide.
-- [ ] **T02.3:** Add a restricted WebView2 static HTML probe. Test local assets,
-  blocked hostile requests/navigation, capture/restore, and offline behavior
-  on the Windows host.
-- [ ] **T02.4:** Add a `Windows.Data.Pdf` page probe. Test page/zoom/restore
-  and cache bounds; inspect tagged-document text access with Narrator.
-- [ ] **T01.2:** Add a Windows CI workflow for restore, headless tests, and
-  architecture-labeled package builds. Check that test failures make CI fail.
-- [ ] **T01.3:** Build a development MSIX, install and launch on a clean
-  Windows 11 x64 VM/session, record WebView2 and framework prerequisites, and
-  repeat the probes offline.
-- [ ] Record fixture-linked results and reader choices in `docs/p0/results.md`
-  and `docs/p0/reader-decisions.md`. Mark untested OS/CPU combinations as such.
+## Remaining external gate
 
-## Review focus
+On a disposable, runtime-free Windows 11 x64 VM, run the [signed install procedure](toolchain.md) first without the Windows App Runtime framework and record the deployment error. Install the official x64 framework dependency, install the app, then check HTML before and after adding the official offline WebView2 Runtime. Record app version, OS/CPU, hashes, installer logs and the three reader outcomes. The local host cannot give an absent-prerequisite observation without removing shared runtimes or enabling a VM and rebooting it.
 
-- Invalid UTF-8 must produce an encoding choice, not silent replacement.
-- A long TXT guide must not create one persistent visual per source line.
-- CSS and HTML requests must not reach an external host, even with scripts off.
-- Restored HTML must survive images changing the page height.
-- A PDF bitmap must not be reported as screen-reader-readable document text.
+Windows 10 x64 launch stays `untested` until a suitable host or remote CI is available. Native ARM64 installation, launch and 14 reader fixtures passed in CI; ARM64 offline and physical keyboard password entry were not checked. S10 remains blocked by the PDF engine decision, independently of deployment.

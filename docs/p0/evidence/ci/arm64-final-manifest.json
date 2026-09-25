@@ -1,0 +1,22 @@
+{
+  "commit": "a9bdd212f1935e7485bf55c1e201bacf05f04aa2",
+  "architecture": "ARM64",
+  "runnerImage": "win25-vs2026 20260922.246.2",
+  "osBuild": "10.0.26100.0",
+  "dotnetSdk": "10.0.401",
+  "visualStudio": "18.10.12210.168",
+  "windowsSdkBins": [
+    "10.0.14393.0",
+    "10.0.15063.0",
+    "10.0.16299.0",
+    "10.0.17134.0",
+    "10.0.26100.0",
+    "arm64",
+    "x64",
+    "x86"
+  ],
+  "package": "DesktopGuides.App_0.1.0.0_arm64.msix",
+  "packageVersion": "0.1.0.0",
+  "packageBytes": 62571484,
+  "packageSha256": "4CF9A62B68A94E1B8D7981669A84CCE77197395D531EEAD4D71855A36B514304"
+}

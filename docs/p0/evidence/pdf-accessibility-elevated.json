@@ -1,0 +1,17 @@
+﻿{
+    "observedAt":  "2026-09-25T08:11:06.3626917Z",
+    "osBuild":  "10.0.26200.0",
+    "appProcessId":  42736,
+    "narratorRunning":  true,
+    "narratorStartedForCheck":  true,
+    "previousKeyboardFocusable":  true,
+    "nextKeyboardFocusable":  true,
+    "focusedPrevious":  "Previous page",
+    "focusedAfterTab":  "Next page",
+    "focusedWithNarrator":  "Next page",
+    "pageImageName":  "Rendered image of PDF page 1 of 1",
+    "pageImageKeyboardFocusable":  false,
+    "pageImageHasTextPattern":  false,
+    "taggedParagraphInAutomationTree":  false,
+    "narratorSpeechCaptured":  false
+}

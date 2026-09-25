@@ -1,0 +1,27 @@
+﻿{
+    "fixture":  "html-static",
+    "observedAt":  "2026-09-25T08:05:04.2494177Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "AMD64",
+    "processWorkingSetBytes":  158240768,
+    "processPeakWorkingSetBytes":  158240768,
+    "openToVisibleMilliseconds":  null,
+    "scrollCallsMilliseconds":  [
+
+                                ],
+    "phases":  [
+                   {
+                       "action":  "open",
+                       "status":  "Could not open html-static: HTML requires Microsoft Edge WebView2 Runtime. Install or repair the runtime and retry.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  704,
+                       "workingSetBytes":  158232576,
+                       "peakWorkingSetBytes":  158232576
+                   }
+               ]
+}

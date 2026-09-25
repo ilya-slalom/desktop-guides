@@ -1,0 +1,119 @@
+﻿{
+    "fixture":  "html-hostile",
+    "observedAt":  "2026-09-25T08:59:25.8666560Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "ARM64",
+    "processWorkingSetBytes":  248422400,
+    "processPeakWorkingSetBytes":  249778176,
+    "passwordEntryMode":  null,
+    "openToVisibleMilliseconds":  null,
+    "scrollCallsMilliseconds":  [
+
+                                ],
+    "phases":  [
+                   {
+                       "action":  "open",
+                       "status":  "html-hostile: assets 2, blocked 0, popups 0; open 619 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  1264,
+                       "workingSetBytes":  246980608,
+                       "peakWorkingSetBytes":  249778176
+                   },
+                   {
+                       "action":  "try-links",
+                       "status":  "html-hostile: assets 2, blocked 0, popups 0; open 619 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  1579,
+                       "workingSetBytes":  247291904,
+                       "peakWorkingSetBytes":  249778176
+                   },
+                   {
+                       "action":  "jump",
+                       "status":  "html-hostile: assets 2, blocked 0, popups 0; open 619 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "Marker: ",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  1884,
+                       "workingSetBytes":  247357440,
+                       "peakWorkingSetBytes":  249778176
+                   },
+                   {
+                       "action":  "capture",
+                       "status":  "Position captured. assets 2, blocked 3, popups 1; open 619 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "Marker: ",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2184,
+                       "workingSetBytes":  247382016,
+                       "peakWorkingSetBytes":  249778176
+                   },
+                   {
+                       "action":  "top",
+                       "status":  "Position captured. assets 2, blocked 3, popups 1; open 619 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "At top.",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2485,
+                       "workingSetBytes":  247304192,
+                       "peakWorkingSetBytes":  249778176
+                   },
+                   {
+                       "action":  "resize",
+                       "status":  "Position captured. assets 2, blocked 3, popups 1; open 619 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "At top.",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  3306,
+                       "workingSetBytes":  248180736,
+                       "peakWorkingSetBytes":  249778176
+                   },
+                   {
+                       "action":  "larger",
+                       "status":  "assets 2, blocked 3, popups 1; open 619 ms; zoom 1.10; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "At top.",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  3620,
+                       "workingSetBytes":  248070144,
+                       "peakWorkingSetBytes":  249778176
+                   },
+                   {
+                       "action":  "restore",
+                       "status":  "Position restored. assets 2, blocked 3, popups 1; open 619 ms; zoom 1.10; restore text context.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "Restored text context: Hostile resource probe",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  3942,
+                       "workingSetBytes":  248180736,
+                       "peakWorkingSetBytes":  249778176
+                   }
+               ]
+}

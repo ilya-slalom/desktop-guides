@@ -1,42 +1,52 @@
-# P0 reader probe: initial Windows observations
+# P0 Windows reader and deployment results
 
-Status: partial, 25 September 2026. This records implementation evidence for
-[T01.1–T02.4](../p0-technical-design.md) on one Windows 11 x64 host. The
-working tree was uncommitted when these observations were made; app package
-version was `0.1.0.0`. Fixture hashes and self-authored provenance are in the
-[manifest](../../tests/fixtures/p0/manifest.json). The
-[toolchain note](toolchain.md) records versions and reproduction commands.
+Status: Windows 11 x64 reader and installed/offline gates verified, 25 September 2026. Native Windows 11 ARM64 Core execution and all 14 installed reader fixtures passed in CI. The clean-machine missing-framework check and Windows 10 runtime check remain unverified; see [limits](#limits-and-follow-up). This records the P0 experiments in [T01–T02](../p0-technical-design.md). The final x64 online app commit is `1a361aa286810acd505bd3020a6c442f439a37ac`; the physically disconnected x64 run used `b8d9efccf404a1f9b0e3f15d4bf8b964552d8c42`; the ARM64 CI suite used `a9bdd212f1935e7485bf55c1e201bacf05f04aa2`. Package version is `0.1.0.0`.
 
-| Fixture and SHA-256 | Windows observation | Evidence |
-| --- | --- | --- |
-| `txt-long`: `fe1fbddf8febae06a00c153cf9f4511a527ec34b78a618ffffa4d65ba45e78f7` | The 10 MiB file produced 197,845 indexed lines. After scrolling, 98 `ListViewItem` visuals were realized. Capture at visible line 20 and restore after increasing font size returned to line 20 with an exact content-hash match. Decode and line preparation took 46 ms; first paint and scroll gaps were not timed. | [Trace](evidence/txt-long.json) |
-| `html-layout`: `bf517fb8c5733e683593be118af9ba95fa2b16333fb65ed461ee172b610e0127` | The local image loaded. Jumping to `resume`, capturing, returning to top, increasing text zoom to 1.10, and restoring used the element locator. A screenshot inspection showed the “Resume marker after chart” visible after restore. The complete HTML navigation took 1,310 ms. | [Trace](evidence/html-layout.json) |
-| `html-hostile`: `9d1011d5b0f4f91024234078b5e61c44c1a9e9337f991af5c77a3c64eb1c087a` | A loopback canary on `127.0.0.1:8765` returned 204 for a health request. After loading hostile HTML and exercising its links, the canary logged **zero guide requests**. The adapter recorded 3 blocked requests or navigations and 1 blocked popup. Local CSS loaded. | [Trace](evidence/html-hostile.json) |
-| `pdf-long`: `3ea02ce2dcd27b67034df87a0f8c3cbbf35580e9ae2deec808c1b239a4442eeb` | The 200-page PDF rendered page 1, moved to page 2, captured, moved back to page 1, and restored page 2. Estimated current decoded raster size was 7.4 MiB, below the 96 MiB cap. First page load and render took 125 ms. | [Trace](evidence/pdf-long.json) |
+## Environment and repeatable builds
 
-The TXT, HTML, and PDF views were also inspected visually in the WinUI window.
-`txt-utf8` displayed café and Japanese characters; `html-static` displayed
-its nested CSS and local blue map image; and `pdf-short` displayed a raster page
-with accessible Previous/Next controls and an image-only text-accessibility
-notice. After the last source change, locked restore and **20/20 core tests**
-passed on the Windows host, and the current x64 and ARM64 MSIX builds both
-succeeded. Packaging reported one warning for the optional `mspdbcmf.exe`
-symbols tool; no build errors occurred.
+The interactive target was Windows 11 Enterprise build `10.0.26200.0`, x64, AMD Ryzen 7 7800X3D, about 63 GiB RAM, 96 DPI. Source was staged under `E:\work\desktop-guides`. It had .NET SDK `10.0.401`, Windows App Runtime `2.5.1` x64, and Evergreen WebView2 Runtime `153.0.4234.48`. The app is WinUI 3. The suite uses Windows UI Automation in the active desktop session. Source fixtures were regenerated and all [manifest](../../tests/fixtures/p0/manifest.json) hashes verified on macOS and Windows before use.
 
-## Limits of these observations
+[CI run 36115189930](https://github.com/ilya-slalom/desktop-guides/actions/runs/36115189930) on `a9bdd21` passed all five jobs: 23/23 headless Core tests, 23/23 native ARM64 Core tests, x64 and ARM64 package builds, and the 14/14 installed ARM64 UI suite. The packages were built on fresh Windows Server 2025 x64 runners (`win25-vs2026 20260922.246.2`, OS build `10.0.26100.0`, VS `18.10.12210.168`, SDK `10.0.401`). The [x64 manifest](evidence/ci/x64-final-manifest.json) records a 64,361,586-byte MSIX with SHA-256 `cde5460b9f9a027d495dfebcd0edce3afc9f9a8ea4b0af7a02d33ac7b664c130`; the [ARM64 manifest](evidence/ci/arm64-final-manifest.json) records a 62,571,484-byte MSIX with SHA-256 `4cf9a62b68a94e1b8d7981669a84cce77197395d531eead4d71855a36b514304`. Downloaded hashes matched both manifests. The ARM64 Core [environment](evidence/ci/native-arm64-environment.json) and [23-pass TRX](evidence/ci/native-arm64-core.trx) from the earlier passing [native run 36111487852](https://github.com/ilya-slalom/desktop-guides/actions/runs/36111487852) record a native `Arm64` process on Windows 11 build `10.0.26200.0`, with Windows App Runtime `2.5.1`. [CI run 36109671195](https://github.com/ilya-slalom/desktop-guides/actions/runs/36109671195) injected a deliberate Core failure: 1 failed and 23 passed; both package jobs were skipped. Thus the test job gates packaging.
 
-- The GUI run used a self-contained **unpackaged** x64 publish. Both x64 and
-  ARM64 MSIX packages built, but neither current package was installed or
-  launched. The ARM64 artifact was built on x64 hardware; native ARM64 and
-  Windows 10 runs are pending.
-- No clean VM, offline network-disconnect run, or missing-runtime recovery run
-  was performed. The empty loopback log proves only that the tested hostile
-  fixture did not reach that canary during this run.
-- The HTML locator was restored after a font zoom change, but resize, delayed
-  image loading, content edits, and symlink or junction escapes remain to test.
-- The PDF renderer draws page images. Narrator document-text access, tagged,
-  scanned, and password-protected PDF fixtures remain to test. Page fraction
-  after a viewport resize and rapid zoom cancellation also remain to measure.
-- Working-set numbers in the JSON traces are for the app process after the
-  workflow. They are not peak memory, do not include separate WebView2
-  processes, and were measured in a session that had opened earlier fixtures.
+The final x64 [signed install record](evidence/installed-final/signed-install.json) shows a development-signed MSIX installed and launched from `C:\Program Files\WindowsApps` in the Windows 11 interactive session. Its local unsigned input SHA-256 was `ef41f36b193b8277d7366833e1e95bad9ee8d022d232c8e16c6abbdfe4d46dd3`. All 14 packaged UI workflows passed. The [offline record](evidence/offline/signed-install.json) used the earlier `b8d9efc` package, relaunched with `Wi-Fi 2` disabled, and passed 14/14 workflows between `08:03:13Z` and `08:04:12Z`. The adapter returned to `Up`, the gateway responded, and the watchdog task was removed. The [final host cleanup check](evidence/windows-host-cleanup.json) shows no app package/process, test trust or private certificate, Narrator process, or P0 scheduled task. An earlier SSH-initiated install failed at Windows app lifecycle initialization (`0x80070005`) after signature and dependency validation; the interactive-session install succeeded.
+
+The native ARM64 [signed install record](evidence/arm64-ci/signed-install.json) from passing [CI run 36115189930](https://github.com/ilya-slalom/desktop-guides/actions/runs/36115189930) shows the ARM64 MSIX installed and launched from `C:\Program Files\WindowsApps` in interactive session 2 on Windows 11 build `10.0.26200.0`. The downloaded package matched its [build manifest](evidence/ci/arm64-final-manifest.json): 62,571,484 bytes, SHA-256 `4cf9a62b68a94e1b8d7981669a84cce77197395d531eead4d71855a36b514304`. Windows App Runtime `2.5.1` and WebView2 `153.0.4234.48` were present. The [ARM64 UI suite](evidence/arm64-ci/ui-suite/suite.json) passed 14/14; the package and test trust certificate were removed. Its `txt-long` first text took 724 ms with 35 realized items; `pdf-long` peak image cache was 35.7 MiB. The [locked PDF trace](evidence/arm64-ci/ui-suite/pdf-locked.json) rejected a wrong password and opened with the fixture password set through UI Automation `ValuePattern`, also verified in an [x64 targeted run](evidence/pdf-locked-uia-x64.json). Three prior ARM64 attempts failed at that fixture; the [diagnostic partial trace](evidence/ci/arm64-ui-password-partial.json) from [CI run 36113877486](https://github.com/ilya-slalom/desktop-guides/actions/runs/36113877486) recorded zero characters received from foreground keystrokes. The ARM64 run establishes native reader behavior for these fixtures; physical keyboard entry and disconnected-network operation on ARM64 were not separately checked.
+
+## Fixture-linked reader observations
+
+Each listed input is self-authored under CC0-1.0; generator, expected behavior, full size and hash are in the manifest. The trace links below are from the final development-signed installed app on Windows 11 x64. The same 14 workflows passed [offline](evidence/offline/ui-suite/suite.json) on `b8d9efc`.
+
+| Fixture | SHA-256 | Observed result | Installed trace |
+| --- | --- | --- | --- |
+| `txt-utf8` | `e21e7137eca4d996fced2143d7111220ea5051dc40708103cc6b7c490354b779` | Mixed line endings and non-ASCII text; exact restore after width and font changes. | [JSON](evidence/installed-final/ui-suite/txt-utf8.json) |
+| `txt-bom` | `3951ac963b008b76171832000d08d205ea464675adf5abb21dbb07a7ae226fb0` | BOM excluded; exact restore. | [JSON](evidence/installed-final/ui-suite/txt-bom.json) |
+| `txt-legacy` | `f105c9c5952018b15edc617ecced30a4e2bccd3e8fa252ce7792f1a1ac723d26` | Strict UTF-8 rejected, CP437 selected explicitly, then exact restore. | [JSON](evidence/installed-final/ui-suite/txt-legacy.json) |
+| `txt-ascii` | `2afacbaead8c22735ca014b3a2b7dac6455dd948d0d05b6fa6ffdf5c4b409fa0` | Eight logical lines and ASCII columns; exact restore after resize. | [JSON](evidence/installed-final/ui-suite/txt-ascii.json) |
+| `txt-long` | `fe1fbddf8febae06a00c153cf9f4511a527ec34b78a618ffffa4d65ba45e78f7` | 10 MiB, 197,845 lines; first text 902 ms, 98 realized items, exact line-20 restore. | [JSON](evidence/installed-final/ui-suite/txt-long.json) |
+| `html-static` | `0d9fcc790ea378da04c82a2ed239cea96fbcc2190bfc4a8c82c5a40b76f1cd1e` | Four local asset requests; boss marker restored after width and zoom changes. | [JSON](evidence/installed-final/ui-suite/html-static.json) |
+| `html-layout` | `bf517fb8c5733e683593be118af9ba95fa2b16333fb65ed461ee172b610e0127` | Large image loaded; resume marker restored after width and zoom changes. | [JSON](evidence/installed-final/ui-suite/html-layout.json) |
+| `html-hostile` | `9d1011d5b0f4f91024234078b5e61c44c1a9e9337f991af5c77a3c64eb1c087a` | Two local assets, three blocked requests, one blocked popup; text-context restore. | [JSON](evidence/installed-final/ui-suite/html-hostile.json) |
+| `redirect` | `b5aa933a8bce6a867bb22bd8b455de77422656f449da9f99fa321f51040a2748` | Three blocked requests; meta redirect did not leave the reader. | [JSON](evidence/installed-final/ui-suite/redirect.json) |
+| `pdf-short` | `b67dd6f52454ead4b99571b5a66e8be6a63c3a34a522db5b4670d57cc0f0006f` | Two pages rendered; page locator restored after resize and zoom. | [JSON](evidence/installed-final/ui-suite/pdf-short.json) |
+| `pdf-long` | `3ea02ce2dcd27b67034df87a0f8c3cbbf35580e9ae2deec808c1b239a4442eeb` | 200 pages; rapid turns and resize; page 6 fraction 0.33 to 0.31, cache peak 90.1 MiB. | [JSON](evidence/installed-final/ui-suite/pdf-long.json) |
+| `pdf-access` | `461372eab070c4523fb36b384bd72f9027f62db62fbe66c362d77b6f6709c25b` | Tagged/selectable source text renders, but PDF document text is absent from UI Automation. | [JSON](evidence/installed-final/ui-suite/pdf-access.json) |
+| `pdf-scan` | `e38b4f831f606eb94ede3927d2341e215b7b6e5f2d81e6ead28d02177d2551c0` | Raster-only source renders; no document text is exposed. | [JSON](evidence/installed-final/ui-suite/pdf-scan.json) |
+| `pdf-locked` | `5211330359380323bcbbf2c9a69248125f7f52bc606104ffdd20da2f75a78857` | Wrong password rejected, then test password unlocked the page. | [JSON](evidence/installed-final/ui-suite/pdf-locked.json) |
+
+The TXT long-file threshold was first visible text within three seconds and bounded realized visuals. The recorded 902 ms includes the Open action and UI Automation observation; it is **not** a paint-only measurement. Eight UI Automation scroll calls returned in 0–3 ms, but those calls alone do not prove the absence of later UI thread stalls. The 98 realized items were independent of 197,845 indexed source lines. The repeated-context edited-text fallback passed a Core test; the installed fixture workflows exercised unchanged-byte restore. Display scaling remained at 96 DPI.
+
+The HTML responder uses a synthetic HTTPS origin, staged verified assets, disabled page scripts, a deny-by-default resource handler and separate navigation/popup blocking. In a new-profile hostile run, the loopback [canary record](evidence/html-canary-final.json) returned HTTP 204 for its health check and logged **zero** guide requests across `html-hostile` and `redirect`; [hostile](evidence/html-hostile-final.json) and [redirect](evidence/redirect-final.json) traces show the blocked actions. The static and image-layout fixtures restored their specific `boss` and `resume` markers after window narrowing and 10% zoom. Text context restored the hostile fixture without an element ID. The UI suite did not exercise a changed HTML file because fixture hash verification rejects modifications; the implementation labels a hash-mismatched same-document restore approximate.
+
+For the 200-page PDF, five rapid Next actions ended with both status and image on page 6. Capturing around page fraction `0.33`, narrowing the window, zooming, moving to page 5 and restoring returned to page 6 around `0.31`, within the 0.1-page threshold. Three further forward/backward pairs stayed within the 96 MiB rendered-image cache budget (observed peak `90.1 MiB`). The app process peak working set during this suite was about `628 MiB`; that process had already opened TXT, HTML and short PDF fixtures, so it is not an isolated PDF memory cost. `pdf-access` contains a tagged paragraph extractable by `pdftotext`; `pdf-scan` extracts no text. Neither page image exposes a UI Automation TextPattern or tagged paragraph. With Narrator running, [keyboard/accessibility trace](evidence/pdf-accessibility-elevated.json) shows focus moving from Previous page to Next page; Narrator speech itself was not captured. These results do not establish PDF document-text access, selection or search.
+
+## Prerequisites and recovery
+
+This is a framework-dependent Windows App SDK package with a self-contained .NET publish. Windows App Runtime `2.5.1` x64 and WebView2 were **already installed** on the Windows 11 host. Signature and framework dependency resolution passed in the installation log. A process-only [missing-WebView2 simulation](evidence/missing-webview.json), using a nonexistent `WEBVIEW2_BROWSER_EXECUTABLE_FOLDER`, caused HTML to show an installer/repair message. [TXT](evidence/missing-webview-txt.json) and [PDF](evidence/missing-webview-pdf.json) remained usable in that process; [HTML recovery](evidence/webview-recovered.json) passed after a normal relaunch. This proves the error branch, not behavior on a truly runtime-free machine. Actual missing-framework installation failure and recovery remain a clean-VM check.
+
+## Limits and follow-up
+
+- Windows 11 x64: signed install, UI fixture suite and physically disconnected offline relaunch tested. The host was **not** a clean OS snapshot; prerequired runtimes were present.
+- Windows 10 x64: `untested`, deferred by the user. The target framework minimum alone is not a compatibility result.
+- Native Windows ARM64: Core tests and 14/14 installed UI fixture workflows passed in CI on Windows 11 ARM64. The UI run used fixture-only ValuePattern password entry and did not disconnect networking; the x64 host supplies the physical offline evidence.
+- Narrator audio output, full PDF document keyboard reading, and an actual missing-runtime machine were not directly observed. [PDF decision](reader-decisions.md) blocks text-accessible S10 on this renderer. A disposable clean Windows 11 VM is needed for the missing-runtime installer gate.
+- WebView2 may use its own processes, which are not in the app-process memory figures. The canary result addresses guide-originated requests in tested fixtures; it is not a packet capture of every WebView2 runtime connection.

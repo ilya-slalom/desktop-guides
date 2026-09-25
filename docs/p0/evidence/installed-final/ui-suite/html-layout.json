@@ -1,0 +1,105 @@
+﻿{
+    "fixture":  "html-layout",
+    "observedAt":  "2026-09-25T08:30:48.4548010Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "AMD64",
+    "processWorkingSetBytes":  261197824,
+    "processPeakWorkingSetBytes":  261431296,
+    "openToVisibleMilliseconds":  null,
+    "scrollCallsMilliseconds":  [
+
+                                ],
+    "phases":  [
+                   {
+                       "action":  "open",
+                       "status":  "html-layout: assets 2, blocked 0, popups 0; open 1340 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  null,
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  1908,
+                       "workingSetBytes":  261115904,
+                       "peakWorkingSetBytes":  261431296
+                   },
+                   {
+                       "action":  "jump",
+                       "status":  "html-layout: assets 2, blocked 0, popups 0; open 1340 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "Marker: resume",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2210,
+                       "workingSetBytes":  261062656,
+                       "peakWorkingSetBytes":  261431296
+                   },
+                   {
+                       "action":  "capture",
+                       "status":  "Position captured. assets 2, blocked 1, popups 0; open 1340 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "Marker: resume",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2503,
+                       "workingSetBytes":  261099520,
+                       "peakWorkingSetBytes":  261431296
+                   },
+                   {
+                       "action":  "top",
+                       "status":  "Position captured. assets 2, blocked 1, popups 0; open 1340 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "At top.",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  2800,
+                       "workingSetBytes":  261206016,
+                       "peakWorkingSetBytes":  261431296
+                   },
+                   {
+                       "action":  "resize",
+                       "status":  "Position captured. assets 2, blocked 1, popups 0; open 1340 ms; zoom 1.00; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "At top.",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  3611,
+                       "workingSetBytes":  261115904,
+                       "peakWorkingSetBytes":  261431296
+                   },
+                   {
+                       "action":  "larger",
+                       "status":  "assets 2, blocked 1, popups 0; open 1340 ms; zoom 1.10; restore none.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "At top.",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  3904,
+                       "workingSetBytes":  261148672,
+                       "peakWorkingSetBytes":  261431296
+                   },
+                   {
+                       "action":  "restore",
+                       "status":  "Position restored. assets 2, blocked 1, popups 0; open 1340 ms; zoom 1.10; restore element.",
+                       "page":  null,
+                       "image":  null,
+                       "imageHasTextPattern":  false,
+                       "taggedTextInAutomation":  false,
+                       "marker":  "Restored element: resume",
+                       "realizedListItems":  0,
+                       "elapsedMilliseconds":  4199,
+                       "workingSetBytes":  261193728,
+                       "peakWorkingSetBytes":  261431296
+                   }
+               ]
+}
