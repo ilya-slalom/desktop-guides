@@ -95,13 +95,16 @@ try {
         $resume = Wait-Name 'ResumeGuide' 'Resume Route Test Guide'
         Invoke-Element $resume
         [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
+        [void](Wait-Name 'ShellStatus' 'Guide ready.')
         $report.phases += 'resume-reader'
 
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
         $report.phases += 'reader-back-game'
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Name 'ShellStatus' 'Library ready.')
         $report.phases += 'game-back-library'
 
         Select-Element (Find-ByName 'Settings')
@@ -109,14 +112,18 @@ try {
         $report.phases += 'settings'
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Name 'ShellStatus' 'Library ready.')
         $report.phases += 'settings-back-library'
 
         Select-Element (Find-ByName 'Route Test Game')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
         Select-Element (Find-ByName 'Route Test Guide')
         [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
+        [void](Wait-Name 'ShellStatus' 'Guide ready.')
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
         $report.phases += 'library-game-reader-game'
     }
     $report.success = $true

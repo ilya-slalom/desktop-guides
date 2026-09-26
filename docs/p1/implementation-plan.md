@@ -61,8 +61,9 @@ with transactional v1→v2 upgrade and a consistent recovery copy under
 `DataRoot/.recovery`. T15.2 was merged through
 [PR #5](https://github.com/ilya-slalom/desktop-guides/pull/5), merge commit
 `47c9e906c01e85eb9ce9f9759f6359390d809e52`. Startup reconciliation
-now precedes M2 file mutation. T11.1 is the next M1 change; reader controls
-and package identity remain separate gates.
+now precedes M2 file mutation. T11.1 is implemented for review in
+[PR #6](https://github.com/ilya-slalom/desktop-guides/pull/6); reader
+controls and package identity remain separate gates.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
@@ -188,7 +189,7 @@ evidence. Publish only targets with complete target-specific results.
 | Lane | Required result | Current status |
 | --- | --- | --- |
 | Headless Core/Infrastructure | Schema/migration, locator, path, transaction recovery, archive, import-security, and fault-injection tests on locked Windows CI; NTFS link/junction checks on Windows. | T03.2's merged [PR CI](results.md) passed 61 Core and 24 Infrastructure tests on x64 and native ARM64. T15.2's locked Windows 11 x64 run passed 61 Core and 41 Infrastructure tests after the uppercase-ID review fix, including NTFS junction, prepared-import collision, and retry cases. Earlier PR #5 CI passed 61 Core and 39 Infrastructure tests on x64 and native ARM64; current-head results are in PR checks. Later-task suites are pending. |
-| Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | T11.1 package builds and route tests pass, but two local signed installs stopped at Windows AppX PLM initialization with `0x80070005`. A separate x64 CI installed-shell lane is pending. Full P1 flow and release gates remain open. |
+| Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | T11.1 installed shell routes passed on a Windows 11 x64 CI runner. Two local signed installs stopped at Windows AppX PLM initialization with `0x80070005`. Full P1 flow and release gates remain open. |
 | Runtime-free Windows 11 x64 VM | Actual absent Windows App Runtime and WebView2 failures, prerequisite setup, recovery, and clean restore. | Deferred by user until a disposable VM is available. Do not claim clean-machine support before this lane passes. |
 | Windows 11 ARM64 | Native complete P1 installed workflow, backup, accessibility, and offline evidence before advertising ARM64. | P1 pending; P0 native Core/UI fixtures passed. |
 | Windows 10 x64 | Equivalent signed install and reader workflow before advertising Windows 10. | Deferred by user. |

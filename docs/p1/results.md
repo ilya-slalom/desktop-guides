@@ -208,19 +208,40 @@ placeholder until M3 adds the format adapters. The P0 diagnostic project
 stays available for its fixture regression lane.
 
 On the Windows 11 x64 host (build `10.0.26200.0`, .NET SDK `10.0.401`,
-`E:\work\desktop-guides`), locked Release tests passed **67/67 Core** and
+`E:\work\desktop-guides`), locked Release tests passed **69/69 Core** and
 **41/41 Infrastructure**. Unsigned production x64 and ARM64 MSIX builds
 passed with zero errors; each reported the existing missing `mspdbcmf.exe`
 symbols-tool warning. Package inspection found the production assembly and
 no P0 diagnostic assembly, fixture files, or probe controls. The test-only
 metadata seeder successfully set valid and stale last-guide IDs.
 
-Two temporary self-signed x64 install attempts passed signature verification
-but `Add-AppxPackage` failed with `0x80070005` while initializing Windows
-Process Lifetime Manager. The deployment log also records access failures
+Two temporary self-signed x64 install attempts
+([first record](evidence/production-shell-host-install-1.json),
+[retry record](evidence/production-shell-host-install-2.json))
+passed signature verification but `Add-AppxPackage` failed with `0x80070005`
+while initializing Windows Process Lifetime Manager. The deployment log also records access failures
 when Windows attempted cleanup under `C:\Program Files\WindowsApps\Deleted`
 for unrelated WhatsApp and Clipchamp packages. Both attempts removed the
 temporary certificate and left no preview app installed. No installed shell
-behavior is claimed from this host. The new CI installed-shell lane is
-intended to exercise Library → Game → Reader → Game, Settings/Back, stale
-Resume, and fixture-control absence on a separate Windows x64 runner.
+behavior is claimed from this host.
+
+The new production-shell UI job passed on the PR #6 Windows 11 x64 runner,
+build `10.0.26100.0`, in interactive session 2. The
+[signed install record](evidence/ci/production-shell/signed-install.json)
+shows package SHA-256
+`21102F8C953E9A4B5F1DB4BA4BD5A1893E7FDA3FA0D292DE5A0B865006BCAA5D`
+and successful package/certificate cleanup. The
+[normal UIA trace](evidence/ci/production-shell/normal.json) verifies
+Library, explicit Resume, Reader → Game → Library, Settings → Library,
+and Library → Game → Reader → Game. The
+[stale-ID trace](evidence/ci/production-shell/stale.json) verifies that a
+missing last-guide ID does not expose Resume after relaunch. The smoke test
+also checks that the P0 fixture picker is absent. This verifies T11.1's
+installed routing behavior; reading the guide remains M3 work.
+
+The duplicate push workflow exposed a smoke-test race after Settings → Library:
+the test selected a game while the Library list was still loading
+([failure trace](evidence/ci/production-shell/smoke-race-before-fix.json)).
+The smoke script now waits for each route's ready status before selecting
+rows or navigating again. The expanded route suite also checks that a stale
+Game or Reader route clears its Back history.

@@ -95,4 +95,24 @@ public sealed class ShellNavigatorTests
             () => navigator.OpenReader(Guid.Empty, Guid.NewGuid()));
         Assert.Equal(new LibraryRoute(), navigator.Current);
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MissingCurrentGameOrGuideResetsToLibrary(bool isReader)
+    {
+        ShellNavigator navigator = new();
+        Guid gameId = Guid.NewGuid();
+        navigator.OpenGame(gameId);
+        if (isReader)
+        {
+            navigator.OpenReader(Guid.NewGuid(), gameId);
+        }
+
+        navigator.ResetToLibrary();
+
+        Assert.Equal(new LibraryRoute(), navigator.Current);
+        Assert.False(navigator.CanGoBack);
+        Assert.False(navigator.GoBack());
+    }
 }
