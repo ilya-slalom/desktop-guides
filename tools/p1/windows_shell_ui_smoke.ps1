@@ -517,6 +517,15 @@ try {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Name 'ShellStatus' 'Game ready.')
         $report.phases += 'library-game-reader-game'
+        if ($rapidGuide -ne 'Route Test Guide') {
+            Open-GuideFromGame 'Route Test Guide'
+            [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
+            [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+            Go-Back
+            [void](Wait-Name 'GameHeading' 'Route Test Game')
+            [void](Wait-Name 'ShellStatus' 'Game ready.')
+            $report.phases += 'restore-last-guide-for-relaunch'
+        }
     }
     $report.success = $true
 }
