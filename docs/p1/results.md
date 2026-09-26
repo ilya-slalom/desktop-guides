@@ -515,3 +515,20 @@ activate it, and the blocked-write handoff temporarily changes the Resume
 guide. The final smoke activates a selected row with Enter and explicitly
 returns to the route guide before later relaunches. Dynamic toolbar actions
 remain an M3 adapter integration check; this M1 preview has no adapter.
+
+The T11.3 review follow-up at code head
+`920324342d0947bc3c04237f783dbfee479f2339` passed the signed installed
+Windows 11 x64 shell job in [PR run 36247566880](https://github.com/ilya-slalom/desktop-guides/actions/runs/36247566880)
+and [push run 36247564409](https://github.com/ilya-slalom/desktop-guides/actions/runs/36247564409).
+The [install record](evidence/ci/production-shell/reader-shell/review-followup/signed-install.json)
+reports Windows build `10.0.26100.0`, AMD64, success, and removal of the
+temporary package and certificate. The [normal trace](evidence/ci/production-shell/reader-shell/review-followup/normal.json)
+checks that Reader closes the navigation pane, its toggle opens and closes
+it, pointer Back restores guide selection and focus, pointer input reopens
+the selected row, and keyboard Back and Enter reopen it again. Screenshot
+capture now fails the smoke if it cannot save a nonempty image; the retained
+[Reader screenshot](evidence/ci/production-shell/reader-shell/review-followup/normal.reader.png)
+shows the closed pane and unavailable-reading preview. The first review
+follow-up run failed because WinUI's pane toggle did not expose a UI
+Automation clickable point; using its visible bounds for the physical click
+passed the installed rerun.
