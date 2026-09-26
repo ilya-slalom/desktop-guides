@@ -38,7 +38,8 @@ $certificate = $null
 $installed = $null
 $expectedExecutablePath = $null
 $imported = $false
-$ownedProcesses = [System.Collections.Generic.Dictionary[int,datetime]]::new()
+. (Join-Path $PSScriptRoot 'windows_shell_process.ps1')
+$ownedProcesses = [System.Collections.Generic.Dictionary[int,DesktopGuidesOwnedProcess]]::new()
 $cleanupErrors = [System.Collections.Generic.List[string]]::new()
 $launchTask = "DesktopGuides-P1-ShellLaunch-$runId"
 $secondLaunchTask = "DesktopGuides-P1-ShellSecondLaunch-$runId"
@@ -56,9 +57,30 @@ function Get-InstalledShellProcesses {
         }
 }
 
-. (Join-Path $PSScriptRoot 'windows_shell_process.ps1')
+function Wait-LaunchTaskIdle(
+    [string] $TaskName,
+    [int] $TimeoutSeconds) {
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        $task = Get-ScheduledTask -TaskName $TaskName `
+            -ErrorAction SilentlyContinue
+        if (-not $task -or $task.State -eq 'Ready') {
+            return $true
+        }
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $deadline)
+    return $false
+}
 
-function Wait-LaunchResult([string] $ResultPath) {
+function Clear-LaunchResult([string] $ResultPath) {
+    Remove-Item -LiteralPath $ResultPath, "$ResultPath.tmp",
+        "$ResultPath.ack", "$ResultPath.ack.tmp" `
+        -ErrorAction SilentlyContinue
+}
+
+function Wait-LaunchResult(
+    [string] $ResultPath,
+    [string] $TaskName) {
     $deadline = (Get-Date).AddSeconds(30)
     do {
         Start-Sleep -Milliseconds 250
@@ -75,14 +97,46 @@ function Wait-LaunchResult([string] $ResultPath) {
             [StringComparison]::OrdinalIgnoreCase)) {
         throw 'Interactive launch returned an unexpected session or executable.'
     }
-    $ownedProcesses[[int]$launch.processId] =
-        ([datetime]$launch.startedAt).ToUniversalTime()
+    $token = [Guid]::Empty
+    if (-not [Guid]::TryParseExact(
+        [string]$launch.handoffToken, 'N', [ref]$token)) {
+        throw 'Interactive launch returned an invalid handoff token.'
+    }
+    $owned = [DesktopGuidesOwnedProcess]::OpenVerified(
+        [int]$launch.processId, [datetime]$launch.startedAt,
+        $targetSessionId, $expectedExecutablePath)
+    if ($owned) {
+        if ($ownedProcesses.ContainsKey([int]$launch.processId)) {
+            $previous = $ownedProcesses[[int]$launch.processId]
+            if (-not $previous.HasExited) {
+                $owned.Dispose()
+                throw 'Interactive launch reused the ID of a live test process.'
+            }
+            $previous.Dispose()
+            [void]$ownedProcesses.Remove([int]$launch.processId)
+        }
+        $ownedProcesses[[int]$launch.processId] = $owned
+    }
+    $ack = @{ handoffToken = $token.ToString('N') }
+    $ack | ConvertTo-Json -Compress |
+        Set-Content -LiteralPath "$ResultPath.ack.tmp" -Encoding UTF8
+    Move-Item -LiteralPath "$ResultPath.ack.tmp" `
+        -Destination "$ResultPath.ack" -Force
+    if (-not (Wait-LaunchTaskIdle $TaskName 10)) {
+        throw "Interactive launch task $TaskName did not finish after handoff."
+    }
     return $launch
 }
 
 function Wait-InstalledShellWindow([int] $ShellProcessId) {
+    if (-not $ownedProcesses.ContainsKey($ShellProcessId)) {
+        throw "Test-launched shell process $ShellProcessId exited before ownership handoff."
+    }
     $deadline = (Get-Date).AddSeconds(30)
     do {
+        if ($ownedProcesses[$ShellProcessId].HasExited) {
+            throw "Test-launched shell process $ShellProcessId exited before opening a window."
+        }
         $appProcess = Get-InstalledShellProcesses |
             Where-Object { $_.ProcessId -eq $ShellProcessId } |
             Select-Object -First 1
@@ -104,9 +158,9 @@ function Wait-InstalledShellWindow([int] $ShellProcessId) {
 }
 
 function Start-InstalledShell {
-    Remove-Item $launchResultPath -ErrorAction SilentlyContinue
+    Clear-LaunchResult $launchResultPath
     Start-ScheduledTask -TaskName $launchTask
-    $launch = Wait-LaunchResult $launchResultPath
+    $launch = Wait-LaunchResult $launchResultPath $launchTask
     Wait-InstalledShellWindow ([int]$launch.processId)
 }
 
@@ -129,9 +183,9 @@ function Assert-SingleInstance {
         $activationEvent.Reset() | Out-Null
         Register-ScheduledTask -TaskName $secondLaunchTask -Action $secondLaunchAction `
             -Principal $principal -Force | Out-Null
-        Remove-Item $secondLaunchResultPath -ErrorAction SilentlyContinue
+        Clear-LaunchResult $secondLaunchResultPath
         Start-ScheduledTask -TaskName $secondLaunchTask
-        $secondLaunch = Wait-LaunchResult $secondLaunchResultPath
+        $secondLaunch = Wait-LaunchResult $secondLaunchResultPath $secondLaunchTask
         $report.secondLaunchProcessId = $secondLaunch.processId
         if (-not $activationEvent.WaitOne(15000)) {
             throw 'Original shell did not acknowledge redirected activation.'
@@ -161,6 +215,10 @@ function Assert-SingleInstance {
 function Request-InstalledShellClose([int] $ShellProcessId) {
     Add-Type -AssemblyName UIAutomationClient
     Add-Type -AssemblyName UIAutomationTypes
+    if (-not $ownedProcesses.ContainsKey($ShellProcessId) -or
+        $ownedProcesses[$ShellProcessId].HasExited) {
+        throw "Test-launched shell process $ShellProcessId has already exited."
+    }
     $process = Get-Process -Id $ShellProcessId -ErrorAction Stop
     if ($process.MainWindowHandle -eq 0) {
         throw 'Installed production shell has no window to close.'
@@ -173,12 +231,17 @@ function Request-InstalledShellClose([int] $ShellProcessId) {
 }
 
 function Wait-InstalledShellExit([int] $ShellProcessId) {
+    if (-not $ownedProcesses.ContainsKey($ShellProcessId)) {
+        throw "No test-owned handle for shell process $ShellProcessId."
+    }
     $deadline = (Get-Date).AddSeconds(20)
     do {
+        if ($ownedProcesses[$ShellProcessId].HasExited) {
+            return
+        }
         Start-Sleep -Milliseconds 250
-    } while ((Get-Process -Id $ShellProcessId -ErrorAction SilentlyContinue) -and
-        (Get-Date) -lt $deadline)
-    if (Get-Process -Id $ShellProcessId -ErrorAction SilentlyContinue) {
+    } while ((Get-Date) -lt $deadline)
+    if (-not $ownedProcesses[$ShellProcessId].HasExited) {
         throw 'Production shell did not exit after a normal window close.'
     }
 }
@@ -233,8 +296,10 @@ function Assert-RelaunchDuringClose {
     finally {
         New-Item -ItemType File -Force $lockRelease | Out-Null
         if (-not $lockProcess.WaitForExit(10000)) {
-            Stop-Process -Id $lockProcess.Id -Force
-            $lockProcess.WaitForExit()
+            if (-not [DesktopGuidesOwnedProcess]::TerminateAndWait(
+                $lockProcess.Handle, 10000)) {
+                throw 'Write-lock helper did not exit after handle termination.'
+            }
         }
     }
     if ($lockProcess.ExitCode -ne 0) {
@@ -256,9 +321,9 @@ function Assert-ClosingTargetRedirect {
     try {
         $selected.Reset() | Out-Null
         $resume.Reset() | Out-Null
-        Remove-Item $secondLaunchResultPath -ErrorAction SilentlyContinue
+        Clear-LaunchResult $secondLaunchResultPath
         Start-ScheduledTask -TaskName $secondLaunchTask
-        $secondLaunch = Wait-LaunchResult $secondLaunchResultPath
+        $secondLaunch = Wait-LaunchResult $secondLaunchResultPath $secondLaunchTask
         if (-not $selected.WaitOne(15000)) {
             throw 'Second launch did not select the closing target.'
         }
@@ -288,9 +353,9 @@ function Assert-QueuedActivationClose {
     try {
         $queued.Reset() | Out-Null
         $resume.Reset() | Out-Null
-        Remove-Item $secondLaunchResultPath -ErrorAction SilentlyContinue
+        Clear-LaunchResult $secondLaunchResultPath
         Start-ScheduledTask -TaskName $secondLaunchTask
-        $secondLaunch = Wait-LaunchResult $secondLaunchResultPath
+        $secondLaunch = Wait-LaunchResult $secondLaunchResultPath $secondLaunchTask
         if (-not $queued.WaitOne(15000)) {
             throw 'Original shell did not queue redirected activation.'
         }
@@ -320,9 +385,9 @@ function Assert-AcceptedThenClose {
     try {
         $received.Reset() | Out-Null
         $resume.Reset() | Out-Null
-        Remove-Item $secondLaunchResultPath -ErrorAction SilentlyContinue
+        Clear-LaunchResult $secondLaunchResultPath
         Start-ScheduledTask -TaskName $secondLaunchTask
-        $secondLaunch = Wait-LaunchResult $secondLaunchResultPath
+        $secondLaunch = Wait-LaunchResult $secondLaunchResultPath $secondLaunchTask
         if (-not $received.WaitOne(15000)) {
             throw 'Second launch did not receive UI acceptance.'
         }
@@ -471,7 +536,8 @@ catch {
                     processId = $_.ProcessId
                     sessionId = $_.SessionId
                     created = $_.CreationDate.ToString('o')
-                    testOwned = $ownedProcesses.ContainsKey([int]$_.ProcessId)
+                    testOwned = ($ownedProcesses.ContainsKey([int]$_.ProcessId) -and
+                        -not $ownedProcesses[[int]$_.ProcessId].HasExited)
                 }
             })
     }
@@ -507,17 +573,34 @@ finally {
     Stop-ScheduledTask -TaskName $smokeTask -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName $smokeTask -Confirm:$false `
         -ErrorAction SilentlyContinue
-    Stop-ScheduledTask -TaskName $secondLaunchTask -ErrorAction SilentlyContinue
-    Unregister-ScheduledTask -TaskName $secondLaunchTask -Confirm:$false `
-        -ErrorAction SilentlyContinue
-    Unregister-ScheduledTask -TaskName $launchTask -Confirm:$false `
-        -ErrorAction SilentlyContinue
+    $launchTasksDrained = $true
+    foreach ($taskName in @($secondLaunchTask, $launchTask)) {
+        if (-not (Wait-LaunchTaskIdle $taskName 70)) {
+            $cleanupErrors.Add(
+                "Interactive launch task $taskName did not finish its child handoff.")
+            Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+            if (-not (Wait-LaunchTaskIdle $taskName 10)) {
+                $cleanupErrors.Add(
+                    "Interactive launch task $taskName is still active.")
+                $launchTasksDrained = $false
+            }
+        }
+        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false `
+            -ErrorAction SilentlyContinue
+    }
     if ($installed) { Stop-InstalledShell -BestEffort }
+    $shellProcessesAfterStop = @(Get-InstalledShellProcesses)
+    if ($shellProcessesAfterStop.Count -gt 0) {
+        $cleanupErrors.Add(
+            "Installed shell processes remain after cleanup: $(
+                ($shellProcessesAfterStop | ForEach-Object { $_.ProcessId }) -join ', ').")
+    }
     $installedNow = @(Get-AppxPackage -Name DesktopGuides.Preview)
     $ownedPackage = @($installedNow | Where-Object {
         $installed -and $_.PackageFullName -eq $installed.PackageFullName
     })
-    if ($ownedPackage.Count -eq 1) {
+    if ($ownedPackage.Count -eq 1 -and $launchTasksDrained -and
+        $shellProcessesAfterStop.Count -eq 0) {
         Remove-AppxPackage -Package $ownedPackage[0].PackageFullName `
             -ErrorAction SilentlyContinue
     }

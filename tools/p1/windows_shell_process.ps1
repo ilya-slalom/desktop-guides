@@ -1,11 +1,11 @@
-function Get-TestOwnedShellProcess([int] $OwnedId, [datetime] $StartedAt) {
-    Get-InstalledShellProcesses |
-        Where-Object {
-            $_.ProcessId -eq $OwnedId -and
-            [Math]::Abs(($_.CreationDate.ToUniversalTime() -
-                $StartedAt).TotalSeconds) -lt 2
-        } |
-        Select-Object -First 1
+if (-not ('DesktopGuidesOwnedProcess' -as [type])) {
+    Add-Type -Path (Join-Path $PSScriptRoot 'windows_owned_process.cs')
+}
+
+function Stop-OwnedShellHandle(
+    [DesktopGuidesOwnedProcess] $Owned,
+    [int] $TimeoutMilliseconds) {
+    return $Owned.TerminateAndWait($TimeoutMilliseconds)
 }
 
 function Stop-InstalledShell(
@@ -15,25 +15,10 @@ function Stop-InstalledShell(
     $before = $cleanupErrors.Count
     foreach ($ownedId in @($ownedProcesses.Keys)) {
         $exited = $false
+        $owned = $ownedProcesses[$ownedId]
         try {
-            $startedAt = $ownedProcesses[$ownedId]
-            if (Get-TestOwnedShellProcess $ownedId $startedAt) {
-                try {
-                    Stop-Process -Id $ownedId -Force -ErrorAction Stop
-                }
-                catch {
-                    if (Get-TestOwnedShellProcess $ownedId $startedAt) {
-                        throw
-                    }
-                }
-                $deadline = (Get-Date).AddSeconds($ExitTimeoutSeconds)
-                while ((Get-TestOwnedShellProcess $ownedId $startedAt) -and
-                    (Get-Date) -lt $deadline) {
-                    Start-Sleep -Milliseconds 250
-                }
-                if (Get-TestOwnedShellProcess $ownedId $startedAt) {
-                    throw "Timed out waiting for test process $ownedId to exit."
-                }
+            if (-not (Stop-OwnedShellHandle $owned ($ExitTimeoutSeconds * 1000))) {
+                throw "Timed out waiting for test process $ownedId to exit."
             }
             $exited = $true
         }
@@ -41,7 +26,10 @@ function Stop-InstalledShell(
             $cleanupErrors.Add("Could not stop test process ${ownedId}: $_")
         }
         finally {
-            if ($exited) { [void]$ownedProcesses.Remove($ownedId) }
+            if ($exited) {
+                $owned.Dispose()
+                [void]$ownedProcesses.Remove($ownedId)
+            }
         }
     }
     if (-not $BestEffort -and $cleanupErrors.Count -gt $before) {

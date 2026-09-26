@@ -105,6 +105,18 @@ implementation under T17.2.
    session, failed scenario, unsuccessful restoration, or incomplete
    cleanup fails the run.
 
+For the M1 installed shell runner, each interactive launch helper writes a
+per-launch result with a random handoff token, then keeps its original child
+handle until the installer acknowledges ownership or the child exits. The
+installer opens its own process handle and checks the exact creation time,
+desktop session, and executable image through that handle before writing
+the matching acknowledgment. If result publication or handoff fails, the
+helper stops its child through the original handle. Cleanup terminates
+verified children through retained handles and waits for exit; it drains both
+launch tasks before package removal. A task that cannot drain or an
+unverified remaining process fails cleanup. Clear old result and
+acknowledgment files before each task start.
+
 ## Scenario checklist
 
 Each row needs a named UI trace or result file from the signed, installed
@@ -112,7 +124,7 @@ production app. Add cases as the dependent P1 tasks complete.
 
 | Scenario | Required observation | Task / requirement |
 | --- | --- | --- |
-| Shell smoke | Fresh empty Library, Library/Game/Reader/Settings routes, rapid Game/Guide → Settings selections and Back, stale Resume, no P0 fixture controls, and a positive UI-accepted second launch. Launch a new window while an old guide write is blocked; verify the new window waits for the library lease and then shows the distinct guide saved by the old window. Pause a second launch after it selects the old instance, and pause a callback after it reaches the UI queue; close the old window in each case and verify the launch takes over. After a second launch receives UI acceptance, close the old window before the second process exits and verify it does not reopen. Obtain test-owned process IDs from the interactive launch helper, validate executable path, start time, and session before UI checks, and wait for verified process exit before seeding or package cleanup. Reader is still a placeholder. | T11.1, TR11.1 |
+| Shell smoke | Fresh empty Library, Library/Game/Reader/Settings routes, rapid Game/Guide → Settings selections and Back, stale Resume, no P0 fixture controls, and a positive UI-accepted second launch. Launch a new window while an old guide write is blocked; verify the new window waits for the library lease and then shows the distinct guide saved by the old window. Pause a second launch after it selects the old instance, and pause a callback after it reaches the UI queue; close the old window in each case and verify the launch takes over. After a second launch receives UI acceptance, close the old window before the second process exits and verify it does not reopen. Retain verified process handles from the interactive launch handoff and wait for handle-confirmed exit before seeding or package cleanup. Reader is still a placeholder. | T11.1, TR11.1 |
 | Install and upgrade | Signed MSIX installs in an interactive session; an older version upgrades under the same identity without losing a populated library. Verify package version, launch, and data after restart. | T17.1, T17.3, TR17.2 |
 | Import and offline reading | Add a game and import TXT, static HTML with local assets, and PDF through the UI. Remove the originals; while online in a fresh WebView2 profile, verify a reachable HTML canary receives zero guide-originated requests. Then remove all egress, relaunch, and open all three managed copies while recording disconnected state through the final check. | T04–T10, T17.3, TR17.1 |
 | Independent state | Move to different positions in two guides, restart, and verify their locators separately. Change layout/theme, check exact or labeled approximate restore, and toggle completion explicitly; reaching the end must not mark complete. | T12–T14, TR12.1–TR14.2 |

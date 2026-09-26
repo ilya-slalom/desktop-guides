@@ -149,11 +149,25 @@ queued-before-close check, add an accepted-before-close check, and test that
 a late reply on one connection cannot complete a different launch. When file
 or protocol activation is introduced, define payload forwarding separately.
 
-`Stop-Process` only requests termination. Before database seeding or package
-removal, wait a bounded time for each validated test-owned PID to exit. Retain
-ownership on timeout so final cleanup can retry, and report a failure if the
-process still remains. Verify a slow exit and an already-exited process in
-PowerShell, then rerun the signed installed Windows 11 x64 gate.
+Before database seeding or package removal, wait a bounded time for each
+test-owned process handle to signal exit. Retain ownership on timeout so
+final cleanup can retry, and report a failure if the process still remains.
+Verify a timeout and an already-exited process in PowerShell, then rerun the
+signed installed Windows 11 x64 gate.
+
+The installed-runner review found a gap between child creation and result
+publication, and a PID reuse gap between validation and termination. Keep the
+scheduled launch helper alive until the installer acknowledges that it has
+opened and verified its own handle to the child. If result publication or
+handoff fails, the helper terminates the child through its original handle
+before exiting. The installer checks exact start time, session, and executable
+while retaining its handle, and stops through that handle; PID-only
+termination and a two-second start-time tolerance are unsafe. A failed run
+must drain both launch tasks before removing the package, then report any
+process it cannot prove it owns. Test failed publication, rejected identity,
+and exit/timeout cleanup with harmless child processes; repeat the signed
+installed x64 lane. This handle handoff keeps the existing interactive task
+model without keeping a scheduled helper running for the full app session.
 
 ## M2 — catalog, static-asset validation, import, and removal
 
