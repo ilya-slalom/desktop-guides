@@ -66,10 +66,17 @@
                 <TextBlock x:Name="GamePlatform"
                            Grid.Row="1"
                            TextWrapping="Wrap" />
-                <TextBlock x:Name="GameEmpty"
-                           Grid.Row="2"
-                           Text="No guides in this game."
-                           TextWrapping="Wrap" />
+                <Grid Grid.Row="2">
+                    <TextBlock x:Name="GameEmpty"
+                               Text="No guides in this game."
+                               TextWrapping="Wrap" />
+                    <Button x:Name="OpenSelectedGuideButton"
+                            Content="Open selected guide"
+                            HorizontalAlignment="Left"
+                            Visibility="Collapsed"
+                            Click="OpenSelectedGuideClicked"
+                            AutomationProperties.AutomationId="OpenSelectedGuide" />
+                </Grid>
                 <ListView x:Name="GuideList"
                           Grid.Row="3"
                           DisplayMemberPath="Title"

@@ -286,6 +286,7 @@ jobs:
           path: |
             artifacts/production-shell/installed/*.json
             artifacts/production-shell/installed/normal.reader.png
+            artifacts/production-shell/installed/normal.game.png
           if-no-files-found: warn
 
   reader-toolbar-ui:

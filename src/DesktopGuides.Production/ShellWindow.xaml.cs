@@ -234,9 +234,15 @@ public sealed partial class ShellWindow : Window
 
     private async void GuideSelected(object sender, SelectionChangedEventArgs args)
     {
-        if (!settingGuideSelection && GuideList.SelectedItem is Guide guide)
+        if (settingGuideSelection)
         {
-            await RunNavigationAsync(() => OpenGuideAsync(guide.Id));
+            return;
+        }
+        UpdateOpenSelectedGuideAction();
+        if (GuideList.SelectedItem is Guide guide)
+        {
+            await RunNavigationAsync(
+                () => OpenGuideAsync(guide.Id, guide.GameId));
         }
     }
 
@@ -244,7 +250,8 @@ public sealed partial class ShellWindow : Window
     {
         if (GuideFromRow(args.OriginalSource as DependencyObject) is Guide guide)
         {
-            await RunNavigationAsync(() => OpenGuideAsync(guide.Id));
+            await RunNavigationAsync(
+                () => OpenGuideAsync(guide.Id, guide.GameId));
         }
     }
 
@@ -252,6 +259,10 @@ public sealed partial class ShellWindow : Window
     {
         while (source is not null && !ReferenceEquals(source, GuideList))
         {
+            if (source is Button)
+            {
+                return null;
+            }
             if (source is ListViewItem row && row.Content is Guide guide)
             {
                 return guide;
@@ -267,7 +278,34 @@ public sealed partial class ShellWindow : Window
             GuideFromRow(args.OriginalSource as DependencyObject) is Guide guide)
         {
             args.Handled = true;
-            await RunNavigationAsync(() => OpenGuideAsync(guide.Id));
+            await RunNavigationAsync(
+                () => OpenGuideAsync(guide.Id, guide.GameId));
+        }
+    }
+
+    private async void OpenSelectedGuideClicked(object sender, RoutedEventArgs args)
+    {
+        if (GuideList.SelectedItem is Guide guide)
+        {
+            await RunNavigationAsync(
+                () => OpenGuideAsync(guide.Id, guide.GameId));
+        }
+    }
+
+    private void UpdateOpenSelectedGuideAction()
+    {
+        if (GuideList.IsEnabled &&
+            navigator.Current is GameRoute game &&
+            GuideList.SelectedItem is Guide guide &&
+            guide.GameId == game.GameId)
+        {
+            AutomationProperties.SetName(
+                OpenSelectedGuideButton, $"Open {guide.Title}");
+            OpenSelectedGuideButton.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            OpenSelectedGuideButton.Visibility = Visibility.Collapsed;
         }
     }
 
@@ -337,8 +375,15 @@ public sealed partial class ShellWindow : Window
         }
     }
 
-    private async Task OpenGuideAsync(Guid guideId)
+    private async Task OpenGuideAsync(Guid guideId, Guid? sourceGameId = null)
     {
+        if (sourceGameId is Guid expectedGameId &&
+            (navigator.Current is not GameRoute game ||
+             game.GameId != expectedGameId ||
+             !GuideList.IsEnabled))
+        {
+            return;
+        }
         if (navigator.Current is ReaderRoute current && current.GuideId == guideId)
         {
             return;
@@ -348,7 +393,9 @@ public sealed partial class ShellWindow : Window
         {
             SqliteLibraryRepository library = RequireRepository();
             Guide? guide = await library.GetGuideAsync(guideId);
-            if (guide is null || await library.GetGameAsync(guide.GameId) is null)
+            if (guide is null ||
+                (sourceGameId is Guid source && guide.GameId != source) ||
+                await library.GetGameAsync(guide.GameId) is null)
             {
                 ShellStatus.Text = "This guide is no longer in your library.";
                 return;
@@ -376,6 +423,7 @@ public sealed partial class ShellWindow : Window
         GamePanel.Visibility = Visibility.Collapsed;
         ReaderPanel.Visibility = Visibility.Collapsed;
         SettingsPanel.Visibility = Visibility.Collapsed;
+        OpenSelectedGuideButton.Visibility = Visibility.Collapsed;
         Navigation.IsBackEnabled = navigator.CanGoBack;
         Navigation.SelectedItem = navigator.Current is SettingsRoute
             ? Navigation.SettingsItem
@@ -418,6 +466,22 @@ public sealed partial class ShellWindow : Window
                 case GameRoute gameRoute:
                     GamePanel.Visibility = Visibility.Visible;
                     ShellStatus.Text = "Loading game…";
+                    Guid? selectedGuideId = pendingGuideFocus ??
+                        (GuideList.SelectedItem as Guide)?.Id;
+                    GameHeading.Text = "Loading game…";
+                    GamePlatform.Text = string.Empty;
+                    GameEmpty.Visibility = Visibility.Collapsed;
+                    GuideList.IsEnabled = false;
+                    settingGuideSelection = true;
+                    try
+                    {
+                        GuideList.ItemsSource = null;
+                        GuideList.SelectedItem = null;
+                    }
+                    finally
+                    {
+                        settingGuideSelection = false;
+                    }
                     Game? game = await library.GetGameAsync(gameRoute.GameId);
                     if (generation != renderGeneration)
                     {
@@ -438,8 +502,6 @@ public sealed partial class ShellWindow : Window
                     }
                     GameHeading.Text = game.Title;
                     GamePlatform.Text = game.Platform ?? string.Empty;
-                    Guid? selectedGuideId = pendingGuideFocus ??
-                        (GuideList.SelectedItem as Guide)?.Id;
                     Guide? selectedGuide = selectedGuideId is Guid id
                         ? guides.FirstOrDefault(item => item.Id == id)
                         : null;
@@ -453,8 +515,10 @@ public sealed partial class ShellWindow : Window
                     {
                         settingGuideSelection = false;
                     }
+                    GuideList.IsEnabled = true;
                     GameEmpty.Visibility =
                         guides.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+                    UpdateOpenSelectedGuideAction();
                     if (pendingGuideFocus is not null && selectedGuide is not null)
                     {
                         guideFocusRenderGeneration = generation;

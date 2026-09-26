@@ -186,6 +186,32 @@ PR run `36255001818` (attempt 2). The PR's first attempt timed out in the
 unchanged process-helper fixture; that same check passed in the push run
 and PR rerun.
 
+### T11.3 game switching and invokable action follow-up
+
+The Game view can briefly expose the previous game's guide rows while the
+next game's repository reads run. Clear and disable the guide list before
+those reads, hide the selected-guide action, and validate the source game ID
+when a queued row action runs. This keeps an old row from opening its Reader
+after a different game has become current. The installed shell check seeds
+two games and verifies the second game's guide list and Reader context
+after switching.
+
+For an already selected guide, `SelectionItem.Select` changes no state and
+does not offer an action to invoke. A custom `ListViewItem` automation peer
+could add Invoke, but it would require maintaining peer behavior across row
+virtualization. Use a visible `Open selected guide` button with native
+WinUI button semantics. Keep it beside the Game list context, hide it
+without a valid selection, and give its automation name the selected title.
+The existing quiet guide workspace uses the same `#F8F9FB` canvas,
+`#FFFFFF` surface, `#1C1C1C` primary text, `#616161` secondary text,
+`#0067C0` action accent, and WinUI system type. The action is a compact
+control above the left-aligned list, without adding row decoration.
+
+An installed UI Automation check must Invoke that button after Reader →
+Game and reopen the same guide. Existing pointer, Enter, and long-list
+focus checks must continue to pass. Verify the Release x64 production
+package and all Windows CI jobs before recording this exit.
+
 ### T11.1 review follow-up: close handoff and installed gate
 
 The shell must allow a new window to appear while the old one drains, but

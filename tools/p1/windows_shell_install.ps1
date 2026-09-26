@@ -571,6 +571,12 @@ try {
     Start-InstalledShell
     $report.longList = Run-ShellSmoke 'long-list'
     Close-InstalledShell
+
+    dotnet run --project $seedProject -c Release --no-restore -- seed-second $dataRoot
+    if ($LASTEXITCODE -ne 0) { throw 'Could not seed the second game.' }
+    Start-InstalledShell
+    $report.switchGame = Run-ShellSmoke 'switch-game'
+    Close-InstalledShell
     $report.success = $true
 }
 catch {

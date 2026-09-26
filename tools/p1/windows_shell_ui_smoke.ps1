@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('empty', 'normal', 'stale', 'long-list', 'queue-guide',
+    [ValidateSet('empty', 'normal', 'stale', 'long-list', 'switch-game', 'queue-guide',
         'waiting-handoff')]
     [string] $Mode,
 
@@ -325,9 +325,9 @@ try {
         return $target
     }
 
-    function Save-ReaderScreenshot {
+    function Save-WindowScreenshot([string] $view) {
         Add-Type -AssemblyName System.Drawing
-        $path = [System.IO.Path]::ChangeExtension($ResultPath, 'reader.png')
+        $path = [System.IO.Path]::ChangeExtension($ResultPath, "$view.png")
         if (Test-Path -LiteralPath $path) {
             Remove-Item -LiteralPath $path -ErrorAction Stop
         }
@@ -335,7 +335,7 @@ try {
         $width = [int][Math]::Ceiling($bounds.Width)
         $height = [int][Math]::Ceiling($bounds.Height)
         if ($width -lt 1 -or $height -lt 1) {
-            throw 'The reader window has no visible screenshot bounds.'
+            throw 'The shell window has no visible screenshot bounds.'
         }
         $bitmap = [System.Drawing.Bitmap]::new($width, $height)
         $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
@@ -345,7 +345,7 @@ try {
             $bitmap.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
             if (-not (Test-Path -LiteralPath $path) -or
                 (Get-Item -LiteralPath $path).Length -eq 0) {
-                throw 'The Reader screenshot was not saved.'
+                throw 'The shell screenshot was not saved.'
             }
             return $path
         }
@@ -414,11 +414,50 @@ try {
         [void](Wait-Name 'ShellStatus' 'Game ready.')
         [void](Wait-SelectedGuide $target)
         Wait-FocusedGuide $target
+        [void](Wait-Name 'OpenSelectedGuide' "Open $target")
         $report.phases += 'virtualized-guide-back-focus'
         [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
         [void](Wait-Name 'ReaderHeading' $target)
         [void](Wait-Name 'ShellStatus' 'Guide details ready.')
         $report.phases += 'virtualized-guide-enter-reopen'
+    }
+    elseif ($Mode -eq 'switch-game') {
+        $target = 'ZZZ Focus Target Guide'
+        Invoke-Element (Wait-Name 'ResumeGuide' "Resume $target")
+        [void](Wait-Name 'ReaderHeading' $target)
+        Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-SelectedGuide $target)
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        Select-Element 'Second Test Game'
+        [void](Wait-Name 'GameHeading' 'Second Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        $list = Find-ById 'GuideList'
+        $oldCondition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::NameProperty, $target)
+        if ($list.FindAll($scope, $oldCondition).Count -ne 0) {
+            throw 'The second game retained a guide row from the first game.'
+        }
+        $open = Find-ById 'OpenSelectedGuide'
+        if ($open -and -not $open.Current.IsOffscreen) {
+            throw 'The second game retained the first game selected-guide action.'
+        }
+        [void](Wait-GuideRow 'Second Test Guide')
+        $report.phases += 'game-switch-clears-old-guide'
+        Select-Element 'Second Test Guide'
+        [void](Wait-Name 'ReaderHeading' 'Second Test Guide')
+        [void](Wait-Name 'ReaderGameName' 'Second Test Game')
+        $report.phases += 'game-switch-opens-current-guide'
+        Go-Back
+        [void](Wait-Name 'GameHeading' 'Second Test Game')
+        [void](Wait-SelectedGuide 'Second Test Guide')
+        Invoke-Element (Wait-Name 'OpenSelectedGuide' 'Open Second Test Guide')
+        [void](Wait-Name 'ReaderHeading' 'Second Test Guide')
+        [void](Wait-Name 'ReaderGameName' 'Second Test Game')
+        $report.phases += 'game-switch-uia-reopen'
     }
     elseif ($Mode -eq 'normal') {
         $resume = Wait-Name 'ResumeGuide' "Resume $ExpectedResumeGuide"
@@ -434,7 +473,7 @@ try {
         }
         [void](Wait-Name 'ShellStatus' 'Guide details ready.')
         Wait-PaneState 'Navigation pane closed'
-        $report.readerScreenshot = Save-ReaderScreenshot
+        $report.readerScreenshot = Save-WindowScreenshot 'reader'
         $report.phases += 'resume-reader'
 
         $paneToggle = Find-PaneToggle
@@ -451,6 +490,17 @@ try {
         [void](Wait-SelectedGuide $ExpectedResumeGuide)
         Wait-FocusedGuide $ExpectedResumeGuide
         $report.phases += 'reader-back-game'
+
+        $openSelected = Wait-Name 'OpenSelectedGuide' "Open $ExpectedResumeGuide"
+        $report.gameScreenshot = Save-WindowScreenshot 'game'
+        Invoke-Element $openSelected
+        [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
+        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        $report.phases += 'uia-reopen-selected-guide'
+        Go-Back
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-SelectedGuide $ExpectedResumeGuide)
+        Wait-FocusedGuide $ExpectedResumeGuide
 
         Click-Element (Wait-SelectedGuide $ExpectedResumeGuide)
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)

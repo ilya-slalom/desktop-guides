@@ -38,10 +38,11 @@ if (args.Length == 4 && args[0] == "hold-write-lock")
     return 0;
 }
 
-if (args.Length != 2 || args[0] is not ("seed" or "stale" or "seed-long"))
+if (args.Length != 2 ||
+    args[0] is not ("seed" or "stale" or "seed-long" or "seed-second"))
 {
     Console.Error.WriteLine(
-        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long <app-data-root> " +
+        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second <app-data-root> " +
         "or hold-write-lock <app-data-root> <ready-path> <release-path>");
     return 2;
 }
@@ -81,6 +82,19 @@ if (args[0] == "seed-long")
     await repository.SaveSettingsAsync(
         current with { LastActiveGuideId = tailGuideId });
     Console.WriteLine($"Seeded virtualized tail guide {tailGuideId:N}.");
+    return 0;
+}
+
+if (args[0] == "seed-second")
+{
+    Game secondGame = await repository.AddGameAsync(
+        "Second Test Game", "Windows", null);
+    Guid secondGuideId = Guid.NewGuid();
+    await InsertGuideAsync(
+        paths, secondGame.Id, secondGuideId, "Second Test Guide",
+        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+    Console.WriteLine(
+        $"Seeded second game {secondGame.Id:N} and guide {secondGuideId:N}.");
     return 0;
 }
 
