@@ -214,6 +214,46 @@ try {
 }
 catch {
     $report.error = $_ | Out-String
+    try {
+        $report.processesAtFailure = @(
+            Get-CimInstance Win32_Process `
+                -Filter "Name = 'DesktopGuides.Production.exe'" |
+            Where-Object { $_.ExecutablePath -like "$($installed.InstallLocation)*" } |
+            ForEach-Object {
+                [ordered]@{
+                    processId = $_.ProcessId
+                    sessionId = $_.SessionId
+                    created = $_.CreationDate.ToString('o')
+                }
+            })
+    }
+    catch {
+        $report.processesAtFailureError = $_ | Out-String
+    }
+    try {
+        $report.applicationEvents = @(
+            Get-WinEvent -FilterHashtable @{
+                LogName = 'Application'
+                StartTime = [datetime]$report.observedAt
+            } -ErrorAction Stop |
+            Where-Object {
+                $_.Message -match 'DesktopGuides\.Production' -and
+                $_.ProviderName -in @('.NET Runtime', 'Application Error',
+                    'Windows Error Reporting')
+            } |
+            Select-Object -First 8 |
+            ForEach-Object {
+                [ordered]@{
+                    observedAt = $_.TimeCreated.ToUniversalTime().ToString('o')
+                    provider = $_.ProviderName
+                    eventId = $_.Id
+                    message = $_.Message
+                }
+            })
+    }
+    catch {
+        $report.applicationEventsError = $_ | Out-String
+    }
 }
 finally {
     Stop-ScheduledTask -TaskName $smokeTask -ErrorAction SilentlyContinue
