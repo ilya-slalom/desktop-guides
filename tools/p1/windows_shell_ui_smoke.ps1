@@ -305,6 +305,25 @@ try {
         Select-Element $name
     }
 
+    function Select-DifferentGuideFromGame {
+        $list = Find-ById 'GuideList'
+        if (-not $list -or $list.Current.IsOffscreen) {
+            throw 'Expected a visible guide list.'
+        }
+        $selection = $list.GetCurrentPattern(
+            [System.Windows.Automation.SelectionPattern]::Pattern)
+        $selected = @($selection.Current.GetSelection())
+        $target = if ($selected.Count -gt 0 -and
+            $selected[0].Current.Name -eq 'Route Test Guide') {
+            'Blocked Write Guide'
+        }
+        else {
+            'Route Test Guide'
+        }
+        Select-Element $target
+        return $target
+    }
+
     function Save-ReaderScreenshot {
         Add-Type -AssemblyName System.Drawing
         $path = [System.IO.Path]::ChangeExtension($ResultPath, 'reader.png')
@@ -486,12 +505,12 @@ try {
         [void](Wait-Name 'ShellStatus' 'Game ready.')
         $report.phases += 'rapid-game-settings-back-game'
 
-        Open-GuideFromGame 'Route Test Guide'
+        $rapidGuide = Select-DifferentGuideFromGame
         Select-Element 'Settings'
         [void](Wait-Name 'SettingsHeading' 'Settings')
         [void](Wait-Name 'ShellStatus' 'Settings ready.')
         Go-Back
-        [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
+        [void](Wait-Name 'ReaderHeading' $rapidGuide)
         [void](Wait-Name 'ShellStatus' 'Guide details ready.')
         $report.phases += 'rapid-guide-settings-back-reader'
         Go-Back
