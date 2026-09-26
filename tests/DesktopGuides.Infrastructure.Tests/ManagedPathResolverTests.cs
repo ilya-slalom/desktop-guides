@@ -86,6 +86,25 @@ public sealed class ManagedPathResolverTests
         }
     }
 
+    [Fact]
+    public void RejectsLinkedRecoveryRoot()
+    {
+        using TestLibrary directory = new();
+        ManagedPathResolver paths = directory.Paths;
+        string outside = Path.Combine(directory.Root, "outside-recovery");
+        Directory.CreateDirectory(outside);
+        Directory.Delete(paths.RecoveryRoot);
+        Directory.CreateSymbolicLink(paths.RecoveryRoot, outside);
+        try
+        {
+            Assert.Throws<InvalidDataException>(() => paths.EnsureCreated());
+        }
+        finally
+        {
+            Directory.Delete(paths.RecoveryRoot);
+        }
+    }
+
     [Theory]
     [InlineData("../outside.txt")]
     [InlineData("styles\\main.css")]

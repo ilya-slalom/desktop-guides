@@ -1,14 +1,13 @@
 # P1 implementation plan and exit gates
 
-Status: M0 implemented for review, M1–M6 planned; review follow-up recorded
-26 September 2026.
+Status: M0 merged; M1 in progress; M2–M6 planned, 26 September 2026.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
 This plan orders all **16 P1 stories and 49 tasks** in the
 [work breakdown](../work-breakdown.md). The [technical design](../p1-technical-design.md)
 defines the architecture, data contracts, failure protocols, and reader
-behavior. [M0 results](results.md) and the [PDF decision](pdf-decision.md)
-record tested output; reviewed integration and remaining M1–M6 work are open.
+behavior. [Implementation results](results.md) and the
+[PDF decision](pdf-decision.md) record tested output.
 
 ## Delivery rules
 
@@ -38,12 +37,10 @@ Exit: portable models and path rules are reviewed; a failing tagged-PDF
 candidate cannot be treated as a completed reader. The PDF experiment may run
 in parallel with storage contracts.
 
-Implementation of T03.1, T03.3, T11.2, T12.1, and the T10.0 candidate decision
-is on `feat/p1-m0`. The Windows x64 checks are in [M0 results](results.md).
-[PR #3](https://github.com/ilya-slalom/desktop-guides/pull/3) passed its
-initial five-job Windows CI run. A SQLite initialization review fix has passed
-the locked Windows 11 x64 Core and Infrastructure suites. PR checks and
-review remain the integration gate before M0 reaches `main`.
+T03.1, T03.3, T11.2, T12.1, and the T10.0 candidate decision were merged into
+`main` through [PR #3](https://github.com/ilya-slalom/desktop-guides/pull/3)
+on 26 September 2026. [M0 results](results.md) record Windows x64 and native
+ARM64 CI evidence, including the SQLite initialization review fix.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
@@ -58,6 +55,12 @@ review remain the integration gate before M0 reaches `main`.
 Exit: the app opens a persistent empty library, can upgrade a populated
 database safely, and navigates production routes without fixture controls.
 Set the public package identity before producing a public candidate.
+
+The first M1 change on `feat/p1-m1-migrations` implements T03.2 with
+transactional v1→v2 upgrade and a consistent recovery copy under
+`DataRoot/.recovery`. The next change is T15.2; startup reconciliation must
+exist before M2 begins mutating managed guide files. Production routes,
+reader controls, and package identity remain separate M1 gates.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |

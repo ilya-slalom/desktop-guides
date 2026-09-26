@@ -55,7 +55,13 @@ public sealed class SqliteLibraryRepositoryTests
         using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
         using SqliteCommand version = connection.CreateCommand();
         version.CommandText = "PRAGMA user_version";
-        Assert.Equal(1L, (long)version.ExecuteScalar()!);
+        Assert.Equal(2L, (long)version.ExecuteScalar()!);
+        using SqliteCommand index = connection.CreateCommand();
+        index.CommandText = """
+            SELECT name FROM sqlite_schema
+            WHERE type = 'index' AND name = 'IX_ReadingStates_LastOpenedUtcMs'
+            """;
+        Assert.Equal("IX_ReadingStates_LastOpenedUtcMs", index.ExecuteScalar());
         using SqliteCommand orphan = connection.CreateCommand();
         orphan.CommandText = "INSERT INTO ReadingStates (GuideId) VALUES ($id)";
         orphan.Parameters.AddWithValue("$id", Guid.NewGuid().ToString("N"));
@@ -159,6 +165,198 @@ public sealed class SqliteLibraryRepositoryTests
         Assert.Equal(4242L, (long)verify.ExecuteScalar()!);
     }
 
+    [Fact]
+    public async Task UpgradesPopulatedVersionOneWithConsistentRecoveryCopy()
+    {
+        using TestLibrary directory = new();
+        Guid gameId = Guid.NewGuid();
+        Guid guideId = Guid.NewGuid();
+        CreatePopulatedVersionOne(directory, gameId, guideId);
+
+        // Keep a writer open with a recently committed WAL change during backup.
+        using SqliteConnection active = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using (SqliteCommand latest = active.CreateCommand())
+        {
+            latest.CommandText = "UPDATE Games SET Notes = 'latest WAL note' WHERE Id = $id";
+            latest.Parameters.AddWithValue("$id", gameId.ToString("N"));
+            Assert.Equal(1, latest.ExecuteNonQuery());
+        }
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+
+        Assert.Equal("Older game", (await repository.GetGameAsync(gameId))?.Title);
+        Assert.Equal("latest WAL note", (await repository.GetGameAsync(gameId))?.Notes);
+        Assert.Equal(guideId, (await repository.GetGuideAsync(guideId))?.Id);
+        Assert.Equal("{\"old\":true}",
+            (await repository.GetReadingStateAsync(guideId))?.LocatorJson);
+        Assert.Equal(Now, (await repository.GetReadingStateAsync(guideId))?.CompletedUtc);
+        Assert.Equal(1.25, (await repository.GetReaderPreferencesAsync(guideId))?.TextScale);
+        Assert.Equal(new AppSettings(ThemePreference.Dark, guideId),
+            await repository.GetSettingsAsync());
+
+        using SqliteCommand version = active.CreateCommand();
+        version.CommandText = "PRAGMA user_version";
+        Assert.Equal(2L, (long)version.ExecuteScalar()!);
+        using SqliteCommand index = active.CreateCommand();
+        index.CommandText = """
+            SELECT name FROM sqlite_schema
+            WHERE type = 'index' AND name = 'IX_ReadingStates_LastOpenedUtcMs'
+            """;
+        Assert.Equal("IX_ReadingStates_LastOpenedUtcMs", index.ExecuteScalar());
+
+        string backupPath = Assert.Single(
+            Directory.GetFiles(directory.Paths.RecoveryRoot, "*.sqlite"));
+        using SqliteConnection backup = OpenWithForeignKeys(backupPath);
+        using SqliteCommand backupVersion = backup.CreateCommand();
+        backupVersion.CommandText = "PRAGMA user_version";
+        Assert.Equal(1L, (long)backupVersion.ExecuteScalar()!);
+        using SqliteCommand backupGuide = backup.CreateCommand();
+        backupGuide.CommandText = "SELECT Id FROM Guides WHERE Id = $id";
+        backupGuide.Parameters.AddWithValue("$id", guideId.ToString("N"));
+        Assert.Equal(guideId.ToString("N"), backupGuide.ExecuteScalar());
+        using SqliteCommand backupNote = backup.CreateCommand();
+        backupNote.CommandText = "SELECT Notes FROM Games WHERE Id = $id";
+        backupNote.Parameters.AddWithValue("$id", gameId.ToString("N"));
+        Assert.Equal("latest WAL note", backupNote.ExecuteScalar());
+
+        await repository.InitializeAsync();
+        Assert.Single(Directory.GetFiles(directory.Paths.RecoveryRoot, "*.sqlite"));
+    }
+
+    [Fact]
+    public async Task FailedMigrationRetainsVersionOneDataAndRecoveryCopy()
+    {
+        using TestLibrary directory = new();
+        Guid gameId = Guid.NewGuid();
+        Guid guideId = Guid.NewGuid();
+        CreatePopulatedVersionOne(directory, gameId, guideId);
+
+        await using (SqliteLibraryRepository failing = new(
+            directory.Paths, null, version =>
+            {
+                if (version == 2)
+                {
+                    throw new IOException("Injected after the v2 index was created.");
+                }
+            }))
+        {
+            InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(
+                () => failing.InitializeAsync());
+            Assert.Contains("recovery copy:", error.Message);
+            Assert.IsType<IOException>(error.InnerException);
+        }
+
+        using (SqliteConnection original = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        {
+            using SqliteCommand version = original.CreateCommand();
+            version.CommandText = "PRAGMA user_version";
+            Assert.Equal(1L, (long)version.ExecuteScalar()!);
+            using SqliteCommand index = original.CreateCommand();
+            index.CommandText = """
+                SELECT name FROM sqlite_schema
+                WHERE type = 'index' AND name = 'IX_ReadingStates_LastOpenedUtcMs'
+                """;
+            Assert.Null(index.ExecuteScalar());
+            using SqliteCommand game = original.CreateCommand();
+            game.CommandText = "SELECT Title FROM Games WHERE Id = $id";
+            game.Parameters.AddWithValue("$id", gameId.ToString("N"));
+            Assert.Equal("Older game", game.ExecuteScalar());
+        }
+
+        string backupPath = Assert.Single(
+            Directory.GetFiles(directory.Paths.RecoveryRoot, "*.sqlite"));
+        using (SqliteConnection backup = OpenWithForeignKeys(backupPath))
+        {
+            using SqliteCommand version = backup.CreateCommand();
+            version.CommandText = "PRAGMA user_version";
+            Assert.Equal(1L, (long)version.ExecuteScalar()!);
+            using SqliteCommand guide = backup.CreateCommand();
+            guide.CommandText = "SELECT Id FROM Guides WHERE Id = $id";
+            guide.Parameters.AddWithValue("$id", guideId.ToString("N"));
+            Assert.Equal(guideId.ToString("N"), guide.ExecuteScalar());
+        }
+
+        await using SqliteLibraryRepository retry = new(directory.Paths);
+        await retry.InitializeAsync();
+        Assert.Equal(guideId, (await retry.GetGuideAsync(guideId))?.Id);
+    }
+
+    [Fact]
+    public async Task RejectsNewerSchemaWithoutReplacingItsData()
+    {
+        using TestLibrary directory = new();
+        directory.Paths.EnsureCreated();
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        {
+            using SqliteCommand data = connection.CreateCommand();
+            data.CommandText = """
+                CREATE TABLE FutureData (Value TEXT NOT NULL);
+                INSERT INTO FutureData (Value) VALUES ('keep this');
+                PRAGMA user_version = 99;
+                """;
+            data.ExecuteNonQuery();
+        }
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(
+            () => repository.InitializeAsync());
+        Assert.Contains("Update Desktop Guides", error.Message);
+        using SqliteConnection original = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand verify = original.CreateCommand();
+        verify.CommandText = "SELECT Value FROM FutureData";
+        Assert.Equal("keep this", verify.ExecuteScalar());
+        Assert.Empty(Directory.GetFiles(directory.Paths.RecoveryRoot));
+    }
+
+    [Fact]
+    public async Task RejectsOrphanedVersionOneRowsBeforeMigration()
+    {
+        using TestLibrary directory = new();
+        Guid gameId = Guid.NewGuid();
+        Guid guideId = Guid.NewGuid();
+        CreatePopulatedVersionOne(directory, gameId, guideId);
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        {
+            using SqliteCommand foreignKeys = connection.CreateCommand();
+            foreignKeys.CommandText = "PRAGMA foreign_keys=OFF";
+            foreignKeys.ExecuteNonQuery();
+            using SqliteCommand orphan = connection.CreateCommand();
+            orphan.CommandText = "INSERT INTO ReadingStates (GuideId) VALUES ($id)";
+            orphan.Parameters.AddWithValue("$id", Guid.NewGuid().ToString("N"));
+            orphan.ExecuteNonQuery();
+        }
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(
+            () => repository.InitializeAsync());
+        Assert.Contains("orphaned records", error.Message);
+        using SqliteConnection original = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand version = original.CreateCommand();
+        version.CommandText = "PRAGMA user_version";
+        Assert.Equal(1L, (long)version.ExecuteScalar()!);
+        Assert.Empty(Directory.GetFiles(directory.Paths.RecoveryRoot));
+    }
+
+    [Fact]
+    public async Task RejectsIncompleteCurrentSchemaWithoutReinitializing()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Keep", null, null);
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        {
+            using SqliteCommand drop = connection.CreateCommand();
+            drop.CommandText = "DROP INDEX IX_ReadingStates_LastOpenedUtcMs";
+            drop.ExecuteNonQuery();
+        }
+
+        InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(
+            () => repository.InitializeAsync());
+        Assert.Contains("schema is incomplete", error.Message);
+        Assert.Equal("Keep", (await repository.GetGameAsync(game.Id))?.Title);
+    }
+
     private static void InsertGuide(
         string databasePath, Guid guideId, Guid gameId, string? managedRoot = null)
     {
@@ -183,6 +381,44 @@ public sealed class SqliteLibraryRepositoryTests
         command.Parameters.AddWithValue("$hash", new string('a', 64));
         command.Parameters.AddWithValue("$now", Now.ToUnixTimeMilliseconds());
         command.ExecuteNonQuery();
+    }
+
+    private static void CreatePopulatedVersionOne(
+        TestLibrary directory, Guid gameId, Guid guideId)
+    {
+        directory.Paths.EnsureCreated();
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        {
+            using SqliteCommand journal = connection.CreateCommand();
+            journal.CommandText = "PRAGMA journal_mode=WAL";
+            journal.ExecuteNonQuery();
+            using SqliteCommand schema = connection.CreateCommand();
+            schema.CommandText = LibrarySchema.Version1;
+            schema.ExecuteNonQuery();
+            using SqliteCommand game = connection.CreateCommand();
+            game.CommandText = """
+                INSERT INTO Games (Id, Title, CreatedUtcMs, UpdatedUtcMs)
+                VALUES ($id, 'Older game', $now, $now)
+                """;
+            game.Parameters.AddWithValue("$id", gameId.ToString("N"));
+            game.Parameters.AddWithValue("$now", Now.ToUnixTimeMilliseconds());
+            game.ExecuteNonQuery();
+        }
+
+        InsertGuide(directory.Paths.DatabasePath, guideId, gameId);
+        using SqliteConnection reopened = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand state = reopened.CreateCommand();
+        state.CommandText = """
+            UPDATE ReadingStates
+            SET LocatorJson = '{"old":true}', CompletedUtcMs = $now
+            WHERE GuideId = $id;
+            UPDATE ReaderPreferences SET TextScale = 1.25 WHERE GuideId = $id;
+            INSERT INTO Settings (Key, Value) VALUES
+                ('Theme', 'Dark'), ('LastActiveGuideId', $id);
+            """;
+        state.Parameters.AddWithValue("$id", guideId.ToString("N"));
+        state.Parameters.AddWithValue("$now", Now.ToUnixTimeMilliseconds());
+        state.ExecuteNonQuery();
     }
 
     private static SqliteConnection OpenWithForeignKeys(string databasePath)

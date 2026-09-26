@@ -20,6 +20,7 @@ public sealed class ManagedPathResolver : ILibraryPaths
         ContentRoot = Path.Combine(LibraryRoot, "content");
         StagingRoot = Path.Combine(LibraryRoot, ".staging");
         TrashRoot = Path.Combine(LibraryRoot, ".trash");
+        RecoveryRoot = Path.Combine(DataRoot, ".recovery");
         DatabasePath = Path.Combine(LibraryRoot, "library.sqlite");
     }
 
@@ -28,11 +29,13 @@ public sealed class ManagedPathResolver : ILibraryPaths
     public string ContentRoot { get; }
     public string StagingRoot { get; }
     public string TrashRoot { get; }
+    public string RecoveryRoot { get; }
     public string DatabasePath { get; }
 
     public void EnsureCreated()
     {
-        foreach (string path in new[] { DataRoot, LibraryRoot, ContentRoot, StagingRoot, TrashRoot })
+        foreach (string path in new[]
+                 { DataRoot, LibraryRoot, ContentRoot, StagingRoot, TrashRoot, RecoveryRoot })
         {
             RejectFilesystemLinks(path);
             Directory.CreateDirectory(path);

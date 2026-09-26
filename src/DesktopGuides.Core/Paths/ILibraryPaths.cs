@@ -7,6 +7,7 @@ public interface ILibraryPaths
     string ContentRoot { get; }
     string StagingRoot { get; }
     string TrashRoot { get; }
+    string RecoveryRoot { get; }
     string DatabasePath { get; }
 
     void EnsureCreated();

@@ -2,6 +2,8 @@ namespace DesktopGuides.Infrastructure.Storage;
 
 internal static class LibrarySchema
 {
+    public const int CurrentVersion = 2;
+
     public const string Version1 = """
         CREATE TABLE Games (
             Id TEXT PRIMARY KEY CHECK (length(Id) = 32),
@@ -62,4 +64,17 @@ internal static class LibrarySchema
 
         PRAGMA user_version = 1;
         """;
+
+    public const string Version2 = """
+        CREATE INDEX IX_ReadingStates_LastOpenedUtcMs
+            ON ReadingStates(LastOpenedUtcMs);
+
+        PRAGMA user_version = 2;
+        """;
+
+    public static readonly (int Version, string Sql)[] Migrations =
+    [
+        (1, Version1),
+        (2, Version2)
+    ];
 }

@@ -152,6 +152,8 @@ transaction, then run both `integrity_check` and `foreign_key_check`. Failure
 rolls back and leaves the old file/copy for recovery. A populated v1 fixture
 must upgrade to v2 with the last-opened index and all rows intact.
 Do not execute SQLite I/O on the WinUI dispatcher.
+Keep named migration recovery copies under the app-data `.recovery/` sibling
+of the live library, so a later whole-library replacement cannot remove them.
 
 ## 3. Reader contract, locators, and UI state
 
