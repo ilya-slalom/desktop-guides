@@ -408,3 +408,21 @@ records the interactive session and handoff token. Both the push and
 [PR workflow](https://github.com/ilya-slalom/desktop-guides/actions/runs/36235738707)
 passed 8/8 jobs, including the native ARM64 P0 UI regression. These remain
 M1 shell checks; the complete P1 installed workflow is still T17.2 work.
+
+The next review follow-up at code head `92011f9` rejects an existing
+`DesktopGuides.Preview_*` profile before the M1 shell test prepares or
+installs a package, even if the package was previously unregistered. The
+handoff test retains its launched child's handle for failure cleanup, and
+activation waits for a reply through the remaining deadline. On the Windows
+11 x64 host, PowerShell parsing, fresh-profile and process-handoff checks,
+and 47/47 locked Infrastructure tests passed.
+
+The signed Windows 11 x64
+[install record](evidence/ci/production-shell/profile-boundary/signed-install.json)
+from [push run 36237540783](https://github.com/ilya-slalom/desktop-guides/actions/runs/36237540783)
+shows successful activation and removal of the temporary package and
+certificate without a process cleanup error. Both the push and
+[PR workflow](https://github.com/ilya-slalom/desktop-guides/actions/runs/36237542985)
+passed 8/8 jobs, including the native ARM64 P0 UI regression. This closes
+the M1 review findings; the complete P1 installed workflow remains T17.2
+work.
