@@ -290,12 +290,12 @@ try {
         [void](Wait-Name 'ShellStatus' 'Game ready.')
         $report.phases += 'rapid-game-settings-back-game'
 
-        Activate-SelectedGuide 'Route Test Guide'
+        Activate-SelectedGuide $ExpectedResumeGuide
         Select-Element 'Settings'
         [void](Wait-Name 'SettingsHeading' 'Settings')
         [void](Wait-Name 'ShellStatus' 'Settings ready.')
         Go-Back
-        [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
+        [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
         [void](Wait-Name 'ShellStatus' 'Guide details ready.')
         $report.phases += 'rapid-guide-settings-back-reader'
         Go-Back
