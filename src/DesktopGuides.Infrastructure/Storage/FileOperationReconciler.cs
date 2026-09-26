@@ -66,6 +66,12 @@ internal sealed class FileOperationReconciler(ILibraryPaths paths)
                 RequireDirectoryOrMissing(operationRoot);
                 OwnedGuideTree content = OwnedGuideTree.Capture(contentPath);
                 OwnedGuideTree side = OwnedGuideTree.Capture(sidePath);
+                if (row.Kind == FileOperationKind.Import &&
+                    content.Exists && side.Exists)
+                {
+                    throw new InvalidDataException(
+                        "Prepared import has conflicting staging and content directories.");
+                }
                 if (row.Kind != FileOperationKind.Import &&
                     row.Phase == FileOperationPhase.Prepared &&
                     content.Exists && side.Exists)

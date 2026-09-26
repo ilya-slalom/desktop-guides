@@ -230,6 +230,28 @@ public sealed class FileOperationReconciliationTests
         Assert.Equal(1, OperationCount(directory.Paths.DatabasePath));
     }
 
+    [Fact]
+    public async Task ConflictingPreparedImportLeavesStageAndContentForReview()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Guid operationId = Guid.NewGuid();
+        Guid guideId = Guid.NewGuid();
+        string staged = StagedRoot(directory.Paths, operationId, guideId);
+        string content = directory.Paths.GetGuideRoot(guideId);
+        WriteMarker(staged);
+        WriteMarker(content);
+        InsertOperation(directory.Paths.DatabasePath, operationId, "Import", "Prepared",
+            Manifest("Import", operationId, guideId));
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+
+        Assert.True(File.Exists(Path.Combine(staged, "marker.txt")));
+        Assert.True(File.Exists(Path.Combine(content, "marker.txt")));
+        Assert.Equal(1, OperationCount(directory.Paths.DatabasePath));
+    }
+
     [Theory]
     [InlineData("future-version")]
     [InlineData("extra-field")]

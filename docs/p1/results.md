@@ -161,10 +161,13 @@ The startup report counts resolved operations and untracked content/staging/
 trash entries for later `Review orphan` UI. Unknown entries are retained.
 
 The first eight recovery tests failed against the merged T03.2 repository.
-After implementation, **14/14 focused recovery tests** passed on the
+The focused review exposed a prepared-import collision: staging and content
+both existed. Its regression failed against the first PR head; the preflight
+now stops recovery and retains both directories and the journal row for
+review. After that fix, **15/15 focused recovery tests** passed on the
 Windows 11 x64 host, build `10.0.26200.0`, under `E:\work\desktop-guides`
 with .NET SDK `10.0.401`. Locked restore and the full Release suites passed
-**61/61 Core** and **38/38 Infrastructure**. Tests include stage-only and
+**61/61 Core** and **39/39 Infrastructure**. Tests include stage-only and
 moved imports, prepared and committed deletions, partial two-guide restore,
 unknown directories, malformed and overlapping manifests, nested links,
 an NTFS junction, conflicting paths, and retry after a locked-file deletion
