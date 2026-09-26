@@ -127,6 +127,8 @@ try {
     $children.Add($shortLived)
     $shortOwned = Open-Sleeper $shortLived
     $shortLived.WaitForExit()
+    Assert-True ($null -eq (Open-Sleeper $shortLived)) `
+        'An exited launch child was treated as live ownership.'
     $ownedProcesses[$shortLived.Id] = $shortOwned
     Stop-InstalledShell
     Assert-True ($ownedProcesses.Count -eq 0) `

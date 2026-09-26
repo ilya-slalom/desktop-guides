@@ -207,6 +207,13 @@ Changing to a new result filename on every scenario would scatter evidence
 files; reusing stable scenario filenames with invocation IDs keeps the
 artifact layout and makes stale results detectable.
 
+A duplicate can exit while the installer queries its handle, before the
+handle signals. If a process-information query fails, wait briefly for
+that exact handle to signal exit; treat only a confirmed exit as a
+short-lived child, and retain the failure for a still-live process.
+Exercise already-exited ownership and repeat the signed installed gate
+because the foreground launch makes duplicate exit timing faster.
+
 ## M2 — catalog, static-asset validation, import, and removal
 
 Exit: two independent managed guides can be added under one game, retain

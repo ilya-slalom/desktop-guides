@@ -11,6 +11,9 @@ public sealed class DesktopGuidesOwnedProcess : IDisposable
     private const uint WaitObject0 = 0;
     private const uint WaitTimeout = 0x102;
     private const uint WaitFailed = 0xFFFFFFFF;
+    // A duplicate launch may stop answering process queries just before its
+    // handle signals exit; never treat a still-live process as unowned.
+    private const uint ExitTransitionMilliseconds = 500;
     private IntPtr handle;
 
     private DesktopGuidesOwnedProcess(IntPtr handle)
@@ -74,7 +77,12 @@ public sealed class DesktopGuidesOwnedProcess : IDisposable
             long kernel;
             long user;
             if (!GetProcessTimes(opened, out created, out exited, out kernel, out user))
-                throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not read process creation time.");
+            {
+                int error = Marshal.GetLastWin32Error();
+                if (WaitForExit(opened, ExitTransitionMilliseconds))
+                    return null;
+                throw new Win32Exception(error, "Could not read process creation time.");
+            }
             if (created != startedAt.ToUniversalTime().ToFileTimeUtc())
                 throw new InvalidOperationException("Reported process creation time changed.");
 
@@ -84,9 +92,10 @@ public sealed class DesktopGuidesOwnedProcess : IDisposable
             uint actualSession;
             if (!ProcessIdToSessionId(actualId, out actualSession))
             {
-                if (IsExited(opened))
+                int error = Marshal.GetLastWin32Error();
+                if (WaitForExit(opened, ExitTransitionMilliseconds))
                     return null;
-                throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not read process session.");
+                throw new Win32Exception(error, "Could not read process session.");
             }
             if (actualSession != (uint)sessionId)
                 throw new InvalidOperationException("Reported process session changed.");
@@ -95,9 +104,10 @@ public sealed class DesktopGuidesOwnedProcess : IDisposable
             int length = imagePath.Capacity;
             if (!QueryFullProcessImageName(opened, 0, imagePath, ref length))
             {
-                if (IsExited(opened))
+                int error = Marshal.GetLastWin32Error();
+                if (WaitForExit(opened, ExitTransitionMilliseconds))
                     return null;
-                throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not read process image path.");
+                throw new Win32Exception(error, "Could not read process image path.");
             }
             if (!string.Equals(imagePath.ToString(), executablePath,
                 StringComparison.OrdinalIgnoreCase))
