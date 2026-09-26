@@ -242,8 +242,10 @@ installed routing behavior; reading the guide remains M3 work.
 The duplicate push workflow exposed a smoke-test race after Settings → Library:
 the test selected a game while the Library list was still loading
 ([failure trace](evidence/ci/production-shell/smoke-race-before-fix.json)).
-The smoke script now waits for each route's ready status before selecting
-rows or navigating again. The expanded route suite also checks that a stale
-Game or Reader route clears its Back history. The installed script now
-launches before seeding to verify the fresh empty Library; its CI result is
-pending.
+A route-ready wait alone did not resolve the race in the next two CI runs:
+UI Automation exposed the selectable row after the status became ready. The
+smoke script now polls for the visible row and its selection pattern. The
+expanded route suite also checks that a stale Game or Reader route clears its
+Back history. The installed script now launches before seeding; its
+[first empty-Library trace](evidence/ci/production-shell/empty.json) passed.
+The combined installed result with row polling is pending.

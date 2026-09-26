@@ -64,11 +64,39 @@ try {
         $pattern.Invoke()
     }
 
-    function Select-Element($element) {
-        if (-not $element) { throw 'Expected UI selection is missing.' }
-        $pattern = $element.GetCurrentPattern(
-            [System.Windows.Automation.SelectionItemPattern]::Pattern)
-        $pattern.Select()
+    function Select-Element([string] $name) {
+        $condition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::NameProperty, $name)
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $candidates = $root.FindAll($scope, $condition)
+            foreach ($element in $candidates) {
+                try {
+                    if ($element.Current.IsOffscreen) { continue }
+                    $pattern = $element.GetCurrentPattern(
+                        [System.Windows.Automation.SelectionItemPattern]::Pattern)
+                }
+                catch {
+                    continue
+                }
+                $pattern.Select()
+                return
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        $listId = if ($name -eq 'Route Test Game') {
+            'GameList'
+        }
+        elseif ($name -eq 'Route Test Guide') {
+            'GuideList'
+        }
+        else {
+            'Navigation'
+        }
+        $list = Find-ById $listId
+        $bounds = if ($list) { $list.Current.BoundingRectangle.ToString() }
+                  else { 'missing' }
+        throw "Expected visible selectable '$name'; $listId bounds: $bounds."
     }
 
     function Go-Back {
@@ -115,7 +143,7 @@ try {
         [void](Wait-Name 'ShellStatus' 'Library ready.')
         $report.phases += 'game-back-library'
 
-        Select-Element (Find-ByName 'Settings')
+        Select-Element 'Settings'
         [void](Wait-Name 'SettingsHeading' 'Settings')
         $report.phases += 'settings'
         Go-Back
@@ -123,10 +151,10 @@ try {
         [void](Wait-Name 'ShellStatus' 'Library ready.')
         $report.phases += 'settings-back-library'
 
-        Select-Element (Find-ByName 'Route Test Game')
+        Select-Element 'Route Test Game'
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Name 'ShellStatus' 'Game ready.')
-        Select-Element (Find-ByName 'Route Test Guide')
+        Select-Element 'Route Test Guide'
         [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
         [void](Wait-Name 'ShellStatus' 'Guide ready.')
         Go-Back
