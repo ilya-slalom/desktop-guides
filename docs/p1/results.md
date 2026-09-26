@@ -225,6 +225,17 @@ records access failures when Windows attempted cleanup under
 packages. Both attempts removed the temporary certificate and left no
 preview app installed. No installed shell behavior is claimed from this host.
 
+After the user retried the signed x64 copy from an interactive desktop,
+Windows installed `DesktopGuides.Preview_0.1.0.0_x64` and the user reported
+that it launched successfully. A [host check](evidence/production-shell-host-interactive-install.json)
+confirmed the installed package reports `Status: Ok` and the same signed
+copy has a valid signature. The app was closed when checked, so launch is a
+user observation rather than an automated local UI trace. The interactive
+result narrows the earlier failure to the install context or host state; it
+does not establish why the two SSH-driven attempts failed at PLM. The
+temporary development signer remains in the host's `TrustedPeople` store
+while this manual install is being evaluated and must be removed afterward.
+
 The [current-head production-shell UI job](https://github.com/ilya-slalom/desktop-guides/actions/runs/36217602539)
 passed on the PR #6 Windows 11 x64 runner, build `10.0.26100.0`, in
 interactive session 2. The
