@@ -1,6 +1,7 @@
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Navigation;
 using DesktopGuides.Infrastructure.Storage;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Storage;
@@ -10,27 +11,30 @@ namespace DesktopGuides.Production;
 public sealed partial class ShellWindow : Window
 {
     private readonly ShellNavigator navigator = new();
-    private readonly SemaphoreSlim navigationGate = new(1, 1);
+    private readonly NavigationActionQueue navigationQueue = new();
+    private Task initializationTask = Task.CompletedTask;
     private SqliteLibraryRepository? repository;
     private Guid? resumeGuideId;
     private int renderGeneration;
     private bool ready;
+    private bool closeRequested;
+    private bool allowClose;
 
     public ShellWindow()
     {
         InitializeComponent();
         Title = "Desktop Guides Preview";
         Navigation.SelectedItem = LibraryItem;
-        Closed += async (_, _) =>
-        {
-            if (repository is not null)
-            {
-                await repository.DisposeAsync();
-            }
-        };
+        AppWindow.Closing += WindowClosing;
     }
 
-    public async Task InitializeAsync()
+    public Task InitializeAsync()
+    {
+        initializationTask = InitializeCoreAsync();
+        return initializationTask;
+    }
+
+    private async Task InitializeCoreAsync()
     {
         try
         {
@@ -44,6 +48,48 @@ public sealed partial class ShellWindow : Window
         {
             ready = false;
             ShellStatus.Text = $"Could not open the library: {error.Message}";
+        }
+    }
+
+    private void WindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (allowClose)
+        {
+            return;
+        }
+        args.Cancel = true;
+        if (closeRequested)
+        {
+            return;
+        }
+        closeRequested = true;
+        Task pendingNavigation = navigationQueue.StopAndDrainAsync();
+        _ = CloseWhenIdleAsync(pendingNavigation);
+    }
+
+    private async Task CloseWhenIdleAsync(Task pendingNavigation)
+    {
+        // Close again after the first Closing event has returned.
+        await Task.Yield();
+        try
+        {
+            await Task.WhenAll(initializationTask, pendingNavigation);
+        }
+        finally
+        {
+            try
+            {
+                await navigationQueue.DisposeAsync();
+                if (repository is not null)
+                {
+                    await repository.DisposeAsync();
+                }
+            }
+            finally
+            {
+                allowClose = true;
+                Close();
+            }
         }
     }
 
@@ -101,22 +147,14 @@ public sealed partial class ShellWindow : Window
         }
     }
 
-    private async Task RunNavigationAsync(Func<Task> action)
-    {
-        // Finish route changes and last-guide writes in the order requested.
-        await navigationGate.WaitAsync();
-        try
+    private Task RunNavigationAsync(Func<Task> action) =>
+        navigationQueue.RunAsync(async () =>
         {
             if (ready)
             {
                 await action();
             }
-        }
-        finally
-        {
-            navigationGate.Release();
-        }
-    }
+        });
 
     private async Task OpenGameAsync(Guid gameId)
     {

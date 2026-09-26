@@ -44,14 +44,18 @@ implementation under T17.2.
    signed recovery MSIX and an interactive recovery task ready. A fresh
    install verifies the package is absent before adding it; an upgrade
    verifies the expected older package is present and does not uninstall it.
+   Record the initial package identity, version, signer, and data hashes so
+   cleanup can restore that exact state after either outcome.
    Never run the current `tools/p1/windows_shell_install.ps1` cleanup
    against a user's working Preview installation.
 3. Check for a logged-in, usable desktop. Run a short interactive-task
    probe before any destructive step and record its user, session ID, and
-   access to the intended package profile. Require a nonzero session ID
-   matching the desktop's Explorer session. If the probe fails or the
-   desktop is locked, stop before uninstalling. Do not retry the install
-   directly from SSH.
+   access to the existing package profile, if any, or a writable
+   `%LOCALAPPDATA%` parent for a first install. Require a nonzero session ID
+   matching the desktop's Explorer session. After installation, verify
+   access to the new package profile before driving the UI. If the probe
+   fails or the desktop is locked, stop before uninstalling. Do not retry
+   the install directly from SSH.
 4. Register a uniquely named task for the test user with
    `New-ScheduledTaskPrincipal`, `-LogonType Interactive`, and
    `-RunLevel Limited`. Its action starts a versioned PowerShell runner from
@@ -62,32 +66,44 @@ implementation under T17.2.
    starting the task alone is not a pass. This limited task does not change
    network adapters.
 5. On failure, save the PowerShell error and AppX deployment Activity ID,
-   collect `Get-AppPackageLog`, and record which phase failed. If a shared
-   profile was uninstalled, use the prepared interactive task to restore
-   the signed package, then restore and verify backed-up user data. Recovery
-   protects the host; it does not turn a failed test into a pass. Retain the
-   backup until package health, data, and launch are checked.
-6. With networking available, independently probe the HTML test canary,
-   record its request count, then run the hostile-input case. Verify its
-   server log received zero guide-originated requests and retain the app
-   request trace. Run offline scenarios entirely on the Windows host
-   because SSH may disconnect. An elevated, host-side controller task arms
-   a repeating `SYSTEM` network-restore watchdog before disabling the
-   designated adapter. The limited interactive task relaunches and checks
-   the imported guides while disconnected; it never changes the adapter.
-   The controller restores networking after the offline result or timeout.
-   Keep the watchdog armed until the adapter and gateway are reachable and
-   the SSH or CI launcher acknowledges restored connectivity through a
-   separate per-run acknowledgment file. Then have the elevated controller
-   remove the watchdog. If restoration cannot be confirmed, retain the
-   watchdog and fail the run. Read the recorded results after connectivity
-   returns.
+   collect `Get-AppPackageLog`, and record which phase failed. After both
+   successful and failed scenarios on a shared profile, use the prepared
+   interactive recovery task to restore the original signed package,
+   including its version, and restore and verify backed-up user data.
+   Recovery protects the host; it does not turn a failed test into a pass.
+   Retain the backup until package identity, health, data hashes, and
+   interactive launch are checked.
+6. With networking available, create a fresh, empty WebView2 user-data
+   profile for the HTML hostile-input case. Independently probe a unique
+   per-run canary URL, then record its server request count as the baseline.
+   Run the guide case and verify no new guide-originated server requests;
+   retain the app request trace and profile identifier. Then run offline
+   scenarios entirely on the Windows host because SSH may disconnect. An
+   elevated, host-side controller task records active adapters and routes,
+   verifies that disabling the designated adapter leaves no other egress
+   path, checks that a separate external probe endpoint is reachable, and
+   arms a repeating `SYSTEM` network-restore watchdog before disconnection.
+   Set its first restore after the bounded offline UI timeout. The limited
+   interactive task relaunches and checks the imported guides while
+   disconnected; it never changes the adapter. Record failed
+   external-reachability probes before relaunch, between guide checks, and
+   after the final check. Any successful probe or available egress route
+   fails the offline scenario, even if reading succeeds. The controller
+   restores networking after the offline result or timeout. Keep the
+   watchdog armed until the adapter, gateway, and external probe endpoint
+   are reachable and the SSH or CI launcher acknowledges restored
+   connectivity through a separate per-run acknowledgment file. Then have
+   the elevated controller remove the watchdog. If restoration cannot be
+   confirmed, retain the watchdog and fail the run. Read the recorded
+   results after connectivity returns.
 7. Stop only test-owned processes and remove only test-owned tasks,
-   packages, and temporary trust. Do not remove an existing user package or
-   its signer as generic cleanup. Record the final package/data state and
-   any retained recovery artifact. A missing result, unexpected session,
-   failed scenario, unsuccessful restoration, or incomplete cleanup fails
-   the run.
+   packages, and temporary trust. Restore a shared profile to its recorded
+   initial package and data state, or verify that a previously empty test
+   profile has no candidate package left. Do not remove an existing user
+   package or its signer as generic cleanup. Record the final package/data
+   state and any retained recovery artifact. A missing result, unexpected
+   session, failed scenario, unsuccessful restoration, or incomplete
+   cleanup fails the run.
 
 ## Scenario checklist
 
@@ -98,7 +114,7 @@ production app. Add cases as the dependent P1 tasks complete.
 | --- | --- | --- |
 | Shell smoke | Fresh empty Library, Library/Game/Reader/Settings routes, rapid Game/Guide → Settings selections and Back, stale Resume, and no P0 fixture controls. Existing CI smoke covers these routes with seeded metadata; Reader is still a placeholder. | T11.1, TR11.1 |
 | Install and upgrade | Signed MSIX installs in an interactive session; an older version upgrades under the same identity without losing a populated library. Verify package version, launch, and data after restart. | T17.1, T17.3, TR17.2 |
-| Import and offline reading | Add a game and import TXT, static HTML with local assets, and PDF through the UI. Remove the originals; while online, verify a reachable HTML canary receives zero guide-originated requests. Then disconnect networking, relaunch, and open all three managed copies. | T04–T10, T17.3, TR17.1 |
+| Import and offline reading | Add a game and import TXT, static HTML with local assets, and PDF through the UI. Remove the originals; while online in a fresh WebView2 profile, verify a reachable HTML canary receives zero guide-originated requests. Then remove all egress, relaunch, and open all three managed copies while recording disconnected state through the final check. | T04–T10, T17.3, TR17.1 |
 | Independent state | Move to different positions in two guides, restart, and verify their locators separately. Change layout/theme, check exact or labeled approximate restore, and toggle completion explicitly; reaching the end must not mark complete. | T12–T14, TR12.1–TR14.2 |
 | Removal and recovery | Cancel and confirm guide/game removal, restart around an interrupted operation, and verify only owned records and files change. Export outside app data and restore into both clean and populated libraries. | T15.2–T15.4, T20.1–T20.2 |
 | Accessibility and PDF limits | Drive import/read/complete/export with keyboard and UIA; record focus, high contrast, DPI, and Narrator checks. Tagged PDF text must be accessible; scanned, locked, and long PDFs get their stated checks and limits. | T10.2–T10.3, T16.1–T16.3 |
@@ -116,10 +132,11 @@ Write per-run JSON and UI traces outside package data, under
 the equivalent CI artifact directory. Record scenario ID, start/end time,
 result, package and fixture hashes, OS/CPU/prerequisite versions, signer
 thumbprint, interactive task/user/session, package status, AppX Activity ID
-on failure, online canary reachability, baseline/final server request counts,
-and app request trace, elevated offline controller and watchdog status,
-offline network restoration and launcher acknowledgment, and final
-cleanup/data checks.
+on failure, fresh WebView2 profile identifier, online canary reachability,
+baseline/final server request counts, and app request trace, elevated offline
+controller and watchdog status, offline adapter/route snapshots and failed
+reachability probes through the final guide check, network restoration and
+launcher acknowledgment, and verified final package/data state.
 Keep user guide contents, private keys, and raw package data out of
 repository evidence. Link the sanitized result from `docs/p1/results.md`.
 

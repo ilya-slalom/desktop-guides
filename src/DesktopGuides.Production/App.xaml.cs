@@ -17,4 +17,6 @@ public partial class App : Application
         shellWindow.Activate();
         _ = shellWindow.InitializeAsync();
     }
+
+    internal void ActivateMainWindow() => shellWindow?.Activate();
 }

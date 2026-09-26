@@ -257,6 +257,14 @@ own Game. Launch opens Library and may show a `Resume last guide` action; it
 does not auto-open that guide. A dialog or overlay returns focus to its
 invoking control. Every shortcut has a visible matching command.
 
+`AppInstance` registration in the production entry point gives one process
+ownership of the library and redirects later activations to its window. A
+process mutex would prevent duplicate owners but would discard the user's
+second launch. Register before the WinUI dispatcher starts on both x64 and
+ARM64. On window close, stop accepting navigation, await initialization and
+queued actions, then dispose the repository and close. This may briefly
+defer closing while a database write finishes.
+
 The P0 fixture picker and test assets remain available only in a separate
 CI/development probe mode. A production MSIX does not bundle the P0 corpus
 or expose fixture controls. CI must keep one diagnostic package lane for P0
@@ -492,7 +500,8 @@ project uses a provisional package identity until T17.1 sets the public one.
   window and stable ID-based back navigation. Start at Library, show an
   optional Resume action, and handle missing last-guide IDs. Serialize user
   route intents, including last-guide persistence, so a delayed lookup or
-  write cannot override a later selection. Keep a
+  write cannot override a later selection. Redirect duplicate activations
+  before the library opens and drain pending navigation on close. Keep a
   build-time diagnostic probe mode for P0 CI without shipping fixtures in
   the production package.
 - **T11.2** Define the typed reader adapter/capabilities in section 3 and

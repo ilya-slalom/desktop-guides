@@ -260,8 +260,10 @@ An [earlier production-shell UI job](https://github.com/ilya-slalom/desktop-guid
 passed on the PR #6 Windows 11 x64 runner, build `10.0.26100.0`, in
 interactive session 2. The
 [signed install record](evidence/ci/production-shell/signed-install.json)
-shows package SHA-256
+shows unsigned input SHA-256
 `E78CC2C24856A0DD094C78006B7B4CDBD5FC511B3B9F59CC27C9CE43BC57D6E4`
+and installed signed MSIX SHA-256
+`60ECD7C582B74F4974F4DF61BA68E8D1AC7E26AFBE0FEA73E7CF7E873C5C5A14`
 and successful package/certificate cleanup. The
 [empty-Library trace](evidence/ci/production-shell/empty.json) verifies
 fresh startup before seeding. The

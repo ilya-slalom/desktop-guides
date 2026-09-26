@@ -30,6 +30,7 @@ $certificate = $null
 $installed = $null
 $imported = $false
 $launchTask = 'DesktopGuides-P1-ShellLaunch'
+$secondLaunchTask = 'DesktopGuides-P1-ShellSecondLaunch'
 $smokeTask = 'DesktopGuides-P1-ShellSmoke'
 
 function Stop-InstalledShell {
@@ -51,6 +52,54 @@ function Start-InstalledShell {
     if (-not $appProcess) { throw 'Installed production shell did not launch.' }
     $report.launchedProcessId = $appProcess.ProcessId
     $report.launchedSessionId = $appProcess.SessionId
+}
+
+function Assert-SingleInstance {
+    $firstProcessId = $report.launchedProcessId
+    Register-ScheduledTask -TaskName $secondLaunchTask -Action $launchAction `
+        -Principal $principal -Force | Out-Null
+    $previousRun = (Get-ScheduledTaskInfo -TaskName $secondLaunchTask).LastRunTime
+    Start-ScheduledTask -TaskName $secondLaunchTask
+    $deadline = (Get-Date).AddSeconds(15)
+    do {
+        Start-Sleep -Milliseconds 250
+        $launchInfo = Get-ScheduledTaskInfo -TaskName $secondLaunchTask
+    } while ($launchInfo.LastRunTime -le $previousRun -and
+        (Get-Date) -lt $deadline)
+    if ($launchInfo.LastRunTime -le $previousRun) {
+        throw 'Second production launch task never started.'
+    }
+    Start-Sleep -Seconds 2
+    $processes = @(Get-CimInstance Win32_Process `
+        -Filter "Name = 'DesktopGuides.Production.exe'" |
+        Where-Object { $_.ExecutablePath -like "$($installed.InstallLocation)*" })
+    if ($processes.Count -ne 1 -or $processes[0].ProcessId -ne $firstProcessId) {
+        throw 'Second production launch created another library-owning process.'
+    }
+    $report.singleInstanceProcessId = $processes[0].ProcessId
+}
+
+function Close-InstalledShell {
+    Add-Type -AssemblyName UIAutomationClient
+    Add-Type -AssemblyName UIAutomationTypes
+    $process = Get-Process -Id $report.launchedProcessId -ErrorAction Stop
+    if ($process.MainWindowHandle -eq 0) {
+        throw 'Installed production shell has no window to close.'
+    }
+    $window = [System.Windows.Automation.AutomationElement]::FromHandle(
+        $process.MainWindowHandle)
+    $pattern = $window.GetCurrentPattern(
+        [System.Windows.Automation.WindowPattern]::Pattern)
+    $pattern.Close()
+    $deadline = (Get-Date).AddSeconds(20)
+    do {
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Process -Id $process.Id -ErrorAction SilentlyContinue) -and
+        (Get-Date) -lt $deadline)
+    if (Get-Process -Id $process.Id -ErrorAction SilentlyContinue) {
+        throw 'Production shell did not exit after a normal window close.'
+    }
+    $report.closedGracefully = $true
 }
 
 function Run-ShellSmoke([string] $mode) {
@@ -136,6 +185,7 @@ try {
         -Principal $principal -Force | Out-Null
 
     Start-InstalledShell
+    Assert-SingleInstance
     $report.empty = Run-ShellSmoke 'empty'
 
     Stop-InstalledShell
@@ -149,6 +199,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Could not set stale last-guide ID.' }
     Start-InstalledShell
     $report.stale = Run-ShellSmoke 'stale'
+    Close-InstalledShell
     $report.success = $true
 }
 catch {
@@ -157,6 +208,9 @@ catch {
 finally {
     Stop-ScheduledTask -TaskName $smokeTask -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName $smokeTask -Confirm:$false `
+        -ErrorAction SilentlyContinue
+    Stop-ScheduledTask -TaskName $secondLaunchTask -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName $secondLaunchTask -Confirm:$false `
         -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName $launchTask -Confirm:$false `
         -ErrorAction SilentlyContinue
