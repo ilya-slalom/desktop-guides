@@ -67,8 +67,11 @@ with transactional v1→v2 upgrade and a consistent recovery copy under
 `47c9e906c01e85eb9ce9f9759f6359390d809e52`. Startup reconciliation
 now precedes M2 file mutation. T11.1 was merged through
 [PR #6](https://github.com/ilya-slalom/desktop-guides/pull/6), merge commit
-`1f89fb054b523b9e51a0fba0687e0c5c601397ae`. Reader controls and package
-identity remain separate gates.
+`1f89fb054b523b9e51a0fba0687e0c5c601397ae`. T11.3 reader controls are
+implemented for review in
+[PR #7](https://github.com/ilya-slalom/desktop-guides/pull/7) and passed
+the signed installed Windows 11 x64 shell gate. The public package identity
+remains T17.1 work.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |

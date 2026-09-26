@@ -1,0 +1,12 @@
+﻿{
+    "mode":  "waiting-handoff",
+    "invocationId":  "4f417125c2ef47628a9e301ac310b29d",
+    "observedAt":  "2026-09-26T13:19:43.0331620Z",
+    "processId":  2856,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "waiting-for-library-lease"
+               ]
+}

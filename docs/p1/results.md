@@ -489,6 +489,29 @@ x64 MSIX build passed. The MSIX SHA-256 is
 The build reported only the existing missing-`mspdbcmf.exe` symbols warning.
 The updated installed-smoke script passed Windows PowerShell 5.1 parsing.
 The host retains an installed Preview package, so its fresh-profile M1
-installer was not run there. Signed installed Reader → Game, selection,
-focus, and reopen checks remain pending on the clean CI runner; dynamic
-toolbar behavior remains an M3 adapter integration check.
+installer was not run there.
+
+The signed installed Windows 11 x64
+[push run 36244519302](https://github.com/ilya-slalom/desktop-guides/actions/runs/36244519302)
+passed its shell job for code head `2187a0492aa0c1aa5218510289ffc8a8458d292f`.
+The [install record](evidence/ci/production-shell/reader-shell/signed-install.json)
+reports Windows build `10.0.26100.0`, signed MSIX SHA-256
+`11f6bff9f38bccdf62cc5a3c911d972dbcdce37ece9b96ef207b4e5fb5d45827`,
+all normal and close-handoff route smokes, stale Resume, and graceful exit.
+The [normal trace](evidence/ci/production-shell/reader-shell/normal.json)
+includes Reader → Game with selected-row focus, Enter to reopen the same
+guide, and Settings round trips. The
+[Reader screenshot](evidence/ci/production-shell/reader-shell/normal.reader.png)
+shows the compact title/game/format header, collapsed pane, and honest
+unavailable-reading message. The install record confirms that the temporary
+package and signer were removed. Both x64 and ARM64 production package
+builds, Core/Infrastructure tests, and the native ARM64 P0 installed
+fixture regression passed in the eight-job run. The ARM64 result is a
+diagnostic P0 check, not the complete P1 installed workflow.
+
+The installed checks exposed two smoke assumptions that were corrected
+before the passing run: reselecting an already selected guide does not
+activate it, and the blocked-write handoff temporarily changes the Resume
+guide. The final smoke activates a selected row with Enter and explicitly
+returns to the route guide before later relaunches. Dynamic toolbar actions
+remain an M3 adapter integration check; this M1 preview has no adapter.

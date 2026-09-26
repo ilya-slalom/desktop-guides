@@ -1,0 +1,22 @@
+﻿{
+    "mode":  "normal",
+    "invocationId":  "695970d3dc59419ea6eae58dc5ad82d1",
+    "observedAt":  "2026-09-26T13:19:56.5197180Z",
+    "processId":  4216,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "resume-reader",
+                   "reader-back-game",
+                   "reopen-selected-guide",
+                   "game-back-library",
+                   "settings",
+                   "settings-back-library",
+                   "rapid-game-settings-back-game",
+                   "rapid-guide-settings-back-reader",
+                   "library-game-reader-game"
+               ],
+    "readerScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.reader.png"
+}
