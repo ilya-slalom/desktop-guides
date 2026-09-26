@@ -173,5 +173,9 @@ unknown directories, malformed and overlapping manifests, nested links,
 an NTFS junction, conflicting paths, and retry after a locked-file deletion
 failure. The unsigned Release x64 WinUI MSIX build passed with zero errors
 and the host's existing `mspdbcmf.exe` symbols-package warning. Native
-ARM64 branch CI and installed production-app recovery remain separate
-checks; no M2 file mutation is wired yet.
+ARM64 headless CI on PR #5 passed **61/61 Core** and **39/39 Infrastructure**
+tests at implementation head `7a54a58`; the x64 headless lane passed the
+same counts. Both unsigned MSIX package jobs passed. The installed ARM64
+P0 diagnostic regression passed **14/14** fixture workflows, and its record
+shows package and certificate cleanup. Installed production-app recovery
+remains a separate check; no M2 file mutation is wired yet.
