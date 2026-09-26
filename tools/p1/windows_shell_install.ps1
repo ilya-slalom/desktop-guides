@@ -143,11 +143,57 @@ function Close-InstalledShell {
 
 function Assert-RelaunchDuringClose {
     $closingProcessId = $report.launchedProcessId
-    Request-InstalledShellClose $closingProcessId
-    Start-InstalledShell $closingProcessId
+    $lockReady = Join-Path $ResultDirectory 'write-lock-ready'
+    $lockRelease = Join-Path $ResultDirectory 'write-lock-release'
+    Remove-Item $lockReady, $lockRelease -ErrorAction SilentlyContinue
+    $seedDll = Join-Path $PSScriptRoot `
+        'DesktopGuides.ShellSeed\bin\Release\net10.0\DesktopGuides.ShellSeed.dll'
+    if (-not (Test-Path $seedDll)) {
+        throw 'Shell seed executable is unavailable for the close handoff.'
+    }
+    $lockArguments = @(
+        ('"{0}"' -f $seedDll), 'hold-write-lock', ('"{0}"' -f $dataRoot),
+        ('"{0}"' -f $lockReady), ('"{0}"' -f $lockRelease)
+    )
+    $lockProcess = Start-Process -FilePath 'dotnet.exe' `
+        -ArgumentList $lockArguments -PassThru -WindowStyle Hidden
+    try {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            Start-Sleep -Milliseconds 100
+            if ($lockProcess.HasExited) {
+                throw "Write-lock helper exited early: $($lockProcess.ExitCode)."
+            }
+        } while (-not (Test-Path $lockReady) -and (Get-Date) -lt $deadline)
+        if (-not (Test-Path $lockReady)) {
+            throw 'Write-lock helper did not acquire the database.'
+        }
+        $report.pendingGuide = Run-ShellSmoke 'queue-guide'
+        Request-InstalledShellClose $closingProcessId
+        Start-Sleep -Milliseconds 300
+        if (-not (Get-Process -Id $closingProcessId -ErrorAction SilentlyContinue)) {
+            throw 'Closing shell exited before pending guide action drained.'
+        }
+        Start-InstalledShell $closingProcessId
+        $report.closeHandoffOverlapObserved = [bool](
+            Get-Process -Id $closingProcessId -ErrorAction SilentlyContinue)
+        if (-not $report.closeHandoffOverlapObserved) {
+            throw 'New shell opened only after the old shell exited.'
+        }
+    }
+    finally {
+        New-Item -ItemType File -Force $lockRelease | Out-Null
+        if (-not $lockProcess.WaitForExit(10000)) {
+            Stop-Process -Id $lockProcess.Id -Force
+            $lockProcess.WaitForExit()
+        }
+    }
+    if ($lockProcess.ExitCode -ne 0) {
+        throw "Write-lock helper failed: $($lockProcess.ExitCode)."
+    }
     Wait-InstalledShellExit $closingProcessId
     $report.relaunchDuringCloseProcessId = $report.launchedProcessId
-    $report.staleAfterCloseRelaunch = Run-ShellSmoke 'stale'
+    $report.normalAfterCloseRelaunch = Run-ShellSmoke 'normal'
 }
 
 function Run-ShellSmoke([string] $mode) {
@@ -246,13 +292,13 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Could not seed shell route metadata.' }
     Start-InstalledShell
     $report.normal = Run-ShellSmoke 'normal'
+    Assert-RelaunchDuringClose
 
     Stop-InstalledShell
     dotnet run --project $seedProject -c Release --no-restore -- stale $dataRoot
     if ($LASTEXITCODE -ne 0) { throw 'Could not set stale last-guide ID.' }
     Start-InstalledShell
     $report.stale = Run-ShellSmoke 'stale'
-    Assert-RelaunchDuringClose
     Close-InstalledShell
     $report.success = $true
 }

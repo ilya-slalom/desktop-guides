@@ -3,9 +3,46 @@ using DesktopGuides.Core.Library;
 using DesktopGuides.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
 
+if (args.Length == 4 && args[0] == "hold-write-lock")
+{
+    ManagedPathResolver lockPaths = new(args[1]);
+    using SqliteConnection lockConnection = new(new SqliteConnectionStringBuilder
+    {
+        DataSource = lockPaths.DatabasePath,
+        Mode = SqliteOpenMode.ReadWrite,
+        Pooling = false
+    }.ToString());
+    lockConnection.Open();
+    using SqliteCommand lockCommand = lockConnection.CreateCommand();
+    lockCommand.CommandText = "BEGIN IMMEDIATE";
+    lockCommand.ExecuteNonQuery();
+    try
+    {
+        File.WriteAllText(args[2], "ready");
+        DateTime deadline = DateTime.UtcNow.AddSeconds(30);
+        while (!File.Exists(args[3]) && DateTime.UtcNow < deadline)
+        {
+            Thread.Sleep(50);
+        }
+        if (!File.Exists(args[3]))
+        {
+            Console.Error.WriteLine("Write-lock release timed out.");
+            return 3;
+        }
+    }
+    finally
+    {
+        lockCommand.CommandText = "ROLLBACK";
+        lockCommand.ExecuteNonQuery();
+    }
+    return 0;
+}
+
 if (args.Length != 2 || args[0] is not ("seed" or "stale"))
 {
-    Console.Error.WriteLine("Usage: DesktopGuides.ShellSeed seed|stale <app-data-root>");
+    Console.Error.WriteLine(
+        "Usage: DesktopGuides.ShellSeed seed|stale <app-data-root> " +
+        "or hold-write-lock <app-data-root> <ready-path> <release-path>");
     return 2;
 }
 

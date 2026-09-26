@@ -269,7 +269,9 @@ can own it. Await initialization and queued actions, then dispose the
 repository and close. This may briefly defer closing while a database write
 finishes; the old and new processes can overlap during this handoff. The
 installed smoke observes an activation acknowledgment from the existing
-window and checks that a launch requested during close opens a new window.
+window and checks that a launch requested during close opens a new window
+before the old process finishes a guide action blocked by a test-held write
+lock.
 
 The P0 fixture picker and test assets remain available only in a separate
 CI/development probe mode. A production MSIX does not bundle the P0 corpus

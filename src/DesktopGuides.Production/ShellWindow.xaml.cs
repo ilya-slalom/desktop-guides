@@ -177,6 +177,7 @@ public sealed partial class ShellWindow : Window
 
     private async Task OpenGuideAsync(Guid guideId)
     {
+        ShellStatus.Text = "Opening guide...";
         try
         {
             SqliteLibraryRepository library = RequireRepository();

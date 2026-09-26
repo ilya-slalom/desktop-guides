@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('empty', 'normal', 'stale')]
+    [ValidateSet('empty', 'normal', 'stale', 'queue-guide')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -105,12 +105,20 @@ try {
         Invoke-Element $button
     }
 
-    [void](Wait-Name 'ShellStatus' 'Library ready.')
-    [void](Wait-Name 'LibraryHeading' 'Library')
-    if (Find-ById 'FixturePicker') {
-        throw 'The production shell exposes a P0 fixture picker.'
+    if ($Mode -eq 'queue-guide') {
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        Select-Element 'Route Test Guide'
+        [void](Wait-Name 'ShellStatus' 'Opening guide...')
+        $report.phases += 'guide-action-started'
     }
-    $report.phases += 'library'
+    else {
+        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        if (Find-ById 'FixturePicker') {
+            throw 'The production shell exposes a P0 fixture picker.'
+        }
+        $report.phases += 'library'
+    }
 
     if ($Mode -eq 'empty') {
         [void](Wait-Name 'LibraryEmpty' 'No games in your library.')
@@ -127,7 +135,7 @@ try {
         }
         $report.phases += 'stale-resume-hidden'
     }
-    else {
+    elseif ($Mode -eq 'normal') {
         $resume = Wait-Name 'ResumeGuide' 'Resume Route Test Guide'
         Invoke-Element $resume
         [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
