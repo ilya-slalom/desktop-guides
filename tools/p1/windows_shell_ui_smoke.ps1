@@ -176,6 +176,22 @@ try {
         [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
     }
 
+    function Open-GuideFromGame([string] $name) {
+        $list = Find-ById 'GuideList'
+        if (-not $list -or $list.Current.IsOffscreen) {
+            throw 'Expected a visible guide list.'
+        }
+        $selection = $list.GetCurrentPattern(
+            [System.Windows.Automation.SelectionPattern]::Pattern)
+        foreach ($item in $selection.Current.GetSelection()) {
+            if ($item.Current.Name -eq $name) {
+                Activate-SelectedGuide $name
+                return
+            }
+        }
+        Select-Element $name
+    }
+
     function Save-ReaderScreenshot {
         Add-Type -AssemblyName System.Drawing
         $bounds = $root.Current.BoundingRectangle
@@ -290,12 +306,12 @@ try {
         [void](Wait-Name 'ShellStatus' 'Game ready.')
         $report.phases += 'rapid-game-settings-back-game'
 
-        Activate-SelectedGuide $ExpectedResumeGuide
+        Open-GuideFromGame 'Route Test Guide'
         Select-Element 'Settings'
         [void](Wait-Name 'SettingsHeading' 'Settings')
         [void](Wait-Name 'ShellStatus' 'Settings ready.')
         Go-Back
-        [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
+        [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
         [void](Wait-Name 'ShellStatus' 'Guide details ready.')
         $report.phases += 'rapid-guide-settings-back-reader'
         Go-Back
