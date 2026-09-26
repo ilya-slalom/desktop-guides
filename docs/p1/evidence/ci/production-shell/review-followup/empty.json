@@ -1,0 +1,11 @@
+﻿{
+    "mode":  "empty",
+    "observedAt":  "2026-09-26T08:19:23.9272422Z",
+    "processId":  4020,
+    "sessionId":  2,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "empty-library"
+               ]
+}

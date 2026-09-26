@@ -315,3 +315,29 @@ process held a SQLite write lock. After lock release, the old process exited,
 the new window passed the seeded route smoke, and the test package and
 certificate were removed. This is M1 shell evidence; the complete P1
 installed workflow remains T17.2 work.
+
+The next review follow-up at code head `464f7c8` holds an exclusive
+package-local library lease through repository disposal. A new window can
+open during close, but waits for the old session before loading the library.
+The activation path retries if it selected an instance that starts closing.
+The installed test now binds UI checks and process cleanup to recorded
+processes in the interactive session, and queues a different guide from the
+seeded Resume guide.
+
+[PR CI run 36229239568](https://github.com/ilya-slalom/desktop-guides/actions/runs/36229239568)
+passed the signed Windows 11 x64 installed-shell job. Its
+[install record](evidence/ci/production-shell/review-followup/signed-install.json)
+shows two different window processes during close; the
+[waiting-window trace](evidence/ci/production-shell/review-followup/waiting-handoff.json)
+observed the new window waiting for the library lease while the old one was
+still alive. After the test released the SQLite write lock, the old window
+exited and the new Library resumed with the guide selected in the
+[pending-guide trace](evidence/ci/production-shell/review-followup/queue-guide.json).
+The same run paused another launch after target selection, closed that
+target, and verified that the launch opened a new window. The package and
+temporary certificate were removed. The Windows 11 x64 host separately
+passed 42/42 Infrastructure tests, the unsigned x64 production MSIX build,
+and the shell-seed build. Both the push and
+[PR workflow](https://github.com/ilya-slalom/desktop-guides/actions/runs/36229242647)
+passed 8/8 jobs, including the native ARM64 P0 fixture regression. These
+checks remain M1 shell evidence.

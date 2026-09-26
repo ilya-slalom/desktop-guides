@@ -1,0 +1,11 @@
+﻿{
+    "mode":  "stale",
+    "observedAt":  "2026-09-26T08:19:54.0737921Z",
+    "processId":  1740,
+    "sessionId":  2,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "stale-resume-hidden"
+               ]
+}
