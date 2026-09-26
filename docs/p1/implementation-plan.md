@@ -181,6 +181,16 @@ test a completed reply at the boundary and a real timed-out request.
 PowerShell profile/child checks and locked Infrastructure tests must pass
 before repeating the signed Windows 11 x64 installed lane.
 
+The installed UI smoke task writes its result before its PowerShell process
+exits. Reusing one task name with a fixed delay can cause Task Scheduler to
+ignore a new start while the prior instance still runs. Keep one task name
+and wait a bounded time for the registered task to reach `Ready` after each
+result, including failed smoke results, before the next scenario can
+register or start it. A distinct task per scenario would add cleanup state,
+while parallel task instances could overlap UI actions. Exercise task reuse
+with a helper that stays alive for two seconds after publishing its result,
+then rerun the signed installed x64 gate.
+
 ## M2 — catalog, static-asset validation, import, and removal
 
 Exit: two independent managed guides can be added under one game, retain

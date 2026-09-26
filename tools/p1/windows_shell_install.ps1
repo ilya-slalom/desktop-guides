@@ -59,14 +59,16 @@ function Get-InstalledShellProcesses {
         }
 }
 
-function Wait-LaunchTaskIdle(
+function Wait-ScheduledTaskIdle(
     [string] $TaskName,
-    [int] $TimeoutSeconds) {
+    [int] $TimeoutSeconds,
+    [switch] $RequireRegistered) {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     do {
         $task = Get-ScheduledTask -TaskName $TaskName `
             -ErrorAction SilentlyContinue
-        if (-not $task -or $task.State -eq 'Ready') {
+        if (($task -and $task.State -eq 'Ready') -or
+            (-not $task -and -not $RequireRegistered)) {
             return $true
         }
         Start-Sleep -Milliseconds 250
@@ -124,7 +126,7 @@ function Wait-LaunchResult(
         Set-Content -LiteralPath "$ResultPath.ack.tmp" -Encoding UTF8
     Move-Item -LiteralPath "$ResultPath.ack.tmp" `
         -Destination "$ResultPath.ack" -Force
-    if (-not (Wait-LaunchTaskIdle $TaskName 10)) {
+    if (-not (Wait-ScheduledTaskIdle $TaskName 10 -RequireRegistered)) {
         throw "Interactive launch task $TaskName did not finish after handoff."
     }
     return $launch
@@ -413,7 +415,8 @@ function Assert-AcceptedThenClose {
 
 function Run-ShellSmoke(
     [string] $mode,
-    [string] $expectedResumeGuide = 'Route Test Guide') {
+    [string] $expectedResumeGuide = 'Route Test Guide',
+    [int] $ExitDelayMilliseconds = 0) {
     $resultPath = Join-Path $ResultDirectory "$mode.json"
     Remove-Item $resultPath -ErrorAction SilentlyContinue
     $script = Join-Path $PSScriptRoot 'windows_shell_ui_smoke.ps1'
@@ -423,7 +426,8 @@ function Run-ShellSmoke(
         ' -ProcessId ' + $report.launchedProcessId +
         ' -SessionId ' + $targetSessionId +
         ' -ExecutablePath "' + $expectedExecutablePath + '"' +
-        ' -ExpectedResumeGuide "' + $expectedResumeGuide + '"'
+        ' -ExpectedResumeGuide "' + $expectedResumeGuide + '"' +
+        ' -ExitDelayMilliseconds ' + $ExitDelayMilliseconds
     $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
         -Argument $arguments -WorkingDirectory $PSScriptRoot
     Register-ScheduledTask -TaskName $smokeTask -Action $action `
@@ -436,7 +440,9 @@ function Run-ShellSmoke(
     if (-not (Test-Path $resultPath)) {
         throw "Installed $mode shell smoke timed out."
     }
-    Start-Sleep -Milliseconds 250
+    if (-not (Wait-ScheduledTaskIdle $smokeTask 10 -RequireRegistered)) {
+        throw "Installed $mode shell smoke task did not finish after writing its result."
+    }
     $result = Get-Content $resultPath -Raw | ConvertFrom-Json
     if (-not $result.success) {
         throw "Installed $mode shell smoke failed: $($result.error)"
@@ -507,7 +513,8 @@ try {
         -Principal $principal -Force | Out-Null
 
     Start-InstalledShell
-    $report.empty = Run-ShellSmoke 'empty'
+    $report.empty = Run-ShellSmoke 'empty' -ExitDelayMilliseconds 2000
+    $report.emptyAfterDelayedTask = Run-ShellSmoke 'empty'
     Assert-SingleInstance
     $report.emptyAfterSecondLaunch = Run-ShellSmoke 'empty'
 
@@ -578,11 +585,11 @@ finally {
         -ErrorAction SilentlyContinue
     $launchTasksDrained = $true
     foreach ($taskName in @($secondLaunchTask, $launchTask)) {
-        if (-not (Wait-LaunchTaskIdle $taskName 70)) {
+        if (-not (Wait-ScheduledTaskIdle $taskName 70)) {
             $cleanupErrors.Add(
                 "Interactive launch task $taskName did not finish its child handoff.")
             Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-            if (-not (Wait-LaunchTaskIdle $taskName 10)) {
+            if (-not (Wait-ScheduledTaskIdle $taskName 10)) {
                 $cleanupErrors.Add(
                     "Interactive launch task $taskName is still active.")
                 $launchTasksDrained = $false

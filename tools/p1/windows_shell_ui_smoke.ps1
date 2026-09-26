@@ -16,7 +16,10 @@ param(
     [string] $ExecutablePath,
 
     [ValidateSet('Route Test Guide', 'Blocked Write Guide')]
-    [string] $ExpectedResumeGuide = 'Route Test Guide'
+    [string] $ExpectedResumeGuide = 'Route Test Guide',
+
+    [ValidateRange(0, 5000)]
+    [int] $ExitDelayMilliseconds = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -25,6 +28,7 @@ $report = [ordered]@{
     observedAt = (Get-Date).ToUniversalTime().ToString('o')
     processId = $ProcessId
     sessionId = $SessionId
+    exitDelayMilliseconds = $ExitDelayMilliseconds
     success = $false
     phases = @()
 }
@@ -217,5 +221,8 @@ catch {
 finally {
     $report | ConvertTo-Json -Depth 6 |
         Set-Content $ResultPath -Encoding UTF8
+}
+if ($ExitDelayMilliseconds -gt 0) {
+    Start-Sleep -Milliseconds $ExitDelayMilliseconds
 }
 if (-not $report.success) { exit 1 }

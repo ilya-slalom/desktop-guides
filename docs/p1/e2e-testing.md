@@ -120,6 +120,11 @@ before package removal. A task that cannot drain or an unverified remaining
 process fails cleanup. Clear old result and acknowledgment files before
 each task start.
 
+The installed shell UI smoke runner may publish a result before its task
+exits. Wait for the registered task to become idle before reusing its name,
+including after a failed result. The signed shell gate includes a delayed
+task exit followed immediately by another smoke scenario.
+
 ## Scenario checklist
 
 Each row needs a named UI trace or result file from the signed, installed
