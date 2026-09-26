@@ -1,16 +1,30 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('empty', 'normal', 'stale', 'queue-guide')]
+    [ValidateSet('empty', 'normal', 'stale', 'queue-guide', 'waiting-handoff')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
-    [string] $ResultPath
+    [string] $ResultPath,
+
+    [Parameter(Mandatory = $true)]
+    [int] $ProcessId,
+
+    [Parameter(Mandatory = $true)]
+    [int] $SessionId,
+
+    [Parameter(Mandatory = $true)]
+    [string] $ExecutablePath,
+
+    [ValidateSet('Route Test Guide', 'Blocked Write Guide')]
+    [string] $ExpectedResumeGuide = 'Route Test Guide'
 )
 
 $ErrorActionPreference = 'Stop'
 $report = [ordered]@{
     mode = $Mode
     observedAt = (Get-Date).ToUniversalTime().ToString('o')
+    processId = $ProcessId
+    sessionId = $SessionId
     success = $false
     phases = @()
 }
@@ -20,13 +34,23 @@ try {
     Add-Type -AssemblyName UIAutomationTypes
     $deadline = (Get-Date).AddSeconds(30)
     do {
-        $process = Get-Process DesktopGuides.Production -ErrorAction SilentlyContinue |
-            Where-Object { $_.MainWindowHandle -ne 0 } |
-            Select-Object -First 1
-        if ($process) { break }
+        $installedProcess = Get-CimInstance Win32_Process `
+            -Filter "ProcessId = $ProcessId"
+        if (-not $installedProcess) {
+            throw "Expected production shell process $ProcessId exited."
+        }
+        if ($installedProcess.SessionId -ne $SessionId -or
+            -not [string]::Equals($installedProcess.ExecutablePath,
+                $ExecutablePath, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Process $ProcessId is not the installed shell in session $SessionId."
+        }
+        $process = Get-Process -Id $ProcessId -ErrorAction Stop
+        if ($process.MainWindowHandle -ne 0) { break }
         Start-Sleep -Milliseconds 250
     } while ((Get-Date) -lt $deadline)
-    if (-not $process) { throw 'Production shell has no interactive window.' }
+    if ($process.MainWindowHandle -eq 0) {
+        throw 'Production shell has no interactive window.'
+    }
 
     $root = [System.Windows.Automation.AutomationElement]::FromHandle(
         $process.MainWindowHandle)
@@ -105,9 +129,13 @@ try {
         Invoke-Element $button
     }
 
-    if ($Mode -eq 'queue-guide') {
+    if ($Mode -eq 'waiting-handoff') {
+        [void](Wait-Name 'ShellStatus' 'Waiting for previous window...')
+        $report.phases += 'waiting-for-library-lease'
+    }
+    elseif ($Mode -eq 'queue-guide') {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        Select-Element 'Route Test Guide'
+        Select-Element 'Blocked Write Guide'
         [void](Wait-Name 'ShellStatus' 'Opening guide...')
         $report.phases += 'guide-action-started'
     }
@@ -136,9 +164,9 @@ try {
         $report.phases += 'stale-resume-hidden'
     }
     elseif ($Mode -eq 'normal') {
-        $resume = Wait-Name 'ResumeGuide' 'Resume Route Test Guide'
+        $resume = Wait-Name 'ResumeGuide' "Resume $ExpectedResumeGuide"
         Invoke-Element $resume
-        [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
+        [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
         [void](Wait-Name 'ShellStatus' 'Guide ready.')
         $report.phases += 'resume-reader'
 

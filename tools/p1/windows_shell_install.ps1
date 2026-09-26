@@ -8,6 +8,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+$targetSessionId = [System.Diagnostics.Process]::GetCurrentProcess().SessionId
+if ($targetSessionId -eq 0 -or
+    -not @(Get-Process explorer -ErrorAction SilentlyContinue |
+        Where-Object { $_.SessionId -eq $targetSessionId })) {
+    throw 'Shell install test requires an interactive desktop session.'
+}
 $packageName = Split-Path $PackagePath -Leaf
 if ($packageName -notmatch '^DesktopGuides\.Production_[0-9]+(\.[0-9]+){3}_x64\.msix$') {
     throw "Expected an x64 production MSIX, got $packageName."
@@ -30,26 +36,56 @@ $report = [ordered]@{
 }
 $certificate = $null
 $installed = $null
+$expectedExecutablePath = $null
 $imported = $false
+$ownedProcessIds = [System.Collections.Generic.HashSet[int]]::new()
 $launchTask = "DesktopGuides-P1-ShellLaunch-$runId"
 $secondLaunchTask = "DesktopGuides-P1-ShellSecondLaunch-$runId"
 $smokeTask = "DesktopGuides-P1-ShellSmoke-$runId"
 
-function Stop-InstalledShell {
+function Get-InstalledShellProcesses {
+    if (-not $installed) { return @() }
     Get-CimInstance Win32_Process -Filter "Name = 'DesktopGuides.Production.exe'" |
-        Where-Object { $_.ExecutablePath -like "$($installed.InstallLocation)*" } |
-        ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+        Where-Object {
+            $_.SessionId -eq $targetSessionId -and
+            [string]::Equals($_.ExecutablePath, $expectedExecutablePath,
+                [StringComparison]::OrdinalIgnoreCase)
+        }
 }
 
-function Start-InstalledShell([int] $ExcludeProcessId = 0) {
-    Start-ScheduledTask -TaskName $launchTask
+function Stop-InstalledShell {
+    foreach ($ownedId in @($ownedProcessIds)) {
+        $process = Get-InstalledShellProcesses |
+            Where-Object { $_.ProcessId -eq $ownedId } |
+            Select-Object -First 1
+        if ($process) {
+            Stop-Process -Id $ownedId -Force
+        }
+        [void]$ownedProcessIds.Remove($ownedId)
+    }
+}
+
+function Start-InstalledShell(
+    [int] $ExcludeProcessId = 0,
+    [switch] $WaitOnly) {
+    $existingIds = if ($WaitOnly) { @($ExcludeProcessId) }
+                   else {
+                       @(Get-InstalledShellProcesses |
+                           ForEach-Object { $_.ProcessId })
+                   }
+    if (-not $WaitOnly) {
+        Start-ScheduledTask -TaskName $launchTask
+    }
     $deadline = (Get-Date).AddSeconds(30)
     do {
         Start-Sleep -Milliseconds 500
-        $appProcess = Get-CimInstance Win32_Process `
-            -Filter "Name = 'DesktopGuides.Production.exe'" |
-            Where-Object { $_.ExecutablePath -like "$($installed.InstallLocation)*" } |
-            Where-Object { $_.ProcessId -ne $ExcludeProcessId } |
+        $candidates = @(Get-InstalledShellProcesses |
+            Where-Object { $_.ProcessId -ne $ExcludeProcessId -and
+                $_.ProcessId -notin $existingIds })
+        foreach ($candidate in $candidates) {
+            [void]$ownedProcessIds.Add([int]$candidate.ProcessId)
+        }
+        $appProcess = $candidates |
             Where-Object {
                 $windowProcess = Get-Process -Id $_.ProcessId `
                     -ErrorAction SilentlyContinue
@@ -93,9 +129,7 @@ function Assert-SingleInstance {
     }
     $deadline = (Get-Date).AddSeconds(20)
     do {
-        $processes = @(Get-CimInstance Win32_Process `
-            -Filter "Name = 'DesktopGuides.Production.exe'" |
-            Where-Object { $_.ExecutablePath -like "$($installed.InstallLocation)*" })
+        $processes = @(Get-InstalledShellProcesses)
         if ($processes.Count -eq 1 -and
             $processes[0].ProcessId -eq $firstProcessId) {
             break
@@ -180,6 +214,7 @@ function Assert-RelaunchDuringClose {
         if (-not $report.closeHandoffOverlapObserved) {
             throw 'New shell opened only after the old shell exited.'
         }
+        $report.waitingDuringClose = Run-ShellSmoke 'waiting-handoff'
     }
     finally {
         New-Item -ItemType File -Force $lockRelease | Out-Null
@@ -193,15 +228,52 @@ function Assert-RelaunchDuringClose {
     }
     Wait-InstalledShellExit $closingProcessId
     $report.relaunchDuringCloseProcessId = $report.launchedProcessId
-    $report.normalAfterCloseRelaunch = Run-ShellSmoke 'normal'
+    $report.normalAfterCloseRelaunch = Run-ShellSmoke 'normal' 'Blocked Write Guide'
 }
 
-function Run-ShellSmoke([string] $mode) {
+function Assert-ClosingTargetRedirect {
+    $closingProcessId = $report.launchedProcessId
+    $selected = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::AutoReset,
+        'Local\DesktopGuides.Preview.RedirectSelected')
+    $resume = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::ManualReset,
+        'Local\DesktopGuides.Preview.RedirectContinue')
+    try {
+        $selected.Reset() | Out-Null
+        $resume.Reset() | Out-Null
+        Start-ScheduledTask -TaskName $secondLaunchTask
+        if (-not $selected.WaitOne(15000)) {
+            throw 'Second launch did not select the closing target.'
+        }
+        $report.closingTargetSelected = $true
+        Request-InstalledShellClose $closingProcessId
+        Wait-InstalledShellExit $closingProcessId
+        $resume.Set() | Out-Null
+        Start-InstalledShell $closingProcessId -WaitOnly
+        $report.closingTargetRelaunchProcessId = $report.launchedProcessId
+        $report.normalAfterClosingTarget = Run-ShellSmoke 'normal'
+    }
+    finally {
+        $resume.Set() | Out-Null
+        $resume.Dispose()
+        $selected.Dispose()
+    }
+}
+
+function Run-ShellSmoke(
+    [string] $mode,
+    [string] $expectedResumeGuide = 'Route Test Guide') {
     $resultPath = Join-Path $ResultDirectory "$mode.json"
     Remove-Item $resultPath -ErrorAction SilentlyContinue
     $script = Join-Path $PSScriptRoot 'windows_shell_ui_smoke.ps1'
     $arguments = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass ' +
-        '-File "' + $script + '" -Mode ' + $mode + ' -ResultPath "' + $resultPath + '"'
+        '-File "' + $script + '" -Mode ' + $mode +
+        ' -ResultPath "' + $resultPath + '"' +
+        ' -ProcessId ' + $report.launchedProcessId +
+        ' -SessionId ' + $targetSessionId +
+        ' -ExecutablePath "' + $expectedExecutablePath + '"' +
+        ' -ExpectedResumeGuide "' + $expectedResumeGuide + '"'
     $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
         -Argument $arguments -WorkingDirectory $PSScriptRoot
     Register-ScheduledTask -TaskName $smokeTask -Action $action `
@@ -267,6 +339,8 @@ try {
     $report.packageFullName = $installed.PackageFullName
     $report.packageFamilyName = $installed.PackageFamilyName
     $report.installLocation = $installed.InstallLocation
+    $expectedExecutablePath = Join-Path $installed.InstallLocation `
+        'DesktopGuides.Production.exe'
 
     $dataRoot = Join-Path $env:LOCALAPPDATA `
         "Packages\$($installed.PackageFamilyName)\LocalState"
@@ -293,6 +367,7 @@ try {
     Start-InstalledShell
     $report.normal = Run-ShellSmoke 'normal'
     Assert-RelaunchDuringClose
+    Assert-ClosingTargetRedirect
 
     Stop-InstalledShell
     dotnet run --project $seedProject -c Release --no-restore -- stale $dataRoot
@@ -306,14 +381,13 @@ catch {
     $report.error = $_ | Out-String
     try {
         $report.processesAtFailure = @(
-            Get-CimInstance Win32_Process `
-                -Filter "Name = 'DesktopGuides.Production.exe'" |
-            Where-Object { $_.ExecutablePath -like "$($installed.InstallLocation)*" } |
+            Get-InstalledShellProcesses |
             ForEach-Object {
                 [ordered]@{
                     processId = $_.ProcessId
                     sessionId = $_.SessionId
                     created = $_.CreationDate.ToString('o')
+                    testOwned = $ownedProcessIds.Contains([int]$_.ProcessId)
                 }
             })
     }

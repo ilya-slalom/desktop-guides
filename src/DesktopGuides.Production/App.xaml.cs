@@ -20,7 +20,7 @@ public partial class App : Application
 
     internal bool ActivateMainWindow()
     {
-        if (shellWindow is null)
+        if (shellWindow is null || shellWindow.IsClosing)
         {
             return false;
         }

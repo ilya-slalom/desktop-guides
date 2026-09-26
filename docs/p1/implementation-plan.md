@@ -101,6 +101,26 @@ harder to detect. The public package identity is finalized in T17.1.
 | Package separation | Production shell | Build distinct production and diagnostic MSIX packages. Inspect production package contents for fixture/probe strings and files; the diagnostic P0 workflow remains available. |
 | Installed Windows exit | Package separation | On Windows 11 x64 install production MSIX, verify an empty Library on first launch, then exercise Library → Game → Reader → Game, Settings and Back through UI Automation with seeded local metadata. Verify a second launch reuses the original process and window, a stale last-guide ID is ignored, and fixture controls are absent. Queue tests hold a pending navigation while closing begins. Run locked Core/Infrastructure tests and both package builds in CI; retain installed ARM64 P0 regression. |
 
+### T11.1 review follow-up: close handoff and installed gate
+
+The shell must allow a new window to appear while the old one drains, but
+library initialization and writes must remain ordered across processes.
+Keeping the app-instance key until drain completes would block that window;
+versioning only the last-guide setting would leave startup recovery exposed.
+Use an exclusive lease file in package-local data from before repository
+initialization through repository disposal. A waiting window stays visible,
+can close, and opens its library only after the previous session releases the
+lease. The OS releases the file handle if a process exits unexpectedly.
+
+For activation, mark a closing target before unregistering its key. A launch
+that selected that target retries registration after the target closes,
+including when redirection fails; a launch redirected to a healthy target
+still exits. In the installed gate, bind every UI trace and cleanup action to
+the launched process and session. Queue a guide different from the seeded
+Resume guide, then verify its persisted Resume state after lock release and
+old-process exit. Pass when locked Infrastructure tests, production builds,
+and the signed Windows 11 x64 installed handoff gate succeed.
+
 ## M2 — catalog, static-asset validation, import, and removal
 
 Exit: two independent managed guides can be added under one game, retain

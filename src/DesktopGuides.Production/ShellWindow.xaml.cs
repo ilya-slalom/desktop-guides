@@ -12,7 +12,9 @@ public sealed partial class ShellWindow : Window
 {
     private readonly ShellNavigator navigator = new();
     private readonly NavigationActionQueue navigationQueue = new();
+    private readonly CancellationTokenSource leaseWait = new();
     private Task initializationTask = Task.CompletedTask;
+    private LibrarySessionLease? libraryLease;
     private SqliteLibraryRepository? repository;
     private Guid? resumeGuideId;
     private int renderGeneration;
@@ -34,15 +36,25 @@ public sealed partial class ShellWindow : Window
         return initializationTask;
     }
 
+    internal bool IsClosing => closeRequested;
+
     private async Task InitializeCoreAsync()
     {
         try
         {
             string dataRoot = ApplicationData.Current.LocalFolder.Path;
+            ShellStatus.Text = "Waiting for previous window...";
+            libraryLease = await LibrarySessionLease.AcquireAsync(
+                dataRoot, leaseWait.Token);
+            ShellStatus.Text = "Loading library...";
             repository = new SqliteLibraryRepository(new ManagedPathResolver(dataRoot));
             await repository.InitializeAsync();
             ready = true;
             await RenderCurrentAsync();
+        }
+        catch (OperationCanceledException) when (closeRequested)
+        {
+            // The waiting window was closed before it acquired the library.
         }
         catch (Exception error)
         {
@@ -63,6 +75,7 @@ public sealed partial class ShellWindow : Window
             return;
         }
         closeRequested = true;
+        leaseWait.Cancel();
         Task pendingNavigation = navigationQueue.StopAndDrainAsync();
         Program.ReleaseInstanceKey();
         _ = CloseWhenIdleAsync(pendingNavigation);
@@ -81,15 +94,32 @@ public sealed partial class ShellWindow : Window
             try
             {
                 await navigationQueue.DisposeAsync();
-                if (repository is not null)
-                {
-                    await repository.DisposeAsync();
-                }
             }
             finally
             {
-                allowClose = true;
-                Close();
+                try
+                {
+                    if (repository is not null)
+                    {
+                        await repository.DisposeAsync();
+                    }
+                }
+                finally
+                {
+                    try
+                    {
+                        if (libraryLease is not null)
+                        {
+                            await libraryLease.DisposeAsync();
+                        }
+                    }
+                    finally
+                    {
+                        leaseWait.Dispose();
+                        allowClose = true;
+                        Close();
+                    }
+                }
             }
         }
     }

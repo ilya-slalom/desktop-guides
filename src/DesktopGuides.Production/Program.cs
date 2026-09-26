@@ -7,9 +7,15 @@ namespace DesktopGuides.Production;
 
 internal static class Program
 {
+    private const string InstanceKey = "DesktopGuides.Preview.Main";
     private const string ActivationProbeName =
         @"Local\DesktopGuides.Preview.RedirectedActivation";
+    private const string RedirectSelectedProbeName =
+        @"Local\DesktopGuides.Preview.RedirectSelected";
+    private const string RedirectContinueProbeName =
+        @"Local\DesktopGuides.Preview.RedirectContinue";
     private static AppInstance? primaryInstance;
+    private static EventWaitHandle? closingSignal;
     private static DispatcherQueue? uiQueue;
     private static App? app;
 
@@ -29,14 +35,16 @@ internal static class Program
 
         AppInstance current = AppInstance.GetCurrent();
         AppActivationArguments activation = current.GetActivatedEventArgs();
-        AppInstance main = AppInstance.FindOrRegisterForKey("DesktopGuides.Preview.Main");
-        if (!main.IsCurrent)
+        AppInstance? main = FindPrimaryOrRedirect(activation);
+        if (main is null)
         {
-            RedirectActivation(activation, main);
             return;
         }
 
         primaryInstance = main;
+        closingSignal = new EventWaitHandle(
+            false, EventResetMode.ManualReset, ClosingSignalName(Environment.ProcessId));
+        closingSignal.Reset();
         primaryInstance.Activated += (_, _) =>
         {
             Volatile.Read(ref uiQueue)?.TryEnqueue(
@@ -49,20 +57,140 @@ internal static class Program
                 });
         };
 
-        Application.Start(initialization =>
+        try
         {
-            DispatcherQueue dispatcher = DispatcherQueue.GetForCurrentThread();
-            SynchronizationContext.SetSynchronizationContext(
-                new DispatcherQueueSynchronizationContext(dispatcher));
-            Volatile.Write(ref uiQueue, dispatcher);
-            app = new App();
-        });
+            Application.Start(initialization =>
+            {
+                DispatcherQueue dispatcher = DispatcherQueue.GetForCurrentThread();
+                SynchronizationContext.SetSynchronizationContext(
+                    new DispatcherQueueSynchronizationContext(dispatcher));
+                Volatile.Write(ref uiQueue, dispatcher);
+                app = new App();
+            });
+        }
+        finally
+        {
+            ReleaseInstanceKey();
+            closingSignal.Dispose();
+            closingSignal = null;
+        }
     }
 
     internal static void ReleaseInstanceKey()
     {
+        closingSignal?.Set();
         primaryInstance?.UnregisterKey();
         primaryInstance = null;
+    }
+
+    private static AppInstance? FindPrimaryOrRedirect(
+        AppActivationArguments activation)
+    {
+        DateTime deadline = DateTime.UtcNow.AddSeconds(60);
+        Exception? lastError = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            AppInstance target = AppInstance.FindOrRegisterForKey(InstanceKey);
+            if (target.IsCurrent)
+            {
+                return target;
+            }
+            PauseAfterSelectingTargetForTest();
+            AppInstance ownerBeforeRedirect =
+                AppInstance.FindOrRegisterForKey(InstanceKey);
+            if (ownerBeforeRedirect.IsCurrent)
+            {
+                return ownerBeforeRedirect;
+            }
+            if (ownerBeforeRedirect.ProcessId != target.ProcessId)
+            {
+                continue;
+            }
+            if (IsClosing(target))
+            {
+                Thread.Sleep(50);
+                continue;
+            }
+
+            try
+            {
+                RedirectActivation(activation, target);
+                lastError = null;
+            }
+            catch (Exception error)
+            {
+                lastError = error;
+            }
+
+            // The target may have started closing after FindOrRegisterForKey.
+            // Claim the released key or redirect again to its new owner.
+            AppInstance owner = AppInstance.FindOrRegisterForKey(InstanceKey);
+            if (owner.IsCurrent)
+            {
+                return owner;
+            }
+            if (owner.ProcessId == target.ProcessId &&
+                !IsClosing(owner) && lastError is null)
+            {
+                return null;
+            }
+            Thread.Sleep(50);
+        }
+        throw new TimeoutException(
+            "Could not redirect or take over application activation.", lastError);
+    }
+
+    private static string ClosingSignalName(int processId) =>
+        $@"Local\DesktopGuides.Preview.Closing.{processId}";
+
+    private static void PauseAfterSelectingTargetForTest()
+    {
+        try
+        {
+            if (!EventWaitHandle.TryOpenExisting(
+                RedirectSelectedProbeName, out EventWaitHandle? selected))
+            {
+                return;
+            }
+            using (selected)
+            {
+                if (!EventWaitHandle.TryOpenExisting(
+                    RedirectContinueProbeName, out EventWaitHandle? resume))
+                {
+                    return;
+                }
+                using (resume)
+                {
+                    selected.Set();
+                    resume.WaitOne(15_000);
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The optional test gate must not affect normal activation.
+        }
+    }
+
+    private static bool IsClosing(AppInstance instance)
+    {
+        try
+        {
+            if (!EventWaitHandle.TryOpenExisting(
+                ClosingSignalName((int)instance.ProcessId),
+                out EventWaitHandle? signal))
+            {
+                return false;
+            }
+            using (signal)
+            {
+                return signal.WaitOne(0);
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     private static void SignalActivationProbe()

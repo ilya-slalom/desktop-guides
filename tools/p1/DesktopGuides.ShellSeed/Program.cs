@@ -60,23 +60,30 @@ if (args[0] == "stale")
 }
 
 Game game = await repository.AddGameAsync("Route Test Game", "Windows", null);
-Guid guideId = Guid.NewGuid();
-string guideRoot = paths.GetGuideRoot(guideId);
-Directory.CreateDirectory(guideRoot);
-string content = Path.Combine(guideRoot, "guide.txt");
-await File.WriteAllTextAsync(content, "Test guide.");
-byte[] bytes = await File.ReadAllBytesAsync(content);
-string hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
+Guid resumeGuideId = Guid.NewGuid();
+Guid blockedGuideId = Guid.NewGuid();
 long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-using (SqliteConnection connection = new(new SqliteConnectionStringBuilder
+foreach ((Guid guideId, string title) in new[]
+         {
+             (resumeGuideId, "Route Test Guide"),
+             (blockedGuideId, "Blocked Write Guide")
+         })
 {
-    DataSource = paths.DatabasePath,
-    Mode = SqliteOpenMode.ReadWrite,
-    Pooling = false,
-    ForeignKeys = true
-}.ToString()))
-{
+    string guideRoot = paths.GetGuideRoot(guideId);
+    Directory.CreateDirectory(guideRoot);
+    string content = Path.Combine(guideRoot, "guide.txt");
+    await File.WriteAllTextAsync(content, "Test guide.");
+    byte[] bytes = await File.ReadAllBytesAsync(content);
+    string hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
+
+    using SqliteConnection connection = new(new SqliteConnectionStringBuilder
+    {
+        DataSource = paths.DatabasePath,
+        Mode = SqliteOpenMode.ReadWrite,
+        Pooling = false,
+        ForeignKeys = true
+    }.ToString());
     connection.Open();
     using SqliteCommand command = connection.CreateCommand();
     command.CommandText = """
@@ -84,7 +91,7 @@ using (SqliteConnection connection = new(new SqliteConnectionStringBuilder
             Id, GameId, Title, Format, ManagedRelativeRoot, PrimaryRelativePath,
             ContentSha256, ContentBytes, ImportedUtcMs, UpdatedUtcMs
         ) VALUES (
-            $guide, $game, 'Route Test Guide', 'Txt', $root, 'guide.txt',
+            $guide, $game, $title, 'Txt', $root, 'guide.txt',
             $hash, $bytes, $now, $now
         );
         INSERT INTO ReadingStates (GuideId) VALUES ($guide);
@@ -92,6 +99,7 @@ using (SqliteConnection connection = new(new SqliteConnectionStringBuilder
         """;
     command.Parameters.AddWithValue("$guide", guideId.ToString("N"));
     command.Parameters.AddWithValue("$game", game.Id.ToString("N"));
+    command.Parameters.AddWithValue("$title", title);
     command.Parameters.AddWithValue("$root", $"content/{guideId:N}");
     command.Parameters.AddWithValue("$hash", hash);
     command.Parameters.AddWithValue("$bytes", bytes.LongLength);
@@ -100,6 +108,8 @@ using (SqliteConnection connection = new(new SqliteConnectionStringBuilder
 }
 
 AppSettings settings = await repository.GetSettingsAsync();
-await repository.SaveSettingsAsync(settings with { LastActiveGuideId = guideId });
-Console.WriteLine($"Seeded game {game.Id:N} and guide {guideId:N}.");
+await repository.SaveSettingsAsync(settings with { LastActiveGuideId = resumeGuideId });
+Console.WriteLine(
+    $"Seeded game {game.Id:N}, Resume guide {resumeGuideId:N}, " +
+    $"and blocked-write guide {blockedGuideId:N}.");
 return 0;
