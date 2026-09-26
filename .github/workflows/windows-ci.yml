@@ -81,6 +81,9 @@ jobs:
       - name: Check installed-shell smoke result identity
         shell: pwsh
         run: ./tools/p1/test_windows_shell_smoke_result.ps1
+      - name: Check toolbar smoke result identity
+        shell: pwsh
+        run: ./tools/p1/test_windows_reader_toolbar_smoke_result.ps1
       - name: Check test-owned scheduled task cleanup
         shell: pwsh
         run: ./tools/p1/test_windows_shell_task_cleanup.ps1

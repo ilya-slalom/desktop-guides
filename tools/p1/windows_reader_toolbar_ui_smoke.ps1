@@ -3,11 +3,16 @@ param(
     [string] $PackagePath,
 
     [Parameter(Mandatory = $true)]
-    [string] $ResultPath
+    [string] $ResultPath,
+
+    [Parameter(Mandatory = $true)]
+    [ValidatePattern('^[0-9a-f]{32}$')]
+    [string] $InvocationId
 )
 
 $ErrorActionPreference = 'Stop'
 $report = [ordered]@{
+    invocationId = $InvocationId
     observedAt = (Get-Date).ToUniversalTime().ToString('o')
     sessionId = [System.Diagnostics.Process]::GetCurrentProcess().SessionId
     success = $false

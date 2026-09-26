@@ -33,8 +33,10 @@ $ResultDirectory = (Resolve-Path $ResultDirectory).Path
 $signed = Join-Path $ResultDirectory 'reader-toolbar-signed-x64.msix'
 $public = Join-Path $ResultDirectory 'test-certificate.cer'
 $smokeResult = Join-Path $ResultDirectory 'toolbar-ui.json'
-$taskName = 'DesktopGuides-P1-Toolbar-' + [Guid]::NewGuid().ToString('N')
+$invocationId = [Guid]::NewGuid().ToString('N')
+$taskName = 'DesktopGuides-P1-Toolbar-' + $invocationId
 $report = [ordered]@{
+    invocationId = $invocationId
     observedAt = (Get-Date).ToUniversalTime().ToString('o')
     sourcePackageSha256 = (Get-FileHash $PackagePath -Algorithm SHA256).Hash
     success = $false
@@ -42,6 +44,7 @@ $report = [ordered]@{
 $certificate = $null
 $imported = $false
 $registered = $false
+. (Join-Path $PSScriptRoot 'windows_reader_toolbar_smoke_result.ps1')
 
 try {
     Copy-Item -LiteralPath $PackagePath -Destination $signed -Force
@@ -78,7 +81,8 @@ try {
     $arguments = '-NoProfile -NonInteractive -Sta -WindowStyle Hidden ' +
         '-ExecutionPolicy Bypass -File "' + $script + '"' +
         ' -PackagePath "' + $signed + '"' +
-        ' -ResultPath "' + $smokeResult + '"'
+        ' -ResultPath "' + $smokeResult + '"' +
+        ' -InvocationId ' + $invocationId
     $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
         -Argument $arguments -WorkingDirectory $PSScriptRoot
     $interactive = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
@@ -86,6 +90,7 @@ try {
     Register-ScheduledTask -TaskName $taskName -Action $action `
         -Principal $interactive -Force | Out-Null
     $registered = $true
+    Clear-ToolbarSmokeResult $smokeResult
     Start-ScheduledTask -TaskName $taskName
     $deadline = (Get-Date).AddSeconds(180)
     do {
@@ -104,13 +109,10 @@ try {
     if ($task.State -ne 'Ready') {
         throw 'Interactive toolbar smoke task did not finish.'
     }
-    $smoke = Get-Content -LiteralPath $smokeResult -Raw | ConvertFrom-Json
+    $smoke = Read-ToolbarSmokeResult $smokeResult $invocationId `
+        ([System.Diagnostics.Process]::GetCurrentProcess().SessionId)
     if (-not $smoke.success) {
         throw "Interactive toolbar smoke failed: $($smoke.error)"
-    }
-    if ($smoke.sessionId -ne
-        [System.Diagnostics.Process]::GetCurrentProcess().SessionId) {
-        throw 'Toolbar smoke ran in an unexpected desktop session.'
     }
     $report.phases = $smoke.phases
     $report.success = $true

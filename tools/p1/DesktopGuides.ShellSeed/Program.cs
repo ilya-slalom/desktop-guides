@@ -38,10 +38,10 @@ if (args.Length == 4 && args[0] == "hold-write-lock")
     return 0;
 }
 
-if (args.Length != 2 || args[0] is not ("seed" or "stale"))
+if (args.Length != 2 || args[0] is not ("seed" or "stale" or "seed-long"))
 {
     Console.Error.WriteLine(
-        "Usage: DesktopGuides.ShellSeed seed|stale <app-data-root> " +
+        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long <app-data-root> " +
         "or hold-write-lock <app-data-root> <ready-path> <release-path>");
     return 2;
 }
@@ -59,6 +59,31 @@ if (args[0] == "stale")
     return 0;
 }
 
+if (args[0] == "seed-long")
+{
+    Game seededGame = (await repository.ListGamesAsync())
+        .Single(game => game.Title == "Route Test Game");
+    if ((await repository.ListGuidesAsync(seededGame.Id))
+        .Any(guide => guide.Title == "ZZZ Focus Target Guide"))
+    {
+        throw new InvalidOperationException("Long-list guides were already seeded.");
+    }
+    long timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    for (int index = 0; index < 96; index++)
+    {
+        await InsertGuideAsync(
+            paths, seededGame.Id, Guid.NewGuid(), $"Guide {index:D3}", timestamp);
+    }
+    Guid tailGuideId = Guid.NewGuid();
+    await InsertGuideAsync(
+        paths, seededGame.Id, tailGuideId, "ZZZ Focus Target Guide", timestamp);
+    AppSettings current = await repository.GetSettingsAsync();
+    await repository.SaveSettingsAsync(
+        current with { LastActiveGuideId = tailGuideId });
+    Console.WriteLine($"Seeded virtualized tail guide {tailGuideId:N}.");
+    return 0;
+}
+
 Game game = await repository.AddGameAsync("Route Test Game", "Windows", null);
 Guid resumeGuideId = Guid.NewGuid();
 Guid blockedGuideId = Guid.NewGuid();
@@ -69,6 +94,19 @@ foreach ((Guid guideId, string title) in new[]
              (resumeGuideId, "Route Test Guide"),
              (blockedGuideId, "Blocked Write Guide")
          })
+{
+    await InsertGuideAsync(paths, game.Id, guideId, title, now);
+}
+
+AppSettings settings = await repository.GetSettingsAsync();
+await repository.SaveSettingsAsync(settings with { LastActiveGuideId = resumeGuideId });
+Console.WriteLine(
+    $"Seeded game {game.Id:N}, Resume guide {resumeGuideId:N}, " +
+    $"and blocked-write guide {blockedGuideId:N}.");
+return 0;
+
+static async Task InsertGuideAsync(
+    ManagedPathResolver paths, Guid gameId, Guid guideId, string title, long now)
 {
     string guideRoot = paths.GetGuideRoot(guideId);
     Directory.CreateDirectory(guideRoot);
@@ -98,7 +136,7 @@ foreach ((Guid guideId, string title) in new[]
         INSERT INTO ReaderPreferences (GuideId) VALUES ($guide);
         """;
     command.Parameters.AddWithValue("$guide", guideId.ToString("N"));
-    command.Parameters.AddWithValue("$game", game.Id.ToString("N"));
+    command.Parameters.AddWithValue("$game", gameId.ToString("N"));
     command.Parameters.AddWithValue("$title", title);
     command.Parameters.AddWithValue("$root", $"content/{guideId:N}");
     command.Parameters.AddWithValue("$hash", hash);
@@ -106,10 +144,3 @@ foreach ((Guid guideId, string title) in new[]
     command.Parameters.AddWithValue("$now", now);
     command.ExecuteNonQuery();
 }
-
-AppSettings settings = await repository.GetSettingsAsync();
-await repository.SaveSettingsAsync(settings with { LastActiveGuideId = resumeGuideId });
-Console.WriteLine(
-    $"Seeded game {game.Id:N}, Resume guide {resumeGuideId:N}, " +
-    $"and blocked-write guide {blockedGuideId:N}.");
-return 0;

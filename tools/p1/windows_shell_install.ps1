@@ -565,6 +565,12 @@ try {
     Start-InstalledShell
     $report.stale = Run-ShellSmoke 'stale'
     Close-InstalledShell
+
+    dotnet run --project $seedProject -c Release --no-restore -- seed-long $dataRoot
+    if ($LASTEXITCODE -ne 0) { throw 'Could not seed the long guide list.' }
+    Start-InstalledShell
+    $report.longList = Run-ShellSmoke 'long-list'
+    Close-InstalledShell
     $report.success = $true
 }
 catch {

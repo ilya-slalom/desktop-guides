@@ -22,6 +22,7 @@ public sealed partial class ShellWindow : Window
     private SqliteLibraryRepository? repository;
     private Guid? resumeGuideId;
     private Guid? pendingGuideFocus;
+    private int guideFocusRenderGeneration = -1;
     private int renderGeneration;
     private bool settingGuideSelection;
     private bool ready;
@@ -41,6 +42,7 @@ public sealed partial class ShellWindow : Window
             UIElement.TappedEvent, new TappedEventHandler(GuideTapped), true);
         GuideList.AddHandler(
             UIElement.KeyDownEvent, new KeyEventHandler(GuideKeyDown), true);
+        GuideList.LayoutUpdated += GuideListLayoutUpdated;
         Navigation.RegisterPropertyChangedCallback(
             NavigationView.IsPaneOpenProperty, (_, _) => UpdatePaneStatus());
         UpdatePaneStatus();
@@ -269,6 +271,33 @@ public sealed partial class ShellWindow : Window
         }
     }
 
+    private void GuideListLayoutUpdated(object? sender, object args) =>
+        TryRestoreGuideFocus();
+
+    private void TryRestoreGuideFocus()
+    {
+        if (pendingGuideFocus is not Guid guideId ||
+            guideFocusRenderGeneration != renderGeneration ||
+            navigator.Current is not GameRoute game ||
+            GuideList.SelectedItem is not Guide selected ||
+            selected.Id != guideId ||
+            selected.GameId != game.GameId ||
+            GuideList.ContainerFromItem(selected) is not Control container)
+        {
+            return;
+        }
+        // Focus can cause another layout pass. Suspend the callback while it runs.
+        guideFocusRenderGeneration = -1;
+        if (container.Focus(FocusState.Programmatic))
+        {
+            pendingGuideFocus = null;
+        }
+        else
+        {
+            guideFocusRenderGeneration = renderGeneration;
+        }
+    }
+
     private async void ResumeClicked(object sender, RoutedEventArgs args)
     {
         if (resumeGuideId is Guid guideId)
@@ -338,6 +367,11 @@ public sealed partial class ShellWindow : Window
     private async Task RenderCurrentAsync()
     {
         int generation = ++renderGeneration;
+        guideFocusRenderGeneration = -1;
+        if (navigator.Current is not GameRoute)
+        {
+            pendingGuideFocus = null;
+        }
         LibraryPanel.Visibility = Visibility.Collapsed;
         GamePanel.Visibility = Visibility.Collapsed;
         ReaderPanel.Visibility = Visibility.Collapsed;
@@ -423,28 +457,24 @@ public sealed partial class ShellWindow : Window
                         guides.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
                     if (pendingGuideFocus is not null && selectedGuide is not null)
                     {
+                        guideFocusRenderGeneration = generation;
+                        GuideList.UpdateLayout();
                         GuideList.ScrollIntoView(selectedGuide);
+                        GuideList.UpdateLayout();
+                        TryRestoreGuideFocus();
                         DispatcherQueue.TryEnqueue(() =>
                         {
-                            if (navigator.Current is GameRoute current &&
-                                current.GameId == gameRoute.GameId &&
-                                (GuideList.SelectedItem as Guide)?.Id ==
-                                selectedGuide.Id)
+                            if (guideFocusRenderGeneration == generation)
                             {
                                 GuideList.UpdateLayout();
-                                if (GuideList.ContainerFromItem(selectedGuide) is
-                                    Control container)
-                                {
-                                    container.Focus(FocusState.Programmatic);
-                                }
-                                else
-                                {
-                                    GuideList.Focus(FocusState.Programmatic);
-                                }
+                                TryRestoreGuideFocus();
                             }
                         });
                     }
-                    pendingGuideFocus = null;
+                    else
+                    {
+                        pendingGuideFocus = null;
+                    }
                     ShellStatus.Text = "Game ready.";
                     break;
 

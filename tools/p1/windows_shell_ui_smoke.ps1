@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('empty', 'normal', 'stale', 'queue-guide', 'waiting-handoff')]
+    [ValidateSet('empty', 'normal', 'stale', 'long-list', 'queue-guide',
+        'waiting-handoff')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -387,6 +388,37 @@ try {
             throw 'A stale last-guide ID exposed Resume.'
         }
         $report.phases += 'stale-resume-hidden'
+    }
+    elseif ($Mode -eq 'long-list') {
+        $target = 'ZZZ Focus Target Guide'
+        Select-Element 'Route Test Game'
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        $list = Find-ById 'GuideList'
+        $condition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::NameProperty, $target)
+        foreach ($item in $list.FindAll($scope, $condition)) {
+            if (-not $item.Current.IsOffscreen) {
+                throw 'The tail guide was visible before scrolling.'
+            }
+        }
+        $report.phases += 'tail-guide-outside-initial-viewport'
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        Invoke-Element (Wait-Name 'ResumeGuide' "Resume $target")
+        [void](Wait-Name 'ReaderHeading' $target)
+        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-SelectedGuide $target)
+        Wait-FocusedGuide $target
+        $report.phases += 'virtualized-guide-back-focus'
+        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        [void](Wait-Name 'ReaderHeading' $target)
+        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        $report.phases += 'virtualized-guide-enter-reopen'
     }
     elseif ($Mode -eq 'normal') {
         $resume = Wait-Name 'ResumeGuide' "Resume $ExpectedResumeGuide"

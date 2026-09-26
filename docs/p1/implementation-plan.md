@@ -154,6 +154,25 @@ records the same pointer and keyboard phases across normal launch and three
 relaunch paths. Both push and PR `reader-toolbar-ui` and
 `production-shell-ui` jobs passed at that code head.
 
+### T11.3 virtualization and result-identity follow-up
+
+The two-guide route fixture does not exercise focus restoration when the
+selected guide starts outside the realized viewport. Keep the WinUI
+`ListView`: update its layout before scrolling, then retain the target guide
+ID until its row exists and accepts focus. A single deferred focus attempt
+can still precede container realization. Check again after list layout while
+the Game route and selection match; stop when focus succeeds or navigation
+changes. Add a separate installed route fixture with enough guides to
+virtualize the tail row. Returning Reader → Game must focus that row, and
+Enter must reopen the same guide.
+
+The toolbar UI runner must also bind a result to the scheduled task that
+produced it. Remove a prior `toolbar-ui.json` before launch, pass a fresh
+invocation ID to the smoke task, and require the same ID and desktop session
+when reading the result. A reused directory containing a successful older
+report must fail a headless result-identity test. The signed installed
+toolbar job then repeats the end-to-end check.
+
 ### T11.1 review follow-up: close handoff and installed gate
 
 The shell must allow a new window to appear while the old one drains, but
