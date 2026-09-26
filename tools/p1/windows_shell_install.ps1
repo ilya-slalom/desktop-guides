@@ -23,6 +23,8 @@ if (Get-AppxPackage -Name DesktopGuides.Preview) {
 }
 . (Join-Path $PSScriptRoot 'windows_shell_profile.ps1')
 Assert-FreshPreviewProfile $env:LOCALAPPDATA
+. (Join-Path $PSScriptRoot 'windows_shell_smoke_result.ps1')
+. (Join-Path $PSScriptRoot 'windows_shell_task_cleanup.ps1')
 
 New-Item -ItemType Directory -Force $ResultDirectory | Out-Null
 $ResultDirectory = (Resolve-Path $ResultDirectory).Path
@@ -168,29 +170,53 @@ function Start-InstalledShell {
     Wait-InstalledShellWindow ([int]$launch.processId)
 }
 
-function New-ShellLaunchAction([string] $ResultPath) {
+function New-ShellLaunchAction(
+    [string] $ResultPath,
+    [int] $ForegroundTargetProcessId = 0) {
     $script = Join-Path $PSScriptRoot 'windows_shell_launch.ps1'
-    $arguments = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass ' +
+    $arguments = '-NoProfile -NonInteractive -Sta -WindowStyle Hidden -ExecutionPolicy Bypass ' +
         '-File "' + $script + '"' +
         ' -ExecutablePath "' + $expectedExecutablePath + '"' +
         ' -ResultPath "' + $ResultPath + '"'
+    if ($ForegroundTargetProcessId -gt 0) {
+        $arguments += ' -ForegroundTargetProcessId ' +
+            $ForegroundTargetProcessId
+    }
     New-ScheduledTaskAction -Execute 'powershell.exe' `
         -Argument $arguments -WorkingDirectory $PSScriptRoot
 }
 
 function Assert-SingleInstance {
     $firstProcessId = $report.launchedProcessId
+    $foregroundAction = New-ShellLaunchAction `
+        $secondLaunchResultPath $firstProcessId
+    $focusResultPath = "$secondLaunchResultPath.foreground.json"
     $activationEvent = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::AutoReset,
         'Local\DesktopGuides.Preview.RedirectedActivation')
     try {
         $activationEvent.Reset() | Out-Null
-        Register-ScheduledTask -TaskName $secondLaunchTask -Action $secondLaunchAction `
+        Register-ScheduledTask -TaskName $secondLaunchTask -Action $foregroundAction `
             -Principal $principal -Force | Out-Null
         Clear-LaunchResult $secondLaunchResultPath
+        if (Test-Path -LiteralPath $focusResultPath) {
+            Remove-Item -LiteralPath $focusResultPath -ErrorAction Stop
+        }
         Start-ScheduledTask -TaskName $secondLaunchTask
         $secondLaunch = Wait-LaunchResult $secondLaunchResultPath $secondLaunchTask
         $report.secondLaunchProcessId = $secondLaunch.processId
+        if (-not (Test-Path -LiteralPath $focusResultPath)) {
+            throw 'Foreground launch did not record a focus result.'
+        }
+        $focusResult = Get-Content -LiteralPath $focusResultPath -Raw |
+            ConvertFrom-Json
+        if ($focusResult.handoffToken -ne $secondLaunch.handoffToken -or
+            $focusResult.foregroundTargetProcessId -ne $firstProcessId -or
+            -not $focusResult.success) {
+            throw "Second launch did not bring the background shell forward: $(
+                $focusResult | ConvertTo-Json -Compress)."
+        }
+        $report.backgroundActivation = $focusResult
         if (-not $activationEvent.WaitOne(15000)) {
             throw 'Original shell did not acknowledge redirected activation.'
         }
@@ -214,6 +240,8 @@ function Assert-SingleInstance {
         throw "Second launch did not settle on original process $firstProcessId; found $($report.secondLaunchProcessIds -join ', ')."
     }
     $report.singleInstanceProcessId = $processes[0].ProcessId
+    Register-ScheduledTask -TaskName $secondLaunchTask -Action $secondLaunchAction `
+        -Principal $principal -Force | Out-Null
 }
 
 function Request-InstalledShellClose([int] $ShellProcessId) {
@@ -418,11 +446,13 @@ function Run-ShellSmoke(
     [string] $expectedResumeGuide = 'Route Test Guide',
     [int] $ExitDelayMilliseconds = 0) {
     $resultPath = Join-Path $ResultDirectory "$mode.json"
-    Remove-Item $resultPath -ErrorAction SilentlyContinue
+    Clear-ShellSmokeResult $resultPath
+    $invocationId = [Guid]::NewGuid().ToString('N')
     $script = Join-Path $PSScriptRoot 'windows_shell_ui_smoke.ps1'
     $arguments = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass ' +
         '-File "' + $script + '" -Mode ' + $mode +
         ' -ResultPath "' + $resultPath + '"' +
+        ' -InvocationId ' + $invocationId +
         ' -ProcessId ' + $report.launchedProcessId +
         ' -SessionId ' + $targetSessionId +
         ' -ExecutablePath "' + $expectedExecutablePath + '"' +
@@ -443,7 +473,8 @@ function Run-ShellSmoke(
     if (-not (Wait-ScheduledTaskIdle $smokeTask 10 -RequireRegistered)) {
         throw "Installed $mode shell smoke task did not finish after writing its result."
     }
-    $result = Get-Content $resultPath -Raw | ConvertFrom-Json
+    $result = Read-ShellSmokeResult $resultPath $invocationId $mode `
+        $report.launchedProcessId $targetSessionId
     if (-not $result.success) {
         throw "Installed $mode shell smoke failed: $($result.error)"
     }
@@ -580,10 +611,22 @@ catch {
     }
 }
 finally {
-    Stop-ScheduledTask -TaskName $smokeTask -ErrorAction SilentlyContinue
-    Unregister-ScheduledTask -TaskName $smokeTask -Confirm:$false `
-        -ErrorAction SilentlyContinue
-    $launchTasksDrained = $true
+    $tasksDrained = $true
+    if (-not (Wait-ScheduledTaskIdle $smokeTask 10)) {
+        Stop-ScheduledTask -TaskName $smokeTask -ErrorAction SilentlyContinue
+        if (-not (Wait-ScheduledTaskIdle $smokeTask 10)) {
+            $cleanupErrors.Add(
+                "Interactive smoke task $smokeTask is still active.")
+            $tasksDrained = $false
+        }
+    }
+    try {
+        Remove-OwnedScheduledTask $smokeTask
+    }
+    catch {
+        $cleanupErrors.Add(
+            "Could not remove interactive smoke task $smokeTask`: $($_.Exception.Message)")
+    }
     foreach ($taskName in @($secondLaunchTask, $launchTask)) {
         if (-not (Wait-ScheduledTaskIdle $taskName 70)) {
             $cleanupErrors.Add(
@@ -592,11 +635,22 @@ finally {
             if (-not (Wait-ScheduledTaskIdle $taskName 10)) {
                 $cleanupErrors.Add(
                     "Interactive launch task $taskName is still active.")
-                $launchTasksDrained = $false
+                $tasksDrained = $false
             }
         }
-        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false `
-            -ErrorAction SilentlyContinue
+        try {
+            Remove-OwnedScheduledTask $taskName
+        }
+        catch {
+            $cleanupErrors.Add(
+                "Could not remove interactive launch task $taskName`: $($_.Exception.Message)")
+        }
+    }
+    try {
+        Assert-NoOwnedScheduledTasks @($smokeTask, $secondLaunchTask, $launchTask)
+    }
+    catch {
+        $cleanupErrors.Add($_.Exception.Message)
     }
     if ($installed) { Stop-InstalledShell -BestEffort }
     $shellProcessesAfterStop = @(Get-InstalledShellProcesses)
@@ -609,7 +663,7 @@ finally {
     $ownedPackage = @($installedNow | Where-Object {
         $installed -and $_.PackageFullName -eq $installed.PackageFullName
     })
-    if ($ownedPackage.Count -eq 1 -and $launchTasksDrained -and
+    if ($ownedPackage.Count -eq 1 -and $tasksDrained -and
         $shellProcessesAfterStop.Count -eq 0) {
         Remove-AppxPackage -Package $ownedPackage[0].PackageFullName `
             -ErrorAction SilentlyContinue

@@ -24,7 +24,6 @@ public partial class App : Application
         {
             return false;
         }
-        shellWindow.Activate();
-        return true;
+        return ForegroundActivation.Activate(shellWindow);
     }
 }

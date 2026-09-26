@@ -7,6 +7,10 @@ param(
     [string] $ResultPath,
 
     [Parameter(Mandatory = $true)]
+    [ValidatePattern('^[0-9a-f]{32}$')]
+    [string] $InvocationId,
+
+    [Parameter(Mandatory = $true)]
     [int] $ProcessId,
 
     [Parameter(Mandatory = $true)]
@@ -25,6 +29,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $report = [ordered]@{
     mode = $Mode
+    invocationId = $InvocationId
     observedAt = (Get-Date).ToUniversalTime().ToString('o')
     processId = $ProcessId
     sessionId = $SessionId

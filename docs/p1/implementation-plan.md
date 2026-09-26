@@ -191,6 +191,22 @@ while parallel task instances could overlap UI actions. Exercise task reuse
 with a helper that stays alive for two seconds after publishing its result,
 then rerun the signed installed x64 gate.
 
+The next review found three follow-up gaps. A duplicate launch must give
+its foreground permission to the existing process before asking it to
+activate; `Window.Activate()` alone does not bring a background WinUI app
+forward. The existing window attempts native foreground activation after
+showing itself, and Windows signals on the taskbar if the foreground lock
+denies it. Keep the per-launch acceptance handshake and verify an installed
+background-window case with a foreground-launched duplicate. A smoke result
+must belong to its current invocation, process, and session; fail if an old
+result cannot be removed, rather than accepting old success JSON. During
+cleanup, drain and unregister each test-owned task, then confirm none
+remains before reporting success. Test a read-only old result and a
+simulated task-removal failure, then repeat the signed installed x64 gate.
+Changing to a new result filename on every scenario would scatter evidence
+files; reusing stable scenario filenames with invocation IDs keeps the
+artifact layout and makes stale results detectable.
+
 ## M2 — catalog, static-asset validation, import, and removal
 
 Exit: two independent managed guides can be added under one game, retain

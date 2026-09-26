@@ -123,7 +123,10 @@ each task start.
 The installed shell UI smoke runner may publish a result before its task
 exits. Wait for the registered task to become idle before reusing its name,
 including after a failed result. The signed shell gate includes a delayed
-task exit followed immediately by another smoke scenario.
+task exit followed immediately by another smoke scenario. Each result must
+carry the current invocation ID, process ID, and session ID. Fail on an
+uncleared old result or a result with the wrong identity. Confirm that the
+runner's scheduled tasks were removed before reporting cleanup success.
 
 ## Scenario checklist
 
@@ -132,7 +135,7 @@ production app. Add cases as the dependent P1 tasks complete.
 
 | Scenario | Required observation | Task / requirement |
 | --- | --- | --- |
-| Shell smoke | Fresh empty Library, Library/Game/Reader/Settings routes, rapid Game/Guide → Settings selections and Back, stale Resume, no P0 fixture controls, and a positive UI-accepted second launch. Launch a new window while an old guide write is blocked; verify the new window waits for the library lease and then shows the distinct guide saved by the old window. Pause a second launch after it selects the old instance, and pause a callback after it reaches the UI queue; close the old window in each case and verify the launch takes over. After a second launch receives UI acceptance, close the old window before the second process exits and verify it does not reopen. Retain verified process handles from the interactive launch handoff and wait for handle-confirmed exit before seeding or package cleanup. Reader is still a placeholder. | T11.1, TR11.1 |
+| Shell smoke | Fresh empty Library, Library/Game/Reader/Settings routes, rapid Game/Guide → Settings selections and Back, stale Resume, no P0 fixture controls, and a positive UI-accepted second launch that brings a background window to the foreground. Launch a new window while an old guide write is blocked; verify the new window waits for the library lease and then shows the distinct guide saved by the old window. Pause a second launch after it selects the old instance, and pause a callback after it reaches the UI queue; close the old window in each case and verify the launch takes over. After a second launch receives UI acceptance, close the old window before the second process exits and verify it does not reopen. Retain verified process handles from the interactive launch handoff and wait for handle-confirmed exit before seeding or package cleanup. Reader is still a placeholder. | T11.1, TR11.1 |
 | Install and upgrade | Signed MSIX installs in an interactive session; an older version upgrades under the same identity without losing a populated library. Verify package version, launch, and data after restart. | T17.1, T17.3, TR17.2 |
 | Import and offline reading | Add a game and import TXT, static HTML with local assets, and PDF through the UI. Remove the originals; while online in a fresh WebView2 profile, verify a reachable HTML canary receives zero guide-originated requests. Then remove all egress, relaunch, and open all three managed copies while recording disconnected state through the final check. | T04–T10, T17.3, TR17.1 |
 | Independent state | Move to different positions in two guides, restart, and verify their locators separately. Change layout/theme, check exact or labeled approximate restore, and toggle completion explicitly; reaching the end must not mark complete. | T12–T14, TR12.1–TR14.2 |

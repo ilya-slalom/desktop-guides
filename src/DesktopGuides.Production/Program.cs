@@ -119,6 +119,7 @@ internal static class Program
                 Thread.Sleep(50);
                 continue;
             }
+            ForegroundActivation.AllowFor((int)target.ProcessId);
             if (LaunchActivationPipe.TryRequest(
                 ActivationPipeName((int)target.ProcessId), deadline))
             {
