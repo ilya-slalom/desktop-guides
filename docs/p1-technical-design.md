@@ -151,7 +151,19 @@ insufficient. Apply each forward migration and `user_version` change in one
 transaction, then run both `integrity_check` and `foreign_key_check`. Failure
 rolls back and leaves the old file/copy for recovery. A populated v1 fixture
 must upgrade to v2 with the last-opened index and all rows intact.
+Reject filesystem links at `library.sqlite`, its `-wal`, `-shm`, and
+`-journal` sidecars, and their parent paths before each database open. On
+Windows, also reject any of these files with multiple hard links, using a
+file handle to read the NTFS link count; the reparse-point attribute alone
+does not identify hard links. For each supported version, compare app-owned
+table and index definitions with a reference database built from that
+version's migration scripts. This checks columns, constraints, and index
+definitions that object-name checks miss. Exact matching deliberately
+rejects manual schema alterations while preserving their data for recovery;
+SQLite's internal `sqlite_*` objects are excluded.
 Do not execute SQLite I/O on the WinUI dispatcher.
+Keep named migration recovery copies under the app-data `.recovery/` sibling
+of the live library, so a later whole-library replacement cannot remove them.
 
 ## 3. Reader contract, locators, and UI state
 

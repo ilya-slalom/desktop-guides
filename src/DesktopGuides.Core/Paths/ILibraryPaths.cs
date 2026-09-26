@@ -7,9 +7,11 @@ public interface ILibraryPaths
     string ContentRoot { get; }
     string StagingRoot { get; }
     string TrashRoot { get; }
+    string RecoveryRoot { get; }
     string DatabasePath { get; }
 
     void EnsureCreated();
+    void ValidateDatabasePath();
     string GetGuideRoot(Guid guideId);
     string GetPlannedGuideFile(Guid guideId, string relativePath);
     string ResolveExistingGuideFile(Guid guideId, string relativePath);

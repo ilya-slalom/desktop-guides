@@ -20,6 +20,7 @@ public sealed class ManagedPathResolver : ILibraryPaths
         ContentRoot = Path.Combine(LibraryRoot, "content");
         StagingRoot = Path.Combine(LibraryRoot, ".staging");
         TrashRoot = Path.Combine(LibraryRoot, ".trash");
+        RecoveryRoot = Path.Combine(DataRoot, ".recovery");
         DatabasePath = Path.Combine(LibraryRoot, "library.sqlite");
     }
 
@@ -28,15 +29,31 @@ public sealed class ManagedPathResolver : ILibraryPaths
     public string ContentRoot { get; }
     public string StagingRoot { get; }
     public string TrashRoot { get; }
+    public string RecoveryRoot { get; }
     public string DatabasePath { get; }
 
     public void EnsureCreated()
     {
-        foreach (string path in new[] { DataRoot, LibraryRoot, ContentRoot, StagingRoot, TrashRoot })
+        foreach (string path in new[]
+                 { DataRoot, LibraryRoot, ContentRoot, StagingRoot, TrashRoot, RecoveryRoot })
         {
             RejectFilesystemLinks(path);
             Directory.CreateDirectory(path);
             RejectFilesystemLinks(path);
+        }
+        ValidateDatabasePath();
+    }
+
+    public void ValidateDatabasePath()
+    {
+        foreach (string suffix in new[] { "", "-wal", "-shm", "-journal" })
+        {
+            string path = DatabasePath + suffix;
+            RejectFilesystemLinks(path);
+            if (OperatingSystem.IsWindows() && File.Exists(path))
+            {
+                WindowsFileLinks.RejectMultipleHardLinks(path);
+            }
         }
     }
 
@@ -92,7 +109,7 @@ public sealed class ManagedPathResolver : ILibraryPaths
             {
                 if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
                 {
-                    throw new InvalidDataException("Managed content path crosses a filesystem link.");
+                    throw new InvalidDataException("Managed path crosses a filesystem link.");
                 }
             }
             catch (FileNotFoundException)

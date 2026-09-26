@@ -6,14 +6,29 @@ namespace DesktopGuides.Infrastructure.Storage;
 
 public sealed class SqliteLibraryRepository : ILibraryRepository
 {
+    private sealed record SchemaObject(string Type, string Name, string Table, string Sql);
+
+    private static readonly Lazy<IReadOnlyList<SchemaObject>> VersionOneSchema =
+        new(() => BuildExpectedSchema(1));
+    private static readonly Lazy<IReadOnlyList<SchemaObject>> VersionTwoSchema =
+        new(() => BuildExpectedSchema(2));
+
     private readonly ILibraryPaths paths;
     private readonly TimeProvider clock;
+    private readonly Action<int>? migrationCheckpoint;
     private readonly SemaphoreSlim writeGate = new(1, 1);
 
     public SqliteLibraryRepository(ILibraryPaths paths, TimeProvider? clock = null)
     {
         this.paths = paths;
         this.clock = clock ?? TimeProvider.System;
+    }
+
+    internal SqliteLibraryRepository(
+        ILibraryPaths paths, TimeProvider? clock, Action<int> migrationCheckpoint)
+        : this(paths, clock)
+    {
+        this.migrationCheckpoint = migrationCheckpoint;
     }
 
     public Task InitializeAsync(CancellationToken token = default) =>
@@ -292,26 +307,168 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         using SqliteCommand version = connection.CreateCommand();
         version.CommandText = "PRAGMA user_version";
         long currentVersion = (long)version.ExecuteScalar()!;
-        if (currentVersion == 1)
+        if (currentVersion > LibrarySchema.CurrentVersion)
         {
+            throw new InvalidDataException(
+                $"Library schema version {currentVersion} is newer than this app supports. Update Desktop Guides.");
+        }
+        if (currentVersion == LibrarySchema.CurrentVersion)
+        {
+            ValidateDatabase(connection, null, LibrarySchema.CurrentVersion);
             return;
         }
-        if (currentVersion != 0 || !IsRecoverableEmptyDatabase(connection))
+        if (currentVersion < 0 ||
+            (currentVersion == 0 && !IsRecoverableEmptyDatabase(connection)))
         {
             throw new InvalidDataException(
                 $"Library schema version {currentVersion} needs a supported migration or recovery.");
         }
-        using (SqliteCommand journal = connection.CreateCommand())
+
+        if (currentVersion > 0)
         {
-            journal.CommandText = "PRAGMA journal_mode=WAL";
-            journal.ExecuteNonQuery();
+            ValidateDatabase(connection, null, (int)currentVersion);
         }
-        using SqliteTransaction transaction = connection.BeginTransaction();
-        using SqliteCommand schema = connection.CreateCommand();
-        schema.Transaction = transaction;
-        schema.CommandText = LibrarySchema.Version1;
-        schema.ExecuteNonQuery();
-        transaction.Commit();
+
+        string? recoveryCopy = currentVersion > 0
+            ? CreateRecoveryCopy(connection, (int)currentVersion)
+            : null;
+        try
+        {
+            using (SqliteCommand journal = connection.CreateCommand())
+            {
+                journal.CommandText = "PRAGMA journal_mode=WAL";
+                journal.ExecuteNonQuery();
+            }
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            foreach ((int nextVersion, string sql) in LibrarySchema.Migrations)
+            {
+                if (nextVersion <= currentVersion)
+                {
+                    continue;
+                }
+                using SqliteCommand migration = connection.CreateCommand();
+                migration.Transaction = transaction;
+                migration.CommandText = sql;
+                migration.ExecuteNonQuery();
+                migrationCheckpoint?.Invoke(nextVersion);
+            }
+            ValidateDatabase(connection, transaction, LibrarySchema.CurrentVersion);
+            transaction.Commit();
+        }
+        catch (Exception error) when (recoveryCopy is not null)
+        {
+            throw new InvalidDataException(
+                $"Library upgrade failed. Pre-upgrade recovery copy: {recoveryCopy}",
+                error);
+        }
+    }
+
+    private string CreateRecoveryCopy(SqliteConnection connection, int version)
+    {
+        string path = Path.Combine(paths.RecoveryRoot,
+            $"library-v{version}-{clock.GetUtcNow():yyyyMMddHHmmss}-{Guid.NewGuid():N}.sqlite");
+        // Reserve the generated name without opening an existing file or link.
+        using (FileStream created = new(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
+        }
+        try
+        {
+            using SqliteConnection backup = new(new SqliteConnectionStringBuilder
+            {
+                DataSource = path,
+                Mode = SqliteOpenMode.ReadWrite,
+                Pooling = false
+            }.ToString());
+            backup.Open();
+            connection.BackupDatabase(backup);
+            ValidateDatabase(backup, null, version);
+            return path;
+        }
+        catch
+        {
+            File.Delete(path);
+            throw;
+        }
+    }
+
+    private static void ValidateDatabase(
+        SqliteConnection connection, SqliteTransaction? transaction, int expectedVersion)
+    {
+        using SqliteCommand check = connection.CreateCommand();
+        check.Transaction = transaction;
+        check.CommandText = "PRAGMA user_version";
+        if ((long)check.ExecuteScalar()! != expectedVersion)
+        {
+            throw new InvalidDataException("Library database schema version is inconsistent.");
+        }
+        check.CommandText = "PRAGMA integrity_check";
+        using (SqliteDataReader integrity = check.ExecuteReader())
+        {
+            if (!integrity.Read() ||
+                !string.Equals(integrity.GetString(0), "ok", StringComparison.Ordinal) ||
+                integrity.Read())
+            {
+                throw new InvalidDataException("Library database failed its integrity check.");
+            }
+        }
+        check.CommandText = "PRAGMA foreign_key_check";
+        using (SqliteDataReader foreignKeys = check.ExecuteReader())
+        {
+            if (foreignKeys.Read())
+            {
+                throw new InvalidDataException("Library database contains orphaned records.");
+            }
+        }
+        IReadOnlyList<SchemaObject> expectedSchema = expectedVersion switch
+        {
+            1 => VersionOneSchema.Value,
+            2 => VersionTwoSchema.Value,
+            _ => throw new InvalidDataException("Unsupported library schema version.")
+        };
+        if (!ReadSchema(connection, transaction).SequenceEqual(expectedSchema))
+        {
+            throw new InvalidDataException("Library database schema is incomplete or altered.");
+        }
+    }
+
+    private static IReadOnlyList<SchemaObject> BuildExpectedSchema(int version)
+    {
+        using SqliteConnection reference = new(new SqliteConnectionStringBuilder
+        {
+            DataSource = ":memory:",
+            Pooling = false
+        }.ToString());
+        reference.Open();
+        using SqliteCommand migration = reference.CreateCommand();
+        migration.CommandText = LibrarySchema.Version1;
+        migration.ExecuteNonQuery();
+        if (version == 2)
+        {
+            migration.CommandText = LibrarySchema.Version2;
+            migration.ExecuteNonQuery();
+        }
+        return ReadSchema(reference, null);
+    }
+
+    private static IReadOnlyList<SchemaObject> ReadSchema(
+        SqliteConnection connection, SqliteTransaction? transaction)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT type, name, tbl_name, sql FROM sqlite_schema
+            WHERE sql IS NOT NULL AND name NOT GLOB 'sqlite_*'
+            ORDER BY type, name
+            """;
+        using SqliteDataReader reader = command.ExecuteReader();
+        List<SchemaObject> objects = [];
+        while (reader.Read())
+        {
+            objects.Add(new SchemaObject(
+                reader.GetString(0), reader.GetString(1),
+                reader.GetString(2), reader.GetString(3)));
+        }
+        return objects;
     }
 
     private static bool IsRecoverableEmptyDatabase(SqliteConnection connection)
@@ -336,6 +493,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
 
     private SqliteConnection OpenConnection(bool create = false)
     {
+        paths.ValidateDatabasePath();
         SqliteConnection connection = new(new SqliteConnectionStringBuilder
         {
             DataSource = paths.DatabasePath,

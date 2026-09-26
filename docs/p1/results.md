@@ -1,7 +1,8 @@
 # P1 implementation results
 
-Status: M0 implemented on `feat/p1-m0` in [PR #3](https://github.com/ilya-slalom/desktop-guides/pull/3)
-for review, with a SQLite initialization review fix on 26 September 2026.
+Status: M0 merged into `main` through
+[PR #3](https://github.com/ilya-slalom/desktop-guides/pull/3) on
+26 September 2026, including the SQLite initialization review fix.
 The P1 first usable release remains in progress. The
 [dependency plan](implementation-plan.md) defines all 49 task exit gates;
 this file records checks actually run.
@@ -81,6 +82,59 @@ This verifies the diagnostic P0 package on ARM64; the M0 PDF text candidate
 was exercised interactively on Windows 11 x64, and the production P1 reader
 has not been installed or tested.
 
+[Final PR CI run 36206500420](https://github.com/ilya-slalom/desktop-guides/actions/runs/36206500420)
+passed all five jobs for review-fix head
+`39daad9f768249415bc7b434221ccad5c3cbad59`. Both x64 and native ARM64
+ran **61/61 Core** and **13/13 Infrastructure** tests; both unsigned MSIX
+builds and the installed native ARM64 **14/14** P0 fixture regression passed.
+
 P0's 14-fixture installed result remains [P0 evidence](../p0/results.md);
 these M0 prototype results do not claim that the production shell, import,
 resume coordinator, PDF reader, or release package is complete.
+
+## M1 T03.2 migration result — 26 September 2026
+
+The first M1 change on `feat/p1-m1-migrations` applies schema v1 and v2 in
+order for a new library and upgrades a populated v1 library to v2. Before
+upgrading existing data, it creates a consistent SQLite backup under the
+app-data `.recovery` directory. Upgrade scripts and the version change run
+in one transaction. Initialization checks schema objects, database integrity,
+and foreign keys; it rejects newer or incomplete schemas without replacing
+their data. An injected failure after creating the v2 index rolls back to a
+usable v1 database and retains the v1 recovery copy.
+
+The tests first failed against the v1-only repository (two failures, five
+passes). On the Windows 11 x64 host, build `10.0.26200.0`, under
+`E:\work\desktop-guides` with .NET SDK `10.0.401`, the completed locked run
+passed **61/61 Core** and **19/19 Infrastructure** tests. The Release x64
+WinUI build passed with zero warnings and errors. Tests cover the populated
+v1 backup, failure rollback and retry, newer-schema and orphaned-row
+rejection, incomplete v2 detection, and linked recovery-root rejection.
+Production installed-app migration remains a later M1 shell check.
+
+The PR #4 review follow-up added three Windows regression tests. Before the
+fix, all three failed: a linked `library.sqlite` upgraded an external v1
+database, a changed v1 `CHECK` constraint reached backup and migration, and
+a v2 database with `Games.Notes` renamed to `Memo` passed initialization.
+The resolver now rejects a linked database before SQLite opens it, including
+repository reads. Initialization compares app-owned table and index
+definitions against the version's migration scripts before backup or use;
+unrecognized definitions stop with their existing data intact.
+
+With the fix on the Windows 11 x64 host under `E:\work\desktop-guides`, locked
+restore and Release tests passed **61/61 Core** and **22/22 Infrastructure**.
+The unsigned Release x64 WinUI MSIX build succeeded with zero errors. It
+reported one host tooling warning: `mspdbcmf.exe` was unavailable, so no
+symbols package was generated. The installed production-app migration gate
+remains open.
+
+A second PR #4 review found two more path cases. Disposable Windows 11 x64
+probes confirmed that a linked `library.sqlite-shm` modified an outside file
+and an NTFS hard link at `library.sqlite` let initialization upgrade an
+outside v1 database. Two regression tests failed against that PR head. The
+resolver now checks SQLite sidecar paths and rejects Windows files whose
+link count is not one before opening SQLite. The two focused tests passed
+after the change. Locked restore, **61/61 Core** and **24/24 Infrastructure**
+tests passed on the same host, including the active-WAL-writer migration
+test. The unsigned Release x64 WinUI MSIX build succeeded with zero errors
+and the same host symbols-tool warning.
