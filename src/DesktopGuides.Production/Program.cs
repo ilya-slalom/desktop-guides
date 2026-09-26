@@ -14,8 +14,13 @@ internal static class Program
         @"Local\DesktopGuides.Preview.RedirectSelected";
     private const string RedirectContinueProbeName =
         @"Local\DesktopGuides.Preview.RedirectContinue";
+    private const string ActivationQueuedProbeName =
+        @"Local\DesktopGuides.Preview.ActivationQueued";
+    private const string ActivationContinueProbeName =
+        @"Local\DesktopGuides.Preview.ActivationContinue";
     private static AppInstance? primaryInstance;
     private static EventWaitHandle? closingSignal;
+    private static EventWaitHandle? activationAcceptedSignal;
     private static DispatcherQueue? uiQueue;
     private static App? app;
 
@@ -45,13 +50,19 @@ internal static class Program
         closingSignal = new EventWaitHandle(
             false, EventResetMode.ManualReset, ClosingSignalName(Environment.ProcessId));
         closingSignal.Reset();
+        activationAcceptedSignal = new EventWaitHandle(
+            false, EventResetMode.AutoReset,
+            ActivationAcceptedName(Environment.ProcessId));
+        activationAcceptedSignal.Reset();
         primaryInstance.Activated += (_, _) =>
         {
             Volatile.Read(ref uiQueue)?.TryEnqueue(
-                () =>
+                async () =>
                 {
+                    await PauseQueuedActivationForTestAsync();
                     if (app?.ActivateMainWindow() == true)
                     {
+                        activationAcceptedSignal?.Set();
                         SignalActivationProbe();
                     }
                 });
@@ -71,6 +82,8 @@ internal static class Program
         finally
         {
             ReleaseInstanceKey();
+            activationAcceptedSignal.Dispose();
+            activationAcceptedSignal = null;
             closingSignal.Dispose();
             closingSignal = null;
         }
@@ -96,43 +109,61 @@ internal static class Program
                 return target;
             }
             PauseAfterSelectingTargetForTest();
-            AppInstance ownerBeforeRedirect =
-                AppInstance.FindOrRegisterForKey(InstanceKey);
-            if (ownerBeforeRedirect.IsCurrent)
-            {
-                return ownerBeforeRedirect;
-            }
-            if (ownerBeforeRedirect.ProcessId != target.ProcessId)
-            {
-                continue;
-            }
-            if (IsClosing(target))
-            {
-                Thread.Sleep(50);
-                continue;
-            }
-
+            using Mutex redirectGate = new(
+                false, RedirectGateName((int)target.ProcessId));
+            bool gateHeld;
             try
             {
-                RedirectActivation(activation, target);
-                lastError = null;
+                gateHeld = redirectGate.WaitOne(1000);
             }
-            catch (Exception error)
+            catch (AbandonedMutexException)
             {
-                lastError = error;
+                gateHeld = true;
             }
-
-            // The target may have started closing after FindOrRegisterForKey.
-            // Claim the released key or redirect again to its new owner.
-            AppInstance owner = AppInstance.FindOrRegisterForKey(InstanceKey);
-            if (owner.IsCurrent)
+            if (!gateHeld)
             {
-                return owner;
+                continue;
             }
-            if (owner.ProcessId == target.ProcessId &&
-                !IsClosing(owner) && lastError is null)
+            try
             {
-                return null;
+                AppInstance owner = AppInstance.FindOrRegisterForKey(InstanceKey);
+                if (owner.IsCurrent)
+                {
+                    return owner;
+                }
+                if (owner.ProcessId != target.ProcessId || IsClosing(target))
+                {
+                    continue;
+                }
+                if (!EventWaitHandle.TryOpenExisting(
+                    ActivationAcceptedName((int)target.ProcessId),
+                    out EventWaitHandle? accepted))
+                {
+                    Thread.Sleep(50);
+                    continue;
+                }
+                using (accepted)
+                {
+                    accepted.Reset();
+                    try
+                    {
+                        RedirectActivation(activation, target);
+                        lastError = null;
+                    }
+                    catch (Exception error)
+                    {
+                        lastError = error;
+                    }
+                    if (lastError is null &&
+                        WaitForActivationAcceptance(accepted, target, deadline))
+                    {
+                        return null;
+                    }
+                }
+            }
+            finally
+            {
+                redirectGate.ReleaseMutex();
             }
             Thread.Sleep(50);
         }
@@ -142,6 +173,36 @@ internal static class Program
 
     private static string ClosingSignalName(int processId) =>
         $@"Local\DesktopGuides.Preview.Closing.{processId}";
+
+    private static string ActivationAcceptedName(int processId) =>
+        $@"Local\DesktopGuides.Preview.ActivationAccepted.{processId}";
+
+    private static string RedirectGateName(int processId) =>
+        $@"Local\DesktopGuides.Preview.RedirectGate.{processId}";
+
+    private static bool WaitForActivationAcceptance(
+        EventWaitHandle accepted, AppInstance target, DateTime deadline)
+    {
+        DateTime acceptanceDeadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline &&
+            DateTime.UtcNow < acceptanceDeadline)
+        {
+            if (IsClosing(target))
+            {
+                return false;
+            }
+            if (accepted.WaitOne(50))
+            {
+                return !IsClosing(target);
+            }
+            AppInstance owner = AppInstance.FindOrRegisterForKey(InstanceKey);
+            if (owner.IsCurrent || owner.ProcessId != target.ProcessId)
+            {
+                return false;
+            }
+        }
+        return false;
+    }
 
     private static void PauseAfterSelectingTargetForTest()
     {
@@ -163,6 +224,35 @@ internal static class Program
                 {
                     selected.Set();
                     resume.WaitOne(15_000);
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The optional test gate must not affect normal activation.
+        }
+    }
+
+    private static async Task PauseQueuedActivationForTestAsync()
+    {
+        try
+        {
+            if (!EventWaitHandle.TryOpenExisting(
+                ActivationQueuedProbeName, out EventWaitHandle? queued))
+            {
+                return;
+            }
+            using (queued)
+            {
+                if (!EventWaitHandle.TryOpenExisting(
+                    ActivationContinueProbeName, out EventWaitHandle? resume))
+                {
+                    return;
+                }
+                using (resume)
+                {
+                    queued.Set();
+                    await Task.Run(() => resume.WaitOne(15_000));
                 }
             }
         }

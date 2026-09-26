@@ -38,10 +38,13 @@ $certificate = $null
 $installed = $null
 $expectedExecutablePath = $null
 $imported = $false
-$ownedProcessIds = [System.Collections.Generic.HashSet[int]]::new()
+$ownedProcesses = [System.Collections.Generic.Dictionary[int,datetime]]::new()
+$cleanupErrors = [System.Collections.Generic.List[string]]::new()
 $launchTask = "DesktopGuides-P1-ShellLaunch-$runId"
 $secondLaunchTask = "DesktopGuides-P1-ShellSecondLaunch-$runId"
 $smokeTask = "DesktopGuides-P1-ShellSmoke-$runId"
+$launchResultPath = Join-Path $ResultDirectory 'launch.json'
+$secondLaunchResultPath = Join-Path $ResultDirectory 'second-launch.json'
 
 function Get-InstalledShellProcesses {
     if (-not $installed) { return @() }
@@ -53,50 +56,98 @@ function Get-InstalledShellProcesses {
         }
 }
 
-function Stop-InstalledShell {
-    foreach ($ownedId in @($ownedProcessIds)) {
-        $process = Get-InstalledShellProcesses |
-            Where-Object { $_.ProcessId -eq $ownedId } |
-            Select-Object -First 1
-        if ($process) {
-            Stop-Process -Id $ownedId -Force
+function Stop-InstalledShell([switch] $BestEffort) {
+    $before = $cleanupErrors.Count
+    foreach ($ownedId in @($ownedProcesses.Keys)) {
+        try {
+            $process = Get-InstalledShellProcesses |
+                Where-Object { $_.ProcessId -eq $ownedId } |
+                Select-Object -First 1
+            if ($process -and
+                [Math]::Abs(($process.CreationDate.ToUniversalTime() -
+                    $ownedProcesses[$ownedId]).TotalSeconds) -lt 2) {
+                try {
+                    Stop-Process -Id $ownedId -Force -ErrorAction Stop
+                }
+                catch {
+                    if (Get-Process -Id $ownedId -ErrorAction SilentlyContinue) {
+                        throw
+                    }
+                }
+            }
         }
-        [void]$ownedProcessIds.Remove($ownedId)
+        catch {
+            $cleanupErrors.Add("Could not stop test process ${ownedId}: $_")
+        }
+        finally {
+            [void]$ownedProcesses.Remove($ownedId)
+        }
+    }
+    if (-not $BestEffort -and $cleanupErrors.Count -gt $before) {
+        throw 'Could not stop all test-owned shell processes.'
     }
 }
 
-function Start-InstalledShell(
-    [int] $ExcludeProcessId = 0,
-    [switch] $WaitOnly) {
-    $existingIds = if ($WaitOnly) { @($ExcludeProcessId) }
-                   else {
-                       @(Get-InstalledShellProcesses |
-                           ForEach-Object { $_.ProcessId })
-                   }
-    if (-not $WaitOnly) {
-        Start-ScheduledTask -TaskName $launchTask
-    }
+function Wait-LaunchResult([string] $ResultPath) {
     $deadline = (Get-Date).AddSeconds(30)
     do {
-        Start-Sleep -Milliseconds 500
-        $candidates = @(Get-InstalledShellProcesses |
-            Where-Object { $_.ProcessId -ne $ExcludeProcessId -and
-                $_.ProcessId -notin $existingIds })
-        foreach ($candidate in $candidates) {
-            [void]$ownedProcessIds.Add([int]$candidate.ProcessId)
+        Start-Sleep -Milliseconds 250
+    } while (-not (Test-Path $ResultPath) -and (Get-Date) -lt $deadline)
+    if (-not (Test-Path $ResultPath)) {
+        throw "Interactive launch did not write $ResultPath."
+    }
+    $launch = Get-Content $ResultPath -Raw | ConvertFrom-Json
+    if (-not $launch.success) {
+        throw "Interactive launch failed: $($launch.error)"
+    }
+    if ($launch.sessionId -ne $targetSessionId -or
+        -not [string]::Equals($launch.executablePath, $expectedExecutablePath,
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Interactive launch returned an unexpected session or executable.'
+    }
+    $ownedProcesses[[int]$launch.processId] =
+        ([datetime]$launch.startedAt).ToUniversalTime()
+    return $launch
+}
+
+function Wait-InstalledShellWindow([int] $ShellProcessId) {
+    $deadline = (Get-Date).AddSeconds(30)
+    do {
+        $appProcess = Get-InstalledShellProcesses |
+            Where-Object { $_.ProcessId -eq $ShellProcessId } |
+            Select-Object -First 1
+        if ($appProcess) {
+            $windowProcess = Get-Process -Id $ShellProcessId `
+                -ErrorAction SilentlyContinue
+            if ($windowProcess -and $windowProcess.MainWindowHandle -ne 0) {
+                break
+            }
         }
-        $appProcess = $candidates |
-            Where-Object {
-                $windowProcess = Get-Process -Id $_.ProcessId `
-                    -ErrorAction SilentlyContinue
-                $windowProcess -and $windowProcess.MainWindowHandle -ne 0
-            } | Select-Object -First 1
-    } while (-not $appProcess -and (Get-Date) -lt $deadline)
-    if (-not $appProcess) {
-        throw 'Installed production shell did not open a window.'
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $deadline)
+    if (-not $appProcess -or -not $windowProcess -or
+        $windowProcess.MainWindowHandle -eq 0) {
+        throw "Test-launched shell process $ShellProcessId did not open a window."
     }
     $report.launchedProcessId = $appProcess.ProcessId
     $report.launchedSessionId = $appProcess.SessionId
+}
+
+function Start-InstalledShell {
+    Remove-Item $launchResultPath -ErrorAction SilentlyContinue
+    Start-ScheduledTask -TaskName $launchTask
+    $launch = Wait-LaunchResult $launchResultPath
+    Wait-InstalledShellWindow ([int]$launch.processId)
+}
+
+function New-ShellLaunchAction([string] $ResultPath) {
+    $script = Join-Path $PSScriptRoot 'windows_shell_launch.ps1'
+    $arguments = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass ' +
+        '-File "' + $script + '"' +
+        ' -ExecutablePath "' + $expectedExecutablePath + '"' +
+        ' -ResultPath "' + $ResultPath + '"'
+    New-ScheduledTaskAction -Execute 'powershell.exe' `
+        -Argument $arguments -WorkingDirectory $PSScriptRoot
 }
 
 function Assert-SingleInstance {
@@ -106,19 +157,12 @@ function Assert-SingleInstance {
         'Local\DesktopGuides.Preview.RedirectedActivation')
     try {
         $activationEvent.Reset() | Out-Null
-        Register-ScheduledTask -TaskName $secondLaunchTask -Action $launchAction `
+        Register-ScheduledTask -TaskName $secondLaunchTask -Action $secondLaunchAction `
             -Principal $principal -Force | Out-Null
-        $previousRun = (Get-ScheduledTaskInfo -TaskName $secondLaunchTask).LastRunTime
+        Remove-Item $secondLaunchResultPath -ErrorAction SilentlyContinue
         Start-ScheduledTask -TaskName $secondLaunchTask
-        $deadline = (Get-Date).AddSeconds(15)
-        do {
-            Start-Sleep -Milliseconds 250
-            $launchInfo = Get-ScheduledTaskInfo -TaskName $secondLaunchTask
-        } while ($launchInfo.LastRunTime -le $previousRun -and
-            (Get-Date) -lt $deadline)
-        if ($launchInfo.LastRunTime -le $previousRun) {
-            throw 'Second production launch task never started.'
-        }
+        $secondLaunch = Wait-LaunchResult $secondLaunchResultPath
+        $report.secondLaunchProcessId = $secondLaunch.processId
         if (-not $activationEvent.WaitOne(15000)) {
             throw 'Original shell did not acknowledge redirected activation.'
         }
@@ -208,7 +252,7 @@ function Assert-RelaunchDuringClose {
         if (-not (Get-Process -Id $closingProcessId -ErrorAction SilentlyContinue)) {
             throw 'Closing shell exited before pending guide action drained.'
         }
-        Start-InstalledShell $closingProcessId
+        Start-InstalledShell
         $report.closeHandoffOverlapObserved = [bool](
             Get-Process -Id $closingProcessId -ErrorAction SilentlyContinue)
         if (-not $report.closeHandoffOverlapObserved) {
@@ -242,7 +286,9 @@ function Assert-ClosingTargetRedirect {
     try {
         $selected.Reset() | Out-Null
         $resume.Reset() | Out-Null
+        Remove-Item $secondLaunchResultPath -ErrorAction SilentlyContinue
         Start-ScheduledTask -TaskName $secondLaunchTask
+        $secondLaunch = Wait-LaunchResult $secondLaunchResultPath
         if (-not $selected.WaitOne(15000)) {
             throw 'Second launch did not select the closing target.'
         }
@@ -250,7 +296,7 @@ function Assert-ClosingTargetRedirect {
         Request-InstalledShellClose $closingProcessId
         Wait-InstalledShellExit $closingProcessId
         $resume.Set() | Out-Null
-        Start-InstalledShell $closingProcessId -WaitOnly
+        Wait-InstalledShellWindow ([int]$secondLaunch.processId)
         $report.closingTargetRelaunchProcessId = $report.launchedProcessId
         $report.normalAfterClosingTarget = Run-ShellSmoke 'normal'
     }
@@ -258,6 +304,38 @@ function Assert-ClosingTargetRedirect {
         $resume.Set() | Out-Null
         $resume.Dispose()
         $selected.Dispose()
+    }
+}
+
+function Assert-QueuedActivationClose {
+    $closingProcessId = $report.launchedProcessId
+    $queued = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::AutoReset,
+        'Local\DesktopGuides.Preview.ActivationQueued')
+    $resume = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::ManualReset,
+        'Local\DesktopGuides.Preview.ActivationContinue')
+    try {
+        $queued.Reset() | Out-Null
+        $resume.Reset() | Out-Null
+        Remove-Item $secondLaunchResultPath -ErrorAction SilentlyContinue
+        Start-ScheduledTask -TaskName $secondLaunchTask
+        $secondLaunch = Wait-LaunchResult $secondLaunchResultPath
+        if (-not $queued.WaitOne(15000)) {
+            throw 'Original shell did not queue redirected activation.'
+        }
+        $report.activationQueuedBeforeClose = $true
+        Request-InstalledShellClose $closingProcessId
+        Wait-InstalledShellExit $closingProcessId
+        $resume.Set() | Out-Null
+        Wait-InstalledShellWindow ([int]$secondLaunch.processId)
+        $report.queuedActivationRelaunchProcessId = $report.launchedProcessId
+        $report.normalAfterQueuedActivation = Run-ShellSmoke 'normal'
+    }
+    finally {
+        $resume.Set() | Out-Null
+        $resume.Dispose()
+        $queued.Dispose()
     }
 }
 
@@ -350,9 +428,8 @@ try {
 
     $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
         -LogonType Interactive -RunLevel Limited
-    $appId = "shell:AppsFolder\$($installed.PackageFamilyName)!App"
-    $launchAction = New-ScheduledTaskAction -Execute "$env:WINDIR\explorer.exe" `
-        -Argument $appId
+    $launchAction = New-ShellLaunchAction $launchResultPath
+    $secondLaunchAction = New-ShellLaunchAction $secondLaunchResultPath
     Register-ScheduledTask -TaskName $launchTask -Action $launchAction `
         -Principal $principal -Force | Out-Null
 
@@ -368,6 +445,7 @@ try {
     $report.normal = Run-ShellSmoke 'normal'
     Assert-RelaunchDuringClose
     Assert-ClosingTargetRedirect
+    Assert-QueuedActivationClose
 
     Stop-InstalledShell
     dotnet run --project $seedProject -c Release --no-restore -- stale $dataRoot
@@ -387,7 +465,7 @@ catch {
                     processId = $_.ProcessId
                     sessionId = $_.SessionId
                     created = $_.CreationDate.ToString('o')
-                    testOwned = $ownedProcessIds.Contains([int]$_.ProcessId)
+                    testOwned = $ownedProcesses.ContainsKey([int]$_.ProcessId)
                 }
             })
     }
@@ -428,7 +506,7 @@ finally {
         -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName $launchTask -Confirm:$false `
         -ErrorAction SilentlyContinue
-    if ($installed) { Stop-InstalledShell }
+    if ($installed) { Stop-InstalledShell -BestEffort }
     $installedNow = @(Get-AppxPackage -Name DesktopGuides.Preview)
     $ownedPackage = @($installedNow | Where-Object {
         $installed -and $_.PackageFullName -eq $installed.PackageFullName
@@ -460,6 +538,10 @@ finally {
         } else {
             'Temporary package or certificate remains.'
         }
+    }
+    if ($cleanupErrors.Count -gt 0) {
+        $report.success = $false
+        $report.processCleanupErrors = @($cleanupErrors)
     }
     $report | ConvertTo-Json -Depth 8 |
         Set-Content (Join-Path $ResultDirectory 'signed-install.json') -Encoding UTF8

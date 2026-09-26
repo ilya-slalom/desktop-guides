@@ -121,6 +121,23 @@ Resume guide, then verify its persisted Resume state after lock release and
 old-process exit. Pass when locked Infrastructure tests, production builds,
 and the signed Windows 11 x64 installed handoff gate succeed.
 
+The follow-up review found a gap between queueing a redirected activation and
+accepting it on the UI thread. Make the secondary wait for a process-specific
+acceptance signal emitted only after the window activates; on close or failed
+acknowledgment, retry ownership. Exercise this boundary in the installed
+handoff test.
+
+The installed runner also needs positive process ownership. A same-session
+process appearing after the task starts is insufficient proof. Launch the
+installed executable from the interactive task through a small helper that
+records its returned PID, then validate that PID, package path, and session
+before UI checks or cleanup. If direct packaged launch cannot preserve the
+required MSIX behavior, retain shell activation but use an equivalent
+launch-specific identity claim. Cleanup continues through package,
+certificate, and final-report checks even when an owned process exits
+between lookup and stop. Verify these cases with the signed installed x64
+lane and a missing-PID PowerShell check.
+
 ## M2 — catalog, static-asset validation, import, and removal
 
 Exit: two independent managed guides can be added under one game, retain
