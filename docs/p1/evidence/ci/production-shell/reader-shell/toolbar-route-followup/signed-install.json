@@ -1,0 +1,236 @@
+{
+  "runId": "e5876cb20e3241bea063a0eba184a6a8",
+  "observedAt": "2026-09-26T15:49:09.5238653Z",
+  "osBuild": "10.0.26100.0",
+  "cpuArchitecture": "AMD64",
+  "success": true,
+  "windowsAppRuntime": [],
+  "dotnetSdk": "10.0.401",
+  "sourcePackageSha256": "DB54D799F168D4630FE3BE9CA672D7AA91D0572F350AC1485CBE9F526BFF3447",
+  "certificateThumbprint": "B6A02588AA5C83826E33F26DF7534D232070384B",
+  "signedPackageSha256": "2210078318286D51A707BAD49A68CB282222B16B19A8929CFAD1F0BDECEB701C",
+  "packageFullName": "DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+  "packageFamilyName": "DesktopGuides.Preview_en8r599z3n35j",
+  "installLocation": "C:\\Program Files\\WindowsApps\\DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+  "launchedProcessId": 5580,
+  "launchedSessionId": 2,
+  "empty": {
+    "mode": "empty",
+    "invocationId": "8bcb4338b9ed400599b6af8d76899065",
+    "observedAt": "2026-09-26T15:49:32.7532398Z",
+    "processId": 1824,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 2000,
+    "success": true,
+    "phases": [
+      "library",
+      "empty-library"
+    ]
+  },
+  "emptyAfterDelayedTask": {
+    "mode": "empty",
+    "invocationId": "536873bb6801461698b80d8c80a4e6af",
+    "observedAt": "2026-09-26T15:49:37.784532Z",
+    "processId": 1824,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "empty-library"
+    ]
+  },
+  "secondLaunchProcessId": 3692,
+  "backgroundActivation": {
+    "handoffToken": "e652de09fb014579a69aab5fe53e01b8",
+    "foregroundTargetProcessId": 1824,
+    "probeWindowHandle": 66056,
+    "foregroundWindowBefore": 66056,
+    "targetWindowHandle": 327766,
+    "foregroundWindowHandle": 327766,
+    "childExited": true,
+    "success": true
+  },
+  "redirectedActivationObserved": true,
+  "secondLaunchProcessIds": [
+    1824
+  ],
+  "singleInstanceProcessId": 1824,
+  "emptyAfterSecondLaunch": {
+    "mode": "empty",
+    "invocationId": "343f8714e1134b4ba553cfbbac482985",
+    "observedAt": "2026-09-26T15:49:41.6381558Z",
+    "processId": 1824,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "empty-library"
+    ]
+  },
+  "normal": {
+    "mode": "normal",
+    "invocationId": "0f71a11c1f324216ba25f7fe6bc75623",
+    "observedAt": "2026-09-26T15:49:56.4722808Z",
+    "processId": 7500,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-pane-toggle",
+      "reader-back-game",
+      "pointer-reopen-selected-guide",
+      "keyboard-reopen-selected-guide",
+      "focused-guide-enter",
+      "restore-route-guide",
+      "game-back-library",
+      "pointer-library-game-reader-game",
+      "keyboard-library-game-reader-game",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game",
+      "restore-last-guide-for-relaunch"
+    ],
+    "readerScreenshot": "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.reader.png"
+  },
+  "pendingGuide": {
+    "mode": "queue-guide",
+    "invocationId": "f60181235e904557b82358147b08e67f",
+    "observedAt": "2026-09-26T15:50:02.6757606Z",
+    "processId": 7500,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "guide-action-started"
+    ]
+  },
+  "closeHandoffOverlapObserved": true,
+  "waitingDuringClose": {
+    "mode": "waiting-handoff",
+    "invocationId": "ab9127b1878244eba9ac51b3ef28d093",
+    "observedAt": "2026-09-26T15:50:06.9317115Z",
+    "processId": 8712,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "waiting-for-library-lease"
+    ]
+  },
+  "relaunchDuringCloseProcessId": 8712,
+  "normalAfterCloseRelaunch": {
+    "mode": "normal",
+    "invocationId": "e5bf7d0f321c4f1eb1b4937e7107f24f",
+    "observedAt": "2026-09-26T15:50:08.6568668Z",
+    "processId": 8712,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-pane-toggle",
+      "reader-back-game",
+      "pointer-reopen-selected-guide",
+      "keyboard-reopen-selected-guide",
+      "focused-guide-enter",
+      "restore-route-guide",
+      "game-back-library",
+      "pointer-library-game-reader-game",
+      "keyboard-library-game-reader-game",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game",
+      "restore-last-guide-for-relaunch"
+    ],
+    "readerScreenshot": "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.reader.png"
+  },
+  "closingTargetSelected": true,
+  "closingTargetRelaunchProcessId": 2952,
+  "normalAfterClosingTarget": {
+    "mode": "normal",
+    "invocationId": "61d7aa4721df4845865faf79a20a1072",
+    "observedAt": "2026-09-26T15:50:16.126408Z",
+    "processId": 2952,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-pane-toggle",
+      "reader-back-game",
+      "pointer-reopen-selected-guide",
+      "keyboard-reopen-selected-guide",
+      "focused-guide-enter",
+      "restore-route-guide",
+      "game-back-library",
+      "pointer-library-game-reader-game",
+      "keyboard-library-game-reader-game",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game",
+      "restore-last-guide-for-relaunch"
+    ],
+    "readerScreenshot": "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.reader.png"
+  },
+  "activationQueuedBeforeClose": true,
+  "queuedActivationRelaunchProcessId": 6556,
+  "normalAfterQueuedActivation": {
+    "mode": "normal",
+    "invocationId": "f3169c38bddb40808fb574af66bb5611",
+    "observedAt": "2026-09-26T15:50:23.6941078Z",
+    "processId": 6556,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-pane-toggle",
+      "reader-back-game",
+      "pointer-reopen-selected-guide",
+      "keyboard-reopen-selected-guide",
+      "focused-guide-enter",
+      "restore-route-guide",
+      "game-back-library",
+      "pointer-library-game-reader-game",
+      "keyboard-library-game-reader-game",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game",
+      "restore-last-guide-for-relaunch"
+    ],
+    "readerScreenshot": "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.reader.png"
+  },
+  "acceptedBeforeClose": true,
+  "acceptedCloseDidNotRelaunch": true,
+  "stale": {
+    "mode": "stale",
+    "invocationId": "3e44e252698644f7880be33ed92f84fd",
+    "observedAt": "2026-09-26T15:50:35.9111945Z",
+    "processId": 5580,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "stale-resume-hidden"
+    ]
+  },
+  "closedGracefully": true,
+  "packageStillInstalled": false,
+  "certificateStillTrusted": false
+}

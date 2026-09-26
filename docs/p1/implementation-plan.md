@@ -144,8 +144,15 @@ passed capability changes from a worker thread, command dispatch, and
 primary-command overflow after narrowing the linked production toolbar. Its
 [install result](evidence/host/reader-toolbar-review-followup/signed-install.json)
 records an interactive session 1 install and cleanup of the test package,
-certificate, and scheduled task. The CI `reader-toolbar-ui` job repeats this
-gate; the extended production route trace awaits its installed CI run.
+certificate, and scheduled task. The
+[CI toolbar trace](evidence/ci/reader-toolbar-review-followup/toolbar-ui.json)
+repeated the gate on the `23caff4` PR head. The
+[installed production route trace](evidence/ci/production-shell/reader-shell/toolbar-route-followup/normal.json)
+used mouse clicks and Enter for Library → Game → Reader → Game; the
+[signed install result](evidence/ci/production-shell/reader-shell/toolbar-route-followup/signed-install.json)
+records the same pointer and keyboard phases across normal launch and three
+relaunch paths. Both push and PR `reader-toolbar-ui` and
+`production-shell-ui` jobs passed at that code head.
 
 ### T11.1 review follow-up: close handoff and installed gate
 
@@ -359,7 +366,7 @@ entry point and preserve the per-scenario evidence listed in the
 | Lane | Required result | Current status |
 | --- | --- | --- |
 | Headless Core/Infrastructure | Schema/migration, locator, path, transaction recovery, archive, import-security, and fault-injection tests on locked Windows CI; NTFS link/junction checks on Windows. | T03.2's merged [PR CI](results.md) passed 61 Core and 24 Infrastructure tests on x64 and native ARM64. T15.2's locked Windows 11 x64 run passed 61 Core and 41 Infrastructure tests after the uppercase-ID review fix, including NTFS junction, prepared-import collision, and retry cases. Earlier PR #5 CI passed 61 Core and 39 Infrastructure tests on x64 and native ARM64; current-head results are in PR checks. Later-task suites are pending. |
-| Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | T11.1 installed shell routes passed on a Windows 11 x64 CI runner. A [controlled local retest](evidence/production-shell-host-ssh-reinstall.json) reproduced `0x80070005` from SSH session 0 after uninstall and succeeded through an interactive scheduled task in desktop session 1; the package, backup, and launch were verified. Full P1 flow and release gates remain open. |
+| Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | T11.1 installed shell routes and the T11.3 pointer/keyboard route and capability-toolbar gates passed on a Windows 11 x64 CI runner. A [controlled local retest](evidence/production-shell-host-ssh-reinstall.json) reproduced `0x80070005` from SSH session 0 after uninstall and succeeded through an interactive scheduled task in desktop session 1; the package, backup, and launch were verified. Full P1 flow and release gates remain open. |
 | Runtime-free Windows 11 x64 VM | Actual absent Windows App Runtime and WebView2 failures, prerequisite setup, recovery, and clean restore. | Deferred by user until a disposable VM is available. Do not claim clean-machine support before this lane passes. |
 | Windows 11 ARM64 | Native complete P1 installed workflow, backup, accessibility, and offline evidence before advertising ARM64. | P1 pending; P0 native Core/UI fixtures passed. |
 | Windows 10 x64 | Equivalent signed install and reader workflow before advertising Windows 10. | Deferred by user. |
