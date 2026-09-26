@@ -1,0 +1,14 @@
+{
+  "observedAt": "2026-09-26T05:05:44.2181759Z",
+  "osBuild": "10.0.26200.0",
+  "cpuArchitecture": "AMD64",
+  "packageFullName": "DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+  "packageStatus": "Ok",
+  "installLocation": "C:\\Program Files\\WindowsApps\\DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+  "signedPackageSha256": "7BD372F10004A7AD9A28FF34D9643448116EA7B8BA1D52D946E6A6E15AD00FF0",
+  "signedPackageSignature": "Valid",
+  "signerThumbprint": "CA2059E4D4960A4F2A822AAE736FE82B3926C399",
+  "temporarySignerTrusted": true,
+  "runningProcessCount": 0,
+  "launchObservation": "User reported successful interactive launch."
+}

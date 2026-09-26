@@ -257,10 +257,32 @@ own Game. Launch opens Library and may show a `Resume last guide` action; it
 does not auto-open that guide. A dialog or overlay returns focus to its
 invoking control. Every shortcut has a visible matching command.
 
+`AppInstance` registration in the production entry point selects one process
+to own the library. The provisional package registers launch activation only.
+Use a synchronous `[STAThread]` entry point so WinUI creates its window on an
+STA thread. A duplicate launch connects to a same-user named pipe owned by
+that process. The UI callback activates the window and writes acceptance to
+that launch's connection before it can process a later close. A failed or
+closed connection causes the secondary to retry owner selection; a received
+acceptance ends the secondary launch even if the user then closes the window.
+File and protocol activation will need explicit payload forwarding when those
+extensions are added. Verify launch behavior on the supported targets.
+
+On window close, stop accepting navigation, reject pending launch connections,
+and unregister the instance key so a new launch can own it. Await
+initialization and queued actions, then dispose the repository and close.
+This may briefly defer closing while a database write finishes; the old and
+new processes can overlap during this handoff. The installed smoke checks
+acceptance, both close boundaries, and a new window opening while an old guide
+action is blocked by a test-held write lock.
+
 The P0 fixture picker and test assets remain available only in a separate
 CI/development probe mode. A production MSIX does not bundle the P0 corpus
 or expose fixture controls. CI must keep one diagnostic package lane for P0
 reader regressions and add a production-mode library/import workflow lane.
+For T11.1 the existing `DesktopGuides.App` project is the diagnostic package,
+and a separate WinUI production project owns the new shell. The production
+project uses a provisional package identity until T17.1 sets the public one.
 
 ## 5. Security, failure, and acceptance budgets
 
@@ -487,7 +509,10 @@ reader regressions and add a production-mode library/import workflow lane.
 - **T11.1** Replace the fixture window with the `NavigationView` route
   coordinator in section 4. Library, Game, Reader, and Settings share one
   window and stable ID-based back navigation. Start at Library, show an
-  optional Resume action, and handle missing last-guide IDs. Keep a
+  optional Resume action, and handle missing last-guide IDs. Serialize user
+  route intents, including last-guide persistence, so a delayed lookup or
+  write cannot override a later selection. Forward duplicate launch requests
+  before the library opens and drain pending navigation on close. Keep a
   build-time diagnostic probe mode for P0 CI without shipping fixtures in
   the production package.
 - **T11.2** Define the typed reader adapter/capabilities in section 3 and
@@ -649,7 +674,9 @@ reader regressions and add a production-mode library/import workflow lane.
   completion, export, restore, and remove. CI failing storage/security tests
   must block packaging; a failing UI workflow must block release promotion.
   Save anonymized fixture IDs, hashes, package and OS/CPU versions, timing,
-  accessibility, and cleanup evidence.
+  accessibility, and cleanup evidence. Trigger installed E2E work through
+  an interactive scheduled task, including when SSH coordinates the local
+  Windows host; installation and UI Automation run in its desktop session.
 - **T17.3** On every promised target, install a signed release candidate,
   upgrade it, import guides, disconnect network, restart, resume, and
   restore a backup into a clean installation. Observe actual missing
@@ -659,6 +686,8 @@ reader regressions and add a production-mode library/import workflow lane.
   until such a target exists. Start with Windows 11 x64. Windows 10 stays
   unadvertised; ARM64 is added only with its own native full-workflow
   result. Publish a tested matrix and the scanned-PDF/OCR limitation.
+  Follow the [installed E2E procedure](p1/e2e-testing.md) for interactive
+  task preflight, data protection, physical offline recovery, and evidence.
 
 ## 10. Verification gates and design references
 

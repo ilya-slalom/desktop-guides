@@ -1,0 +1,19 @@
+﻿{
+    "mode":  "normal",
+    "observedAt":  "2026-09-26T11:32:40.9590333Z",
+    "processId":  6860,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "resume-reader",
+                   "reader-back-game",
+                   "game-back-library",
+                   "settings",
+                   "settings-back-library",
+                   "rapid-game-settings-back-game",
+                   "rapid-guide-settings-back-reader",
+                   "library-game-reader-game"
+               ]
+}

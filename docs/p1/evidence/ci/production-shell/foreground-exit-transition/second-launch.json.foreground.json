@@ -1,0 +1,10 @@
+﻿{
+    "handoffToken":  "06864b7633ea4a2fabc1c1e3d9770c6e",
+    "foregroundTargetProcessId":  5116,
+    "probeWindowHandle":  66082,
+    "foregroundWindowBefore":  66082,
+    "targetWindowHandle":  459152,
+    "foregroundWindowHandle":  459152,
+    "childExited":  true,
+    "success":  true
+}

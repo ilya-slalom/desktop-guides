@@ -187,3 +187,289 @@ PR head; recovery now compares parsed GUIDs, rejects malformed or duplicate
 logical Guide IDs before cleanup, and counts content orphans by GUID. Locked
 Windows 11 x64 Infrastructure tests passed **41/41** after this fix. PR #5
 checks record CI for its current head.
+
+PR #5 merged into `main` on 26 September 2026 as
+`47c9e906c01e85eb9ce9f9759f6359390d809e52`. Its final x64 and native
+ARM64 headless lanes passed **61/61 Core** and **41/41 Infrastructure**
+tests; both unsigned MSIX packages built. The installed ARM64 P0 fixture lane
+passed **14/14** after a transient first-attempt probe-status lookup failure
+on `pdf-short`; its successful artifact records package and certificate
+cleanup.
+
+## M1 T11.1 production shell — 26 September 2026
+
+`feat/p1-m1-shell` adds a typed Library/Game/Reader/Settings route coordinator,
+an ID-based Back stack, and a separate WinUI production project with a
+provisional `DesktopGuides.Preview` identity. The packaged shell opens a
+persistent library under its package local data, shows empty and populated
+routes, offers an explicit Resume action for a valid last-guide ID, and
+returns to Library when a current route has a stale ID. The Reader route is a
+placeholder until M3 adds the format adapters. The P0 diagnostic project
+stays available for its fixture regression lane.
+
+On the Windows 11 x64 host (build `10.0.26200.0`, .NET SDK `10.0.401`,
+`E:\work\desktop-guides`), locked Release tests passed **69/69 Core** and
+**41/41 Infrastructure**. Unsigned production x64 and ARM64 MSIX builds
+passed with zero errors; each reported the existing missing `mspdbcmf.exe`
+symbols-tool warning. Package inspection found the production assembly and
+no P0 diagnostic assembly, fixture files, or probe controls. The test-only
+metadata seeder successfully set valid and stale last-guide IDs.
+
+Two temporary self-signed x64 install attempts
+([first record](evidence/production-shell-host-install-1.json),
+[retry record](evidence/production-shell-host-install-2.json))
+passed signature verification but `Add-AppxPackage` failed with `0x80070005`
+while initializing Windows Process Lifetime Manager. The deployment log also
+records access failures when Windows attempted cleanup under
+`C:\Program Files\WindowsApps\Deleted` for unrelated WhatsApp and Clipchamp
+packages. Both attempts removed the temporary certificate and left no
+preview app installed. Neither attempt exercised the installed shell.
+
+After the user retried the signed x64 copy from an interactive desktop,
+Windows installed `DesktopGuides.Preview_0.1.0.0_x64` and the user reported
+that it launched successfully. A [host check](evidence/production-shell-host-interactive-install.json)
+confirmed the installed package reports `Status: Ok` and the same signed
+copy has a valid signature. The app was closed when checked, so launch is a
+user observation rather than an automated local UI trace. The interactive
+result narrows the earlier failure to the install context or host state; it
+does not establish why the two SSH-driven attempts failed at PLM. The
+temporary development signer remains in the host's `TrustedPeople` store
+while this manual install is being evaluated and must be removed afterward.
+This test certificate expires on 27 September 2026.
+
+A [controlled fresh-install retest](evidence/production-shell-host-ssh-reinstall.json)
+on the same host used the same signed MSIX after verifying its signature and
+publisher trust. The existing package was removed only after three package
+data files were backed up on `E:\work\desktop-guides` and checked by SHA-256.
+`Add-AppxPackage` from SSH session 0 again failed with `0x80070005`. This
+deployment's log confirms successful signature validation before `Failed to
+initialize PLM` and `PackagesInUseClosed` failure events. An interactive
+scheduled task then installed the same MSIX in desktop session 1. The library
+file was restored and matched its backup; the package reported `Status: Ok`
+and launched in session 1. The app was closed after the check, all temporary
+tasks were removed, and the backup remains on the host. This rules out an
+already installed preview package and missing signer trust as sufficient
+explanations for the SSH failures. The exact PLM access denial remains
+undetermined; WindowsApps cleanup warnings are present in the deployment
+log, but their relation to the failure has not been established.
+
+Future local-host installed runs follow the
+[interactive E2E procedure](e2e-testing.md).
+
+An [earlier production-shell UI job](https://github.com/ilya-slalom/desktop-guides/actions/runs/36217602539)
+passed on the PR #6 Windows 11 x64 runner, build `10.0.26100.0`, in
+interactive session 2. The
+[signed install record](evidence/ci/production-shell/signed-install.json)
+shows unsigned input SHA-256
+`E78CC2C24856A0DD094C78006B7B4CDBD5FC511B3B9F59CC27C9CE43BC57D6E4`
+and installed signed MSIX SHA-256
+`60ECD7C582B74F4974F4DF61BA68E8D1AC7E26AFBE0FEA73E7CF7E873C5C5A14`
+and successful package/certificate cleanup. The
+[empty-Library trace](evidence/ci/production-shell/empty.json) verifies
+fresh startup before seeding. The
+[normal UIA trace](evidence/ci/production-shell/normal.json) verifies
+Library, explicit Resume, Reader → Game → Library, Settings → Library,
+and Library → Game → Reader → Game. The
+[stale-ID trace](evidence/ci/production-shell/stale.json) verifies that a
+missing last-guide ID does not expose Resume after relaunch. The smoke test
+also checks that the P0 fixture picker is absent. This verifies T11.1's
+installed routing behavior; reading the guide remains M3 work.
+
+The duplicate push workflow exposed a smoke-test race after Settings → Library:
+the test selected a game while the Library list was still loading
+([failure trace](evidence/ci/production-shell/smoke-race-before-fix.json)).
+A route-ready wait alone did not resolve the race in the next two CI runs:
+the smoke test still could not find the row immediately after the status
+became ready. The smoke script now polls for a visible row that supports
+selection. The combined empty → seeded → stale installed test passed with
+this change. The expanded route suite also checks that a stale Game or
+Reader route clears its Back history.
+
+The M1 review follow-up added single-instance activation and a normal-close
+drain check. An initial custom `async Task Main` build crashed inside WinUI
+during the first installed UI Automation query. The entry point now uses a
+synchronous STA `Main` and waits for duplicate activation redirection while
+remaining on the STA. [PR CI run 36225502945](https://github.com/ilya-slalom/desktop-guides/actions/runs/36225502945)
+passed the signed installed x64 shell job at code head `88bf060`. Its
+[diagnostic install record](evidence/ci/production-shell/signed-install-single-instance.json)
+shows a second launch redirecting to the original window process, a
+responsive empty Library afterward, all seeded and stale route checks, a
+normal window close, and removal of the test package and certificate. The
+lifecycle trace in that record was used for diagnosis; the production code
+no longer writes it.
+
+The next review pass tightened the installed gate and package cleanup. The
+running window now acknowledges a redirected launch through an optional
+test-created event; starting the scheduled task alone cannot pass the gate.
+The runner removes only the package identity it recorded after its install
+and uses per-run task names. Closing unregisters the instance key before
+draining navigation, so another launch can open a new window.
+[PR CI run 36227524454](https://github.com/ilya-slalom/desktop-guides/actions/runs/36227524454)
+passed the signed installed x64 shell job at code head `ade1a59`. Its
+[install record](evidence/ci/production-shell/signed-install-blocked-handoff.json)
+shows the redirect acknowledgment and a new window while the closing
+process remained alive. The
+[queued-guide trace](evidence/ci/production-shell/queue-guide.json)
+confirms that the old window began a guide action while a separate test
+process held a SQLite write lock. After lock release, the old process exited,
+the new window passed the seeded route smoke, and the test package and
+certificate were removed. This is M1 shell evidence; the complete P1
+installed workflow remains T17.2 work.
+
+The next review follow-up at code head `464f7c8` holds an exclusive
+package-local library lease through repository disposal. A new window can
+open during close, but waits for the old session before loading the library.
+The activation path retries if it selected an instance that starts closing.
+The installed test now binds UI checks and process cleanup to recorded
+processes in the interactive session, and queues a different guide from the
+seeded Resume guide.
+
+[PR CI run 36229239568](https://github.com/ilya-slalom/desktop-guides/actions/runs/36229239568)
+passed the signed Windows 11 x64 installed-shell job. Its
+[install record](evidence/ci/production-shell/review-followup/signed-install.json)
+shows two different window processes during close; the
+[waiting-window trace](evidence/ci/production-shell/review-followup/waiting-handoff.json)
+observed the new window waiting for the library lease while the old one was
+still alive. After the test released the SQLite write lock, the old window
+exited and the new Library resumed with the guide selected in the
+[pending-guide trace](evidence/ci/production-shell/review-followup/queue-guide.json).
+The same run paused another launch after target selection, closed that
+target, and verified that the launch opened a new window. The package and
+temporary certificate were removed. The Windows 11 x64 host separately
+passed 42/42 Infrastructure tests, the unsigned x64 production MSIX build,
+and the shell-seed build. Both the push and
+[PR workflow](https://github.com/ilya-slalom/desktop-guides/actions/runs/36229242647)
+passed 8/8 jobs, including the native ARM64 P0 fixture regression. These
+checks remain M1 shell evidence.
+
+The close-boundary follow-up at code head `1581bde` makes a redirected
+secondary wait for the first window's UI callback to accept activation.
+The installed runner now launches the packaged executable through an
+interactive task helper and records its returned process ID and start time;
+UI checks and process cleanup use that specific launch record. Process
+exit during cleanup no longer stops package and certificate cleanup.
+
+[PR CI run 36230900475](https://github.com/ilya-slalom/desktop-guides/actions/runs/36230900475)
+passed the signed Windows 11 x64 installed shell job. The
+[install record](evidence/ci/production-shell/activation-ack/signed-install.json)
+shows accepted redirection, the library lease wait during the blocked
+guide write, and a new window after both a pre-redirection target close
+and a close while activation was queued on the UI thread. The
+[launch trace](evidence/ci/production-shell/activation-ack/launch.json)
+records the interactive task's package executable, process ID, and session.
+The package and temporary signer were removed. On the Windows 11 x64 host,
+PowerShell parsing, 42/42 Infrastructure tests, the unsigned production MSIX,
+and the shell-seed build passed. Both the push and
+[PR workflow](https://github.com/ilya-slalom/desktop-guides/actions/runs/36230903529)
+passed 8/8 jobs, including the native ARM64 P0 fixture regression. The
+complete P1 installed workflow remains T17.2 work.
+
+The next review fix at code head `625d3c3` replaces the process-wide
+activation acknowledgment with a same-user pipe connection for each launch.
+An accepted reply stays accepted after the old window closes; a delayed
+reply on an abandoned connection cannot acknowledge a later launch. The
+installed runner now waits for each verified test-owned process to exit
+before seeding metadata or removing the MSIX, and retains ownership if
+that wait times out.
+
+The signed Windows 11 x64
+[install record](evidence/ci/production-shell/activation-pipe/signed-install.json)
+from [push run 36233298067](https://github.com/ilya-slalom/desktop-guides/actions/runs/36233298067)
+shows acceptance before close without reopening, a new window when close
+precedes acceptance, and the queued-activation and library-lease handoffs.
+It also records removal of the temporary package and signer. The
+[launch trace](evidence/ci/production-shell/activation-pipe/launch.json)
+identifies the installed executable and interactive process. On the
+Windows 11 x64 host, PowerShell parsing, 45/45 Infrastructure tests, the
+delayed/already-exited/timed-out cleanup checks, and the unsigned x64
+production MSIX build passed. Both the push and
+[PR workflow](https://github.com/ilya-slalom/desktop-guides/actions/runs/36233300630)
+passed 8/8 jobs, including the native ARM64 P0 fixture regression. The
+complete P1 installed workflow remains T17.2 work.
+
+The installed-runner handle follow-up at code head `12d21c2` makes the
+interactive launch helper retain its child until the installer verifies a
+second handle and acknowledges a per-launch token. A failed result write or
+handoff stops the child through the helper's original handle. The installer
+checks exact creation time, session, and image through its retained handle,
+and cleanup terminates and waits through that handle after draining both
+launch tasks. On the Windows 11 x64 host, harmless child-process checks passed
+for rejected identity, an unrelated decoy PID, already-exited and timed-out
+cleanup, failed result publication, accepted handoff, and stale
+acknowledgment. PowerShell 5.1 parsing of the installer also passed.
+
+The signed Windows 11 x64
+[install record](evidence/ci/production-shell/handle-handoff/signed-install.json)
+from [push run 36235737097](https://github.com/ilya-slalom/desktop-guides/actions/runs/36235737097)
+shows the redirect and close handoffs, no process cleanup error, and removal
+of the temporary package and certificate. The
+[launch trace](evidence/ci/production-shell/handle-handoff/launch.json)
+records the interactive session and handoff token. Both the push and
+[PR workflow](https://github.com/ilya-slalom/desktop-guides/actions/runs/36235738707)
+passed 8/8 jobs, including the native ARM64 P0 UI regression. These remain
+M1 shell checks; the complete P1 installed workflow is still T17.2 work.
+
+The next review follow-up at code head `92011f9` rejects an existing
+`DesktopGuides.Preview_*` profile before the M1 shell test prepares or
+installs a package, even if the package was previously unregistered. The
+handoff test retains its launched child's handle for failure cleanup, and
+activation waits for a reply through the remaining deadline. On the Windows
+11 x64 host, PowerShell parsing, fresh-profile and process-handoff checks,
+and 47/47 locked Infrastructure tests passed.
+
+The signed Windows 11 x64
+[install record](evidence/ci/production-shell/profile-boundary/signed-install.json)
+from [push run 36237540783](https://github.com/ilya-slalom/desktop-guides/actions/runs/36237540783)
+shows successful activation and removal of the temporary package and
+certificate without a process cleanup error. Both the push and
+[PR workflow](https://github.com/ilya-slalom/desktop-guides/actions/runs/36237542985)
+passed 8/8 jobs, including the native ARM64 P0 UI regression. This closes
+the M1 review findings; the complete P1 installed workflow remains T17.2
+work.
+
+The next review fix at code head `b5e8aec` waits for the registered
+installed UI smoke task to reach `Ready` after its result is written,
+before another scenario reuses the task name. The first empty-library
+smoke keeps its helper alive for two seconds after publishing its result;
+the next empty-library smoke starts immediately after the task becomes
+ready. Both changed scripts passed Windows PowerShell 5.1 parsing on the
+Windows 11 x64 host.
+
+The signed Windows 11 x64
+[install record](evidence/ci/production-shell/smoke-idle/signed-install.json)
+from [push run 36238917270](https://github.com/ilya-slalom/desktop-guides/actions/runs/36238917270)
+records successful delayed and follow-up smokes, with the test package
+and temporary certificate removed. The complete P1 installed workflow
+remains T17.2 work.
+
+The next review follow-up at code head `a1f7ee5` transfers foreground
+permission from a second user launch to the existing window, rejects
+stale smoke results by invocation and process identity, and checks that
+all test-owned scheduled tasks are removed. On the Windows 11 x64 host,
+PowerShell 5.1 parsing, a read-only result check, a retained-task check,
+an unsigned x64 production MSIX build, and production-package inspection
+passed. The signed Windows 11 x64
+[install record](evidence/ci/production-shell/foreground-result-cleanup/signed-install.json)
+from [push run 36240550121](https://github.com/ilya-slalom/desktop-guides/actions/runs/36240550121)
+shows a separate test window in the foreground before a duplicate
+launch and the original shell in the foreground afterward. The
+[focus trace](evidence/ci/production-shell/foreground-result-cleanup/second-launch.json.foreground.json)
+records the two window handles and the duplicate's exit. The installed
+run passed with no test package or temporary certificate left behind.
+The complete P1 installed workflow remains T17.2 work.
+
+The parallel
+[PR run 36240553671](https://github.com/ilya-slalom/desktop-guides/actions/runs/36240553671)
+for `a1f7ee5` exposed a duplicate-process exit between its image-path query
+and the handle's exit signal. Code head `5bd2821` waits up to 500 ms for
+that exact handle only after a process-information query fails; a still-live
+process remains an error. The Windows 11 x64 host passed the handle and
+launch-handoff checks, including a post-exit ownership check. The signed
+Windows 11 x64
+[install record](evidence/ci/production-shell/foreground-exit-transition/signed-install.json)
+from [push run 36241173720](https://github.com/ilya-slalom/desktop-guides/actions/runs/36241173720)
+passed the background-window activation and reports package, certificate,
+and process cleanup. The
+[focus trace](evidence/ci/production-shell/foreground-exit-transition/second-launch.json.foreground.json)
+again records the test window before launch and the original shell after
+the duplicate exited.

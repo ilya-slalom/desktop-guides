@@ -18,7 +18,11 @@ behavior. [Implementation results](results.md) and the
 2. On the Windows 11 x64 development host, stage source under
    `E:\work\desktop-guides`. Use the repository on macOS as the source checkout.
    Keep package builds and UI automation in Windows CI or an interactive
-   Windows session; Core and Infrastructure tests should be headless.
+   Windows session; Core and Infrastructure tests should be headless. For
+   installed P1 E2E runs, have SSH or CI trigger an interactive scheduled
+   task that installs the signed MSIX and drives the UI. Use the
+   [E2E procedure](e2e-testing.md) for profile isolation, recovery, offline
+   work, and result checks.
 3. A task is done only when its listed output exists and its exit check has a
    recorded result. A passing unit test alone does not close a task that
    requires installed WinUI, offline, keyboard, or UI Automation evidence.
@@ -58,15 +62,18 @@ Set the public package identity before producing a public candidate.
 
 T03.2 was merged through [PR #4](https://github.com/ilya-slalom/desktop-guides/pull/4)
 with transactional v1→v2 upgrade and a consistent recovery copy under
-`DataRoot/.recovery`. The next change is T15.2; startup reconciliation must
-exist before M2 begins mutating managed guide files. Production routes,
-reader controls, and package identity remain separate M1 gates.
+`DataRoot/.recovery`. T15.2 was merged through
+[PR #5](https://github.com/ilya-slalom/desktop-guides/pull/5), merge commit
+`47c9e906c01e85eb9ce9f9759f6359390d809e52`. Startup reconciliation
+now precedes M2 file mutation. T11.1 is implemented for review in
+[PR #6](https://github.com/ilya-slalom/desktop-guides/pull/6); reader
+controls and package identity remain separate gates.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
 | T03.2 | T03.1, T03.3 | Versioned migration runner, pre-upgrade SQLite backup, integrity checks, and a populated v1→v2 fixture. Injected failure retains usable prior data or an actionable recovery copy; newer schema fails clearly. | TR03.1, TR03.3 |
 | T15.2 | T03.1, T03.2, T03.3 | FileOperations startup reconciler and exact owned-path janitor, installed before mutating file operations. Phase and malformed-path tests retain unknown directories and never follow links. | TR15.1 |
-| T11.1 | T03.2, T11.2 | Library/Game/Reader/Settings route coordinator and separate diagnostic build mode. Launch, Back, stale-ID, and route tests pass on installed WinUI; production package has no fixtures. | TR11.1 |
+| T11.1 | T03.2, T11.2 | Library/Game/Reader/Settings route coordinator and separate diagnostic build mode. Launch, Back, stale-ID, duplicate-launch acknowledgment, close/relaunch handoff, and route tests pass on installed WinUI; production package has no fixtures. | TR11.1 |
 | T11.3 | T11.1, T11.2 | Capability-based reader bar, navigation pane, overflow, and status/focus behavior. Keyboard and pointer trace returns Reader → its Game with query and selection retained. | TR11.1, TR11.2 |
 | T17.1 | T11.1 | Production MSIX identity/version/signing and prerequisite delivery plan, plus tested x64 packaging configuration. Install and upgrade use the same identity; credentials stay outside source/logs. Final signing and architecture claims remain gated by M6. | TR17.2 |
 
@@ -78,6 +85,134 @@ reader controls, and package identity remain separate M1 gates.
 | Path and janitor safety | Journal contract, T03.3 | Resolve exact content/staging/trash guide roots under generated IDs. Preflight trees without following links; remove only a preflighted owned root and retain unknown siblings. |
 | Startup reconciliation | Path and janitor safety | Run after schema validation in `InitializeAsync`. Apply the prepared-import, prepared-delete, and committed-delete phase matrix; clear each row only after filesystem work. Expose resolved-operation and review-orphan counts. |
 | Windows exit | Startup reconciliation | Tests cover stage-only and moved imports, partial deletion restore, committed trash cleanup, restart retry, malformed and overlapping manifests, nested links, and unknown directories. Locked Core/Infrastructure tests and the Release x64 package build pass on Windows 11; native ARM64 headless and package checks run in CI. |
+
+### T11.1 implementation sequence
+
+The existing `DesktopGuides.App` project remains the P0 diagnostic package.
+A separate WinUI production project keeps its fixture picker, probe classes,
+and fixture corpus out of the production MSIX. A single conditional project
+would share more build logic, but it would make accidental fixture inclusion
+harder to detect. The public package identity is finalized in T17.1.
+
+| Step | Dependency | Output and check |
+| --- | --- | --- |
+| Route coordinator | T03.2 | Typed Library, Game, Reader, and Settings routes with an ID-based back stack. Test launch, Reader-to-own-Game, stale Game/Guide IDs, Back, and optional last-guide Resume without auto-open. |
+| Production WinUI shell | Route coordinator | A `NavigationView` window loads `SqliteLibraryRepository` under packaged `ApplicationData.LocalFolder`, renders empty Library/Game/Reader/Settings routes, and handles loading/errors without fixture controls. Register one app instance before library startup; queue navigation and drain pending work before repository disposal on close. T04/T05 and M3 later fill in catalog actions and reader adapters. |
+| Package separation | Production shell | Build distinct production and diagnostic MSIX packages. Inspect production package contents for fixture/probe strings and files; the diagnostic P0 workflow remains available. |
+| Installed Windows exit | Package separation | On Windows 11 x64 install production MSIX, verify an empty Library on first launch, then exercise Library → Game → Reader → Game, Settings and Back through UI Automation with seeded local metadata. Verify a second launch reuses the original process and window, a stale last-guide ID is ignored, and fixture controls are absent. Queue tests hold a pending navigation while closing begins. Run locked Core/Infrastructure tests and both package builds in CI; retain installed ARM64 P0 regression. |
+
+### T11.1 review follow-up: close handoff and installed gate
+
+The shell must allow a new window to appear while the old one drains, but
+library initialization and writes must remain ordered across processes.
+Keeping the app-instance key until drain completes would block that window;
+versioning only the last-guide setting would leave startup recovery exposed.
+Use an exclusive lease file in package-local data from before repository
+initialization through repository disposal. A waiting window stays visible,
+can close, and opens its library only after the previous session releases the
+lease. The OS releases the file handle if a process exits unexpectedly.
+
+For activation, mark a closing target before unregistering its key. A launch
+that selected that target retries registration after the target closes,
+including when its connection fails; a launch accepted by a healthy target
+still exits. In the installed gate, bind every UI trace and cleanup action to
+the launched process and session. Queue a guide different from the seeded
+Resume guide, then verify its persisted Resume state after lock release and
+old-process exit. Pass when locked Infrastructure tests, production builds,
+and the signed Windows 11 x64 installed handoff gate succeed.
+
+The follow-up review found a gap between queueing a duplicate launch and
+accepting it on the UI thread. Make the secondary wait for an acceptance
+reply emitted only after the window activates; if the target closes before
+acceptance, retry ownership. Exercise this boundary in the installed handoff
+test.
+
+The installed runner also needs positive process ownership. A same-session
+process appearing after the task starts is insufficient proof. Launch the
+installed executable from the interactive task through a small helper that
+records its returned PID, then validate that PID, package path, and session
+before UI checks or cleanup. The signed Windows 11 x64 installed run confirmed
+that this direct launch keeps the required package behavior. Cleanup continues
+through package, certificate, and final-report checks even when an owned
+process exits between lookup and stop. Verify these cases with the signed
+installed x64 lane and a missing-PID PowerShell check.
+
+The next review identified two remaining acknowledgment races. A close after
+the UI accepts a launch must not make that launch reopen the app, and a late
+callback for one launch must not acknowledge another. The current preview
+package registers launch activation only. Keep `AppInstance` for owner
+selection, and use a same-user pipe connection per secondary launch for the
+shell's bring-to-front request. The UI callback writes that connection's
+acceptance reply before it can handle a later close; a closing target closes
+pending connections so those launches retry ownership. Keep the installed
+queued-before-close check, add an accepted-before-close check, and test that
+a late reply on one connection cannot complete a different launch. When file
+or protocol activation is introduced, define payload forwarding separately.
+
+Before database seeding or package removal, wait a bounded time for each
+test-owned process handle to signal exit. Retain ownership on timeout so
+final cleanup can retry, and report a failure if the process still remains.
+Verify a timeout and an already-exited process in PowerShell, then rerun the
+signed installed Windows 11 x64 gate.
+
+The installed-runner review found a gap between child creation and result
+publication, and a PID reuse gap between validation and termination. Keep the
+scheduled launch helper alive until the installer acknowledges that it has
+opened and verified its own handle to the child. If result publication or
+handoff fails, the helper terminates the child through its original handle
+before exiting. The installer checks exact start time, session, and executable
+while retaining its handle, and stops through that handle; PID-only
+termination and a two-second start-time tolerance are unsafe. A failed run
+must drain both launch tasks before removing the package, then report any
+process it cannot prove it owns. Test failed publication, rejected identity,
+and exit/timeout cleanup with harmless child processes; repeat the signed
+installed x64 lane. This handle handoff keeps the existing interactive task
+model without keeping a scheduled helper running for the full app session.
+
+The next review requires three boundary checks before the signed installed
+gate. Keep the M1 shell install runner limited to a fresh profile: reject any
+existing `DesktopGuides.Preview_*` package profile before preparing the test
+and again immediately before `Add-AppxPackage`. The full P1 E2E runner retains
+the separate backup/restore path for shared profiles. Retain the launch
+handoff test's child handle in failure cleanup, and let launch helpers finish
+their own child cleanup before forcing them to stop. Replace the activation
+reply's fixed polling sleep with a wait bounded by the remaining deadline;
+test a completed reply at the boundary and a real timed-out request.
+PowerShell profile/child checks and locked Infrastructure tests must pass
+before repeating the signed Windows 11 x64 installed lane.
+
+The installed UI smoke task writes its result before its PowerShell process
+exits. Reusing one task name with a fixed delay can cause Task Scheduler to
+ignore a new start while the prior instance still runs. Keep one task name
+and wait a bounded time for the registered task to reach `Ready` after each
+result, including failed smoke results, before the next scenario can
+register or start it. A distinct task per scenario would add cleanup state,
+while parallel task instances could overlap UI actions. Exercise task reuse
+with a helper that stays alive for two seconds after publishing its result,
+then rerun the signed installed x64 gate.
+
+The next review found three follow-up gaps. A duplicate launch must give
+its foreground permission to the existing process before asking it to
+activate; `Window.Activate()` alone does not bring a background WinUI app
+forward. The existing window attempts native foreground activation after
+showing itself, and Windows signals on the taskbar if the foreground lock
+denies it. Keep the per-launch acceptance handshake and verify an installed
+background-window case with a foreground-launched duplicate. A smoke result
+must belong to its current invocation, process, and session; fail if an old
+result cannot be removed, rather than accepting old success JSON. During
+cleanup, drain and unregister each test-owned task, then confirm none
+remains before reporting success. Test a read-only old result and a
+simulated task-removal failure, then repeat the signed installed x64 gate.
+Changing to a new result filename on every scenario would scatter evidence
+files; reusing stable scenario filenames with invocation IDs keeps the
+artifact layout and makes stale results detectable.
+
+A duplicate can exit while the installer queries its handle, before the
+handle signals. If a process-information query fails, wait briefly for
+that exact handle to signal exit; treat only a confirmed exit as a
+short-lived child, and retain the failure for a still-live process.
+Exercise already-exited ownership and repeat the signed installed gate
+because the foreground launch makes duplicate exit timing faster.
 
 ## M2 — catalog, static-asset validation, import, and removal
 
@@ -158,20 +293,27 @@ flows work by keyboard and with the recorded accessibility checks.
 ## M6 — release evidence and tested support matrix
 
 Exit: all P1 TRs pass on a signed installed Windows 11 x64 release candidate
-with prerequisites, restart, physical offline reading, upgrade, and restore
-evidence. Publish only targets with complete target-specific results.
+through the [interactive E2E procedure](e2e-testing.md), with prerequisites,
+restart, physical offline reading, upgrade, and restore evidence. Publish
+only targets with complete target-specific results.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
-| T17.2 | T04.3, T06.4, T07.3, T08.3, T09.3, T10.3, T12.3, T13.1, T14.3, T15.4, T16.2, T16.3, T20.2 | Locked Core/Infrastructure and production UI workflow CI, retained P0 regression lane, and reviewable fixture/evidence checklist. Failing storage/security tests stop packaging; failing installed UI blocks release promotion. | TR17.1, TR17.2 |
-| T17.3 | T17.1, T17.2 | Signed install/upgrade, three-format import after original removal, offline relaunch, independent resume, deletion, and backup restore on each promised target. Record OS/CPU/package/prerequisite versions, hashes, and scanned-PDF limit. A runtime-free Windows 11 x64 VM must prove missing-prerequisite failure and offline-installer recovery before a clean-install claim. | TR17.1, TR17.2 |
+| T17.2 | T04.3, T06.4, T07.3, T08.3, T09.3, T10.3, T12.3, T13.1, T14.3, T15.4, T16.2, T16.3, T20.2 | Locked Core/Infrastructure and signed installed production UI workflow CI started through an interactive scheduled task, retained P0 regression lane, and reviewable fixture/evidence checklist. Failing storage/security tests stop packaging; failing installed UI blocks release promotion. | TR17.1, TR17.2 |
+| T17.3 | T17.1, T17.2 | Interactive-task signed install/upgrade, three-format import after original removal, offline relaunch, independent resume, deletion, and backup restore on each promised target. Record OS/CPU/package/prerequisite versions, hashes, and scanned-PDF limit. A runtime-free Windows 11 x64 VM must prove missing-prerequisite failure and offline-installer recovery before a clean-install claim. | TR17.1, TR17.2 |
+
+The existing `production-shell-ui` CI job verifies M1 routes in an already
+interactive runner session. It does not execute the complete P1 scenario
+checklist or close T17.2. The full E2E runner will use the scheduled-task
+entry point and preserve the per-scenario evidence listed in the
+[procedure](e2e-testing.md).
 
 ## Windows verification and deferred environments
 
 | Lane | Required result | Current status |
 | --- | --- | --- |
 | Headless Core/Infrastructure | Schema/migration, locator, path, transaction recovery, archive, import-security, and fault-injection tests on locked Windows CI; NTFS link/junction checks on Windows. | T03.2's merged [PR CI](results.md) passed 61 Core and 24 Infrastructure tests on x64 and native ARM64. T15.2's locked Windows 11 x64 run passed 61 Core and 41 Infrastructure tests after the uppercase-ID review fix, including NTFS junction, prepared-import collision, and retry cases. Earlier PR #5 CI passed 61 Core and 39 Infrastructure tests on x64 and native ARM64; current-head results are in PR checks. Later-task suites are pending. |
-| Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | P1 pending; P0 fixture evidence exists only for the probe app. |
+| Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | T11.1 installed shell routes passed on a Windows 11 x64 CI runner. A [controlled local retest](evidence/production-shell-host-ssh-reinstall.json) reproduced `0x80070005` from SSH session 0 after uninstall and succeeded through an interactive scheduled task in desktop session 1; the package, backup, and launch were verified. Full P1 flow and release gates remain open. |
 | Runtime-free Windows 11 x64 VM | Actual absent Windows App Runtime and WebView2 failures, prerequisite setup, recovery, and clean restore. | Deferred by user until a disposable VM is available. Do not claim clean-machine support before this lane passes. |
 | Windows 11 ARM64 | Native complete P1 installed workflow, backup, accessibility, and offline evidence before advertising ARM64. | P1 pending; P0 native Core/UI fixtures passed. |
 | Windows 10 x64 | Equivalent signed install and reader workflow before advertising Windows 10. | Deferred by user. |

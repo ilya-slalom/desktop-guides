@@ -1,0 +1,102 @@
+{
+  "observedAt": "2026-09-26T07:04:39.1325990Z",
+  "osBuild": "10.0.26100.0",
+  "cpuArchitecture": "AMD64",
+  "success": true,
+  "windowsAppRuntime": [],
+  "dotnetSdk": "10.0.401",
+  "sourcePackageSha256": "5FAB5DB6B7EAA17A716D3D1860CDB37F1B4693DD751F8EA01DFA2254C33CEB52",
+  "certificateThumbprint": "FFFC78DD92CD6B3E4610F57E5D3A555E25DD29EA",
+  "signedPackageSha256": "91A38EA5A66E379A63FA2ABB15B9F3F988E3E52646FE7940831CEBC16F247AE3",
+  "packageFullName": "DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+  "packageFamilyName": "DesktopGuides.Preview_en8r599z3n35j",
+  "installLocation": "C:\\Program Files\\WindowsApps\\DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+  "launchedProcessId": 6964,
+  "launchedSessionId": 2,
+  "empty": {
+    "mode": "empty",
+    "observedAt": "2026-09-26T07:04:57.1842422Z",
+    "success": true,
+    "phases": [
+      "library",
+      "empty-library"
+    ]
+  },
+  "secondLaunchProcessIds": [
+    7352
+  ],
+  "singleInstanceProcessId": 7352,
+  "emptyAfterSecondLaunch": {
+    "mode": "empty",
+    "observedAt": "2026-09-26T07:05:03.6552791Z",
+    "success": true,
+    "phases": [
+      "library",
+      "empty-library"
+    ]
+  },
+  "normal": {
+    "mode": "normal",
+    "observedAt": "2026-09-26T07:05:17.343836Z",
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-back-game",
+      "game-back-library",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game"
+    ]
+  },
+  "stale": {
+    "mode": "stale",
+    "observedAt": "2026-09-26T07:05:24.2425926Z",
+    "success": true,
+    "phases": [
+      "library",
+      "stale-resume-hidden"
+    ]
+  },
+  "closedGracefully": true,
+  "lifecycleTrace": [
+    "2026-09-26T07:04:51.6566608+00:00 7352 STA Main started",
+    "2026-09-26T07:04:51.6846674+00:00 7352 FindOrRegisterForKey IsCurrent=True",
+    "2026-09-26T07:04:52.4875667+00:00 7352 Application.Start callback",
+    "2026-09-26T07:04:53.0175605+00:00 7352 OnLaunched",
+    "2026-09-26T07:04:54.0496680+00:00 7352 ShellWindow constructed",
+    "2026-09-26T07:04:54.1440244+00:00 7352 InitializeCoreAsync started",
+    "2026-09-26T07:04:54.6597683+00:00 7352 InitializeCoreAsync completed",
+    "2026-09-26T07:05:00.2159253+00:00 8288 STA Main started",
+    "2026-09-26T07:05:00.2314933+00:00 8288 FindOrRegisterForKey IsCurrent=False",
+    "2026-09-26T07:05:00.2365089+00:00 8288 RedirectActivationToAsync started",
+    "2026-09-26T07:05:00.2580544+00:00 7352 Redirected activation received",
+    "2026-09-26T07:05:00.2612073+00:00 7352 Activating main window",
+    "2026-09-26T07:05:00.2641257+00:00 7352 Main window activated",
+    "2026-09-26T07:05:00.2793114+00:00 8288 RedirectActivationToAsync completed",
+    "2026-09-26T07:05:00.2858601+00:00 8288 ProcessExit",
+    "2026-09-26T07:05:15.6564807+00:00 7772 STA Main started",
+    "2026-09-26T07:05:15.6741580+00:00 7772 FindOrRegisterForKey IsCurrent=True",
+    "2026-09-26T07:05:15.7353888+00:00 7772 Application.Start callback",
+    "2026-09-26T07:05:15.8120143+00:00 7772 OnLaunched",
+    "2026-09-26T07:05:15.9236126+00:00 7772 ShellWindow constructed",
+    "2026-09-26T07:05:15.9496047+00:00 7772 InitializeCoreAsync started",
+    "2026-09-26T07:05:16.1334510+00:00 7772 InitializeCoreAsync completed",
+    "2026-09-26T07:05:23.1856124+00:00 6964 STA Main started",
+    "2026-09-26T07:05:23.2035117+00:00 6964 FindOrRegisterForKey IsCurrent=True",
+    "2026-09-26T07:05:23.2683080+00:00 6964 Application.Start callback",
+    "2026-09-26T07:05:23.3569794+00:00 6964 OnLaunched",
+    "2026-09-26T07:05:23.4693933+00:00 6964 ShellWindow constructed",
+    "2026-09-26T07:05:23.4942375+00:00 6964 InitializeCoreAsync started",
+    "2026-09-26T07:05:23.6594134+00:00 6964 InitializeCoreAsync completed",
+    "2026-09-26T07:05:25.6680484+00:00 6964 WindowClosing allowClose=False closeRequested=False",
+    "2026-09-26T07:05:25.6755134+00:00 6964 Pending work drained",
+    "2026-09-26T07:05:25.6792845+00:00 6964 Calling Close after drain",
+    "2026-09-26T07:05:25.8127811+00:00 6964 Application.Start returned",
+    "2026-09-26T07:05:25.8185459+00:00 6964 ProcessExit"
+  ],
+  "packageStillInstalled": false,
+  "certificateStillTrusted": false
+}

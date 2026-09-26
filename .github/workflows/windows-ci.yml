@@ -72,6 +72,18 @@ jobs:
             --logger "trx;LogFileName=infrastructure-tests.trx" `
             --results-directory artifacts/test-results
           exit $LASTEXITCODE
+      - name: Check installed-shell process cleanup
+        shell: pwsh
+        run: ./tools/p1/test_windows_shell_process.ps1
+      - name: Check fresh Preview profile guard
+        shell: pwsh
+        run: ./tools/p1/test_windows_shell_profile.ps1
+      - name: Check installed-shell smoke result identity
+        shell: pwsh
+        run: ./tools/p1/test_windows_shell_smoke_result.ps1
+      - name: Check test-owned scheduled task cleanup
+        shell: pwsh
+        run: ./tools/p1/test_windows_shell_task_cleanup.ps1
       - name: Upload test result
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -159,6 +171,117 @@ jobs:
           name: desktop-guides-${{ matrix.architecture }}
           path: artifacts/build/*
           if-no-files-found: error
+
+  production-packages:
+    needs: core-tests
+    runs-on: windows-2025
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [x64, ARM64]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.401
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.11'
+      - name: Restore locked production dependencies
+        run: dotnet restore src/DesktopGuides.Production/DesktopGuides.Production.csproj --locked-mode -p:Platform=${{ matrix.architecture }}
+      - name: Build unsigned production package
+        shell: pwsh
+        run: |
+          dotnet build src/DesktopGuides.Production/DesktopGuides.Production.csproj `
+            -c Release --no-restore `
+            -p:Platform=${{ matrix.architecture }} `
+            -p:GenerateAppxPackageOnBuild=true `
+            -p:AppxPackageSigningEnabled=false
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $packages = @(Get-ChildItem src/DesktopGuides.Production/AppPackages -Recurse `
+            -Filter 'DesktopGuides.Production_*.msix' |
+            Where-Object {
+              $_.BaseName.EndsWith('_${{ matrix.architecture }}',
+                [StringComparison]::OrdinalIgnoreCase)
+            })
+          if ($packages.Count -ne 1) {
+            throw "Expected one ${{ matrix.architecture }} production MSIX, found $($packages.Count)."
+          }
+          python tools/p1/verify_production_package.py $packages[0].FullName
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force artifacts/production-build | Out-Null
+          [ordered]@{
+            commit = $env:GITHUB_SHA
+            architecture = '${{ matrix.architecture }}'
+            runnerImage = "$env:ImageOS $env:ImageVersion"
+            osBuild = [System.Environment]::OSVersion.Version.ToString()
+            dotnetSdk = (dotnet --version)
+            package = $packages[0].Name
+            packageBytes = $packages[0].Length
+            packageSha256 = (Get-FileHash $packages[0].FullName -Algorithm SHA256).Hash
+          } | ConvertTo-Json | Set-Content artifacts/production-build/manifest.json -Encoding utf8
+          Copy-Item $packages[0].FullName artifacts/production-build/
+      - name: Upload production package and manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-guides-production-${{ matrix.architecture }}
+          path: artifacts/production-build/*
+          if-no-files-found: error
+
+  production-shell-ui:
+    needs: production-packages
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.401
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: desktop-guides-production-x64
+          path: artifacts/production-shell/download
+      - name: Verify interactive desktop and package
+        shell: pwsh
+        run: |
+          $session = [System.Diagnostics.Process]::GetCurrentProcess().SessionId
+          $explorer = @(Get-Process explorer -ErrorAction SilentlyContinue |
+            Where-Object { $_.SessionId -eq $session })
+          if ($explorer.Count -eq 0) { throw 'No interactive desktop in the runner session.' }
+          $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+          $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+          if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            throw 'Signing test requires an elevated runner account.'
+          }
+          $packages = @(Get-ChildItem artifacts/production-shell/download `
+            -Filter 'DesktopGuides.Production_*_x64.msix')
+          if ($packages.Count -ne 1) { throw 'Expected one x64 production package.' }
+          $manifest = Get-Content artifacts/production-shell/download/manifest.json -Raw |
+            ConvertFrom-Json
+          if ($manifest.architecture -ne 'x64' -or
+              $manifest.package -ne $packages[0].Name -or
+              $manifest.packageSha256 -ne
+                (Get-FileHash $packages[0].FullName -Algorithm SHA256).Hash) {
+            throw 'Production package does not match its build manifest.'
+          }
+      - name: Restore locked shell seed dependencies
+        run: dotnet restore tools/p1/DesktopGuides.ShellSeed/DesktopGuides.ShellSeed.csproj --locked-mode
+      - name: Sign, install, and test production shell
+        shell: pwsh
+        run: |
+          $package = Get-ChildItem artifacts/production-shell/download `
+            -Filter 'DesktopGuides.Production_*_x64.msix' |
+            Select-Object -First 1
+          & ./tools/p1/windows_shell_install.ps1 `
+            -PackagePath $package.FullName `
+            -ResultDirectory artifacts/production-shell/installed
+          exit $LASTEXITCODE
+      - name: Upload installed shell evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: production-shell-ui
+          path: artifacts/production-shell/installed/*.json
+          if-no-files-found: warn
 
   native-arm64-core:
     needs: core-tests

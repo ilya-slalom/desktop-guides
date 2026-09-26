@@ -1,0 +1,10 @@
+﻿{
+    "mode":  "waiting-handoff",
+    "observedAt":  "2026-09-26T08:19:43.3579947Z",
+    "processId":  7900,
+    "sessionId":  2,
+    "success":  true,
+    "phases":  [
+                   "waiting-for-library-lease"
+               ]
+}

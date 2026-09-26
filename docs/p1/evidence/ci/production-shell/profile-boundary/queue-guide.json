@@ -1,0 +1,10 @@
+﻿{
+    "mode":  "queue-guide",
+    "observedAt":  "2026-09-26T11:06:57.9668356Z",
+    "processId":  1524,
+    "sessionId":  2,
+    "success":  true,
+    "phases":  [
+                   "guide-action-started"
+               ]
+}

@@ -1,0 +1,13 @@
+﻿{
+    "mode":  "stale",
+    "invocationId":  "64963a3b4c9e44c6adc1123c27f6cf0a",
+    "observedAt":  "2026-09-26T12:16:47.1545974Z",
+    "processId":  7192,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "stale-resume-hidden"
+               ]
+}

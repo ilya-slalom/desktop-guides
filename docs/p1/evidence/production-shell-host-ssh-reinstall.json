@@ -1,0 +1,52 @@
+{
+  "observedAt": "2026-09-26T14:24:12.1034986+09:00",
+  "host": "Windows 11 x64, build 10.0.26200.0",
+  "packageFullName": "DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+  "signedPackageSha256": "7BD372F10004A7AD9A28FF34D9643448116EA7B8BA1D52D946E6A6E15AD00FF0",
+  "signerThumbprint": "CA2059E4D4960A4F2A822AAE736FE82B3926C399",
+  "signerExpiresAt": "2026-09-27T13:05:10+09:00",
+  "signerSignatureValid": true,
+  "signerTrustedBeforeUninstall": true,
+  "backup": {
+    "hostDirectory": "E:\\work\\desktop-guides\\artifacts\\production-shell-test-retry\\ssh-reinstall-20260926-try1",
+    "fileCount": 3,
+    "verifiedBySha256": true
+  },
+  "freshInstall": {
+    "uninstallSucceeded": true,
+    "sshSessionId": 0,
+    "sshAddAppxPackageSucceeded": false,
+    "hresult": "0x80070005",
+    "activityId": "fb9c3d8e-4537-0006-040d-8ffc3745dd01",
+    "deploymentLogEventCount": 22,
+    "deploymentEvents": [
+      {
+        "id": 157,
+        "message": "The app package signature was validated for core content."
+      },
+      {
+        "id": 718,
+        "message": "Failed to initialize PLM with error 0x80070005."
+      },
+      {
+        "id": 605,
+        "message": "Error 0x80070005: Failure in the PackagesInUseClosed state handler."
+      },
+      {
+        "id": 401,
+        "message": "Deployment Add operation failed with error 0x80070005."
+      }
+    ]
+  },
+  "recovery": {
+    "interactiveSessionId": 1,
+    "interactiveAddAppxPackageSucceeded": true,
+    "packageStatus": "Ok",
+    "localStateFilesRestored": 1,
+    "localStateMatchesBackup": true,
+    "postReinstallLaunchObservedInSession": 1,
+    "postReinstallLaunchSucceeded": true,
+    "appRunningAfterTest": false,
+    "temporaryScheduledTasksRemaining": false
+  }
+}

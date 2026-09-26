@@ -1,0 +1,159 @@
+{
+  "runId": "74409f6c2d4e4ca8be0b081c9b093931",
+  "observedAt": "2026-09-26T11:06:06.7030044Z",
+  "osBuild": "10.0.26100.0",
+  "cpuArchitecture": "AMD64",
+  "success": true,
+  "windowsAppRuntime": [],
+  "dotnetSdk": "10.0.401",
+  "sourcePackageSha256": "B8FEC245CC26A5431987F55A5E373EB970C75442220E837DA26FDB78CB7ED7D3",
+  "certificateThumbprint": "C34BD412067F72892ACAC3DF0FF6109B59708B70",
+  "signedPackageSha256": "53ABBBAD8B4D640262CC652782B425CDAB5CBD5EA3C15F371F692771BB5D99E0",
+  "packageFullName": "DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+  "packageFamilyName": "DesktopGuides.Preview_en8r599z3n35j",
+  "installLocation": "C:\\Program Files\\WindowsApps\\DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+  "launchedProcessId": 6300,
+  "launchedSessionId": 2,
+  "empty": {
+    "mode": "empty",
+    "observedAt": "2026-09-26T11:06:33.828382Z",
+    "processId": 7792,
+    "sessionId": 2,
+    "success": true,
+    "phases": [
+      "library",
+      "empty-library"
+    ]
+  },
+  "secondLaunchProcessId": 7716,
+  "redirectedActivationObserved": true,
+  "secondLaunchProcessIds": [
+    7792
+  ],
+  "singleInstanceProcessId": 7792,
+  "emptyAfterSecondLaunch": {
+    "mode": "empty",
+    "observedAt": "2026-09-26T11:06:38.9306532Z",
+    "processId": 7792,
+    "sessionId": 2,
+    "success": true,
+    "phases": [
+      "library",
+      "empty-library"
+    ]
+  },
+  "normal": {
+    "mode": "normal",
+    "observedAt": "2026-09-26T11:06:55.3657731Z",
+    "processId": 1524,
+    "sessionId": 2,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-back-game",
+      "game-back-library",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game"
+    ]
+  },
+  "pendingGuide": {
+    "mode": "queue-guide",
+    "observedAt": "2026-09-26T11:06:57.9668356Z",
+    "processId": 1524,
+    "sessionId": 2,
+    "success": true,
+    "phases": [
+      "guide-action-started"
+    ]
+  },
+  "closeHandoffOverlapObserved": true,
+  "waitingDuringClose": {
+    "mode": "waiting-handoff",
+    "observedAt": "2026-09-26T11:07:02.38362Z",
+    "processId": 7028,
+    "sessionId": 2,
+    "success": true,
+    "phases": [
+      "waiting-for-library-lease"
+    ]
+  },
+  "relaunchDuringCloseProcessId": 7028,
+  "normalAfterCloseRelaunch": {
+    "mode": "normal",
+    "observedAt": "2026-09-26T11:07:04.0278363Z",
+    "processId": 7028,
+    "sessionId": 2,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-back-game",
+      "game-back-library",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game"
+    ]
+  },
+  "closingTargetSelected": true,
+  "closingTargetRelaunchProcessId": 8092,
+  "normalAfterClosingTarget": {
+    "mode": "normal",
+    "observedAt": "2026-09-26T11:07:09.4046716Z",
+    "processId": 8092,
+    "sessionId": 2,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-back-game",
+      "game-back-library",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game"
+    ]
+  },
+  "activationQueuedBeforeClose": true,
+  "queuedActivationRelaunchProcessId": 3876,
+  "normalAfterQueuedActivation": {
+    "mode": "normal",
+    "observedAt": "2026-09-26T11:07:14.0812823Z",
+    "processId": 3876,
+    "sessionId": 2,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-back-game",
+      "game-back-library",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game"
+    ]
+  },
+  "acceptedBeforeClose": true,
+  "acceptedCloseDidNotRelaunch": true,
+  "stale": {
+    "mode": "stale",
+    "observedAt": "2026-09-26T11:07:23.6408484Z",
+    "processId": 6300,
+    "sessionId": 2,
+    "success": true,
+    "phases": [
+      "library",
+      "stale-resume-hidden"
+    ]
+  },
+  "closedGracefully": true,
+  "packageStillInstalled": false,
+  "certificateStillTrusted": false
+}

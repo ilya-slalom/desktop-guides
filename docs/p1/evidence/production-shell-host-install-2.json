@@ -1,0 +1,19 @@
+{
+  "observedAt": "2026-09-26T04:05:10.1135734Z",
+  "osBuild": "10.0.26200.0",
+  "cpuArchitecture": "AMD64",
+  "success": false,
+  "windowsAppRuntime": [
+    "2.2.0.0",
+    "2.3.1.0",
+    "2.4.0.0",
+    "2.5.1.0"
+  ],
+  "dotnetSdk": "10.0.401",
+  "sourcePackageSha256": "FFA1CFF88316CA5E00CFEE7B494035CE96DB8540D964DF530BAEA3A7FD29C7EF",
+  "certificateThumbprint": "CA2059E4D4960A4F2A822AAE736FE82B3926C399",
+  "signedPackageSha256": "7BD372F10004A7AD9A28FF34D9643448116EA7B8BA1D52D946E6A6E15AD00FF0",
+  "error": "Add-AppxPackage : Deployment failed with HRESULT: 0x80070005, Access is denied.\r\n\r\nDeployment Add operation with target volume C: on Package DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j from:  \r\n(desktop-guides-production-signed-x64.msix)  failed with error 0x80070005. See \r\nhttp://go.microsoft.com/fwlink/?LinkId=235160 for help diagnosing app deployment issues.\r\n\r\nNOTE: For additional information, look for [ActivityId] fb9c3d8e-4537-0009-1467-2dfe3745dd01 in the Event Log or use \r\nthe command line Get-AppPackageLog -ActivityID fb9c3d8e-4537-0009-1467-2dfe3745dd01\r\n\r\nAt E:\\work\\desktop-guides\\tools\\p1\\windows_shell_install.ps1:118 char:5\r\n+     Add-AppxPackage -Path $signed\r\n+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : SecurityError: (E:\\work\\desktop...signed-x64.msix:String) [Add-AppxPackage], PSSecurityE \r\n   xception\r\n    + FullyQualifiedErrorId : DeploymentError,Microsoft.Windows.Appx.PackageManager.Commands.AddAppxPackageCommand\r\n \r\n",
+  "packageStillInstalled": false,
+  "certificateStillTrusted": false
+}

@@ -10,5 +10,8 @@
   HTML and asset paths as untrusted.
 - Validate reader behavior and packaging on Windows before claiming support
   for a target OS or architecture.
+- For installed P1 E2E runs triggered over SSH, use an interactive scheduled
+  task for MSIX installation and UI Automation. Follow
+  `docs/p1/e2e-testing.md`, including its data-backup and cleanup rules.
 - Preserve stable per-guide locators and an explicit completion state; do not
   infer completion from estimated reading percentage.

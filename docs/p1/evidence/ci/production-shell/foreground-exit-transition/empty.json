@@ -1,0 +1,13 @@
+﻿{
+    "mode":  "empty",
+    "invocationId":  "a82d550c04dc4ce8b8a0b9b80c2da844",
+    "observedAt":  "2026-09-26T12:16:04.1575531Z",
+    "processId":  5116,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "empty-library"
+               ]
+}
