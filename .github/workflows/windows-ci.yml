@@ -81,6 +81,9 @@ jobs:
       - name: Check installed-shell smoke result identity
         shell: pwsh
         run: ./tools/p1/test_windows_shell_smoke_result.ps1
+      - name: Check toolbar smoke result identity
+        shell: pwsh
+        run: ./tools/p1/test_windows_reader_toolbar_smoke_result.ps1
       - name: Check test-owned scheduled task cleanup
         shell: pwsh
         run: ./tools/p1/test_windows_shell_task_cleanup.ps1
@@ -280,7 +283,50 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: production-shell-ui
-          path: artifacts/production-shell/installed/*.json
+          path: |
+            artifacts/production-shell/installed/*.json
+            artifacts/production-shell/installed/normal.reader.png
+            artifacts/production-shell/installed/normal.game.png
+          if-no-files-found: warn
+
+  reader-toolbar-ui:
+    needs: core-tests
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.401
+      - name: Restore locked toolbar test dependencies
+        run: dotnet restore tools/p1/DesktopGuides.ReaderToolbarSmoke/DesktopGuides.ReaderToolbarSmoke.csproj --locked-mode -p:Platform=x64
+      - name: Build unsigned toolbar test package
+        shell: pwsh
+        run: |
+          dotnet build tools/p1/DesktopGuides.ReaderToolbarSmoke/DesktopGuides.ReaderToolbarSmoke.csproj `
+            -c Release --no-restore -p:Platform=x64 `
+            -p:GenerateAppxPackageOnBuild=true `
+            -p:AppxPackageSigningEnabled=false
+          exit $LASTEXITCODE
+      - name: Sign, install, and test linked production toolbar
+        shell: pwsh
+        run: |
+          $packages = @(
+            Get-ChildItem tools/p1/DesktopGuides.ReaderToolbarSmoke/AppPackages `
+              -Recurse -Filter 'DesktopGuides.ReaderToolbarSmoke_*_x64.msix'
+          )
+          if ($packages.Count -ne 1) {
+            throw "Expected one x64 toolbar test package, found $($packages.Count)."
+          }
+          & ./tools/p1/windows_reader_toolbar_install.ps1 `
+            -PackagePath $packages[0].FullName `
+            -ResultDirectory artifacts/reader-toolbar-ui
+          exit $LASTEXITCODE
+      - name: Upload toolbar UI evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: reader-toolbar-ui
+          path: artifacts/reader-toolbar-ui/*.json
           if-no-files-found: warn
 
   native-arm64-core:

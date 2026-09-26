@@ -65,16 +65,20 @@ with transactional v1→v2 upgrade and a consistent recovery copy under
 `DataRoot/.recovery`. T15.2 was merged through
 [PR #5](https://github.com/ilya-slalom/desktop-guides/pull/5), merge commit
 `47c9e906c01e85eb9ce9f9759f6359390d809e52`. Startup reconciliation
-now precedes M2 file mutation. T11.1 is implemented for review in
-[PR #6](https://github.com/ilya-slalom/desktop-guides/pull/6); reader
-controls and package identity remain separate gates.
+now precedes M2 file mutation. T11.1 was merged through
+[PR #6](https://github.com/ilya-slalom/desktop-guides/pull/6), merge commit
+`1f89fb054b523b9e51a0fba0687e0c5c601397ae`. T11.3 reader controls are
+implemented for review in
+[PR #7](https://github.com/ilya-slalom/desktop-guides/pull/7) and passed
+the signed installed Windows 11 x64 shell gate. The public package identity
+remains T17.1 work.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
 | T03.2 | T03.1, T03.3 | Versioned migration runner, pre-upgrade SQLite backup, integrity checks, and a populated v1→v2 fixture. Injected failure retains usable prior data or an actionable recovery copy; newer schema fails clearly. | TR03.1, TR03.3 |
 | T15.2 | T03.1, T03.2, T03.3 | FileOperations startup reconciler and exact owned-path janitor, installed before mutating file operations. Phase and malformed-path tests retain unknown directories and never follow links. | TR15.1 |
 | T11.1 | T03.2, T11.2 | Library/Game/Reader/Settings route coordinator and separate diagnostic build mode. Launch, Back, stale-ID, duplicate-launch acknowledgment, close/relaunch handoff, and route tests pass on installed WinUI; production package has no fixtures. | TR11.1 |
-| T11.3 | T11.1, T11.2 | Capability-based reader bar, navigation pane, overflow, and status/focus behavior. Keyboard and pointer trace returns Reader → its Game with query and selection retained. | TR11.1, TR11.2 |
+| T11.3 | T11.1, T11.2 | Capability-based reader bar, navigation pane, overflow, and status/focus behavior. Keyboard and pointer trace returns Reader → its Game with selection and focus retained. Query retention is verified in T05.3 after search exists. | TR11.1, TR11.2 |
 | T17.1 | T11.1 | Production MSIX identity/version/signing and prerequisite delivery plan, plus tested x64 packaging configuration. Install and upgrade use the same identity; credentials stay outside source/logs. Final signing and architecture claims remain gated by M6. | TR17.2 |
 
 ### T15.2 implementation sequence
@@ -100,6 +104,129 @@ harder to detect. The public package identity is finalized in T17.1.
 | Production WinUI shell | Route coordinator | A `NavigationView` window loads `SqliteLibraryRepository` under packaged `ApplicationData.LocalFolder`, renders empty Library/Game/Reader/Settings routes, and handles loading/errors without fixture controls. Register one app instance before library startup; queue navigation and drain pending work before repository disposal on close. T04/T05 and M3 later fill in catalog actions and reader adapters. |
 | Package separation | Production shell | Build distinct production and diagnostic MSIX packages. Inspect production package contents for fixture/probe strings and files; the diagnostic P0 workflow remains available. |
 | Installed Windows exit | Package separation | On Windows 11 x64 install production MSIX, verify an empty Library on first launch, then exercise Library → Game → Reader → Game, Settings and Back through UI Automation with seeded local metadata. Verify a second launch reuses the original process and window, a stale last-guide ID is ignored, and fixture controls are absent. Queue tests hold a pending navigation while closing begins. Run locked Core/Infrastructure tests and both package builds in CI; retain installed ARM64 P0 regression. |
+
+### T11.3 reader shell sequence
+
+The visual direction is a quiet guide workspace. The guide title is the
+dominant line; its game name and format supply context. A visible `Back to
+game` action returns to the selected guide row. The app's `NavigationView`
+pane closes on entering Reader and remains available through its native
+toggle. The reading surface takes the remaining height. An adaptive
+`CommandBar` puts page movement and text or zoom controls first, with page
+jump, fit width, and find in overflow; it hides commands that the active
+reader does not support. Until M3 connects an adapter, the unavailable
+message remains visible and no reader command is offered.
+
+| Design token | Light reference | WinUI implementation |
+| --- | --- | --- |
+| Canvas | `#F8F9FB` | System window background |
+| Reading surface | `#FFFFFF` | Theme surface brush |
+| Primary text | `#1C1C1C` | Theme primary text brush |
+| Secondary text | `#616161` | Theme secondary text brush |
+| Action accent | `#0067C0` | System accent and focus brushes |
+
+Use left alignment and the WinUI system type family for the shell; reserve
+monospace text for the TXT adapter. The layout is `Back | title, game |
+format`, followed by the compact toolbar and the reading surface. The first
+sketch gave every command a permanent slot, which crowded the narrow
+reader. Capability visibility and overflow keep the content dominant
+without presenting unavailable actions.
+
+| Step | Dependency | Output and check |
+| --- | --- | --- |
+| Reader header and pane | T11.1 | Add the in-reader Back action, guide/game context, and collapsed reader navigation pane. Returning to Game retains the guide's selected ID and keyboard focus. |
+| Capability toolbar | T11.2 | Bind command visibility and dispatch to `IReaderSession` capabilities, refresh on capability changes, and use the CommandBar overflow at narrow widths. No adapter means no command controls. |
+| Capability toolbar exit | Capability toolbar | Build a separate packaged WinUI test window that links the production toolbar XAML and code, attaches a fake `IReaderSession`, changes capabilities on a worker thread, and checks visible commands, action dispatch, and narrow-width overflow with UI Automation. Keep the fake and test window outside the production project and MSIX. A conditional production test mode would make accidental fixture inclusion harder to rule out. |
+| Installed route exit | Header and toolbar | Extend the signed Windows 11 x64 shell smoke with actual pointer and keyboard Library → Game → Reader → Game traces, Back, selection/focus, placeholder-command, and pane checks. Keep the existing route and close-handoff checks passing. |
+
+The [Windows 11 x64 toolbar host run](evidence/host/reader-toolbar-review-followup/toolbar-ui.json)
+passed capability changes from a worker thread, command dispatch, and
+primary-command overflow after narrowing the linked production toolbar. Its
+[install result](evidence/host/reader-toolbar-review-followup/signed-install.json)
+records an interactive session 1 install and cleanup of the test package,
+certificate, and scheduled task. The
+[CI toolbar trace](evidence/ci/reader-toolbar-review-followup/toolbar-ui.json)
+repeated the gate on the `23caff4` PR head. The
+[installed production route trace](evidence/ci/production-shell/reader-shell/toolbar-route-followup/normal.json)
+used mouse clicks and Enter for Library → Game → Reader → Game; the
+[signed install result](evidence/ci/production-shell/reader-shell/toolbar-route-followup/signed-install.json)
+records the same pointer and keyboard phases across normal launch and three
+relaunch paths. Both push and PR `reader-toolbar-ui` and
+`production-shell-ui` jobs passed at that code head.
+
+### T11.3 virtualization and result-identity follow-up
+
+The two-guide route fixture does not exercise focus restoration when the
+selected guide starts outside the realized viewport. Keep the WinUI
+`ListView`: update its layout before scrolling, then retain the target guide
+ID until its row exists and accepts focus. A single deferred focus attempt
+can still precede container realization. Check again after list layout while
+the Game route and selection match; stop when focus succeeds or navigation
+changes. Add a separate installed route fixture with enough guides to
+virtualize the tail row. Returning Reader → Game must focus that row, and
+Enter must reopen the same guide.
+
+The toolbar UI runner must also bind a result to the scheduled task that
+produced it. Remove a prior `toolbar-ui.json` before launch, pass a fresh
+invocation ID to the smoke task, and require the same ID and desktop session
+when reading the result. A reused directory containing a successful older
+report must fail a headless result-identity test. The signed installed
+toolbar job then repeats the end-to-end check.
+
+The [installed long-list trace](evidence/ci/production-shell/reader-shell/virtualized-focus/long-list.json)
+at code head `b372bfb` records the tail guide outside the initial viewport,
+then focused after Reader → Game and reopened with Enter. Its
+[signed install result](evidence/ci/production-shell/reader-shell/virtualized-focus/signed-install.json)
+records a successful test and temporary package cleanup. The
+[toolbar trace](evidence/ci/reader-toolbar-result-identity/toolbar-ui.json)
+and [install result](evidence/ci/reader-toolbar-result-identity/signed-install.json)
+carry the same invocation ID and report successful task, package, and
+certificate cleanup. All nine jobs passed on push run `36254999817` and
+PR run `36255001818` (attempt 2). The PR's first attempt timed out in the
+unchanged process-helper fixture; that same check passed in the push run
+and PR rerun.
+
+### T11.3 game switching and invokable action follow-up
+
+The Game view can briefly expose the previous game's guide rows while the
+next game's repository reads run. Clear and disable the guide list before
+those reads, hide the selected-guide action, and validate the source game ID
+when a queued row action runs. This keeps an old row from opening its Reader
+after a different game has become current. The installed shell check seeds
+two games and verifies the second game's guide list and Reader context
+after switching.
+
+For an already selected guide, `SelectionItem.Select` changes no state and
+does not offer an action to invoke. A custom `ListViewItem` automation peer
+could add Invoke, but it would require maintaining peer behavior across row
+virtualization. Use a visible `Open selected guide` button with native
+WinUI button semantics. Keep it beside the Game list context, hide it
+without a valid selection, and give its automation name the selected title.
+The existing quiet guide workspace uses the same `#F8F9FB` canvas,
+`#FFFFFF` surface, `#1C1C1C` primary text, `#616161` secondary text,
+`#0067C0` action accent, and WinUI system type. The action is a compact
+control above the left-aligned list, without adding row decoration.
+
+An installed UI Automation check must Invoke that button after Reader →
+Game and reopen the same guide. Existing pointer, Enter, and long-list
+focus checks must continue to pass. Verify the Release x64 production
+package and all Windows CI jobs before recording this exit.
+
+At code head `6f87930`, all nine jobs passed in push run `36257913348`
+and PR run `36257915129`. The
+[normal route trace](evidence/ci/production-shell/reader-shell/game-switch-invoke/normal.json)
+records UI Automation Invoke, pointer, and Enter reopening the selected
+guide. The [two-game trace](evidence/ci/production-shell/reader-shell/game-switch-invoke/switch-game.json)
+records only the current game's guide and Reader context after switching.
+The [long-list trace](evidence/ci/production-shell/reader-shell/game-switch-invoke/long-list.json)
+retains offscreen focus and Enter reopening. The
+[signed install result](evidence/ci/production-shell/reader-shell/game-switch-invoke/signed-install.json)
+records temporary package and certificate cleanup. The
+[Game screenshot](evidence/ci/production-shell/reader-shell/game-switch-invoke/normal.game.png)
+shows the contextual action above the selected guide row. The local
+Windows 11 x64 host passed PowerShell parsing, all shell seed modes, a
+locked Release production package build, and the production fixture
+exclusion check.
 
 ### T11.1 review follow-up: close handoff and installed gate
 
@@ -237,7 +364,7 @@ complete S07's WebView2 policy in M3.
 | T06.4 | T06.3 | Duplicate fingerprint choice (`Open existing` / `Import another copy`) and typed errors. Repeated import never overwrites; a second copy has its own Guide ID and state. | TR06.3 |
 | T15.3 | T06.3, T15.2 | Confirmed guide deletion via trash journal. Cancel, move failure, commit failure, and startup recovery tests preserve or remove exactly the intended metadata and owned bytes. | TR15.1, TR15.2 |
 | T04.3 | T04.2, T15.3 | Count-confirmed multi-guide Game removal through the same trash protocol. Cancel and changed-count cases leave records/files intact; commit removes only that Game's guides and state. | TR04.1, TR04.2 |
-| T05.3 | T04.2, T05.2, T06.3, T15.3 | Stable ID-based selection and Back behavior after rename/import/removal. Async refresh and keyboard focus tests do not jump to stale rows. | TR05.1 |
+| T05.3 | T04.2, T05.2, T06.3, T15.3 | Stable ID-based selection and Back behavior after rename/import/removal. Reader → Game retains guide selection and focus; Back to Library restores its query. Async refresh does not jump to stale rows. | TR05.1 |
 
 ## M3 — managed reader adapters
 
@@ -313,7 +440,7 @@ entry point and preserve the per-scenario evidence listed in the
 | Lane | Required result | Current status |
 | --- | --- | --- |
 | Headless Core/Infrastructure | Schema/migration, locator, path, transaction recovery, archive, import-security, and fault-injection tests on locked Windows CI; NTFS link/junction checks on Windows. | T03.2's merged [PR CI](results.md) passed 61 Core and 24 Infrastructure tests on x64 and native ARM64. T15.2's locked Windows 11 x64 run passed 61 Core and 41 Infrastructure tests after the uppercase-ID review fix, including NTFS junction, prepared-import collision, and retry cases. Earlier PR #5 CI passed 61 Core and 39 Infrastructure tests on x64 and native ARM64; current-head results are in PR checks. Later-task suites are pending. |
-| Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | T11.1 installed shell routes passed on a Windows 11 x64 CI runner. A [controlled local retest](evidence/production-shell-host-ssh-reinstall.json) reproduced `0x80070005` from SSH session 0 after uninstall and succeeded through an interactive scheduled task in desktop session 1; the package, backup, and launch were verified. Full P1 flow and release gates remain open. |
+| Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | T11.1 installed shell routes and the T11.3 pointer/keyboard route and capability-toolbar gates passed on a Windows 11 x64 CI runner. A [controlled local retest](evidence/production-shell-host-ssh-reinstall.json) reproduced `0x80070005` from SSH session 0 after uninstall and succeeded through an interactive scheduled task in desktop session 1; the package, backup, and launch were verified. Full P1 flow and release gates remain open. |
 | Runtime-free Windows 11 x64 VM | Actual absent Windows App Runtime and WebView2 failures, prerequisite setup, recovery, and clean restore. | Deferred by user until a disposable VM is available. Do not claim clean-machine support before this lane passes. |
 | Windows 11 ARM64 | Native complete P1 installed workflow, backup, accessibility, and offline evidence before advertising ARM64. | P1 pending; P0 native Core/UI fixtures passed. |
 | Windows 10 x64 | Equivalent signed install and reader workflow before advertising Windows 10. | Deferred by user. |

@@ -473,3 +473,86 @@ and process cleanup. The
 [focus trace](evidence/ci/production-shell/foreground-exit-transition/second-launch.json.foreground.json)
 again records the test window before launch and the original shell after
 the duplicate exited.
+
+## M1 T11.3 reader shell — 26 September 2026
+
+The `feat/p1-m1-reader-shell` branch adds a guide title/game/format header,
+in-reader Back, a reading-surface host, and a capability-driven CommandBar.
+The preview shell has no reader adapter yet, so it offers no reader
+commands. Returning to Game retains the selected guide and restores focus
+to its row; activating the selected row can reopen it.
+
+On the Windows 11 x64 host, build `10.0.26200.0`, with source staged under
+`E:\work\desktop-guides`, locked production restore and the unsigned Release
+x64 MSIX build passed. The MSIX SHA-256 is
+`1b20ada10646f124dd6e2f716df9fcf6ee8c84a7d9e411bbd95569fb2be6e293`.
+The build reported only the existing missing-`mspdbcmf.exe` symbols warning.
+The updated installed-smoke script passed Windows PowerShell 5.1 parsing.
+The host retains an installed Preview package, so its fresh-profile M1
+installer was not run there.
+
+The signed installed Windows 11 x64
+[push run 36244519302](https://github.com/ilya-slalom/desktop-guides/actions/runs/36244519302)
+passed its shell job for code head `2187a0492aa0c1aa5218510289ffc8a8458d292f`.
+The [install record](evidence/ci/production-shell/reader-shell/signed-install.json)
+reports Windows build `10.0.26100.0`, signed MSIX SHA-256
+`11f6bff9f38bccdf62cc5a3c911d972dbcdce37ece9b96ef207b4e5fb5d45827`,
+all normal and close-handoff route smokes, stale Resume, and graceful exit.
+The [normal trace](evidence/ci/production-shell/reader-shell/normal.json)
+includes Reader → Game with selected-row focus, Enter to reopen the same
+guide, and Settings round trips. The
+[Reader screenshot](evidence/ci/production-shell/reader-shell/normal.reader.png)
+shows the compact title/game/format header, collapsed pane, and honest
+unavailable-reading message. The install record confirms that the temporary
+package and signer were removed. Both x64 and ARM64 production package
+builds, Core/Infrastructure tests, and the native ARM64 P0 installed
+fixture regression passed in the eight-job run. The ARM64 result is a
+diagnostic P0 check, not the complete P1 installed workflow.
+
+The installed checks exposed two smoke assumptions that were corrected
+before the passing run: reselecting an already selected guide does not
+activate it, and the blocked-write handoff temporarily changes the Resume
+guide. The final smoke activates a selected row with Enter and explicitly
+returns to the route guide before later relaunches. Dynamic toolbar actions
+remain an M3 adapter integration check; this M1 preview has no adapter.
+
+The T11.3 review follow-up at code head
+`920324342d0947bc3c04237f783dbfee479f2339` passed the signed installed
+Windows 11 x64 shell job in [PR run 36247566880](https://github.com/ilya-slalom/desktop-guides/actions/runs/36247566880)
+and [push run 36247564409](https://github.com/ilya-slalom/desktop-guides/actions/runs/36247564409).
+The [install record](evidence/ci/production-shell/reader-shell/review-followup/signed-install.json)
+reports Windows build `10.0.26100.0`, AMD64, success, and removal of the
+temporary package and certificate. The [normal trace](evidence/ci/production-shell/reader-shell/review-followup/normal.json)
+checks that Reader closes the navigation pane, its toggle opens and closes
+it, pointer Back restores guide selection and focus, pointer input reopens
+the selected row, and keyboard Back and Enter reopen it again. Screenshot
+capture now fails the smoke if it cannot save a nonempty image; the retained
+[Reader screenshot](evidence/ci/production-shell/reader-shell/review-followup/normal.reader.png)
+shows the closed pane and unavailable-reading preview. The first review
+follow-up run failed because WinUI's pane toggle did not expose a UI
+Automation clickable point; using its visible bounds for the physical click
+passed the installed rerun.
+
+### T11.3 focused-row review follow-up — 26 September 2026
+
+At code head `e81db1a81a23ac6bf13562a8daabfe9415b3a49d`, Enter now opens
+the guide row that received the key even when another row remains selected.
+The Windows 11 x64 host build under `E:\work\desktop-guides` passed the
+unsigned Release MSIX build, and Windows PowerShell 5.1 parsed the updated
+smoke script. The signed installed shell jobs passed in
+[push run 36249362118](https://github.com/ilya-slalom/desktop-guides/actions/runs/36249362118)
+and [PR run 36249364872](https://github.com/ilya-slalom/desktop-guides/actions/runs/36249364872).
+The retained [install record](evidence/ci/production-shell/reader-shell/focused-enter/signed-install.json)
+reports Windows build `10.0.26100.0`, AMD64, success, and removal of the
+temporary package and signer. Its four normal route scenarios all include
+the [focused-row trace](evidence/ci/production-shell/reader-shell/focused-enter/normal.json):
+Ctrl+Arrow moves focus to the other guide without changing selection, Enter
+opens that focused guide, and the test restores the original Resume guide
+before later route checks. The [Reader screenshot](evidence/ci/production-shell/reader-shell/focused-enter/normal.reader.png)
+was retained.
+
+The T11.3 exit check now covers guide selection and focus. Library query
+retention remains required and is assigned to T05.3 after T05.2 adds search.
+In the PR run, the first native ARM64 P0 diagnostic attempt failed when
+`pdf-short` could not read its startup status; the unchanged P0 lane passed
+all 14 fixtures in the push run and in [PR attempt 2](https://github.com/ilya-slalom/desktop-guides/actions/runs/36249364872/attempts/2).
