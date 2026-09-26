@@ -7,6 +7,8 @@ namespace DesktopGuides.Production;
 
 internal static class Program
 {
+    private const string ActivationProbeName =
+        @"Local\DesktopGuides.Preview.RedirectedActivation";
     private static AppInstance? primaryInstance;
     private static DispatcherQueue? uiQueue;
     private static App? app;
@@ -38,7 +40,13 @@ internal static class Program
         primaryInstance.Activated += (_, _) =>
         {
             Volatile.Read(ref uiQueue)?.TryEnqueue(
-                () => app?.ActivateMainWindow());
+                () =>
+                {
+                    if (app?.ActivateMainWindow() == true)
+                    {
+                        SignalActivationProbe();
+                    }
+                });
         };
 
         Application.Start(initialization =>
@@ -49,6 +57,31 @@ internal static class Program
             Volatile.Write(ref uiQueue, dispatcher);
             app = new App();
         });
+    }
+
+    internal static void ReleaseInstanceKey()
+    {
+        primaryInstance?.UnregisterKey();
+        primaryInstance = null;
+    }
+
+    private static void SignalActivationProbe()
+    {
+        try
+        {
+            if (EventWaitHandle.TryOpenExisting(
+                ActivationProbeName, out EventWaitHandle? probe))
+            {
+                using (probe)
+                {
+                    probe.Set();
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The optional test probe must not affect normal activation.
+        }
     }
 
     private static void RedirectActivation(

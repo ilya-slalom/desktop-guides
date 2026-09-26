@@ -64,6 +64,7 @@ public sealed partial class ShellWindow : Window
         }
         closeRequested = true;
         Task pendingNavigation = navigationQueue.StopAndDrainAsync();
+        Program.ReleaseInstanceKey();
         _ = CloseWhenIdleAsync(pendingNavigation);
     }
 

@@ -112,7 +112,7 @@ production app. Add cases as the dependent P1 tasks complete.
 
 | Scenario | Required observation | Task / requirement |
 | --- | --- | --- |
-| Shell smoke | Fresh empty Library, Library/Game/Reader/Settings routes, rapid Game/Guide → Settings selections and Back, stale Resume, and no P0 fixture controls. Existing CI smoke covers these routes with seeded metadata; Reader is still a placeholder. | T11.1, TR11.1 |
+| Shell smoke | Fresh empty Library, Library/Game/Reader/Settings routes, rapid Game/Guide → Settings selections and Back, stale Resume, no P0 fixture controls, a positive redirected-activation acknowledgment, and a relaunch requested as the old window closes. Existing CI smoke covers these routes with seeded metadata; Reader is still a placeholder. | T11.1, TR11.1 |
 | Install and upgrade | Signed MSIX installs in an interactive session; an older version upgrades under the same identity without losing a populated library. Verify package version, launch, and data after restart. | T17.1, T17.3, TR17.2 |
 | Import and offline reading | Add a game and import TXT, static HTML with local assets, and PDF through the UI. Remove the originals; while online in a fresh WebView2 profile, verify a reachable HTML canary receives zero guide-originated requests. Then remove all egress, relaunch, and open all three managed copies while recording disconnected state through the final check. | T04–T10, T17.3, TR17.1 |
 | Independent state | Move to different positions in two guides, restart, and verify their locators separately. Change layout/theme, check exact or labeled approximate restore, and toggle completion explicitly; reaching the end must not mark complete. | T12–T14, TR12.1–TR14.2 |

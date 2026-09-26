@@ -289,7 +289,7 @@ The M1 review follow-up added single-instance activation and a normal-close
 drain check. An initial custom `async Task Main` build crashed inside WinUI
 during the first installed UI Automation query. The entry point now uses a
 synchronous STA `Main` and waits for duplicate activation redirection while
-pumping COM. [PR CI run 36225502945](https://github.com/ilya-slalom/desktop-guides/actions/runs/36225502945)
+remaining on the STA. [PR CI run 36225502945](https://github.com/ilya-slalom/desktop-guides/actions/runs/36225502945)
 passed the signed installed x64 shell job at code head `88bf060`. Its
 [diagnostic install record](evidence/ci/production-shell/signed-install-single-instance.json)
 shows a second launch redirecting to the original window process, a

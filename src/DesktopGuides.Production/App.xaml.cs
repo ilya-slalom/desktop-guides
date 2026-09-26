@@ -18,5 +18,13 @@ public partial class App : Application
         _ = shellWindow.InitializeAsync();
     }
 
-    internal void ActivateMainWindow() => shellWindow?.Activate();
+    internal bool ActivateMainWindow()
+    {
+        if (shellWindow is null)
+        {
+            return false;
+        }
+        shellWindow.Activate();
+        return true;
+    }
 }
