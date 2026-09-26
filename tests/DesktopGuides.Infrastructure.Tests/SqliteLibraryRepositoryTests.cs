@@ -91,6 +91,74 @@ public sealed class SqliteLibraryRepositoryTests
         Assert.Empty(await repository.ListGuidesAsync(game.Id));
     }
 
+    [Fact]
+    public async Task RecoversEmptyVersionZeroDatabaseAfterInterruptedSchemaCreation()
+    {
+        using TestLibrary directory = new();
+        directory.Paths.EnsureCreated();
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        {
+            using SqliteCommand journal = connection.CreateCommand();
+            journal.CommandText = "PRAGMA journal_mode=WAL";
+            journal.ExecuteNonQuery();
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            using SqliteCommand abandoned = connection.CreateCommand();
+            abandoned.Transaction = transaction;
+            abandoned.CommandText = "CREATE TABLE Abandoned (Id INTEGER)";
+            abandoned.ExecuteNonQuery();
+            transaction.Rollback();
+        }
+
+        Assert.True(File.Exists(directory.Paths.DatabasePath));
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Recovered", null, null);
+        Assert.Equal("Recovered", (await repository.GetGameAsync(game.Id))?.Title);
+    }
+
+    [Fact]
+    public async Task PreservesPopulatedUnknownVersionZeroDatabase()
+    {
+        using TestLibrary directory = new();
+        directory.Paths.EnsureCreated();
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        {
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE UnknownData (Value TEXT NOT NULL);
+                INSERT INTO UnknownData (Value) VALUES ('keep this');
+                """;
+            command.ExecuteNonQuery();
+        }
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+        using SqliteConnection reopened = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand verify = reopened.CreateCommand();
+        verify.CommandText = "SELECT Value FROM UnknownData";
+        Assert.Equal("keep this", verify.ExecuteScalar());
+    }
+
+    [Fact]
+    public async Task PreservesEmptyVersionZeroDatabaseWithAnotherApplicationId()
+    {
+        using TestLibrary directory = new();
+        directory.Paths.EnsureCreated();
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        {
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = "PRAGMA application_id = 4242";
+            command.ExecuteNonQuery();
+        }
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+        using SqliteConnection reopened = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand verify = reopened.CreateCommand();
+        verify.CommandText = "PRAGMA application_id";
+        Assert.Equal(4242L, (long)verify.ExecuteScalar()!);
+    }
+
     private static void InsertGuide(
         string databasePath, Guid guideId, Guid gameId, string? managedRoot = null)
     {

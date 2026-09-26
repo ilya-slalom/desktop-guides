@@ -288,7 +288,6 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
     private void Initialize()
     {
         paths.EnsureCreated();
-        bool existed = File.Exists(paths.DatabasePath);
         using SqliteConnection connection = OpenConnection(create: true);
         using SqliteCommand version = connection.CreateCommand();
         version.CommandText = "PRAGMA user_version";
@@ -297,7 +296,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         {
             return;
         }
-        if (currentVersion != 0 || existed)
+        if (currentVersion != 0 || !IsRecoverableEmptyDatabase(connection))
         {
             throw new InvalidDataException(
                 $"Library schema version {currentVersion} needs a supported migration or recovery.");
@@ -313,6 +312,26 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         schema.CommandText = LibrarySchema.Version1;
         schema.ExecuteNonQuery();
         transaction.Commit();
+    }
+
+    private static bool IsRecoverableEmptyDatabase(SqliteConnection connection)
+    {
+        using SqliteCommand check = connection.CreateCommand();
+        check.CommandText = "PRAGMA application_id";
+        if ((long)check.ExecuteScalar()! != 0)
+        {
+            return false;
+        }
+
+        check.CommandText = "PRAGMA integrity_check(1)";
+        if (check.ExecuteScalar() is not string result ||
+            !string.Equals(result, "ok", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        check.CommandText = "SELECT 1 FROM sqlite_schema LIMIT 1";
+        return check.ExecuteScalar() is null;
     }
 
     private SqliteConnection OpenConnection(bool create = false)

@@ -1,6 +1,7 @@
 # P1 implementation plan and exit gates
 
-Status: M0 implemented for review, M1–M6 planned, 25 September 2026.
+Status: M0 implemented for review, M1–M6 planned; review follow-up recorded
+26 September 2026.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
 This plan orders all **16 P1 stories and 49 tasks** in the
@@ -40,8 +41,9 @@ in parallel with storage contracts.
 Implementation of T03.1, T03.3, T11.2, T12.1, and the T10.0 candidate decision
 is on `feat/p1-m0`. The Windows x64 checks are in [M0 results](results.md).
 [PR #3](https://github.com/ilya-slalom/desktop-guides/pull/3) passed its
-five-job Windows CI run and still needs review before M0 is integrated into
-`main`.
+initial five-job Windows CI run. A SQLite initialization review fix has passed
+the locked Windows 11 x64 Core and Infrastructure suites. PR checks and
+review remain the integration gate before M0 reaches `main`.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
@@ -156,7 +158,7 @@ evidence. Publish only targets with complete target-specific results.
 
 | Lane | Required result | Current status |
 | --- | --- | --- |
-| Headless Core/Infrastructure | Schema/migration, locator, path, transaction recovery, archive, import-security, and fault-injection tests on locked Windows CI; NTFS link/junction checks on Windows. | M0 x64 and native ARM64 Core 61/61 and Infrastructure 10/10 passed in [PR CI](results.md#pr-ci-evidence), including Windows NTFS link/junction checks. Later-task suites are pending. |
+| Headless Core/Infrastructure | Schema/migration, locator, path, transaction recovery, archive, import-security, and fault-injection tests on locked Windows CI; NTFS link/junction checks on Windows. | The initial M0 x64 and native ARM64 Core 61/61 and Infrastructure 10/10 passed in [PR CI](results.md#pr-ci-evidence), including Windows NTFS link/junction checks. The review follow-up passed locally on Windows 11 x64: Core 61/61 and Infrastructure 13/13. Later-task suites are pending. |
 | Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | P1 pending; P0 fixture evidence exists only for the probe app. |
 | Runtime-free Windows 11 x64 VM | Actual absent Windows App Runtime and WebView2 failures, prerequisite setup, recovery, and clean restore. | Deferred by user until a disposable VM is available. Do not claim clean-machine support before this lane passes. |
 | Windows 11 ARM64 | Native complete P1 installed workflow, backup, accessibility, and offline evidence before advertising ARM64. | P1 pending; P0 native Core/UI fixtures passed. |
