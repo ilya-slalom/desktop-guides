@@ -297,3 +297,21 @@ responsive empty Library afterward, all seeded and stale route checks, a
 normal window close, and removal of the test package and certificate. The
 lifecycle trace in that record was used for diagnosis; the production code
 no longer writes it.
+
+The next review pass tightened the installed gate and package cleanup. The
+running window now acknowledges a redirected launch through an optional
+test-created event; starting the scheduled task alone cannot pass the gate.
+The runner removes only the package identity it recorded after its install
+and uses per-run task names. Closing unregisters the instance key before
+draining navigation, so another launch can open a new window.
+[PR CI run 36227524454](https://github.com/ilya-slalom/desktop-guides/actions/runs/36227524454)
+passed the signed installed x64 shell job at code head `ade1a59`. Its
+[install record](evidence/ci/production-shell/signed-install-blocked-handoff.json)
+shows the redirect acknowledgment and a new window while the closing
+process remained alive. The
+[queued-guide trace](evidence/ci/production-shell/queue-guide.json)
+confirms that the old window began a guide action while a separate test
+process held a SQLite write lock. After lock release, the old process exited,
+the new window passed the seeded route smoke, and the test package and
+certificate were removed. This is M1 shell evidence; the complete P1
+installed workflow remains T17.2 work.
