@@ -652,7 +652,9 @@ project uses a provisional package identity until T17.1 sets the public one.
   completion, export, restore, and remove. CI failing storage/security tests
   must block packaging; a failing UI workflow must block release promotion.
   Save anonymized fixture IDs, hashes, package and OS/CPU versions, timing,
-  accessibility, and cleanup evidence.
+  accessibility, and cleanup evidence. Trigger installed E2E work through
+  an interactive scheduled task, including when SSH coordinates the local
+  Windows host; installation and UI Automation run in its desktop session.
 - **T17.3** On every promised target, install a signed release candidate,
   upgrade it, import guides, disconnect network, restart, resume, and
   restore a backup into a clean installation. Observe actual missing
@@ -662,6 +664,8 @@ project uses a provisional package identity until T17.1 sets the public one.
   until such a target exists. Start with Windows 11 x64. Windows 10 stays
   unadvertised; ARM64 is added only with its own native full-workflow
   result. Publish a tested matrix and the scanned-PDF/OCR limitation.
+  Follow the [installed E2E procedure](p1/e2e-testing.md) for interactive
+  task preflight, data protection, physical offline recovery, and evidence.
 
 ## 10. Verification gates and design references
 

@@ -223,7 +223,7 @@ while initializing Windows Process Lifetime Manager. The deployment log also
 records access failures when Windows attempted cleanup under
 `C:\Program Files\WindowsApps\Deleted` for unrelated WhatsApp and Clipchamp
 packages. Both attempts removed the temporary certificate and left no
-preview app installed. No installed shell behavior is claimed from this host.
+preview app installed. Neither attempt exercised the installed shell.
 
 After the user retried the signed x64 copy from an interactive desktop,
 Windows installed `DesktopGuides.Preview_0.1.0.0_x64` and the user reported
@@ -235,6 +235,26 @@ result narrows the earlier failure to the install context or host state; it
 does not establish why the two SSH-driven attempts failed at PLM. The
 temporary development signer remains in the host's `TrustedPeople` store
 while this manual install is being evaluated and must be removed afterward.
+This test certificate expires on 27 September 2026.
+
+A [controlled fresh-install retest](evidence/production-shell-host-ssh-reinstall.json)
+on the same host used the same signed MSIX after verifying its signature and
+publisher trust. The existing package was removed only after three package
+data files were backed up on `E:\work\desktop-guides` and checked by SHA-256.
+`Add-AppxPackage` from SSH session 0 again failed with `0x80070005`. This
+deployment's log confirms successful signature validation before `Failed to
+initialize PLM` and `PackagesInUseClosed` failure events. An interactive
+scheduled task then installed the same MSIX in desktop session 1. The library
+file was restored and matched its backup; the package reported `Status: Ok`
+and launched in session 1. The app was closed after the check, all temporary
+tasks were removed, and the backup remains on the host. This rules out an
+already installed preview package and missing signer trust as sufficient
+explanations for the SSH failures. The exact PLM access denial remains
+undetermined; WindowsApps cleanup warnings are present in the deployment
+log, but their relation to the failure has not been established.
+
+Future local-host installed runs follow the
+[interactive E2E procedure](e2e-testing.md).
 
 The [current-head production-shell UI job](https://github.com/ilya-slalom/desktop-guides/actions/runs/36217602539)
 passed on the PR #6 Windows 11 x64 runner, build `10.0.26100.0`, in

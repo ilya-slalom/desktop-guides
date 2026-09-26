@@ -18,7 +18,11 @@ behavior. [Implementation results](results.md) and the
 2. On the Windows 11 x64 development host, stage source under
    `E:\work\desktop-guides`. Use the repository on macOS as the source checkout.
    Keep package builds and UI automation in Windows CI or an interactive
-   Windows session; Core and Infrastructure tests should be headless.
+   Windows session; Core and Infrastructure tests should be headless. For
+   installed P1 E2E runs, have SSH or CI trigger an interactive scheduled
+   task that installs the signed MSIX and drives the UI. Use the
+   [E2E procedure](e2e-testing.md) for profile isolation, recovery, offline
+   work, and result checks.
 3. A task is done only when its listed output exists and its exit check has a
    recorded result. A passing unit test alone does not close a task that
    requires installed WinUI, offline, keyboard, or UI Automation evidence.
@@ -176,20 +180,27 @@ flows work by keyboard and with the recorded accessibility checks.
 ## M6 — release evidence and tested support matrix
 
 Exit: all P1 TRs pass on a signed installed Windows 11 x64 release candidate
-with prerequisites, restart, physical offline reading, upgrade, and restore
-evidence. Publish only targets with complete target-specific results.
+through the [interactive E2E procedure](e2e-testing.md), with prerequisites,
+restart, physical offline reading, upgrade, and restore evidence. Publish
+only targets with complete target-specific results.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
-| T17.2 | T04.3, T06.4, T07.3, T08.3, T09.3, T10.3, T12.3, T13.1, T14.3, T15.4, T16.2, T16.3, T20.2 | Locked Core/Infrastructure and production UI workflow CI, retained P0 regression lane, and reviewable fixture/evidence checklist. Failing storage/security tests stop packaging; failing installed UI blocks release promotion. | TR17.1, TR17.2 |
-| T17.3 | T17.1, T17.2 | Signed install/upgrade, three-format import after original removal, offline relaunch, independent resume, deletion, and backup restore on each promised target. Record OS/CPU/package/prerequisite versions, hashes, and scanned-PDF limit. A runtime-free Windows 11 x64 VM must prove missing-prerequisite failure and offline-installer recovery before a clean-install claim. | TR17.1, TR17.2 |
+| T17.2 | T04.3, T06.4, T07.3, T08.3, T09.3, T10.3, T12.3, T13.1, T14.3, T15.4, T16.2, T16.3, T20.2 | Locked Core/Infrastructure and signed installed production UI workflow CI started through an interactive scheduled task, retained P0 regression lane, and reviewable fixture/evidence checklist. Failing storage/security tests stop packaging; failing installed UI blocks release promotion. | TR17.1, TR17.2 |
+| T17.3 | T17.1, T17.2 | Interactive-task signed install/upgrade, three-format import after original removal, offline relaunch, independent resume, deletion, and backup restore on each promised target. Record OS/CPU/package/prerequisite versions, hashes, and scanned-PDF limit. A runtime-free Windows 11 x64 VM must prove missing-prerequisite failure and offline-installer recovery before a clean-install claim. | TR17.1, TR17.2 |
+
+The existing `production-shell-ui` CI job verifies M1 routes in an already
+interactive runner session. It does not execute the complete P1 scenario
+checklist or close T17.2. The full E2E runner will use the scheduled-task
+entry point and preserve the per-scenario evidence listed in the
+[procedure](e2e-testing.md).
 
 ## Windows verification and deferred environments
 
 | Lane | Required result | Current status |
 | --- | --- | --- |
 | Headless Core/Infrastructure | Schema/migration, locator, path, transaction recovery, archive, import-security, and fault-injection tests on locked Windows CI; NTFS link/junction checks on Windows. | T03.2's merged [PR CI](results.md) passed 61 Core and 24 Infrastructure tests on x64 and native ARM64. T15.2's locked Windows 11 x64 run passed 61 Core and 41 Infrastructure tests after the uppercase-ID review fix, including NTFS junction, prepared-import collision, and retry cases. Earlier PR #5 CI passed 61 Core and 39 Infrastructure tests on x64 and native ARM64; current-head results are in PR checks. Later-task suites are pending. |
-| Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | T11.1 installed shell routes passed on a Windows 11 x64 CI runner. A later interactive signed install on the local x64 host succeeded and the user reported launch; two earlier SSH-driven installs stopped at AppX PLM initialization with `0x80070005`. Full P1 flow and release gates remain open. |
+| Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | T11.1 installed shell routes passed on a Windows 11 x64 CI runner. A [controlled local retest](evidence/production-shell-host-ssh-reinstall.json) reproduced `0x80070005` from SSH session 0 after uninstall and succeeded through an interactive scheduled task in desktop session 1; the package, backup, and launch were verified. Full P1 flow and release gates remain open. |
 | Runtime-free Windows 11 x64 VM | Actual absent Windows App Runtime and WebView2 failures, prerequisite setup, recovery, and clean restore. | Deferred by user until a disposable VM is available. Do not claim clean-machine support before this lane passes. |
 | Windows 11 ARM64 | Native complete P1 installed workflow, backup, accessibility, and offline evidence before advertising ARM64. | P1 pending; P0 native Core/UI fixtures passed. |
 | Windows 10 x64 | Equivalent signed install and reader workflow before advertising Windows 10. | Deferred by user. |
