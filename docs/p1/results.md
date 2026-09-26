@@ -256,7 +256,7 @@ log, but their relation to the failure has not been established.
 Future local-host installed runs follow the
 [interactive E2E procedure](e2e-testing.md).
 
-The [current-head production-shell UI job](https://github.com/ilya-slalom/desktop-guides/actions/runs/36217602539)
+An [earlier production-shell UI job](https://github.com/ilya-slalom/desktop-guides/actions/runs/36217602539)
 passed on the PR #6 Windows 11 x64 runner, build `10.0.26100.0`, in
 interactive session 2. The
 [signed install record](evidence/ci/production-shell/signed-install.json)

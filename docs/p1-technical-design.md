@@ -490,7 +490,9 @@ project uses a provisional package identity until T17.1 sets the public one.
 - **T11.1** Replace the fixture window with the `NavigationView` route
   coordinator in section 4. Library, Game, Reader, and Settings share one
   window and stable ID-based back navigation. Start at Library, show an
-  optional Resume action, and handle missing last-guide IDs. Keep a
+  optional Resume action, and handle missing last-guide IDs. Serialize user
+  route intents, including last-guide persistence, so a delayed lookup or
+  write cannot override a later selection. Keep a
   build-time diagnostic probe mode for P0 CI without shipping fixtures in
   the production package.
 - **T11.2** Define the typed reader adapter/capabilities in section 3 and

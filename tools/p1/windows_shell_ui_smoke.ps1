@@ -152,11 +152,22 @@ try {
         $report.phases += 'settings-back-library'
 
         Select-Element 'Route Test Game'
+        Select-Element 'Settings'
+        [void](Wait-Name 'SettingsHeading' 'Settings')
+        [void](Wait-Name 'ShellStatus' 'Settings ready.')
+        Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Name 'ShellStatus' 'Game ready.')
+        $report.phases += 'rapid-game-settings-back-game'
+
         Select-Element 'Route Test Guide'
+        Select-Element 'Settings'
+        [void](Wait-Name 'SettingsHeading' 'Settings')
+        [void](Wait-Name 'ShellStatus' 'Settings ready.')
+        Go-Back
         [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
         [void](Wait-Name 'ShellStatus' 'Guide ready.')
+        $report.phases += 'rapid-guide-settings-back-reader'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Name 'ShellStatus' 'Game ready.')

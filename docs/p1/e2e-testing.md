@@ -58,20 +58,30 @@ implementation under T17.2.
    the staged workspace. The runner performs the scenario's install or
    upgrade, verifies `Get-AppxPackage` identity/status, launches the
    packaged app, and runs UI Automation in the interactive session. The
-   controller waits for a per-run result JSON with a bounded timeout;
-   starting the task alone is not a pass.
+   SSH or CI launcher waits for a per-run result JSON with a bounded timeout;
+   starting the task alone is not a pass. This limited task does not change
+   network adapters.
 5. On failure, save the PowerShell error and AppX deployment Activity ID,
    collect `Get-AppPackageLog`, and record which phase failed. If a shared
    profile was uninstalled, use the prepared interactive task to restore
    the signed package, then restore and verify backed-up user data. Recovery
    protects the host; it does not turn a failed test into a pass. Retain the
    backup until package health, data, and launch are checked.
-6. Run offline scenarios entirely on the Windows host because SSH may
-   disconnect. Before disabling the test network adapter, arm a timed
-   network-restore watchdog. Relaunch and assert the imported guides work
-   while disconnected; save network state and guide-originated request
-   results. Restore networking and remove the watchdog in cleanup, then
-   check connectivity and read the recorded results over SSH.
+6. With networking available, independently probe the HTML test canary,
+   record its request count, then run the hostile-input case. Verify its
+   server log received zero guide-originated requests and retain the app
+   request trace. Run offline scenarios entirely on the Windows host
+   because SSH may disconnect. An elevated, host-side controller task arms
+   a repeating `SYSTEM` network-restore watchdog before disabling the
+   designated adapter. The limited interactive task relaunches and checks
+   the imported guides while disconnected; it never changes the adapter.
+   The controller restores networking after the offline result or timeout.
+   Keep the watchdog armed until the adapter and gateway are reachable and
+   the SSH or CI launcher acknowledges restored connectivity through a
+   separate per-run acknowledgment file. Then have the elevated controller
+   remove the watchdog. If restoration cannot be confirmed, retain the
+   watchdog and fail the run. Read the recorded results after connectivity
+   returns.
 7. Stop only test-owned processes and remove only test-owned tasks,
    packages, and temporary trust. Do not remove an existing user package or
    its signer as generic cleanup. Record the final package/data state and
@@ -86,9 +96,9 @@ production app. Add cases as the dependent P1 tasks complete.
 
 | Scenario | Required observation | Task / requirement |
 | --- | --- | --- |
-| Shell smoke | Fresh empty Library, Library/Game/Reader/Settings routes, Back, stale Resume, and no P0 fixture controls. Existing CI smoke covers these routes with seeded metadata; Reader is still a placeholder. | T11.1, TR11.1 |
+| Shell smoke | Fresh empty Library, Library/Game/Reader/Settings routes, rapid Game/Guide → Settings selections and Back, stale Resume, and no P0 fixture controls. Existing CI smoke covers these routes with seeded metadata; Reader is still a placeholder. | T11.1, TR11.1 |
 | Install and upgrade | Signed MSIX installs in an interactive session; an older version upgrades under the same identity without losing a populated library. Verify package version, launch, and data after restart. | T17.1, T17.3, TR17.2 |
-| Import and offline reading | Add a game and import TXT, static HTML with local assets, and PDF through the UI. Remove the originals, relaunch, disconnect networking, and open all three managed copies. Check HTML blocks remote requests. | T04–T10, T17.3, TR17.1 |
+| Import and offline reading | Add a game and import TXT, static HTML with local assets, and PDF through the UI. Remove the originals; while online, verify a reachable HTML canary receives zero guide-originated requests. Then disconnect networking, relaunch, and open all three managed copies. | T04–T10, T17.3, TR17.1 |
 | Independent state | Move to different positions in two guides, restart, and verify their locators separately. Change layout/theme, check exact or labeled approximate restore, and toggle completion explicitly; reaching the end must not mark complete. | T12–T14, TR12.1–TR14.2 |
 | Removal and recovery | Cancel and confirm guide/game removal, restart around an interrupted operation, and verify only owned records and files change. Export outside app data and restore into both clean and populated libraries. | T15.2–T15.4, T20.1–T20.2 |
 | Accessibility and PDF limits | Drive import/read/complete/export with keyboard and UIA; record focus, high contrast, DPI, and Narrator checks. Tagged PDF text must be accessible; scanned, locked, and long PDFs get their stated checks and limits. | T10.2–T10.3, T16.1–T16.3 |
@@ -106,7 +116,10 @@ Write per-run JSON and UI traces outside package data, under
 the equivalent CI artifact directory. Record scenario ID, start/end time,
 result, package and fixture hashes, OS/CPU/prerequisite versions, signer
 thumbprint, interactive task/user/session, package status, AppX Activity ID
-on failure, offline network restoration, and final cleanup/data checks.
+on failure, online canary reachability, baseline/final server request counts,
+and app request trace, elevated offline controller and watchdog status,
+offline network restoration and launcher acknowledgment, and final
+cleanup/data checks.
 Keep user guide contents, private keys, and raw package data out of
 repository evidence. Link the sanitized result from `docs/p1/results.md`.
 

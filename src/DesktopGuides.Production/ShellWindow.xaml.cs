@@ -10,6 +10,7 @@ namespace DesktopGuides.Production;
 public sealed partial class ShellWindow : Window
 {
     private readonly ShellNavigator navigator = new();
+    private readonly SemaphoreSlim navigationGate = new(1, 1);
     private SqliteLibraryRepository? repository;
     private Guid? resumeGuideId;
     private int renderGeneration;
@@ -49,51 +50,71 @@ public sealed partial class ShellWindow : Window
     private async void NavigationInvoked(
         NavigationView sender, NavigationViewItemInvokedEventArgs args)
     {
-        if (!ready)
+        bool openSettings = args.IsSettingsInvoked;
+        await RunNavigationAsync(async () =>
         {
-            return;
-        }
-        if (args.IsSettingsInvoked)
-        {
-            navigator.OpenSettings();
-        }
-        else
-        {
-            navigator.OpenLibrary();
-        }
-        await RenderCurrentAsync();
+            if (openSettings)
+            {
+                navigator.OpenSettings();
+            }
+            else
+            {
+                navigator.OpenLibrary();
+            }
+            await RenderCurrentAsync();
+        });
     }
 
     private async void NavigationBackRequested(
         NavigationView sender, NavigationViewBackRequestedEventArgs args)
     {
-        if (ready && navigator.GoBack())
+        await RunNavigationAsync(async () =>
         {
-            await RenderCurrentAsync();
-        }
+            if (navigator.GoBack())
+            {
+                await RenderCurrentAsync();
+            }
+        });
     }
 
     private async void GameSelected(object sender, SelectionChangedEventArgs args)
     {
-        if (ready && GameList.SelectedItem is Game game)
+        if (GameList.SelectedItem is Game game)
         {
-            await OpenGameAsync(game.Id);
+            await RunNavigationAsync(() => OpenGameAsync(game.Id));
         }
     }
 
     private async void GuideSelected(object sender, SelectionChangedEventArgs args)
     {
-        if (ready && GuideList.SelectedItem is Guide guide)
+        if (GuideList.SelectedItem is Guide guide)
         {
-            await OpenGuideAsync(guide.Id);
+            await RunNavigationAsync(() => OpenGuideAsync(guide.Id));
         }
     }
 
     private async void ResumeClicked(object sender, RoutedEventArgs args)
     {
-        if (ready && resumeGuideId is Guid guideId)
+        if (resumeGuideId is Guid guideId)
         {
-            await OpenGuideAsync(guideId);
+            await RunNavigationAsync(() => OpenGuideAsync(guideId));
+        }
+    }
+
+    private async Task RunNavigationAsync(Func<Task> action)
+    {
+        // Finish route changes and last-guide writes in the order requested.
+        await navigationGate.WaitAsync();
+        try
+        {
+            if (ready)
+            {
+                await action();
+            }
+        }
+        finally
+        {
+            navigationGate.Release();
         }
     }
 
