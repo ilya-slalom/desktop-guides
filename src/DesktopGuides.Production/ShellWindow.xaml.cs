@@ -23,6 +23,7 @@ public sealed partial class ShellWindow : Window
     public ShellWindow()
     {
         InitializeComponent();
+        Program.Trace("ShellWindow constructed");
         Title = "Desktop Guides Preview";
         Navigation.SelectedItem = LibraryItem;
         AppWindow.Closing += WindowClosing;
@@ -36,6 +37,7 @@ public sealed partial class ShellWindow : Window
 
     private async Task InitializeCoreAsync()
     {
+        Program.Trace("InitializeCoreAsync started");
         try
         {
             string dataRoot = ApplicationData.Current.LocalFolder.Path;
@@ -43,9 +45,11 @@ public sealed partial class ShellWindow : Window
             await repository.InitializeAsync();
             ready = true;
             await RenderCurrentAsync();
+            Program.Trace("InitializeCoreAsync completed");
         }
         catch (Exception error)
         {
+            Program.Trace($"InitializeCoreAsync failed: {error.GetType().Name}");
             ready = false;
             ShellStatus.Text = $"Could not open the library: {error.Message}";
         }
@@ -53,6 +57,7 @@ public sealed partial class ShellWindow : Window
 
     private void WindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
+        Program.Trace($"WindowClosing allowClose={allowClose} closeRequested={closeRequested}");
         if (allowClose)
         {
             return;
@@ -74,6 +79,7 @@ public sealed partial class ShellWindow : Window
         try
         {
             await Task.WhenAll(initializationTask, pendingNavigation);
+            Program.Trace("Pending work drained");
         }
         finally
         {
@@ -88,6 +94,7 @@ public sealed partial class ShellWindow : Window
             finally
             {
                 allowClose = true;
+                Program.Trace("Calling Close after drain");
                 Close();
             }
         }
