@@ -260,8 +260,11 @@ invoking control. Every shortcut has a visible matching command.
 `AppInstance` registration in the production entry point gives one process
 ownership of the library and redirects later activations to its window. A
 process mutex would prevent duplicate owners but would discard the user's
-second launch. Register before the WinUI dispatcher starts on both x64 and
-ARM64. On window close, stop accepting navigation, await initialization and
+second launch. Use a synchronous `[STAThread]` entry point so WinUI creates
+its window on an STA thread. Register before the WinUI dispatcher starts;
+on a duplicate launch, redirect activation on a worker and pump COM while
+waiting for it to finish. Verify the same behavior on x64 and ARM64. On
+window close, stop accepting navigation, await initialization and
 queued actions, then dispose the repository and close. This may briefly
 defer closing while a database write finishes.
 

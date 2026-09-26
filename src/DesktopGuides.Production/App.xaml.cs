@@ -13,7 +13,6 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        Program.Trace("OnLaunched");
         shellWindow = new ShellWindow();
         shellWindow.Activate();
         _ = shellWindow.InitializeAsync();

@@ -190,8 +190,6 @@ try {
     $dataRoot = Join-Path $env:LOCALAPPDATA `
         "Packages\$($installed.PackageFamilyName)\LocalState"
     New-Item -ItemType Directory -Force $dataRoot | Out-Null
-    New-Item -ItemType File -Force (Join-Path $dataRoot 'enable-lifecycle-trace') |
-        Out-Null
     $seedProject = Join-Path $PSScriptRoot `
         'DesktopGuides.ShellSeed\DesktopGuides.ShellSeed.csproj'
 
@@ -266,13 +264,6 @@ catch {
     }
 }
 finally {
-    if ($installed) {
-        $tracePath = Join-Path $env:LOCALAPPDATA `
-            "Packages\$($installed.PackageFamilyName)\LocalState\shell-lifecycle.txt"
-        if (Test-Path $tracePath) {
-            $report.lifecycleTrace = @(Get-Content $tracePath)
-        }
-    }
     Stop-ScheduledTask -TaskName $smokeTask -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName $smokeTask -Confirm:$false `
         -ErrorAction SilentlyContinue

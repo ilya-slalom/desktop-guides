@@ -284,3 +284,16 @@ became ready. The smoke script now polls for a visible row that supports
 selection. The combined empty → seeded → stale installed test passed with
 this change. The expanded route suite also checks that a stale Game or
 Reader route clears its Back history.
+
+The M1 review follow-up added single-instance activation and a normal-close
+drain check. An initial custom `async Task Main` build crashed inside WinUI
+during the first installed UI Automation query. The entry point now uses a
+synchronous STA `Main` and waits for duplicate activation redirection while
+pumping COM. [PR CI run 36225502945](https://github.com/ilya-slalom/desktop-guides/actions/runs/36225502945)
+passed the signed installed x64 shell job at code head `88bf060`. Its
+[diagnostic install record](evidence/ci/production-shell/signed-install-single-instance.json)
+shows a second launch redirecting to the original window process, a
+responsive empty Library afterward, all seeded and stale route checks, a
+normal window close, and removal of the test package and certificate. The
+lifecycle trace in that record was used for diagnosis; the production code
+no longer writes it.

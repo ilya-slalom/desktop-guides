@@ -2,7 +2,6 @@ using System.Runtime.InteropServices;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
-using Windows.Storage;
 
 namespace DesktopGuides.Production;
 
@@ -25,13 +24,10 @@ internal static class Program
             throw new InvalidOperationException("WinUI requires an STA entry point.");
         }
         WinRT.ComWrappersSupport.InitializeComWrappers();
-        Trace("STA Main started");
-        AppDomain.CurrentDomain.ProcessExit += (_, _) => Trace("ProcessExit");
 
         AppInstance current = AppInstance.GetCurrent();
         AppActivationArguments activation = current.GetActivatedEventArgs();
         AppInstance main = AppInstance.FindOrRegisterForKey("DesktopGuides.Preview.Main");
-        Trace($"FindOrRegisterForKey IsCurrent={main.IsCurrent}");
         if (!main.IsCurrent)
         {
             RedirectActivation(activation, main);
@@ -41,32 +37,23 @@ internal static class Program
         primaryInstance = main;
         primaryInstance.Activated += (_, _) =>
         {
-            Trace("Redirected activation received");
             Volatile.Read(ref uiQueue)?.TryEnqueue(
-                () =>
-                {
-                    Trace("Activating main window");
-                    app?.ActivateMainWindow();
-                    Trace("Main window activated");
-                });
+                () => app?.ActivateMainWindow());
         };
 
         Application.Start(initialization =>
         {
-            Trace("Application.Start callback");
             DispatcherQueue dispatcher = DispatcherQueue.GetForCurrentThread();
             SynchronizationContext.SetSynchronizationContext(
                 new DispatcherQueueSynchronizationContext(dispatcher));
             Volatile.Write(ref uiQueue, dispatcher);
             app = new App();
         });
-        Trace("Application.Start returned");
     }
 
     private static void RedirectActivation(
         AppActivationArguments activation, AppInstance main)
     {
-        Trace("RedirectActivationToAsync started");
         using EventWaitHandle completed = new(false, EventResetMode.ManualReset);
         Task redirect = Task.Run(async () =>
             await main.RedirectActivationToAsync(activation));
@@ -91,24 +78,5 @@ internal static class Program
                 $"Activation redirection failed or timed out: 0x{result:X8}.");
         }
         redirect.GetAwaiter().GetResult();
-        Trace("RedirectActivationToAsync completed");
-    }
-
-    internal static void Trace(string message)
-    {
-        try
-        {
-            string root = ApplicationData.Current.LocalFolder.Path;
-            if (!File.Exists(Path.Combine(root, "enable-lifecycle-trace")))
-            {
-                return;
-            }
-            File.AppendAllText(Path.Combine(root, "shell-lifecycle.txt"),
-                $"{DateTimeOffset.UtcNow:o} {Environment.ProcessId} {message}{Environment.NewLine}");
-        }
-        catch
-        {
-            // Tracing must not change app startup or shutdown.
-        }
     }
 }
