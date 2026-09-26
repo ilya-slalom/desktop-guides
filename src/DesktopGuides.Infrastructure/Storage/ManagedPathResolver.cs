@@ -41,7 +41,10 @@ public sealed class ManagedPathResolver : ILibraryPaths
             Directory.CreateDirectory(path);
             RejectFilesystemLinks(path);
         }
+        ValidateDatabasePath();
     }
+
+    public void ValidateDatabasePath() => RejectFilesystemLinks(DatabasePath);
 
     public string GetGuideRoot(Guid guideId)
     {
@@ -95,7 +98,7 @@ public sealed class ManagedPathResolver : ILibraryPaths
             {
                 if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
                 {
-                    throw new InvalidDataException("Managed content path crosses a filesystem link.");
+                    throw new InvalidDataException("Managed path crosses a filesystem link.");
                 }
             }
             catch (FileNotFoundException)

@@ -357,6 +357,97 @@ public sealed class SqliteLibraryRepositoryTests
         Assert.Equal("Keep", (await repository.GetGameAsync(game.Id))?.Title);
     }
 
+    [Fact]
+    public async Task RejectsLinkedDatabaseBeforeOpeningExternalVersionOneData()
+    {
+        using TestLibrary directory = new();
+        directory.Paths.EnsureCreated();
+        string outside = Path.Combine(directory.Root, "outside.sqlite");
+        using (SqliteConnection connection = OpenWithForeignKeys(outside))
+        {
+            using SqliteCommand schema = connection.CreateCommand();
+            schema.CommandText = LibrarySchema.Version1;
+            schema.ExecuteNonQuery();
+        }
+
+        File.CreateSymbolicLink(directory.Paths.DatabasePath, outside);
+        try
+        {
+            await using SqliteLibraryRepository repository = new(directory.Paths);
+            await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                repository.GetGameAsync(Guid.NewGuid()));
+            Assert.Empty(Directory.GetFiles(directory.Paths.RecoveryRoot));
+        }
+        finally
+        {
+            File.Delete(directory.Paths.DatabasePath);
+        }
+
+        using SqliteConnection original = OpenWithForeignKeys(outside);
+        using SqliteCommand version = original.CreateCommand();
+        version.CommandText = "PRAGMA user_version";
+        Assert.Equal(1L, (long)version.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public async Task RejectsAlteredVersionOneConstraintsBeforeBackup()
+    {
+        using TestLibrary directory = new();
+        directory.Paths.EnsureCreated();
+        string alteredSchema = LibrarySchema.Version1.Replace(
+            "length(Title) BETWEEN 1 AND 160", "length(Title) <= 160",
+            StringComparison.Ordinal);
+        Assert.NotEqual(LibrarySchema.Version1, alteredSchema);
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        {
+            using SqliteCommand schema = connection.CreateCommand();
+            schema.CommandText = alteredSchema;
+            schema.ExecuteNonQuery();
+            using SqliteCommand game = connection.CreateCommand();
+            game.CommandText = """
+                INSERT INTO Games (Id, Title, CreatedUtcMs, UpdatedUtcMs)
+                VALUES ($id, 'Keep', $now, $now)
+                """;
+            game.Parameters.AddWithValue("$id", Guid.NewGuid().ToString("N"));
+            game.Parameters.AddWithValue("$now", Now.ToUnixTimeMilliseconds());
+            game.ExecuteNonQuery();
+        }
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+        Assert.Empty(Directory.GetFiles(directory.Paths.RecoveryRoot));
+
+        using SqliteConnection original = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand verify = original.CreateCommand();
+        verify.CommandText = "SELECT Title FROM Games";
+        Assert.Equal("Keep", verify.ExecuteScalar());
+        verify.CommandText = "PRAGMA user_version";
+        Assert.Equal(1L, (long)verify.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public async Task RejectsRenamedVersionTwoColumnBeforeRepositoryReads()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        await repository.AddGameAsync("Keep", null, "Note");
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        {
+            using SqliteCommand alter = connection.CreateCommand();
+            alter.CommandText = "ALTER TABLE Games RENAME COLUMN Notes TO Memo";
+            alter.ExecuteNonQuery();
+        }
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+        using SqliteConnection original = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand verify = original.CreateCommand();
+        verify.CommandText = "SELECT Title FROM Games";
+        Assert.Equal("Keep", verify.ExecuteScalar());
+        Assert.Empty(Directory.GetFiles(directory.Paths.RecoveryRoot));
+    }
+
     private static void InsertGuide(
         string databasePath, Guid guideId, Guid gameId, string? managedRoot = null)
     {

@@ -111,3 +111,19 @@ WinUI build passed with zero warnings and errors. Tests cover the populated
 v1 backup, failure rollback and retry, newer-schema and orphaned-row
 rejection, incomplete v2 detection, and linked recovery-root rejection.
 Production installed-app migration remains a later M1 shell check.
+
+The PR #4 review follow-up added three Windows regression tests. Before the
+fix, all three failed: a linked `library.sqlite` upgraded an external v1
+database, a changed v1 `CHECK` constraint reached backup and migration, and
+a v2 database with `Games.Notes` renamed to `Memo` passed initialization.
+The resolver now rejects a linked database before SQLite opens it, including
+repository reads. Initialization compares app-owned table and index
+definitions against the version's migration scripts before backup or use;
+unrecognized definitions stop with their existing data intact.
+
+With the fix on the Windows 11 x64 host under `E:\work\desktop-guides`, locked
+restore and Release tests passed **61/61 Core** and **22/22 Infrastructure**.
+The unsigned Release x64 WinUI MSIX build succeeded with zero errors. It
+reported one host tooling warning: `mspdbcmf.exe` was unavailable, so no
+symbols package was generated. The installed production-app migration gate
+remains open.

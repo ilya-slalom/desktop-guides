@@ -6,6 +6,13 @@ namespace DesktopGuides.Infrastructure.Storage;
 
 public sealed class SqliteLibraryRepository : ILibraryRepository
 {
+    private sealed record SchemaObject(string Type, string Name, string Table, string Sql);
+
+    private static readonly Lazy<IReadOnlyList<SchemaObject>> VersionOneSchema =
+        new(() => BuildExpectedSchema(1));
+    private static readonly Lazy<IReadOnlyList<SchemaObject>> VersionTwoSchema =
+        new(() => BuildExpectedSchema(2));
+
     private readonly ILibraryPaths paths;
     private readonly TimeProvider clock;
     private readonly Action<int>? migrationCheckpoint;
@@ -412,27 +419,56 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                 throw new InvalidDataException("Library database contains orphaned records.");
             }
         }
-        check.CommandText = """
-            SELECT count(*) FROM sqlite_schema
-            WHERE type = 'table' AND name IN
-                ('Games', 'Guides', 'ReadingStates', 'ReaderPreferences',
-                 'Settings', 'FileOperations')
+        IReadOnlyList<SchemaObject> expectedSchema = expectedVersion switch
+        {
+            1 => VersionOneSchema.Value,
+            2 => VersionTwoSchema.Value,
+            _ => throw new InvalidDataException("Unsupported library schema version.")
+        };
+        if (!ReadSchema(connection, transaction).SequenceEqual(expectedSchema))
+        {
+            throw new InvalidDataException("Library database schema is incomplete or altered.");
+        }
+    }
+
+    private static IReadOnlyList<SchemaObject> BuildExpectedSchema(int version)
+    {
+        using SqliteConnection reference = new(new SqliteConnectionStringBuilder
+        {
+            DataSource = ":memory:",
+            Pooling = false
+        }.ToString());
+        reference.Open();
+        using SqliteCommand migration = reference.CreateCommand();
+        migration.CommandText = LibrarySchema.Version1;
+        migration.ExecuteNonQuery();
+        if (version == 2)
+        {
+            migration.CommandText = LibrarySchema.Version2;
+            migration.ExecuteNonQuery();
+        }
+        return ReadSchema(reference, null);
+    }
+
+    private static IReadOnlyList<SchemaObject> ReadSchema(
+        SqliteConnection connection, SqliteTransaction? transaction)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT type, name, tbl_name, sql FROM sqlite_schema
+            WHERE sql IS NOT NULL AND name NOT GLOB 'sqlite_*'
+            ORDER BY type, name
             """;
-        if ((long)check.ExecuteScalar()! != 6)
+        using SqliteDataReader reader = command.ExecuteReader();
+        List<SchemaObject> objects = [];
+        while (reader.Read())
         {
-            throw new InvalidDataException("Library database schema is incomplete.");
+            objects.Add(new SchemaObject(
+                reader.GetString(0), reader.GetString(1),
+                reader.GetString(2), reader.GetString(3)));
         }
-        if (expectedVersion >= 2)
-        {
-            check.CommandText = """
-                SELECT 1 FROM sqlite_schema
-                WHERE type = 'index' AND name = 'IX_ReadingStates_LastOpenedUtcMs'
-                """;
-            if (check.ExecuteScalar() is null)
-            {
-                throw new InvalidDataException("Library database schema is incomplete.");
-            }
-        }
+        return objects;
     }
 
     private static bool IsRecoverableEmptyDatabase(SqliteConnection connection)
@@ -457,6 +493,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
 
     private SqliteConnection OpenConnection(bool create = false)
     {
+        paths.ValidateDatabasePath();
         SqliteConnection connection = new(new SqliteConnectionStringBuilder
         {
             DataSource = paths.DatabasePath,

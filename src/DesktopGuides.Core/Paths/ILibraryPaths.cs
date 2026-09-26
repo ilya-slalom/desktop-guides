@@ -11,6 +11,7 @@ public interface ILibraryPaths
     string DatabasePath { get; }
 
     void EnsureCreated();
+    void ValidateDatabasePath();
     string GetGuideRoot(Guid guideId);
     string GetPlannedGuideFile(Guid guideId, string relativePath);
     string ResolveExistingGuideFile(Guid guideId, string relativePath);
