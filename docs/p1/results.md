@@ -341,3 +341,25 @@ and the shell-seed build. Both the push and
 [PR workflow](https://github.com/ilya-slalom/desktop-guides/actions/runs/36229242647)
 passed 8/8 jobs, including the native ARM64 P0 fixture regression. These
 checks remain M1 shell evidence.
+
+The close-boundary follow-up at code head `1581bde` makes a redirected
+secondary wait for the first window's UI callback to accept activation.
+The installed runner now launches the packaged executable through an
+interactive task helper and records its returned process ID and start time;
+UI checks and process cleanup use that specific launch record. Process
+exit during cleanup no longer stops package and certificate cleanup.
+
+[PR CI run 36230900475](https://github.com/ilya-slalom/desktop-guides/actions/runs/36230900475)
+passed the signed Windows 11 x64 installed shell job. The
+[install record](evidence/ci/production-shell/activation-ack/signed-install.json)
+shows accepted redirection, the library lease wait during the blocked
+guide write, and a new window after both a pre-redirection target close
+and a close while activation was queued on the UI thread. The
+[launch trace](evidence/ci/production-shell/activation-ack/launch.json)
+records the interactive task's package executable, process ID, and session.
+The package and temporary signer were removed. On the Windows 11 x64 host,
+PowerShell parsing, 42/42 Infrastructure tests, the unsigned production MSIX,
+and the shell-seed build passed. Both the push and
+[PR workflow](https://github.com/ilya-slalom/desktop-guides/actions/runs/36230903529)
+passed 8/8 jobs, including the native ARM64 P0 fixture regression. The
+complete P1 installed workflow remains T17.2 work.

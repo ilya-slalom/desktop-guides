@@ -131,12 +131,11 @@ The installed runner also needs positive process ownership. A same-session
 process appearing after the task starts is insufficient proof. Launch the
 installed executable from the interactive task through a small helper that
 records its returned PID, then validate that PID, package path, and session
-before UI checks or cleanup. If direct packaged launch cannot preserve the
-required MSIX behavior, retain shell activation but use an equivalent
-launch-specific identity claim. Cleanup continues through package,
-certificate, and final-report checks even when an owned process exits
-between lookup and stop. Verify these cases with the signed installed x64
-lane and a missing-PID PowerShell check.
+before UI checks or cleanup. The signed Windows 11 x64 installed run confirmed
+that this direct launch keeps the required package behavior. Cleanup continues
+through package, certificate, and final-report checks even when an owned
+process exits between lookup and stop. Verify these cases with the signed
+installed x64 lane and a missing-PID PowerShell check.
 
 ## M2 — catalog, static-asset validation, import, and removal
 
