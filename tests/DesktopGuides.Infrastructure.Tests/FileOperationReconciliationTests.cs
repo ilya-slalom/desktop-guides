@@ -252,6 +252,55 @@ public sealed class FileOperationReconciliationTests
         Assert.Equal(1, OperationCount(directory.Paths.DatabasePath));
     }
 
+    [Fact]
+    public async Task PreparedImportRetainsCommittedGuideWithUppercaseDatabaseId()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Keep", null, null);
+        Guid operationId = Guid.NewGuid();
+        Guid guideId = Guid.NewGuid();
+        InsertGuide(directory.Paths.DatabasePath, game.Id, guideId, uppercaseId: true);
+        string content = directory.Paths.GetGuideRoot(guideId);
+        WriteMarker(content);
+        await repository.InitializeAsync();
+        Assert.Equal(
+            new StartupReconciliationReport(0, 0),
+            repository.LastStartupReconciliation);
+        InsertOperation(directory.Paths.DatabasePath, operationId, "Import", "Prepared",
+            Manifest("Import", operationId, guideId));
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+
+        Assert.True(File.Exists(Path.Combine(content, "marker.txt")));
+        Assert.Equal(1, OperationCount(directory.Paths.DatabasePath));
+        Assert.Null(repository.LastStartupReconciliation);
+    }
+
+    [Fact]
+    public async Task DuplicateCaseGuideIdsStopCleanupBeforeDeletingOtherGuides()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Keep", null, null);
+        Guid committedGuide = Guid.NewGuid();
+        InsertGuide(directory.Paths.DatabasePath, game.Id, committedGuide);
+        InsertGuide(directory.Paths.DatabasePath, game.Id, committedGuide, uppercaseId: true);
+        Guid operationId = Guid.NewGuid();
+        Guid pendingGuide = Guid.NewGuid();
+        string staged = StagedRoot(directory.Paths, operationId, pendingGuide);
+        WriteMarker(staged);
+        InsertOperation(directory.Paths.DatabasePath, operationId, "Import", "Prepared",
+            Manifest("Import", operationId, pendingGuide));
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+
+        Assert.True(File.Exists(Path.Combine(staged, "marker.txt")));
+        Assert.Equal(1, OperationCount(directory.Paths.DatabasePath));
+    }
+
     [Theory]
     [InlineData("future-version")]
     [InlineData("extra-field")]
@@ -433,7 +482,8 @@ public sealed class FileOperationReconciliationTests
         command.ExecuteNonQuery();
     }
 
-    private static void InsertGuide(string databasePath, Guid gameId, Guid guideId)
+    private static void InsertGuide(
+        string databasePath, Guid gameId, Guid guideId, bool uppercaseId = false)
     {
         using SqliteConnection connection = Open(databasePath);
         using SqliteCommand command = connection.CreateCommand();
@@ -448,9 +498,14 @@ public sealed class FileOperationReconciliationTests
             INSERT INTO ReadingStates (GuideId) VALUES ($id);
             INSERT INTO ReaderPreferences (GuideId) VALUES ($id);
             """;
-        command.Parameters.AddWithValue("$id", guideId.ToString("N"));
+        string guideName = guideId.ToString("N");
+        if (uppercaseId)
+        {
+            guideName = guideName.ToUpperInvariant();
+        }
+        command.Parameters.AddWithValue("$id", guideName);
         command.Parameters.AddWithValue("$game", gameId.ToString("N"));
-        command.Parameters.AddWithValue("$root", $"content/{guideId:N}");
+        command.Parameters.AddWithValue("$root", $"content/{guideName}");
         command.Parameters.AddWithValue("$hash", new string('a', 64));
         command.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         command.ExecuteNonQuery();

@@ -19,7 +19,7 @@ internal sealed class FileOperationReconciler(ILibraryPaths paths)
 
     public StartupReconciliationReport Run(SqliteConnection connection)
     {
-        HashSet<string> committedGuides = ReadGuideNames(connection);
+        HashSet<Guid> committedGuides = ReadGuideIds(connection);
         IReadOnlyList<JournalRow> rows = ReadJournalRows(connection);
         List<OperationPlan> plans = Preflight(rows, committedGuides);
 
@@ -34,7 +34,7 @@ internal sealed class FileOperationReconciler(ILibraryPaths paths)
     }
 
     private List<OperationPlan> Preflight(
-        IReadOnlyList<JournalRow> rows, HashSet<string> committedGuides)
+        IReadOnlyList<JournalRow> rows, HashSet<Guid> committedGuides)
     {
         HashSet<Guid> claimedGuides = [];
         List<OperationPlan> plans = [];
@@ -48,7 +48,7 @@ internal sealed class FileOperationReconciler(ILibraryPaths paths)
                 {
                     throw new InvalidDataException("File operations claim the same guide.");
                 }
-                bool hasGuide = committedGuides.Contains(guideId.ToString("N"));
+                bool hasGuide = committedGuides.Contains(guideId);
                 bool shouldHaveGuide =
                     row.Kind != FileOperationKind.Import &&
                     row.Phase == FileOperationPhase.Prepared;
@@ -125,15 +125,19 @@ internal sealed class FileOperationReconciler(ILibraryPaths paths)
         return rows;
     }
 
-    private static HashSet<string> ReadGuideNames(SqliteConnection connection)
+    private static HashSet<Guid> ReadGuideIds(SqliteConnection connection)
     {
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = "SELECT Id FROM Guides";
         using SqliteDataReader reader = command.ExecuteReader();
-        HashSet<string> ids = new(StringComparer.Ordinal);
+        HashSet<Guid> ids = [];
         while (reader.Read())
         {
-            ids.Add(reader.GetString(0));
+            if (!Guid.TryParseExact(reader.GetString(0), "N", out Guid id) ||
+                id == Guid.Empty || !ids.Add(id))
+            {
+                throw new InvalidDataException("Guide ID is invalid or duplicated.");
+            }
         }
         return ids;
     }
@@ -184,10 +188,12 @@ internal sealed class FileOperationReconciler(ILibraryPaths paths)
         }
     }
 
-    private int CountReviewOrphans(HashSet<string> committedGuides)
+    private int CountReviewOrphans(HashSet<Guid> committedGuides)
     {
         int content = Directory.EnumerateFileSystemEntries(paths.ContentRoot)
-            .Count(path => !committedGuides.Contains(Path.GetFileName(path)));
+            .Count(path =>
+                !Guid.TryParseExact(Path.GetFileName(path), "N", out Guid id) ||
+                !committedGuides.Contains(id));
         int staging = Directory.EnumerateFileSystemEntries(paths.StagingRoot).Count();
         int trash = Directory.EnumerateFileSystemEntries(paths.TrashRoot).Count();
         return content + staging + trash;

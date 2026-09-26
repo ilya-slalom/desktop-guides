@@ -148,6 +148,11 @@ paths, incompatible row phases, and conflicting directory states before
 changing files. A nested filesystem link blocks that operation without being
 followed.
 
+Recovery compares committed `Guides.Id` values as parsed GUIDs, since the
+SQLite schema permits uppercase spelling of a generated ID. An unparseable
+or duplicate logical Guide ID stops cleanup before any owned tree changes.
+The orphan count uses the same GUID identity for content directory names.
+
 The startup reconciler preflights every journal row, then resolves rows in
 creation order. It removes only the named roots for a prepared import with
 no committed Guide; restores named trash roots for a prepared deletion whose

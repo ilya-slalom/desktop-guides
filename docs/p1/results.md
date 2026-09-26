@@ -179,3 +179,11 @@ same counts. Both unsigned MSIX package jobs passed. The installed ARM64
 P0 diagnostic regression passed **14/14** fixture workflows, and its record
 shows package and certificate cleanup. Installed production-app recovery
 remains a separate check; no M2 file mutation is wired yet.
+
+A second review found that a schema-valid uppercase `Guides.Id` was missed by
+the case-sensitive committed-guide lookup. A prepared import could then
+remove that guide's content directory. The regression failed on the first
+PR head; recovery now compares parsed GUIDs, rejects malformed or duplicate
+logical Guide IDs before cleanup, and counts content orphans by GUID. Locked
+Windows 11 x64 Infrastructure tests passed **41/41** after this fix. PR #5
+checks record CI for its current head.
