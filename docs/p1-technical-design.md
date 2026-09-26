@@ -257,21 +257,24 @@ own Game. Launch opens Library and may show a `Resume last guide` action; it
 does not auto-open that guide. A dialog or overlay returns focus to its
 invoking control. Every shortcut has a visible matching command.
 
-`AppInstance` registration in the production entry point gives one process
-ownership of the library and redirects later activations to its window. A
-process mutex would prevent duplicate owners but would discard the user's
-second launch. Use a synchronous `[STAThread]` entry point so WinUI creates
-its window on an STA thread. Register before the WinUI dispatcher starts;
-on a duplicate launch, redirect activation on a worker and wait on the STA
-for it to finish. Verify the same behavior on x64 and ARM64. On window close,
-stop accepting navigation and unregister the instance key so a new launch
-can own it. Await initialization and queued actions, then dispose the
-repository and close. This may briefly defer closing while a database write
-finishes; the old and new processes can overlap during this handoff. The
-installed smoke observes an activation acknowledgment from the existing
-window and checks that a launch requested during close opens a new window
-before the old process finishes a guide action blocked by a test-held write
-lock.
+`AppInstance` registration in the production entry point selects one process
+to own the library. The provisional package registers launch activation only.
+Use a synchronous `[STAThread]` entry point so WinUI creates its window on an
+STA thread. A duplicate launch connects to a same-user named pipe owned by
+that process. The UI callback activates the window and writes acceptance to
+that launch's connection before it can process a later close. A failed or
+closed connection causes the secondary to retry owner selection; a received
+acceptance ends the secondary launch even if the user then closes the window.
+File and protocol activation will need explicit payload forwarding when those
+extensions are added. Verify launch behavior on the supported targets.
+
+On window close, stop accepting navigation, reject pending launch connections,
+and unregister the instance key so a new launch can own it. Await
+initialization and queued actions, then dispose the repository and close.
+This may briefly defer closing while a database write finishes; the old and
+new processes can overlap during this handoff. The installed smoke checks
+acceptance, both close boundaries, and a new window opening while an old guide
+action is blocked by a test-held write lock.
 
 The P0 fixture picker and test assets remain available only in a separate
 CI/development probe mode. A production MSIX does not bundle the P0 corpus
@@ -508,7 +511,7 @@ project uses a provisional package identity until T17.1 sets the public one.
   window and stable ID-based back navigation. Start at Library, show an
   optional Resume action, and handle missing last-guide IDs. Serialize user
   route intents, including last-guide persistence, so a delayed lookup or
-  write cannot override a later selection. Redirect duplicate activations
+  write cannot override a later selection. Forward duplicate launch requests
   before the library opens and drain pending navigation on close. Keep a
   build-time diagnostic probe mode for P0 CI without shipping fixtures in
   the production package.

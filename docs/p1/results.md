@@ -363,3 +363,26 @@ and the shell-seed build passed. Both the push and
 [PR workflow](https://github.com/ilya-slalom/desktop-guides/actions/runs/36230903529)
 passed 8/8 jobs, including the native ARM64 P0 fixture regression. The
 complete P1 installed workflow remains T17.2 work.
+
+The next review fix at code head `625d3c3` replaces the process-wide
+activation acknowledgment with a same-user pipe connection for each launch.
+An accepted reply stays accepted after the old window closes; a delayed
+reply on an abandoned connection cannot acknowledge a later launch. The
+installed runner now waits for each verified test-owned process to exit
+before seeding metadata or removing the MSIX, and retains ownership if
+that wait times out.
+
+The signed Windows 11 x64
+[install record](evidence/ci/production-shell/activation-pipe/signed-install.json)
+from [push run 36233298067](https://github.com/ilya-slalom/desktop-guides/actions/runs/36233298067)
+shows acceptance before close without reopening, a new window when close
+precedes acceptance, and the queued-activation and library-lease handoffs.
+It also records removal of the temporary package and signer. The
+[launch trace](evidence/ci/production-shell/activation-pipe/launch.json)
+identifies the installed executable and interactive process. On the
+Windows 11 x64 host, PowerShell parsing, 45/45 Infrastructure tests, the
+delayed/already-exited/timed-out cleanup checks, and the unsigned x64
+production MSIX build passed. Both the push and
+[PR workflow](https://github.com/ilya-slalom/desktop-guides/actions/runs/36233300630)
+passed 8/8 jobs, including the native ARM64 P0 fixture regression. The
+complete P1 installed workflow remains T17.2 work.

@@ -73,7 +73,7 @@ controls and package identity remain separate gates.
 | --- | --- | --- | --- |
 | T03.2 | T03.1, T03.3 | Versioned migration runner, pre-upgrade SQLite backup, integrity checks, and a populated v1→v2 fixture. Injected failure retains usable prior data or an actionable recovery copy; newer schema fails clearly. | TR03.1, TR03.3 |
 | T15.2 | T03.1, T03.2, T03.3 | FileOperations startup reconciler and exact owned-path janitor, installed before mutating file operations. Phase and malformed-path tests retain unknown directories and never follow links. | TR15.1 |
-| T11.1 | T03.2, T11.2 | Library/Game/Reader/Settings route coordinator and separate diagnostic build mode. Launch, Back, stale-ID, redirected-activation acknowledgment, close/relaunch handoff, and route tests pass on installed WinUI; production package has no fixtures. | TR11.1 |
+| T11.1 | T03.2, T11.2 | Library/Game/Reader/Settings route coordinator and separate diagnostic build mode. Launch, Back, stale-ID, duplicate-launch acknowledgment, close/relaunch handoff, and route tests pass on installed WinUI; production package has no fixtures. | TR11.1 |
 | T11.3 | T11.1, T11.2 | Capability-based reader bar, navigation pane, overflow, and status/focus behavior. Keyboard and pointer trace returns Reader → its Game with query and selection retained. | TR11.1, TR11.2 |
 | T17.1 | T11.1 | Production MSIX identity/version/signing and prerequisite delivery plan, plus tested x64 packaging configuration. Install and upgrade use the same identity; credentials stay outside source/logs. Final signing and architecture claims remain gated by M6. | TR17.2 |
 
@@ -114,18 +114,18 @@ lease. The OS releases the file handle if a process exits unexpectedly.
 
 For activation, mark a closing target before unregistering its key. A launch
 that selected that target retries registration after the target closes,
-including when redirection fails; a launch redirected to a healthy target
+including when its connection fails; a launch accepted by a healthy target
 still exits. In the installed gate, bind every UI trace and cleanup action to
 the launched process and session. Queue a guide different from the seeded
 Resume guide, then verify its persisted Resume state after lock release and
 old-process exit. Pass when locked Infrastructure tests, production builds,
 and the signed Windows 11 x64 installed handoff gate succeed.
 
-The follow-up review found a gap between queueing a redirected activation and
-accepting it on the UI thread. Make the secondary wait for a process-specific
-acceptance signal emitted only after the window activates; on close or failed
-acknowledgment, retry ownership. Exercise this boundary in the installed
-handoff test.
+The follow-up review found a gap between queueing a duplicate launch and
+accepting it on the UI thread. Make the secondary wait for an acceptance
+reply emitted only after the window activates; if the target closes before
+acceptance, retry ownership. Exercise this boundary in the installed handoff
+test.
 
 The installed runner also needs positive process ownership. A same-session
 process appearing after the task starts is insufficient proof. Launch the
