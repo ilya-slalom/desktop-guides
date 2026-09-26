@@ -212,6 +212,22 @@ Game and reopen the same guide. Existing pointer, Enter, and long-list
 focus checks must continue to pass. Verify the Release x64 production
 package and all Windows CI jobs before recording this exit.
 
+At code head `6f87930`, all nine jobs passed in push run `36257913348`
+and PR run `36257915129`. The
+[normal route trace](evidence/ci/production-shell/reader-shell/game-switch-invoke/normal.json)
+records UI Automation Invoke, pointer, and Enter reopening the selected
+guide. The [two-game trace](evidence/ci/production-shell/reader-shell/game-switch-invoke/switch-game.json)
+records only the current game's guide and Reader context after switching.
+The [long-list trace](evidence/ci/production-shell/reader-shell/game-switch-invoke/long-list.json)
+retains offscreen focus and Enter reopening. The
+[signed install result](evidence/ci/production-shell/reader-shell/game-switch-invoke/signed-install.json)
+records temporary package and certificate cleanup. The
+[Game screenshot](evidence/ci/production-shell/reader-shell/game-switch-invoke/normal.game.png)
+shows the contextual action above the selected guide row. The local
+Windows 11 x64 host passed PowerShell parsing, all shell seed modes, a
+locked Release production package build, and the production fixture
+exclusion check.
+
 ### T11.1 review follow-up: close handoff and installed gate
 
 The shell must allow a new window to appear while the old one drains, but
