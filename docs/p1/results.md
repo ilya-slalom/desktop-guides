@@ -457,3 +457,19 @@ launch and the original shell in the foreground afterward. The
 records the two window handles and the duplicate's exit. The installed
 run passed with no test package or temporary certificate left behind.
 The complete P1 installed workflow remains T17.2 work.
+
+The parallel
+[PR run 36240553671](https://github.com/ilya-slalom/desktop-guides/actions/runs/36240553671)
+for `a1f7ee5` exposed a duplicate-process exit between its image-path query
+and the handle's exit signal. Code head `5bd2821` waits up to 500 ms for
+that exact handle only after a process-information query fails; a still-live
+process remains an error. The Windows 11 x64 host passed the handle and
+launch-handoff checks, including a post-exit ownership check. The signed
+Windows 11 x64
+[install record](evidence/ci/production-shell/foreground-exit-transition/signed-install.json)
+from [push run 36241173720](https://github.com/ilya-slalom/desktop-guides/actions/runs/36241173720)
+passed the background-window activation and reports package, certificate,
+and process cleanup. The
+[focus trace](evidence/ci/production-shell/foreground-exit-transition/second-launch.json.foreground.json)
+again records the test window before launch and the original shell after
+the duplicate exited.

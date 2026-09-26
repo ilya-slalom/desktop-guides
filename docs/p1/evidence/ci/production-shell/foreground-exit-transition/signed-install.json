@@ -1,0 +1,200 @@
+{
+  "runId": "2b7a30471b0a438faa8286637c71a75f",
+  "observedAt": "2026-09-26T12:15:30.9561816Z",
+  "osBuild": "10.0.26100.0",
+  "cpuArchitecture": "AMD64",
+  "success": true,
+  "windowsAppRuntime": [],
+  "dotnetSdk": "10.0.401",
+  "sourcePackageSha256": "D84B0410B66292A488F60C9476662D0ECB43E3C58E17DD8BCB4DD45B3B40C930",
+  "certificateThumbprint": "16B9164C9D9D5BE4969B0C37CD7CF349BFB4E343",
+  "signedPackageSha256": "8271A722F14C06B05A0D02D8D67602A3C15C9FF0E63DAF74E28715AB0B96D031",
+  "packageFullName": "DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+  "packageFamilyName": "DesktopGuides.Preview_en8r599z3n35j",
+  "installLocation": "C:\\Program Files\\WindowsApps\\DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+  "launchedProcessId": 7192,
+  "launchedSessionId": 2,
+  "empty": {
+    "mode": "empty",
+    "invocationId": "c803eaee09104b75a8ac05cb6c3545fa",
+    "observedAt": "2026-09-26T12:15:55.3236685Z",
+    "processId": 5116,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 2000,
+    "success": true,
+    "phases": [
+      "library",
+      "empty-library"
+    ]
+  },
+  "emptyAfterDelayedTask": {
+    "mode": "empty",
+    "invocationId": "b9888618900f414f842c23120a94d62e",
+    "observedAt": "2026-09-26T12:16:00.0604279Z",
+    "processId": 5116,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "empty-library"
+    ]
+  },
+  "secondLaunchProcessId": 9192,
+  "backgroundActivation": {
+    "handoffToken": "06864b7633ea4a2fabc1c1e3d9770c6e",
+    "foregroundTargetProcessId": 5116,
+    "probeWindowHandle": 66082,
+    "foregroundWindowBefore": 66082,
+    "targetWindowHandle": 459152,
+    "foregroundWindowHandle": 459152,
+    "childExited": true,
+    "success": true
+  },
+  "redirectedActivationObserved": true,
+  "secondLaunchProcessIds": [
+    5116
+  ],
+  "singleInstanceProcessId": 5116,
+  "emptyAfterSecondLaunch": {
+    "mode": "empty",
+    "invocationId": "a82d550c04dc4ce8b8a0b9b80c2da844",
+    "observedAt": "2026-09-26T12:16:04.1575531Z",
+    "processId": 5116,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "empty-library"
+    ]
+  },
+  "normal": {
+    "mode": "normal",
+    "invocationId": "265bf9d06232406a816efdd4b2594b97",
+    "observedAt": "2026-09-26T12:16:21.6960412Z",
+    "processId": 1712,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-back-game",
+      "game-back-library",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game"
+    ]
+  },
+  "pendingGuide": {
+    "mode": "queue-guide",
+    "invocationId": "e7e33a12c4424632a78cdd9873dd7761",
+    "observedAt": "2026-09-26T12:16:24.3542238Z",
+    "processId": 1712,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "guide-action-started"
+    ]
+  },
+  "closeHandoffOverlapObserved": true,
+  "waitingDuringClose": {
+    "mode": "waiting-handoff",
+    "invocationId": "576d6e8b74834bb1bd3b6611bd447925",
+    "observedAt": "2026-09-26T12:16:28.2819973Z",
+    "processId": 732,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "waiting-for-library-lease"
+    ]
+  },
+  "relaunchDuringCloseProcessId": 732,
+  "normalAfterCloseRelaunch": {
+    "mode": "normal",
+    "invocationId": "24e7cc16228646cd99a898deb5cd3de1",
+    "observedAt": "2026-09-26T12:16:29.901744Z",
+    "processId": 732,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-back-game",
+      "game-back-library",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game"
+    ]
+  },
+  "closingTargetSelected": true,
+  "closingTargetRelaunchProcessId": 2196,
+  "normalAfterClosingTarget": {
+    "mode": "normal",
+    "invocationId": "991bacb0227a4b5ebd1a87e31862cc16",
+    "observedAt": "2026-09-26T12:16:35.5365014Z",
+    "processId": 2196,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-back-game",
+      "game-back-library",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game"
+    ]
+  },
+  "activationQueuedBeforeClose": true,
+  "queuedActivationRelaunchProcessId": 8468,
+  "normalAfterQueuedActivation": {
+    "mode": "normal",
+    "invocationId": "cbc6f9e0ff9e460d86e852d49236c610",
+    "observedAt": "2026-09-26T12:16:39.3564305Z",
+    "processId": 8468,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-back-game",
+      "game-back-library",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game"
+    ]
+  },
+  "acceptedBeforeClose": true,
+  "acceptedCloseDidNotRelaunch": true,
+  "stale": {
+    "mode": "stale",
+    "invocationId": "64963a3b4c9e44c6adc1123c27f6cf0a",
+    "observedAt": "2026-09-26T12:16:47.1545974Z",
+    "processId": 7192,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "stale-resume-hidden"
+    ]
+  },
+  "closedGracefully": true,
+  "packageStillInstalled": false,
+  "certificateStillTrusted": false
+}
