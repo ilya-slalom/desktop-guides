@@ -114,7 +114,8 @@ public sealed partial class ReaderToolbar : UserControl
     }
 
     private async Task<string?> PromptAsync(
-        string title, string label, string primaryButtonText)
+        string title, string label, string primaryButtonText,
+        Control invokingControl, IReaderSession expectedSession)
     {
         TextBox input = new()
         {
@@ -130,9 +131,20 @@ public sealed partial class ReaderToolbar : UserControl
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = XamlRoot
         };
-        return await dialog.ShowAsync() == ContentDialogResult.Primary
-            ? input.Text.Trim()
-            : null;
+        dialog.Opened += (_, _) => input.Focus(FocusState.Programmatic);
+        try
+        {
+            return await dialog.ShowAsync() == ContentDialogResult.Primary
+                ? input.Text.Trim()
+                : null;
+        }
+        finally
+        {
+            if (ReferenceEquals(session, expectedSession))
+            {
+                invokingControl.Focus(FocusState.Programmatic);
+            }
+        }
     }
 
     private async void PreviousPageClicked(object sender, RoutedEventArgs args) =>
@@ -159,7 +171,12 @@ public sealed partial class ReaderToolbar : UserControl
     private async void GoToPageClicked(object sender, RoutedEventArgs args)
     {
         IReaderSession? current = session;
-        string? value = await PromptAsync("Go to page", "Page number", "Go");
+        if (current is null)
+        {
+            return;
+        }
+        string? value = await PromptAsync(
+            "Go to page", "Page number", "Go", GoToPage, current);
         if (value is null || !ReferenceEquals(current, session))
         {
             return;
@@ -175,7 +192,12 @@ public sealed partial class ReaderToolbar : UserControl
     private async void FindInGuideClicked(object sender, RoutedEventArgs args)
     {
         IReaderSession? current = session;
-        string? query = await PromptAsync("Find in guide", "Search text", "Find");
+        if (current is null)
+        {
+            return;
+        }
+        string? query = await PromptAsync(
+            "Find in guide", "Search text", "Find", FindInGuide, current);
         if (query is null || !ReferenceEquals(current, session))
         {
             return;

@@ -32,6 +32,10 @@ public sealed partial class ShellWindow : Window
         InitializeComponent();
         Title = "Desktop Guides Preview";
         Navigation.SelectedItem = LibraryItem;
+        GuideList.AddHandler(
+            UIElement.TappedEvent, new TappedEventHandler(GuideTapped), true);
+        GuideList.AddHandler(
+            UIElement.KeyDownEvent, new KeyEventHandler(GuideKeyDown), true);
         ReaderActions.CommandFailed += message => ShellStatus.Text = message;
         AppWindow.Closing += WindowClosing;
     }

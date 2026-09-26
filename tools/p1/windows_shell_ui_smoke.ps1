@@ -169,6 +169,13 @@ try {
         throw "Expected keyboard focus on '$expected' after Back."
     }
 
+    function Activate-SelectedGuide([string] $expected) {
+        $selected = Wait-SelectedGuide $expected
+        $selected.SetFocus()
+        Wait-FocusedGuide $expected
+        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    }
+
     function Save-ReaderScreenshot {
         Add-Type -AssemblyName System.Drawing
         $bounds = $root.Current.BoundingRectangle
@@ -251,12 +258,11 @@ try {
         Invoke-Element $readerBack
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Name 'ShellStatus' 'Game ready.')
-        $selectedGuide = Wait-SelectedGuide $ExpectedResumeGuide
+        [void](Wait-SelectedGuide $ExpectedResumeGuide)
         Wait-FocusedGuide $ExpectedResumeGuide
         $report.phases += 'reader-back-game'
 
-        $selectedGuide.SetFocus()
-        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        Activate-SelectedGuide $ExpectedResumeGuide
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
         [void](Wait-Name 'ShellStatus' 'Guide details ready.')
         $report.phases += 'reopen-selected-guide'
@@ -284,7 +290,7 @@ try {
         [void](Wait-Name 'ShellStatus' 'Game ready.')
         $report.phases += 'rapid-game-settings-back-game'
 
-        Select-Element 'Route Test Guide'
+        Activate-SelectedGuide 'Route Test Guide'
         Select-Element 'Settings'
         [void](Wait-Name 'SettingsHeading' 'Settings')
         [void](Wait-Name 'ShellStatus' 'Settings ready.')

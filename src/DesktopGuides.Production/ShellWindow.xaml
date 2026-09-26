@@ -74,8 +74,6 @@
                           DisplayMemberPath="Title"
                           SelectionMode="Single"
                           SelectionChanged="GuideSelected"
-                          Tapped="GuideTapped"
-                          KeyDown="GuideKeyDown"
                           AutomationProperties.AutomationId="GuideList" />
             </Grid>
 

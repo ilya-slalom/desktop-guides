@@ -485,7 +485,7 @@ to its row; activating the selected row can reopen it.
 On the Windows 11 x64 host, build `10.0.26200.0`, with source staged under
 `E:\work\desktop-guides`, locked production restore and the unsigned Release
 x64 MSIX build passed. The MSIX SHA-256 is
-`28371881b7b490d01d90c8327b95e6259aa2d9566f61a8347cd81157a3f98105`.
+`1b20ada10646f124dd6e2f716df9fcf6ee8c84a7d9e411bbd95569fb2be6e293`.
 The build reported only the existing missing-`mspdbcmf.exe` symbols warning.
 The updated installed-smoke script passed Windows PowerShell 5.1 parsing.
 The host retains an installed Preview package, so its fresh-profile M1
