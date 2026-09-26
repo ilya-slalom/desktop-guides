@@ -135,7 +135,7 @@ stage files before one database transaction publishes a new guide.
 | --- | --- | --- | --- |
 | TXT | Decode into a normalized text model and render through a bounded/virtualized native WinUI text view. Preserve fixed-width layout by default. Offer an encoding choice when detection is uncertain. | Character offset in normalized text plus a small surrounding text fingerprint. | Smart reflow and reliable automatic section detection need separate work. |
 | HTML | Render a managed local copy in WinUI 3 `WebView2`; retain supported relative images/CSS. The host reads the current visible element/text position through controlled DOM calls. | Document-relative path, element/text context, and offset; scroll ratio as fallback. | Dynamic scripts and remote resources are outside the offline MVP. Some live-site layouts may look different. |
-| PDF | Retain the P0 `Windows.Data.Pdf` page preview only while P1 validates a text-capable path; do not ship a raster-only PDF reader as complete. | Zero-based page index plus fractional vertical offset within the page. | The P0 page image exposed no tagged document text to UI Automation. S10 requires a tested accessible text path. |
+| PDF | Use the [T10.0 decision](p1/pdf-decision.md): `Windows.Data.Pdf` preview and PdfPig text for the same page. Implement it as a production adapter before release. | Zero-based page index plus fractional vertical offset within the page. | The prototype exposed the tagged paragraph through UI Automation and keyboard selection on Windows 11 x64. Production Narrator, cache, and installed offline gates remain. |
 
 For HTML, treat every imported document as untrusted. Disable document
 JavaScript, host objects, web messages, and unneeded browser features. Allow

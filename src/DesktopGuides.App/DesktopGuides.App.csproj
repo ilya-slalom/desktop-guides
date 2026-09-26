@@ -16,6 +16,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" />
     <PackageReference Include="Microsoft.Web.WebView2" />
+    <PackageReference Include="PdfPig" />
     <ProjectReference Include="../DesktopGuides.Core/DesktopGuides.Core.csproj" />
     <Manifest Include="$(ApplicationManifest)" />
     <Content Include="Assets\*.png" />

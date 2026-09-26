@@ -1,0 +1,25 @@
+{
+  "observedAt": "2026-09-25T11:23:58.6001126Z",
+  "osBuild": "10.0.26200.0",
+  "sessionId": 1,
+  "executableSha256": "2229bd2989d8464429c017e0982837dde0ff3bdddb553f76ad19681e840901a3",
+  "appAssemblySha256": "f5dc3a8bb53a8b9264eefefb64b1e22f47547f75bd906e25d0e61a312a740e85",
+  "success": true,
+  "openStatus": "pdf-access: WebView2 PDF candidate: allowed 1, blocked 0",
+  "loaded": true,
+  "automationElementCount": 12,
+  "taggedParagraphInName": false,
+  "taggedParagraphInTextPattern": false,
+  "textPatternCount": 2,
+  "textPatterns": [
+    {
+      "name": "Desktop Guides — P0 reader probe",
+      "textPreview": "Desktop Guides — P0 reader probe"
+    },
+    {
+      "name": "pdf-access: WebView2 PDF candidate: allowed 1, blocked 0",
+      "textPreview": "pdf-access: WebView2 PDF candidate: allowed 1, blocked 0"
+    }
+  ],
+  "captureStatus": "Capture failed: The WebView2 PDF candidate has no validated page/fraction locator API."
+}

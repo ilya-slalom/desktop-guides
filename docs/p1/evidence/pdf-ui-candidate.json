@@ -1,0 +1,31 @@
+{
+  "observedAt": "2026-09-25T15:40:10.6951287Z",
+  "osBuild": "10.0.26200.0",
+  "sessionId": 1,
+  "executableSha256": "2229bd2989d8464429c017e0982837dde0ff3bdddb553f76ad19681e840901a3",
+  "appAssemblySha256": "36ffc1af5c5d6ed4541f4dd292cc9ed8ed6773f2b60152f3c053a9a14c9452c9",
+  "networkMode": "Online",
+  "success": true,
+  "tagged": {
+    "hasTextPattern": true,
+    "text": "Tagged guide paragraph for Narrator",
+    "selection": "Tagged guide paragraph for Narrator"
+  },
+  "taggedPageStatus": "Page 1 of 1",
+  "scanned": {
+    "hasTextPattern": true,
+    "text": "",
+    "selection": ""
+  },
+  "scannedLabel": "Image-only page; OCR is unavailable",
+  "wrongPasswordStatus": "Incorrect password; try again",
+  "lockedPageStatus": "Page 1 of 1",
+  "lockedText": "Locked guide secret page",
+  "longPage2Text": "Desktop Guides P0 - page 2 of 200",
+  "longRestoredPageStatus": "Page 2 of 200",
+  "longWorkingSetStartBytes": 259538944,
+  "longWorkingSetPeakBytes": 262098944,
+  "longPageTurnCount": 23,
+  "longPage25Text": "Desktop Guides P0 - page 25 of 200",
+  "longWorkingSetEndBytes": 262098944
+}

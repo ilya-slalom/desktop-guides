@@ -1,0 +1,88 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="4d0ab08a-7ed7-4523-8f38-997dfc3afb76" name="runneradmin@runnervm1vfjv 2026-09-25 08:56:03" runUser="runnervm1vfjv\runneradmin" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-25T08:56:03.7629853-07:00" queuing="2026-09-25T08:56:03.7629855-07:00" start="2026-09-25T08:56:02.7255841-07:00" finish="2026-09-25T08:56:04.0733069-07:00" />
+  <TestSettings name="default" id="4b0f8b52-482e-4127-9774-b623f86c553d">
+    <Deployment runDeploymentRoot="runneradmin_runnervm1vfjv_2026-09-25_08_56_03" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="93251252-4ebe-4a3b-95b7-0ca37fa78b67" testId="f2d45e5f-945d-5bc9-e767-b6ebbd175500" testName="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests.RejectsUnsafeStoredPaths(path: &quot;styles\\main.css&quot;)" computerName="runnervm1vfjv" duration="00:00:00.0045741" startTime="2026-09-25T08:56:03.4479719-07:00" endTime="2026-09-25T08:56:03.4486859-07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="93251252-4ebe-4a3b-95b7-0ca37fa78b67" />
+    <UnitTestResult executionId="7c793282-b243-47fb-98aa-1bea4f2da2da" testId="48291d78-9fdd-b6b4-5628-47488178ee67" testName="DesktopGuides.Infrastructure.Tests.SqliteLibraryRepositoryTests.PersistsTwoIndependentGuideStatesAndSettingsAcrossReopen" computerName="runnervm1vfjv" duration="00:00:00.2896420" startTime="2026-09-25T08:56:03.7309076-07:00" endTime="2026-09-25T08:56:04.0089514-07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7c793282-b243-47fb-98aa-1bea4f2da2da" />
+    <UnitTestResult executionId="79349806-325d-4280-847a-22df0956297b" testId="63c30adb-f024-4ca6-088a-38aabfbd90ab" testName="DesktopGuides.Infrastructure.Tests.SqliteLibraryRepositoryTests.RejectsInvalidMetadataAndUnknownGuidePosition" computerName="runnervm1vfjv" duration="00:00:00.0520415" startTime="2026-09-25T08:56:03.6661465-07:00" endTime="2026-09-25T08:56:03.7186780-07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="79349806-325d-4280-847a-22df0956297b" />
+    <UnitTestResult executionId="866f6fa3-222a-443e-ba3a-df373b9a0d72" testId="134b2996-4ea9-bc81-1dae-4143e9f3c47d" testName="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests.RejectsFileAndDirectoryLinks" computerName="runnervm1vfjv" duration="00:00:00.0264898" startTime="2026-09-25T08:56:03.4012327-07:00" endTime="2026-09-25T08:56:03.4367746-07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="866f6fa3-222a-443e-ba3a-df373b9a0d72" />
+    <UnitTestResult executionId="884f48f0-734c-43b5-a6d6-7b814e0153bf" testId="ee2d5a1c-0d62-facd-0478-3a20639a404b" testName="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests.RejectsUnsafeStoredPaths(path: &quot;C:/outside.txt&quot;)" computerName="runnervm1vfjv" duration="00:00:00.0040311" startTime="2026-09-25T08:56:03.4488237-07:00" endTime="2026-09-25T08:56:03.4527774-07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="884f48f0-734c-43b5-a6d6-7b814e0153bf" />
+    <UnitTestResult executionId="b36b0a52-7909-4adb-a6e8-789637b1d001" testId="f9fbc1e0-eee7-f4a0-2b6f-1e4a2c59c6c8" testName="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests.RejectsUnsafeStoredPaths(path: &quot;styles/%2fmain.css&quot;)" computerName="runnervm1vfjv" duration="00:00:00.0050395" startTime="2026-09-25T08:56:03.4471161-07:00" endTime="2026-09-25T08:56:03.4472179-07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b36b0a52-7909-4adb-a6e8-789637b1d001" />
+    <UnitTestResult executionId="57259983-1163-4613-aaf5-0f5fe290d83b" testId="589fa631-5dee-f2a2-23aa-0da86f93d0bb" testName="DesktopGuides.Infrastructure.Tests.SqliteLibraryRepositoryTests.RejectsGuideRootThatIsNotBoundToItsId" computerName="runnervm1vfjv" duration="00:00:00.2546437" startTime="2026-09-25T08:56:03.4026989-07:00" endTime="2026-09-25T08:56:03.6647468-07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="57259983-1163-4613-aaf5-0f5fe290d83b" />
+    <UnitTestResult executionId="22c9db8c-49af-456e-b8a4-4bd80071a003" testId="7efac092-12ce-8d44-5e48-17e78634527f" testName="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests.RejectsUnsafeStoredPaths(path: &quot;../outside.txt&quot;)" computerName="runnervm1vfjv" duration="00:00:00.0044395" startTime="2026-09-25T08:56:03.4529103-07:00" endTime="2026-09-25T08:56:03.4573008-07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="22c9db8c-49af-456e-b8a4-4bd80071a003" />
+    <UnitTestResult executionId="cd033239-ba17-4e6b-9178-c1c847c4b549" testId="9d5a59d1-b974-2c7e-00bc-a17e9965bd53" testName="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests.ResolvesOnlyExistingFilesInsideGeneratedGuideRoot" computerName="runnervm1vfjv" duration="00:00:00.0113067" startTime="2026-09-25T08:56:03.5123513-07:00" endTime="2026-09-25T08:56:03.5235363-07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="cd033239-ba17-4e6b-9178-c1c847c4b549" />
+    <UnitTestResult executionId="611f7c76-fb6e-467f-b1be-5a0319eeb7dd" testId="dd1140ab-0ae3-8182-f044-781a698c3511" testName="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests.RejectsWindowsJunctions" computerName="runnervm1vfjv" duration="00:00:00.0547301" startTime="2026-09-25T08:56:03.4575387-07:00" endTime="2026-09-25T08:56:03.5121215-07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="611f7c76-fb6e-467f-b1be-5a0319eeb7dd" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="DesktopGuides.Infrastructure.Tests.SqliteLibraryRepositoryTests.PersistsTwoIndependentGuideStatesAndSettingsAcrossReopen" storage="c:\a\desktop-guides\desktop-guides\tests\desktopguides.infrastructure.tests\bin\release\net10.0\desktopguides.infrastructure.tests.dll" id="48291d78-9fdd-b6b4-5628-47488178ee67">
+      <Execution id="7c793282-b243-47fb-98aa-1bea4f2da2da" />
+      <TestMethod codeBase="C:\a\desktop-guides\desktop-guides\tests\DesktopGuides.Infrastructure.Tests\bin\Release\net10.0\DesktopGuides.Infrastructure.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DesktopGuides.Infrastructure.Tests.SqliteLibraryRepositoryTests" name="PersistsTwoIndependentGuideStatesAndSettingsAcrossReopen" />
+    </UnitTest>
+    <UnitTest name="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests.RejectsFileAndDirectoryLinks" storage="c:\a\desktop-guides\desktop-guides\tests\desktopguides.infrastructure.tests\bin\release\net10.0\desktopguides.infrastructure.tests.dll" id="134b2996-4ea9-bc81-1dae-4143e9f3c47d">
+      <Execution id="866f6fa3-222a-443e-ba3a-df373b9a0d72" />
+      <TestMethod codeBase="C:\a\desktop-guides\desktop-guides\tests\DesktopGuides.Infrastructure.Tests\bin\Release\net10.0\DesktopGuides.Infrastructure.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests" name="RejectsFileAndDirectoryLinks" />
+    </UnitTest>
+    <UnitTest name="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests.RejectsUnsafeStoredPaths(path: &quot;../outside.txt&quot;)" storage="c:\a\desktop-guides\desktop-guides\tests\desktopguides.infrastructure.tests\bin\release\net10.0\desktopguides.infrastructure.tests.dll" id="7efac092-12ce-8d44-5e48-17e78634527f">
+      <Execution id="22c9db8c-49af-456e-b8a4-4bd80071a003" />
+      <TestMethod codeBase="C:\a\desktop-guides\desktop-guides\tests\DesktopGuides.Infrastructure.Tests\bin\Release\net10.0\DesktopGuides.Infrastructure.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests" name="RejectsUnsafeStoredPaths" />
+    </UnitTest>
+    <UnitTest name="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests.RejectsUnsafeStoredPaths(path: &quot;styles/%2fmain.css&quot;)" storage="c:\a\desktop-guides\desktop-guides\tests\desktopguides.infrastructure.tests\bin\release\net10.0\desktopguides.infrastructure.tests.dll" id="f9fbc1e0-eee7-f4a0-2b6f-1e4a2c59c6c8">
+      <Execution id="b36b0a52-7909-4adb-a6e8-789637b1d001" />
+      <TestMethod codeBase="C:\a\desktop-guides\desktop-guides\tests\DesktopGuides.Infrastructure.Tests\bin\Release\net10.0\DesktopGuides.Infrastructure.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests" name="RejectsUnsafeStoredPaths" />
+    </UnitTest>
+    <UnitTest name="DesktopGuides.Infrastructure.Tests.SqliteLibraryRepositoryTests.RejectsInvalidMetadataAndUnknownGuidePosition" storage="c:\a\desktop-guides\desktop-guides\tests\desktopguides.infrastructure.tests\bin\release\net10.0\desktopguides.infrastructure.tests.dll" id="63c30adb-f024-4ca6-088a-38aabfbd90ab">
+      <Execution id="79349806-325d-4280-847a-22df0956297b" />
+      <TestMethod codeBase="C:\a\desktop-guides\desktop-guides\tests\DesktopGuides.Infrastructure.Tests\bin\Release\net10.0\DesktopGuides.Infrastructure.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DesktopGuides.Infrastructure.Tests.SqliteLibraryRepositoryTests" name="RejectsInvalidMetadataAndUnknownGuidePosition" />
+    </UnitTest>
+    <UnitTest name="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests.RejectsWindowsJunctions" storage="c:\a\desktop-guides\desktop-guides\tests\desktopguides.infrastructure.tests\bin\release\net10.0\desktopguides.infrastructure.tests.dll" id="dd1140ab-0ae3-8182-f044-781a698c3511">
+      <Execution id="611f7c76-fb6e-467f-b1be-5a0319eeb7dd" />
+      <TestMethod codeBase="C:\a\desktop-guides\desktop-guides\tests\DesktopGuides.Infrastructure.Tests\bin\Release\net10.0\DesktopGuides.Infrastructure.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests" name="RejectsWindowsJunctions" />
+    </UnitTest>
+    <UnitTest name="DesktopGuides.Infrastructure.Tests.SqliteLibraryRepositoryTests.RejectsGuideRootThatIsNotBoundToItsId" storage="c:\a\desktop-guides\desktop-guides\tests\desktopguides.infrastructure.tests\bin\release\net10.0\desktopguides.infrastructure.tests.dll" id="589fa631-5dee-f2a2-23aa-0da86f93d0bb">
+      <Execution id="57259983-1163-4613-aaf5-0f5fe290d83b" />
+      <TestMethod codeBase="C:\a\desktop-guides\desktop-guides\tests\DesktopGuides.Infrastructure.Tests\bin\Release\net10.0\DesktopGuides.Infrastructure.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DesktopGuides.Infrastructure.Tests.SqliteLibraryRepositoryTests" name="RejectsGuideRootThatIsNotBoundToItsId" />
+    </UnitTest>
+    <UnitTest name="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests.ResolvesOnlyExistingFilesInsideGeneratedGuideRoot" storage="c:\a\desktop-guides\desktop-guides\tests\desktopguides.infrastructure.tests\bin\release\net10.0\desktopguides.infrastructure.tests.dll" id="9d5a59d1-b974-2c7e-00bc-a17e9965bd53">
+      <Execution id="cd033239-ba17-4e6b-9178-c1c847c4b549" />
+      <TestMethod codeBase="C:\a\desktop-guides\desktop-guides\tests\DesktopGuides.Infrastructure.Tests\bin\Release\net10.0\DesktopGuides.Infrastructure.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests" name="ResolvesOnlyExistingFilesInsideGeneratedGuideRoot" />
+    </UnitTest>
+    <UnitTest name="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests.RejectsUnsafeStoredPaths(path: &quot;C:/outside.txt&quot;)" storage="c:\a\desktop-guides\desktop-guides\tests\desktopguides.infrastructure.tests\bin\release\net10.0\desktopguides.infrastructure.tests.dll" id="ee2d5a1c-0d62-facd-0478-3a20639a404b">
+      <Execution id="884f48f0-734c-43b5-a6d6-7b814e0153bf" />
+      <TestMethod codeBase="C:\a\desktop-guides\desktop-guides\tests\DesktopGuides.Infrastructure.Tests\bin\Release\net10.0\DesktopGuides.Infrastructure.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests" name="RejectsUnsafeStoredPaths" />
+    </UnitTest>
+    <UnitTest name="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests.RejectsUnsafeStoredPaths(path: &quot;styles\\main.css&quot;)" storage="c:\a\desktop-guides\desktop-guides\tests\desktopguides.infrastructure.tests\bin\release\net10.0\desktopguides.infrastructure.tests.dll" id="f2d45e5f-945d-5bc9-e767-b6ebbd175500">
+      <Execution id="93251252-4ebe-4a3b-95b7-0ca37fa78b67" />
+      <TestMethod codeBase="C:\a\desktop-guides\desktop-guides\tests\DesktopGuides.Infrastructure.Tests\bin\Release\net10.0\DesktopGuides.Infrastructure.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DesktopGuides.Infrastructure.Tests.ManagedPathResolverTests" name="RejectsUnsafeStoredPaths" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="f2d45e5f-945d-5bc9-e767-b6ebbd175500" executionId="93251252-4ebe-4a3b-95b7-0ca37fa78b67" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="48291d78-9fdd-b6b4-5628-47488178ee67" executionId="7c793282-b243-47fb-98aa-1bea4f2da2da" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="63c30adb-f024-4ca6-088a-38aabfbd90ab" executionId="79349806-325d-4280-847a-22df0956297b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="134b2996-4ea9-bc81-1dae-4143e9f3c47d" executionId="866f6fa3-222a-443e-ba3a-df373b9a0d72" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ee2d5a1c-0d62-facd-0478-3a20639a404b" executionId="884f48f0-734c-43b5-a6d6-7b814e0153bf" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f9fbc1e0-eee7-f4a0-2b6f-1e4a2c59c6c8" executionId="b36b0a52-7909-4adb-a6e8-789637b1d001" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="589fa631-5dee-f2a2-23aa-0da86f93d0bb" executionId="57259983-1163-4613-aaf5-0f5fe290d83b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7efac092-12ce-8d44-5e48-17e78634527f" executionId="22c9db8c-49af-456e-b8a4-4bd80071a003" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9d5a59d1-b974-2c7e-00bc-a17e9965bd53" executionId="cd033239-ba17-4e6b-9178-c1c847c4b549" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="dd1140ab-0ae3-8182-f044-781a698c3511" executionId="611f7c76-fb6e-467f-b1be-5a0319eeb7dd" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="10" executed="10" passed="10" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.5+1b188a7b0a (64-bit .NET 10.0.12)&#xD;
+[xUnit.net 00:00:00.12]   Discovering: DesktopGuides.Infrastructure.Tests&#xD;
+[xUnit.net 00:00:00.17]   Discovered:  DesktopGuides.Infrastructure.Tests&#xD;
+[xUnit.net 00:00:00.20]   Starting:    DesktopGuides.Infrastructure.Tests&#xD;
+[xUnit.net 00:00:00.84]   Finished:    DesktopGuides.Infrastructure.Tests&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

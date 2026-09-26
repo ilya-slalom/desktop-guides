@@ -7,8 +7,9 @@ and [implementation plan](p1/implementation-plan.md). Source:
 [initial requirements and high-level design](initial-design.md). The backlog
 defines the acceptance gates; [Windows results](p0/results.md) record
 which checks have been performed. Windows 10 is deferred; native ARM64 CI
-passed the installed reader fixtures. [The PDF decision](p0/reader-decisions.md)
-blocks S10 until a text-capable engine is validated.
+passed the installed reader fixtures. [P1 T10.0](p1/pdf-decision.md) selected
+a text-capable PDF prototype; S10 remains open until the production adapter
+passes its accessibility and installed-offline gates.
 
 ## How to use this backlog
 
@@ -260,6 +261,8 @@ selection and a screen reader; a scanned PDF is labeled image-only.
 
 - **T10.0** Select and validate a distributable text-capable PDF path against
   tagged and scanned fixtures, offline behavior, page location, and licensing.
+  [M0 prototype decision](p1/pdf-decision.md): native preview plus PdfPig text;
+  production acceptance remains under T10.1–T10.3 and T16.3.
 - **T10.1** Render and recycle pages with bounded cache/memory use.
 - **T10.2** Add page count, page jump, fit-to-width, zoom, and keyboard commands.
 - **T10.3** Persist zero-based page index and within-page fraction.

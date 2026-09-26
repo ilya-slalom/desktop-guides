@@ -26,6 +26,12 @@
           "Microsoft.WindowsAppSDK.WinUI": "2.3.9"
         }
       },
+      "PdfPig": {
+        "type": "Direct",
+        "requested": "[0.1.16, )",
+        "resolved": "0.1.16",
+        "contentHash": "qQcbsNMYVY+K5ELptax2S8thNMk0+rSQq3H/KdYj3LLcko8yTCz8y5KIvsKxIyAuTN0ZYNnfsZkM+0EvxTwHVA=="
+      },
       "Microsoft.Windows.AI.MachineLearning": {
         "type": "Transitive",
         "resolved": "2.1.74",
