@@ -41,6 +41,7 @@ $report = [ordered]@{
 try {
     Add-Type -AssemblyName UIAutomationClient
     Add-Type -AssemblyName UIAutomationTypes
+    Add-Type -AssemblyName System.Windows.Forms
     $deadline = (Get-Date).AddSeconds(30)
     do {
         $installedProcess = Get-CimInstance Win32_Process `
@@ -254,7 +255,8 @@ try {
         Wait-FocusedGuide $ExpectedResumeGuide
         $report.phases += 'reader-back-game'
 
-        Invoke-Element $selectedGuide
+        $selectedGuide.SetFocus()
+        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
         [void](Wait-Name 'ShellStatus' 'Guide details ready.')
         $report.phases += 'reopen-selected-guide'

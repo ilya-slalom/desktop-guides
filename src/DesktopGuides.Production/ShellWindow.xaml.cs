@@ -4,7 +4,10 @@ using DesktopGuides.Infrastructure.Storage;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.Storage;
+using Windows.System;
 
 namespace DesktopGuides.Production;
 
@@ -187,13 +190,26 @@ public sealed partial class ShellWindow : Window
         }
     }
 
-    private async void GuideClicked(object sender, ItemClickEventArgs args)
+    private async void GuideTapped(object sender, TappedRoutedEventArgs args)
     {
-        if (args.ClickedItem is Guide clicked &&
-            GuideList.SelectedItem is Guide selected &&
-            selected.Id == clicked.Id)
+        DependencyObject? source = args.OriginalSource as DependencyObject;
+        while (source is not null && !ReferenceEquals(source, GuideList))
         {
-            await RunNavigationAsync(() => OpenGuideAsync(clicked.Id));
+            if (source is ListViewItem row && row.Content is Guide guide)
+            {
+                await RunNavigationAsync(() => OpenGuideAsync(guide.Id));
+                return;
+            }
+            source = VisualTreeHelper.GetParent(source);
+        }
+    }
+
+    private async void GuideKeyDown(object sender, KeyRoutedEventArgs args)
+    {
+        if (args.Key == VirtualKey.Enter && GuideList.SelectedItem is Guide guide)
+        {
+            args.Handled = true;
+            await RunNavigationAsync(() => OpenGuideAsync(guide.Id));
         }
     }
 

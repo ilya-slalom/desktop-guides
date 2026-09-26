@@ -73,9 +73,9 @@
                           Grid.Row="3"
                           DisplayMemberPath="Title"
                           SelectionMode="Single"
-                          IsItemClickEnabled="True"
                           SelectionChanged="GuideSelected"
-                          ItemClick="GuideClicked"
+                          Tapped="GuideTapped"
+                          KeyDown="GuideKeyDown"
                           AutomationProperties.AutomationId="GuideList" />
             </Grid>
 
