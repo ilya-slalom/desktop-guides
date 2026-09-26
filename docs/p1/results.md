@@ -386,3 +386,25 @@ production MSIX build passed. Both the push and
 [PR workflow](https://github.com/ilya-slalom/desktop-guides/actions/runs/36233300630)
 passed 8/8 jobs, including the native ARM64 P0 fixture regression. The
 complete P1 installed workflow remains T17.2 work.
+
+The installed-runner handle follow-up at code head `12d21c2` makes the
+interactive launch helper retain its child until the installer verifies a
+second handle and acknowledges a per-launch token. A failed result write or
+handoff stops the child through the helper's original handle. The installer
+checks exact creation time, session, and image through its retained handle,
+and cleanup terminates and waits through that handle after draining both
+launch tasks. On the Windows 11 x64 host, harmless child-process checks passed
+for rejected identity, an unrelated decoy PID, already-exited and timed-out
+cleanup, failed result publication, accepted handoff, and stale
+acknowledgment. PowerShell 5.1 parsing of the installer also passed.
+
+The signed Windows 11 x64
+[install record](evidence/ci/production-shell/handle-handoff/signed-install.json)
+from [push run 36235737097](https://github.com/ilya-slalom/desktop-guides/actions/runs/36235737097)
+shows the redirect and close handoffs, no process cleanup error, and removal
+of the temporary package and certificate. The
+[launch trace](evidence/ci/production-shell/handle-handoff/launch.json)
+records the interactive session and handoff token. Both the push and
+[PR workflow](https://github.com/ilya-slalom/desktop-guides/actions/runs/36235738707)
+passed 8/8 jobs, including the native ARM64 P0 UI regression. These remain
+M1 shell checks; the complete P1 installed workflow is still T17.2 work.

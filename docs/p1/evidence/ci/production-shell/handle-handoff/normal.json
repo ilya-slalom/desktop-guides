@@ -1,0 +1,18 @@
+﻿{
+    "mode":  "normal",
+    "observedAt":  "2026-09-26T10:29:55.1171471Z",
+    "processId":  1440,
+    "sessionId":  2,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "resume-reader",
+                   "reader-back-game",
+                   "game-back-library",
+                   "settings",
+                   "settings-back-library",
+                   "rapid-game-settings-back-game",
+                   "rapid-guide-settings-back-reader",
+                   "library-game-reader-game"
+               ]
+}
