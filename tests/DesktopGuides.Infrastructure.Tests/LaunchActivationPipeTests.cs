@@ -7,6 +7,23 @@ namespace DesktopGuides.Infrastructure.Tests;
 public sealed class LaunchActivationPipeTests
 {
     [Fact]
+    public void CompletedReplyIsObservedAtDeadline()
+    {
+        byte[] accepted = [1];
+        Assert.True(LaunchActivationPipe.AwaitReply(
+            Task.FromResult(1), accepted, DateTime.UtcNow.AddTicks(-1)));
+    }
+
+    [Fact]
+    public void IncompleteReplyTimesOut()
+    {
+        TaskCompletionSource<int> pending = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        Assert.False(LaunchActivationPipe.AwaitReply(
+            pending.Task, [0], DateTime.UtcNow.AddMilliseconds(20)));
+    }
+
+    [Fact]
     public async Task LateReplyCannotAcknowledgeAnotherLaunch()
     {
         string name = $"DesktopGuides.Tests.Activation.{Guid.NewGuid():N}";

@@ -47,27 +47,45 @@ public sealed class LaunchActivationPipe : IDisposable
             TaskContinuationOptions.OnlyOnFaulted);
         try
         {
-            while (DateTime.UtcNow < deadline)
-            {
-                if (read.IsCompleted)
-                {
-                    try
-                    {
-                        return read.GetAwaiter().GetResult() == 1 && reply[0] == 1;
-                    }
-                    catch (Exception error) when (
-                        error is IOException or OperationCanceledException)
-                    {
-                        return false;
-                    }
-                }
-                Thread.Sleep(50);
-            }
-            return false;
+            return AwaitReply(read, reply, deadline);
         }
         finally
         {
             cancelled.Cancel();
+        }
+    }
+
+    internal static bool AwaitReply(Task<int> read, byte[] reply, DateTime deadline)
+    {
+        try
+        {
+            if (!read.IsCompleted)
+            {
+                TimeSpan remaining = deadline - DateTime.UtcNow;
+                if (remaining > TimeSpan.Zero)
+                {
+                    try
+                    {
+                        int count = read.WaitAsync(remaining)
+                            .GetAwaiter().GetResult();
+                        return count == 1 && reply[0] == 1;
+                    }
+                    catch (TimeoutException)
+                    {
+                        // A reply can complete as the timeout fires.
+                    }
+                }
+                if (!read.IsCompleted)
+                {
+                    return false;
+                }
+            }
+            return read.GetAwaiter().GetResult() == 1 && reply[0] == 1;
+        }
+        catch (Exception error) when (
+            error is IOException or OperationCanceledException or TimeoutException)
+        {
+            return false;
         }
     }
 

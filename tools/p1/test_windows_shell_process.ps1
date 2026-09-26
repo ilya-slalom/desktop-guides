@@ -83,6 +83,7 @@ Set-Content -LiteralPath $Marker -Value $PID
 Start-Sleep -Seconds $SleepSeconds
 '@ | Set-Content -LiteralPath $sleeperScript -Encoding UTF8
 $children = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
+$launchHelpers = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
 
 try {
     $script:ownedProcesses =
@@ -153,6 +154,7 @@ try {
     $marker = Join-Path $scratch 'handoff-marker'
     $helper = Start-LaunchHelper $marker $resultPath 10
     $children.Add($helper)
+    $launchHelpers.Add($helper)
     Wait-File $resultPath
     $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
     Assert-True $result.success 'Launch helper did not report success.'
@@ -160,6 +162,7 @@ try {
         [int]$result.processId, [datetime]$result.startedAt,
         [int]$result.sessionId, $windowsPowerShell)
     Assert-True ($null -ne $handoffChild) 'Launch child exited before handoff.'
+    $ownedProcesses[[int]$result.processId] = $handoffChild
     @{ handoffToken = $result.handoffToken } | ConvertTo-Json -Compress |
         Set-Content -LiteralPath "$resultPath.ack" -Encoding UTF8
     Assert-True ($helper.WaitForExit(10000)) 'Launch helper ignored acknowledgment.'
@@ -167,14 +170,16 @@ try {
         'Launch helper reported an error after handoff.'
     Assert-True (-not $handoffChild.HasExited) `
         'Launch helper stopped an acknowledged child.'
-    Assert-True ($handoffChild.TerminateAndWait(10000)) `
-        'Could not stop acknowledged child.'
-    $handoffChild.Dispose()
+    Stop-InstalledShell
+    Assert-True ($ownedProcesses.Count -eq 0) `
+        'Acknowledged child retained ownership after cleanup.'
+    Assert-NoSleeper $marker
 
     $missingResultPath = Join-Path $scratch 'missing\failed.json'
     $failedMarker = Join-Path $scratch 'failed-marker'
     $helper = Start-LaunchHelper $failedMarker $missingResultPath 5
     $children.Add($helper)
+    $launchHelpers.Add($helper)
     Assert-True ($helper.WaitForExit(15000)) `
         'Launch helper hung after result write failure.'
     Assert-True ([bool](Get-Content -LiteralPath "$failedMarker.stderr" -Raw)) `
@@ -188,6 +193,7 @@ try {
         Set-Content -LiteralPath "$stalePath.ack" -Encoding UTF8
     $helper = Start-LaunchHelper $staleMarker $stalePath 1
     $children.Add($helper)
+    $launchHelpers.Add($helper)
     Wait-File $stalePath
     Assert-True ($helper.WaitForExit(10000)) `
         'Launch helper hung after unacknowledged child.'
@@ -198,6 +204,11 @@ try {
     Write-Output 'Installed-shell handle and launch-handoff checks passed.'
 }
 finally {
+    foreach ($launchHelper in $launchHelpers) {
+        if (-not $launchHelper.HasExited) {
+            [void]$launchHelper.WaitForExit(35000)
+        }
+    }
     foreach ($ownedId in @($ownedProcesses.Keys)) {
         $ownedProcesses[$ownedId].TerminateAndWait(10000) | Out-Null
         $ownedProcesses[$ownedId].Dispose()

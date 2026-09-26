@@ -21,6 +21,8 @@ if ($packageName -notmatch '^DesktopGuides\.Production_[0-9]+(\.[0-9]+){3}_x64\.
 if (Get-AppxPackage -Name DesktopGuides.Preview) {
     throw 'A production preview package is already installed; refusing to replace it.'
 }
+. (Join-Path $PSScriptRoot 'windows_shell_profile.ps1')
+Assert-FreshPreviewProfile $env:LOCALAPPDATA
 
 New-Item -ItemType Directory -Force $ResultDirectory | Out-Null
 $ResultDirectory = (Resolve-Path $ResultDirectory).Path
@@ -481,6 +483,7 @@ try {
     if (Get-AppxPackage -Name DesktopGuides.Preview) {
         throw 'A production preview package appeared before test install.'
     }
+    Assert-FreshPreviewProfile $env:LOCALAPPDATA
     Add-AppxPackage -Path $signed
     $installed = Get-AppxPackage -Name DesktopGuides.Preview
     if (-not $installed) { throw 'Production package did not install.' }

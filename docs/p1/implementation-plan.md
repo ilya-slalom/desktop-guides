@@ -169,6 +169,18 @@ and exit/timeout cleanup with harmless child processes; repeat the signed
 installed x64 lane. This handle handoff keeps the existing interactive task
 model without keeping a scheduled helper running for the full app session.
 
+The next review requires three boundary checks before the signed installed
+gate. Keep the M1 shell install runner limited to a fresh profile: reject any
+existing `DesktopGuides.Preview_*` package profile before preparing the test
+and again immediately before `Add-AppxPackage`. The full P1 E2E runner retains
+the separate backup/restore path for shared profiles. Retain the launch
+handoff test's child handle in failure cleanup, and let launch helpers finish
+their own child cleanup before forcing them to stop. Replace the activation
+reply's fixed polling sleep with a wait bounded by the remaining deadline;
+test a completed reply at the boundary and a real timed-out request.
+PowerShell profile/child checks and locked Infrastructure tests must pass
+before repeating the signed Windows 11 x64 installed lane.
+
 ## M2 — catalog, static-asset validation, import, and removal
 
 Exit: two independent managed guides can be added under one game, retain

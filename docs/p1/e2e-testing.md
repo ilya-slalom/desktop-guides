@@ -105,17 +105,20 @@ implementation under T17.2.
    session, failed scenario, unsuccessful restoration, or incomplete
    cleanup fails the run.
 
-For the M1 installed shell runner, each interactive launch helper writes a
-per-launch result with a random handoff token, then keeps its original child
-handle until the installer acknowledges ownership or the child exits. The
-installer opens its own process handle and checks the exact creation time,
-desktop session, and executable image through that handle before writing
-the matching acknowledgment. If result publication or handoff fails, the
-helper stops its child through the original handle. Cleanup terminates
-verified children through retained handles and waits for exit; it drains both
-launch tasks before package removal. A task that cannot drain or an
-unverified remaining process fails cleanup. Clear old result and
-acknowledgment files before each task start.
+The M1 shell runner requires a fresh Preview package profile and refuses an
+existing `DesktopGuides.Preview_*` directory even when no package is
+registered. Use the full E2E backup/restore procedure above for a shared
+profile. Each interactive launch helper writes a per-launch result with a
+random handoff token, then keeps its original child handle until the
+installer acknowledges ownership or the child exits. The installer opens
+its own process handle and checks the exact creation time, desktop session,
+and executable image through that handle before writing the matching
+acknowledgment. If result publication or handoff fails, the helper stops
+its child through the original handle. Cleanup terminates verified children
+through retained handles and waits for exit; it drains both launch tasks
+before package removal. A task that cannot drain or an unverified remaining
+process fails cleanup. Clear old result and acknowledgment files before
+each task start.
 
 ## Scenario checklist
 
