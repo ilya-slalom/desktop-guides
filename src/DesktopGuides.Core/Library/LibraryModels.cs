@@ -46,3 +46,7 @@ public sealed record ReadingState(
 public sealed record ReaderPreferences(Guid GuideId, double? TextScale);
 
 public sealed record AppSettings(ThemePreference Theme, Guid? LastActiveGuideId);
+
+public sealed record StartupReconciliationReport(
+    int ResolvedOperationCount,
+    int ReviewOrphanCount);

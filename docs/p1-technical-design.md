@@ -137,6 +137,32 @@ row. A missing file does not justify deleting other files. This is
 recoverable, not a claim of one atomic transaction across SQLite and NTFS.
 Cancel occurs before the operation is written and changes nothing.
 
+For T15.2, `ManifestJson` v1 contains `schemaVersion`, canonical `"N"` guide
+IDs, and the expected library-relative `ownedPaths`. An import names one
+`.staging/<operation-id>/<guide-id>` and `content/<guide-id>` pair. A
+`DeleteGuide` names one `content/<guide-id>` and
+`.trash/<operation-id>/<guide-id>` pair; `DeleteGame` names one or more such
+pairs. Recovery derives paths from IDs and requires the manifest paths to
+match exactly. It rejects unknown versions, duplicate IDs or claims, unsafe
+paths, incompatible row phases, and conflicting directory states before
+changing files. A nested filesystem link blocks that operation without being
+followed.
+
+Recovery compares committed `Guides.Id` values as parsed GUIDs, since the
+SQLite schema permits uppercase spelling of a generated ID. An unparseable
+or duplicate logical Guide ID stops cleanup before any owned tree changes.
+The orphan count uses the same GUID identity for content directory names.
+
+The startup reconciler preflights every journal row, then resolves rows in
+creation order. It removes only the named roots for a prepared import with
+no committed Guide; restores named trash roots for a prepared deletion whose
+Guides still exist; and removes named trash roots for a committed deletion
+whose Guides are absent. It clears each row after its filesystem work, so
+a crash can be retried. It leaves untracked entries under `content`,
+`.staging`, and `.trash` untouched and reports their count for a later
+`Review orphan` UI. A collision or malformed row stops startup recovery
+while preserving the journal and files for repair.
+
 On startup, run schema validation/migration, reconcile known operations,
 then detect untracked directories under `content` without deleting them.
 Surface missing/corrupt managed guides as repairable rows. If the database is

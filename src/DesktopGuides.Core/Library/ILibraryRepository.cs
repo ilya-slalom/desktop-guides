@@ -2,6 +2,7 @@ namespace DesktopGuides.Core.Library;
 
 public interface ILibraryRepository : IAsyncDisposable
 {
+    StartupReconciliationReport? LastStartupReconciliation { get; }
     Task InitializeAsync(CancellationToken token = default);
     Task<Game> AddGameAsync(
         string title, string? platform, string? notes, CancellationToken token = default);
