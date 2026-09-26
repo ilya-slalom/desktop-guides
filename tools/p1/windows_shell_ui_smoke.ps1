@@ -204,6 +204,30 @@ try {
         throw "Expected selected guide '$expected' after returning to Game."
     }
 
+    function Wait-GuideRow([string] $expected) {
+        $condition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::NameProperty, $expected)
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $list = Find-ById 'GuideList'
+            if ($list -and -not $list.Current.IsOffscreen) {
+                foreach ($item in $list.FindAll($scope, $condition)) {
+                    try {
+                        if ($item.Current.IsOffscreen) { continue }
+                        [void]$item.GetCurrentPattern(
+                            [System.Windows.Automation.SelectionItemPattern]::Pattern)
+                        return $item
+                    }
+                    catch {
+                        continue
+                    }
+                }
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected visible guide row '$expected'."
+    }
+
     function Wait-FocusedGuide([string] $expected) {
         $deadline = (Get-Date).AddSeconds(15)
         do {
@@ -214,6 +238,24 @@ try {
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
         throw "Expected keyboard focus on '$expected' after Back."
+    }
+
+    function Focus-OtherGuideWithoutSelection(
+        [string] $selectedName, [string] $focusedName) {
+        $selected = Wait-SelectedGuide $selectedName
+        $other = Wait-GuideRow $focusedName
+        $selectedTop = $selected.Current.BoundingRectangle.Top
+        $otherTop = $other.Current.BoundingRectangle.Top
+        if ($selectedTop -eq $otherTop) {
+            throw 'Guide rows have the same vertical position.'
+        }
+        $keys = if ($otherTop -lt $selectedTop) { '^{UP}' }
+                else { '^{DOWN}' }
+        $selected.SetFocus()
+        Wait-FocusedGuide $selectedName
+        [System.Windows.Forms.SendKeys]::SendWait($keys)
+        Wait-FocusedGuide $focusedName
+        [void](Wait-SelectedGuide $selectedName)
     }
 
     function Activate-SelectedGuide([string] $expected) {
@@ -347,6 +389,27 @@ try {
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
         [void](Wait-Name 'ShellStatus' 'Guide details ready.')
         $report.phases += 'keyboard-reopen-selected-guide'
+        Go-Back
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-SelectedGuide $ExpectedResumeGuide)
+        Wait-FocusedGuide $ExpectedResumeGuide
+        $otherGuide = if ($ExpectedResumeGuide -eq 'Route Test Guide') {
+            'Blocked Write Guide'
+        }
+        else {
+            'Route Test Guide'
+        }
+        Focus-OtherGuideWithoutSelection $ExpectedResumeGuide $otherGuide
+        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        [void](Wait-Name 'ReaderHeading' $otherGuide)
+        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        $report.phases += 'focused-guide-enter'
+        Go-Back
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        Open-GuideFromGame $ExpectedResumeGuide
+        [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
+        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        $report.phases += 'restore-route-guide'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         Go-Back

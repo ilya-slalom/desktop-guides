@@ -78,7 +78,7 @@ remains T17.1 work.
 | T03.2 | T03.1, T03.3 | Versioned migration runner, pre-upgrade SQLite backup, integrity checks, and a populated v1→v2 fixture. Injected failure retains usable prior data or an actionable recovery copy; newer schema fails clearly. | TR03.1, TR03.3 |
 | T15.2 | T03.1, T03.2, T03.3 | FileOperations startup reconciler and exact owned-path janitor, installed before mutating file operations. Phase and malformed-path tests retain unknown directories and never follow links. | TR15.1 |
 | T11.1 | T03.2, T11.2 | Library/Game/Reader/Settings route coordinator and separate diagnostic build mode. Launch, Back, stale-ID, duplicate-launch acknowledgment, close/relaunch handoff, and route tests pass on installed WinUI; production package has no fixtures. | TR11.1 |
-| T11.3 | T11.1, T11.2 | Capability-based reader bar, navigation pane, overflow, and status/focus behavior. Keyboard and pointer trace returns Reader → its Game with query and selection retained. | TR11.1, TR11.2 |
+| T11.3 | T11.1, T11.2 | Capability-based reader bar, navigation pane, overflow, and status/focus behavior. Keyboard and pointer trace returns Reader → its Game with selection and focus retained. Query retention is verified in T05.3 after search exists. | TR11.1, TR11.2 |
 | T17.1 | T11.1 | Production MSIX identity/version/signing and prerequisite delivery plan, plus tested x64 packaging configuration. Install and upgrade use the same identity; credentials stay outside source/logs. Final signing and architecture claims remain gated by M6. | TR17.2 |
 
 ### T15.2 implementation sequence
@@ -274,7 +274,7 @@ complete S07's WebView2 policy in M3.
 | T06.4 | T06.3 | Duplicate fingerprint choice (`Open existing` / `Import another copy`) and typed errors. Repeated import never overwrites; a second copy has its own Guide ID and state. | TR06.3 |
 | T15.3 | T06.3, T15.2 | Confirmed guide deletion via trash journal. Cancel, move failure, commit failure, and startup recovery tests preserve or remove exactly the intended metadata and owned bytes. | TR15.1, TR15.2 |
 | T04.3 | T04.2, T15.3 | Count-confirmed multi-guide Game removal through the same trash protocol. Cancel and changed-count cases leave records/files intact; commit removes only that Game's guides and state. | TR04.1, TR04.2 |
-| T05.3 | T04.2, T05.2, T06.3, T15.3 | Stable ID-based selection and Back behavior after rename/import/removal. Async refresh and keyboard focus tests do not jump to stale rows. | TR05.1 |
+| T05.3 | T04.2, T05.2, T06.3, T15.3 | Stable ID-based selection and Back behavior after rename/import/removal. Reader → Game retains guide selection and focus; Back to Library restores its query. Async refresh does not jump to stale rows. | TR05.1 |
 
 ## M3 — managed reader adapters
 

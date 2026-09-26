@@ -152,7 +152,8 @@ matching games and guides without requiring network access.
 
 - **T05.1** Implement sorted game list/grid and guide cards or rows in WinUI 3.
 - **T05.2** Add library title search and empty, loading, and no-result states.
-- **T05.3** Keep selection and navigation stable when a game or guide is edited.
+- **T05.3** Keep query, selection, and navigation stable on Back and when a
+  game or guide is edited.
 - **TR05.1** Search compares titles case-insensitively and does not open or
   parse guide content.
 - **TR05.2** An unread guide has an explicit `Not started` display rather than

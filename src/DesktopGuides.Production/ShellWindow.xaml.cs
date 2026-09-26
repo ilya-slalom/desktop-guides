@@ -205,21 +205,29 @@ public sealed partial class ShellWindow : Window
 
     private async void GuideTapped(object sender, TappedRoutedEventArgs args)
     {
-        DependencyObject? source = args.OriginalSource as DependencyObject;
+        if (GuideFromRow(args.OriginalSource as DependencyObject) is Guide guide)
+        {
+            await RunNavigationAsync(() => OpenGuideAsync(guide.Id));
+        }
+    }
+
+    private Guide? GuideFromRow(DependencyObject? source)
+    {
         while (source is not null && !ReferenceEquals(source, GuideList))
         {
             if (source is ListViewItem row && row.Content is Guide guide)
             {
-                await RunNavigationAsync(() => OpenGuideAsync(guide.Id));
-                return;
+                return guide;
             }
             source = VisualTreeHelper.GetParent(source);
         }
+        return null;
     }
 
     private async void GuideKeyDown(object sender, KeyRoutedEventArgs args)
     {
-        if (args.Key == VirtualKey.Enter && GuideList.SelectedItem is Guide guide)
+        if (args.Key == VirtualKey.Enter &&
+            GuideFromRow(args.OriginalSource as DependencyObject) is Guide guide)
         {
             args.Handled = true;
             await RunNavigationAsync(() => OpenGuideAsync(guide.Id));
