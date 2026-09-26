@@ -44,7 +44,18 @@ public sealed class ManagedPathResolver : ILibraryPaths
         ValidateDatabasePath();
     }
 
-    public void ValidateDatabasePath() => RejectFilesystemLinks(DatabasePath);
+    public void ValidateDatabasePath()
+    {
+        foreach (string suffix in new[] { "", "-wal", "-shm", "-journal" })
+        {
+            string path = DatabasePath + suffix;
+            RejectFilesystemLinks(path);
+            if (OperatingSystem.IsWindows() && File.Exists(path))
+            {
+                WindowsFileLinks.RejectMultipleHardLinks(path);
+            }
+        }
+    }
 
     public string GetGuideRoot(Guid guideId)
     {

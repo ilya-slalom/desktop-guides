@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
@@ -384,6 +385,79 @@ public sealed class SqliteLibraryRepositoryTests
             File.Delete(directory.Paths.DatabasePath);
         }
 
+        using SqliteConnection original = OpenWithForeignKeys(outside);
+        using SqliteCommand version = original.CreateCommand();
+        version.CommandText = "PRAGMA user_version";
+        Assert.Equal(1L, (long)version.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public async Task RejectsLinkedSharedMemoryFileBeforeModifyingItsTarget()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        await repository.AddGameAsync("Keep", null, null);
+
+        string sharedMemory = directory.Paths.DatabasePath + "-shm";
+        if (File.Exists(sharedMemory))
+        {
+            File.Delete(sharedMemory);
+        }
+        string outside = Path.Combine(directory.Root, "outside-shm");
+        byte[] sentinel = Enumerable.Repeat((byte)0x61, 32768).ToArray();
+        File.WriteAllBytes(outside, sentinel);
+        File.CreateSymbolicLink(sharedMemory, outside);
+        try
+        {
+            await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                repository.GetGameAsync(Guid.NewGuid()));
+            Assert.Equal(sentinel, File.ReadAllBytes(outside));
+        }
+        finally
+        {
+            File.Delete(sharedMemory);
+        }
+    }
+
+    [Fact]
+    public async Task RejectsHardLinkedDatabaseBeforeUpgradingExternalData()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using TestLibrary directory = new();
+        directory.Paths.EnsureCreated();
+        string outside = Path.Combine(directory.Root, "outside.sqlite");
+        using (SqliteConnection connection = OpenWithForeignKeys(outside))
+        {
+            using SqliteCommand schema = connection.CreateCommand();
+            schema.CommandText = LibrarySchema.Version1;
+            schema.ExecuteNonQuery();
+        }
+
+        ProcessStartInfo start = new(
+            "cmd.exe", $"/c mklink /H \"{directory.Paths.DatabasePath}\" \"{outside}\"")
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        using (Process process = Process.Start(start)!)
+        {
+            process.WaitForExit();
+            Assert.True(process.ExitCode == 0, process.StandardError.ReadToEnd());
+        }
+        Assert.True((File.GetAttributes(directory.Paths.DatabasePath) &
+                     FileAttributes.ReparsePoint) == 0);
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+        Assert.Empty(Directory.GetFiles(directory.Paths.RecoveryRoot));
         using SqliteConnection original = OpenWithForeignKeys(outside);
         using SqliteCommand version = original.CreateCommand();
         version.CommandText = "PRAGMA user_version";

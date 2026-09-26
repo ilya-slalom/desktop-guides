@@ -127,3 +127,14 @@ The unsigned Release x64 WinUI MSIX build succeeded with zero errors. It
 reported one host tooling warning: `mspdbcmf.exe` was unavailable, so no
 symbols package was generated. The installed production-app migration gate
 remains open.
+
+A second PR #4 review found two more path cases. Disposable Windows 11 x64
+probes confirmed that a linked `library.sqlite-shm` modified an outside file
+and an NTFS hard link at `library.sqlite` let initialization upgrade an
+outside v1 database. Two regression tests failed against that PR head. The
+resolver now checks SQLite sidecar paths and rejects Windows files whose
+link count is not one before opening SQLite. The two focused tests passed
+after the change. Locked restore, **61/61 Core** and **24/24 Infrastructure**
+tests passed on the same host, including the active-WAL-writer migration
+test. The unsigned Release x64 WinUI MSIX build succeeded with zero errors
+and the same host symbols-tool warning.
