@@ -173,6 +173,19 @@ when reading the result. A reused directory containing a successful older
 report must fail a headless result-identity test. The signed installed
 toolbar job then repeats the end-to-end check.
 
+The [installed long-list trace](evidence/ci/production-shell/reader-shell/virtualized-focus/long-list.json)
+at code head `b372bfb` records the tail guide outside the initial viewport,
+then focused after Reader → Game and reopened with Enter. Its
+[signed install result](evidence/ci/production-shell/reader-shell/virtualized-focus/signed-install.json)
+records a successful test and temporary package cleanup. The
+[toolbar trace](evidence/ci/reader-toolbar-result-identity/toolbar-ui.json)
+and [install result](evidence/ci/reader-toolbar-result-identity/signed-install.json)
+carry the same invocation ID and report successful task, package, and
+certificate cleanup. All nine jobs passed on push run `36254999817` and
+PR run `36255001818` (attempt 2). The PR's first attempt timed out in the
+unchanged process-helper fixture; that same check passed in the push run
+and PR rerun.
+
 ### T11.1 review follow-up: close handoff and installed gate
 
 The shell must allow a new window to appear while the old one drains, but
