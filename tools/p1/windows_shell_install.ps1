@@ -1,0 +1,185 @@
+param(
+    [Parameter(Mandatory = $true)]
+    [string] $PackagePath,
+
+    [Parameter(Mandatory = $true)]
+    [string] $ResultDirectory
+)
+
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+$packageName = Split-Path $PackagePath -Leaf
+if ($packageName -notmatch '^DesktopGuides\.Production_[0-9]+(\.[0-9]+){3}_x64\.msix$') {
+    throw "Expected an x64 production MSIX, got $packageName."
+}
+if (Get-AppxPackage -Name DesktopGuides.Preview) {
+    throw 'A production preview package is already installed; refusing to replace it.'
+}
+
+New-Item -ItemType Directory -Force $ResultDirectory | Out-Null
+$ResultDirectory = (Resolve-Path $ResultDirectory).Path
+$signed = Join-Path $ResultDirectory 'desktop-guides-production-signed-x64.msix'
+$public = Join-Path $ResultDirectory 'test-certificate.cer'
+$report = [ordered]@{
+    observedAt = (Get-Date).ToUniversalTime().ToString('o')
+    osBuild = [Environment]::OSVersion.Version.ToString()
+    cpuArchitecture = $env:PROCESSOR_ARCHITECTURE
+    success = $false
+}
+$certificate = $null
+$installed = $null
+$imported = $false
+$launchTask = 'DesktopGuides-P1-ShellLaunch'
+$smokeTask = 'DesktopGuides-P1-ShellSmoke'
+
+function Stop-InstalledShell {
+    Get-CimInstance Win32_Process -Filter "Name = 'DesktopGuides.Production.exe'" |
+        Where-Object { $_.ExecutablePath -like "$($installed.InstallLocation)*" } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+}
+
+function Start-InstalledShell {
+    Start-ScheduledTask -TaskName $launchTask
+    $deadline = (Get-Date).AddSeconds(30)
+    do {
+        Start-Sleep -Milliseconds 500
+        $appProcess = Get-CimInstance Win32_Process `
+            -Filter "Name = 'DesktopGuides.Production.exe'" |
+            Where-Object { $_.ExecutablePath -like "$($installed.InstallLocation)*" } |
+            Select-Object -First 1
+    } while (-not $appProcess -and (Get-Date) -lt $deadline)
+    if (-not $appProcess) { throw 'Installed production shell did not launch.' }
+    $report.launchedProcessId = $appProcess.ProcessId
+    $report.launchedSessionId = $appProcess.SessionId
+}
+
+function Run-ShellSmoke([string] $mode) {
+    $resultPath = Join-Path $ResultDirectory "$mode.json"
+    Remove-Item $resultPath -ErrorAction SilentlyContinue
+    $script = Join-Path $PSScriptRoot 'windows_shell_ui_smoke.ps1'
+    $arguments = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass ' +
+        '-File "' + $script + '" -Mode ' + $mode + ' -ResultPath "' + $resultPath + '"'
+    $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
+        -Argument $arguments -WorkingDirectory $PSScriptRoot
+    Register-ScheduledTask -TaskName $smokeTask -Action $action `
+        -Principal $principal -Force | Out-Null
+    Start-ScheduledTask -TaskName $smokeTask
+    $deadline = (Get-Date).AddSeconds(60)
+    do {
+        Start-Sleep -Milliseconds 500
+    } while (-not (Test-Path $resultPath) -and (Get-Date) -lt $deadline)
+    if (-not (Test-Path $resultPath)) {
+        throw "Installed $mode shell smoke timed out."
+    }
+    Start-Sleep -Milliseconds 250
+    $result = Get-Content $resultPath -Raw | ConvertFrom-Json
+    if (-not $result.success) {
+        throw "Installed $mode shell smoke failed: $($result.error)"
+    }
+    return $result
+}
+
+try {
+    $report.windowsAppRuntime = @(
+        Get-AppxPackage -Name 'Microsoft.WindowsAppRuntime.2*' |
+            Where-Object { $_.Architecture -eq 'X64' } |
+            Select-Object -ExpandProperty Version |
+            ForEach-Object { $_.ToString() }
+    )
+    $report.dotnetSdk = (dotnet --version)
+    $report.sourcePackageSha256 = (Get-FileHash $PackagePath -Algorithm SHA256).Hash
+    Copy-Item $PackagePath $signed -Force
+
+    $certificate = New-SelfSignedCertificate `
+        -Type CodeSigningCert `
+        -Subject 'CN=DesktopGuides Development' `
+        -CertStoreLocation 'Cert:\CurrentUser\My' `
+        -KeyExportPolicy NonExportable `
+        -HashAlgorithm SHA256 `
+        -NotAfter (Get-Date).AddDays(1)
+    $report.certificateThumbprint = $certificate.Thumbprint
+    Export-Certificate -Cert $certificate -FilePath $public | Out-Null
+    Import-Certificate -FilePath $public `
+        -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
+    $imported = $true
+
+    $signTool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' `
+        -Recurse -Filter signtool.exe |
+        Where-Object { $_.FullName -like '*\x64\signtool.exe' } |
+        Sort-Object FullName |
+        Select-Object -Last 1 -ExpandProperty FullName
+    if (-not $signTool) { throw 'Windows SDK SignTool is unavailable.' }
+    & $signTool sign /fd SHA256 /sha1 $certificate.Thumbprint /s My $signed
+    if ($LASTEXITCODE -ne 0) { throw "SignTool failed with exit code $LASTEXITCODE." }
+    & $signTool verify /pa $signed
+    if ($LASTEXITCODE -ne 0) { throw 'Signed MSIX verification failed.' }
+    $report.signedPackageSha256 = (Get-FileHash $signed -Algorithm SHA256).Hash
+
+    Add-AppxPackage -Path $signed
+    $installed = Get-AppxPackage -Name DesktopGuides.Preview
+    if (-not $installed) { throw 'Production package did not install.' }
+    $report.packageFullName = $installed.PackageFullName
+    $report.packageFamilyName = $installed.PackageFamilyName
+    $report.installLocation = $installed.InstallLocation
+
+    $dataRoot = Join-Path $env:LOCALAPPDATA `
+        "Packages\$($installed.PackageFamilyName)\LocalState"
+    $seedProject = Join-Path $PSScriptRoot `
+        'DesktopGuides.ShellSeed\DesktopGuides.ShellSeed.csproj'
+    dotnet run --project $seedProject -c Release --no-restore -- seed $dataRoot
+    if ($LASTEXITCODE -ne 0) { throw 'Could not seed shell route metadata.' }
+
+    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
+        -LogonType Interactive -RunLevel Limited
+    $appId = "shell:AppsFolder\$($installed.PackageFamilyName)!App"
+    $launchAction = New-ScheduledTaskAction -Execute "$env:WINDIR\explorer.exe" `
+        -Argument $appId
+    Register-ScheduledTask -TaskName $launchTask -Action $launchAction `
+        -Principal $principal -Force | Out-Null
+
+    Start-InstalledShell
+    $report.normal = Run-ShellSmoke 'normal'
+
+    Stop-InstalledShell
+    dotnet run --project $seedProject -c Release --no-restore -- stale $dataRoot
+    if ($LASTEXITCODE -ne 0) { throw 'Could not set stale last-guide ID.' }
+    Start-InstalledShell
+    $report.stale = Run-ShellSmoke 'stale'
+    $report.success = $true
+}
+catch {
+    $report.error = $_ | Out-String
+}
+finally {
+    Stop-ScheduledTask -TaskName $smokeTask -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName $smokeTask -Confirm:$false `
+        -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName $launchTask -Confirm:$false `
+        -ErrorAction SilentlyContinue
+    if ($installed) { Stop-InstalledShell }
+    $installedNow = Get-AppxPackage -Name DesktopGuides.Preview
+    if ($installedNow) {
+        Remove-AppxPackage -Package $installedNow.PackageFullName `
+            -ErrorAction SilentlyContinue
+    }
+    if ($certificate) {
+        if ($imported) {
+            Remove-Item "Cert:\LocalMachine\TrustedPeople\$($certificate.Thumbprint)" `
+                -ErrorAction SilentlyContinue
+        }
+        Remove-Item "Cert:\CurrentUser\My\$($certificate.Thumbprint)" `
+            -ErrorAction SilentlyContinue
+    }
+    Remove-Item $public -ErrorAction SilentlyContinue
+    $report.packageStillInstalled = [bool](Get-AppxPackage -Name DesktopGuides.Preview)
+    $report.certificateStillTrusted = if ($certificate) {
+        Test-Path "Cert:\LocalMachine\TrustedPeople\$($certificate.Thumbprint)"
+    } else { $false }
+    if ($report.packageStillInstalled -or $report.certificateStillTrusted) {
+        $report.success = $false
+        $report.cleanupError = 'Temporary package or certificate remains.'
+    }
+    $report | ConvertTo-Json -Depth 8 |
+        Set-Content (Join-Path $ResultDirectory 'signed-install.json') -Encoding UTF8
+}
+if (-not $report.success) { exit 1 }

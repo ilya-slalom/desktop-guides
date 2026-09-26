@@ -261,6 +261,9 @@ The P0 fixture picker and test assets remain available only in a separate
 CI/development probe mode. A production MSIX does not bundle the P0 corpus
 or expose fixture controls. CI must keep one diagnostic package lane for P0
 reader regressions and add a production-mode library/import workflow lane.
+For T11.1 the existing `DesktopGuides.App` project is the diagnostic package,
+and a separate WinUI production project owns the new shell. The production
+project uses a provisional package identity until T17.1 sets the public one.
 
 ## 5. Security, failure, and acceptance budgets
 

@@ -58,9 +58,11 @@ Set the public package identity before producing a public candidate.
 
 T03.2 was merged through [PR #4](https://github.com/ilya-slalom/desktop-guides/pull/4)
 with transactional v1→v2 upgrade and a consistent recovery copy under
-`DataRoot/.recovery`. The next change is T15.2; startup reconciliation must
-exist before M2 begins mutating managed guide files. Production routes,
-reader controls, and package identity remain separate M1 gates.
+`DataRoot/.recovery`. T15.2 was merged through
+[PR #5](https://github.com/ilya-slalom/desktop-guides/pull/5), merge commit
+`47c9e906c01e85eb9ce9f9759f6359390d809e52`. Startup reconciliation
+now precedes M2 file mutation. T11.1 is the next M1 change; reader controls
+and package identity remain separate gates.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
@@ -78,6 +80,21 @@ reader controls, and package identity remain separate M1 gates.
 | Path and janitor safety | Journal contract, T03.3 | Resolve exact content/staging/trash guide roots under generated IDs. Preflight trees without following links; remove only a preflighted owned root and retain unknown siblings. |
 | Startup reconciliation | Path and janitor safety | Run after schema validation in `InitializeAsync`. Apply the prepared-import, prepared-delete, and committed-delete phase matrix; clear each row only after filesystem work. Expose resolved-operation and review-orphan counts. |
 | Windows exit | Startup reconciliation | Tests cover stage-only and moved imports, partial deletion restore, committed trash cleanup, restart retry, malformed and overlapping manifests, nested links, and unknown directories. Locked Core/Infrastructure tests and the Release x64 package build pass on Windows 11; native ARM64 headless and package checks run in CI. |
+
+### T11.1 implementation sequence
+
+The existing `DesktopGuides.App` project remains the P0 diagnostic package.
+A separate WinUI production project keeps its fixture picker, probe classes,
+and fixture corpus out of the production MSIX. A single conditional project
+would share more build logic, but it would make accidental fixture inclusion
+harder to detect. The public package identity is finalized in T17.1.
+
+| Step | Dependency | Output and check |
+| --- | --- | --- |
+| Route coordinator | T03.2 | Typed Library, Game, Reader, and Settings routes with an ID-based back stack. Test launch, Reader-to-own-Game, stale Game/Guide IDs, Back, and optional last-guide Resume without auto-open. |
+| Production WinUI shell | Route coordinator | A `NavigationView` window loads `SqliteLibraryRepository` under packaged `ApplicationData.LocalFolder`, renders empty Library/Game/Reader/Settings routes, and handles loading/errors without fixture controls. T04/T05 and M3 later fill in catalog actions and reader adapters. |
+| Package separation | Production shell | Build distinct production and diagnostic MSIX packages. Inspect production package contents for fixture/probe strings and files; the diagnostic P0 workflow remains available. |
+| Installed Windows exit | Package separation | On Windows 11 x64 install production MSIX, exercise Library → Game → Reader → Game, Settings and Back through UI Automation with seeded local metadata, verify stale last-guide ID is ignored, and confirm fixture controls are absent. Run locked Core/Infrastructure tests and both package builds in CI; retain installed ARM64 P0 regression. |
 
 ## M2 — catalog, static-asset validation, import, and removal
 
@@ -171,7 +188,7 @@ evidence. Publish only targets with complete target-specific results.
 | Lane | Required result | Current status |
 | --- | --- | --- |
 | Headless Core/Infrastructure | Schema/migration, locator, path, transaction recovery, archive, import-security, and fault-injection tests on locked Windows CI; NTFS link/junction checks on Windows. | T03.2's merged [PR CI](results.md) passed 61 Core and 24 Infrastructure tests on x64 and native ARM64. T15.2's locked Windows 11 x64 run passed 61 Core and 41 Infrastructure tests after the uppercase-ID review fix, including NTFS junction, prepared-import collision, and retry cases. Earlier PR #5 CI passed 61 Core and 39 Infrastructure tests on x64 and native ARM64; current-head results are in PR checks. Later-task suites are pending. |
-| Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | P1 pending; P0 fixture evidence exists only for the probe app. |
+| Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | T11.1 package builds and route tests pass, but two local signed installs stopped at Windows AppX PLM initialization with `0x80070005`. A separate x64 CI installed-shell lane is pending. Full P1 flow and release gates remain open. |
 | Runtime-free Windows 11 x64 VM | Actual absent Windows App Runtime and WebView2 failures, prerequisite setup, recovery, and clean restore. | Deferred by user until a disposable VM is available. Do not claim clean-machine support before this lane passes. |
 | Windows 11 ARM64 | Native complete P1 installed workflow, backup, accessibility, and offline evidence before advertising ARM64. | P1 pending; P0 native Core/UI fixtures passed. |
 | Windows 10 x64 | Equivalent signed install and reader workflow before advertising Windows 10. | Deferred by user. |

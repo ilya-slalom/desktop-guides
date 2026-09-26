@@ -1,0 +1,20 @@
+using Microsoft.UI.Xaml;
+
+namespace DesktopGuides.Production;
+
+public partial class App : Application
+{
+    private ShellWindow? shellWindow;
+
+    public App()
+    {
+        InitializeComponent();
+    }
+
+    protected override void OnLaunched(LaunchActivatedEventArgs args)
+    {
+        shellWindow = new ShellWindow();
+        shellWindow.Activate();
+        _ = shellWindow.InitializeAsync();
+    }
+}

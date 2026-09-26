@@ -187,3 +187,40 @@ PR head; recovery now compares parsed GUIDs, rejects malformed or duplicate
 logical Guide IDs before cleanup, and counts content orphans by GUID. Locked
 Windows 11 x64 Infrastructure tests passed **41/41** after this fix. PR #5
 checks record CI for its current head.
+
+PR #5 merged into `main` on 26 September 2026 as
+`47c9e906c01e85eb9ce9f9759f6359390d809e52`. Its final x64 and native
+ARM64 headless lanes passed **61/61 Core** and **41/41 Infrastructure**
+tests; both unsigned MSIX packages built. The installed ARM64 P0 fixture lane
+passed **14/14** after a transient first-attempt probe-status lookup failure
+on `pdf-short`; its successful artifact records package and certificate
+cleanup.
+
+## M1 T11.1 production shell — 26 September 2026
+
+`feat/p1-m1-shell` adds a typed Library/Game/Reader/Settings route coordinator,
+an ID-based Back stack, and a separate WinUI production project with a
+provisional `DesktopGuides.Preview` identity. The packaged shell opens a
+persistent library under its package local data, shows empty and populated
+routes, offers an explicit Resume action for a valid last-guide ID, and
+returns to Library when a current route has a stale ID. The Reader route is a
+placeholder until M3 adds the format adapters. The P0 diagnostic project
+stays available for its fixture regression lane.
+
+On the Windows 11 x64 host (build `10.0.26200.0`, .NET SDK `10.0.401`,
+`E:\work\desktop-guides`), locked Release tests passed **67/67 Core** and
+**41/41 Infrastructure**. Unsigned production x64 and ARM64 MSIX builds
+passed with zero errors; each reported the existing missing `mspdbcmf.exe`
+symbols-tool warning. Package inspection found the production assembly and
+no P0 diagnostic assembly, fixture files, or probe controls. The test-only
+metadata seeder successfully set valid and stale last-guide IDs.
+
+Two temporary self-signed x64 install attempts passed signature verification
+but `Add-AppxPackage` failed with `0x80070005` while initializing Windows
+Process Lifetime Manager. The deployment log also records access failures
+when Windows attempted cleanup under `C:\Program Files\WindowsApps\Deleted`
+for unrelated WhatsApp and Clipchamp packages. Both attempts removed the
+temporary certificate and left no preview app installed. No installed shell
+behavior is claimed from this host. The new CI installed-shell lane is
+intended to exercise Library → Game → Reader → Game, Settings/Back, stale
+Resume, and fixture-control absence on a separate Windows x64 runner.
