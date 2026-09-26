@@ -138,3 +138,37 @@ after the change. Locked restore, **61/61 Core** and **24/24 Infrastructure**
 tests passed on the same host, including the active-WAL-writer migration
 test. The unsigned Release x64 WinUI MSIX build succeeded with zero errors
 and the same host symbols-tool warning.
+
+[Final M1 migration PR CI run 36211490767](https://github.com/ilya-slalom/desktop-guides/actions/runs/36211490767)
+passed all five jobs for `26ad3c3e119c7d264bd80b345a4a3f25510fead3`
+before merge through [PR #4](https://github.com/ilya-slalom/desktop-guides/pull/4).
+Both x64 and native ARM64 passed **61/61 Core** and **24/24
+Infrastructure** tests; both unsigned MSIX builds and the installed native
+ARM64 **14/14** P0 fixture regression passed. The installed test record
+confirms package and certificate cleanup. The production P1 app and its
+startup recovery remain separate M1 gates.
+
+## M1 T15.2 startup reconciliation — 26 September 2026
+
+On `feat/p1-m1-reconciliation`, `InitializeAsync` validates or migrates SQLite
+before preflighting every pending `FileOperations` row. The v1 manifest
+contains canonical guide IDs and exact generated content/staging/trash paths.
+Prepared imports without a Guide remove only their named staged and moved
+content roots. Prepared deletions restore named trash roots while retaining
+guide metadata; committed deletions remove named trash roots. Each journal
+row is cleared after its filesystem work, allowing interrupted work to retry.
+The startup report counts resolved operations and untracked content/staging/
+trash entries for later `Review orphan` UI. Unknown entries are retained.
+
+The first eight recovery tests failed against the merged T03.2 repository.
+After implementation, **14/14 focused recovery tests** passed on the
+Windows 11 x64 host, build `10.0.26200.0`, under `E:\work\desktop-guides`
+with .NET SDK `10.0.401`. Locked restore and the full Release suites passed
+**61/61 Core** and **38/38 Infrastructure**. Tests include stage-only and
+moved imports, prepared and committed deletions, partial two-guide restore,
+unknown directories, malformed and overlapping manifests, nested links,
+an NTFS junction, conflicting paths, and retry after a locked-file deletion
+failure. The unsigned Release x64 WinUI MSIX build passed with zero errors
+and the host's existing `mspdbcmf.exe` symbols-package warning. Native
+ARM64 branch CI and installed production-app recovery remain separate
+checks; no M2 file mutation is wired yet.

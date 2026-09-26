@@ -31,6 +31,8 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         this.migrationCheckpoint = migrationCheckpoint;
     }
 
+    public StartupReconciliationReport? LastStartupReconciliation { get; private set; }
+
     public Task InitializeAsync(CancellationToken token = default) =>
         WriteAsync(Initialize, token);
 
@@ -302,8 +304,15 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
 
     private void Initialize()
     {
+        LastStartupReconciliation = null;
         paths.EnsureCreated();
         using SqliteConnection connection = OpenConnection(create: true);
+        MigrateOrValidate(connection);
+        LastStartupReconciliation = new FileOperationReconciler(paths).Run(connection);
+    }
+
+    private void MigrateOrValidate(SqliteConnection connection)
+    {
         using SqliteCommand version = connection.CreateCommand();
         version.CommandText = "PRAGMA user_version";
         long currentVersion = (long)version.ExecuteScalar()!;

@@ -64,9 +64,16 @@ public sealed class ManagedPathResolver : ILibraryPaths
             throw new ArgumentException("A generated guide ID is required.", nameof(guideId));
         }
 
-        RejectFilesystemLinks(ContentRoot);
-        return Path.Combine(ContentRoot, guideId.ToString("N"));
+        string root = Path.Combine(ContentRoot, guideId.ToString("N"));
+        RejectFilesystemLinks(root);
+        return root;
     }
+
+    public string GetStagedGuideRoot(Guid operationId, Guid guideId) =>
+        GetOperationGuideRoot(StagingRoot, operationId, guideId);
+
+    public string GetTrashedGuideRoot(Guid operationId, Guid guideId) =>
+        GetOperationGuideRoot(TrashRoot, operationId, guideId);
 
     public string GetPlannedGuideFile(Guid guideId, string relativePath)
     {
@@ -94,6 +101,19 @@ public sealed class ManagedPathResolver : ILibraryPaths
 
         RejectFilesystemLinks(path);
         return path;
+    }
+
+    private static string GetOperationGuideRoot(
+        string operationParent, Guid operationId, Guid guideId)
+    {
+        if (operationId == Guid.Empty || guideId == Guid.Empty)
+        {
+            throw new ArgumentException("Generated operation and guide IDs are required.");
+        }
+        string root = Path.Combine(
+            operationParent, operationId.ToString("N"), guideId.ToString("N"));
+        RejectFilesystemLinks(root);
+        return root;
     }
 
     private static void RejectFilesystemLinks(string path)
