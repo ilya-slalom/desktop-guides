@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('normal', 'stale')]
+    [ValidateSet('empty', 'normal', 'stale')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -84,7 +84,15 @@ try {
     }
     $report.phases += 'library'
 
-    if ($Mode -eq 'stale') {
+    if ($Mode -eq 'empty') {
+        [void](Wait-Name 'LibraryEmpty' 'No games in your library.')
+        $resume = Find-ById 'ResumeGuide'
+        if ($resume -and -not $resume.Current.IsOffscreen) {
+            throw 'An empty library exposed Resume.'
+        }
+        $report.phases += 'empty-library'
+    }
+    elseif ($Mode -eq 'stale') {
         $resume = Find-ById 'ResumeGuide'
         if ($resume -and -not $resume.Current.IsOffscreen) {
             throw 'A stale last-guide ID exposed Resume.'

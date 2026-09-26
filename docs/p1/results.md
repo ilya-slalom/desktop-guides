@@ -244,4 +244,6 @@ the test selected a game while the Library list was still loading
 ([failure trace](evidence/ci/production-shell/smoke-race-before-fix.json)).
 The smoke script now waits for each route's ready status before selecting
 rows or navigating again. The expanded route suite also checks that a stale
-Game or Reader route clears its Back history.
+Game or Reader route clears its Back history. The installed script now
+launches before seeding to verify the fresh empty Library; its CI result is
+pending.

@@ -95,7 +95,7 @@ harder to detect. The public package identity is finalized in T17.1.
 | Route coordinator | T03.2 | Typed Library, Game, Reader, and Settings routes with an ID-based back stack. Test launch, Reader-to-own-Game, stale Game/Guide IDs, Back, and optional last-guide Resume without auto-open. |
 | Production WinUI shell | Route coordinator | A `NavigationView` window loads `SqliteLibraryRepository` under packaged `ApplicationData.LocalFolder`, renders empty Library/Game/Reader/Settings routes, and handles loading/errors without fixture controls. T04/T05 and M3 later fill in catalog actions and reader adapters. |
 | Package separation | Production shell | Build distinct production and diagnostic MSIX packages. Inspect production package contents for fixture/probe strings and files; the diagnostic P0 workflow remains available. |
-| Installed Windows exit | Package separation | On Windows 11 x64 install production MSIX, exercise Library → Game → Reader → Game, Settings and Back through UI Automation with seeded local metadata, verify stale last-guide ID is ignored, and confirm fixture controls are absent. Run locked Core/Infrastructure tests and both package builds in CI; retain installed ARM64 P0 regression. |
+| Installed Windows exit | Package separation | On Windows 11 x64 install production MSIX, verify an empty Library on first launch, then exercise Library → Game → Reader → Game, Settings and Back through UI Automation with seeded local metadata. Verify a stale last-guide ID is ignored and fixture controls are absent. Run locked Core/Infrastructure tests and both package builds in CI; retain installed ARM64 P0 regression. |
 
 ## M2 — catalog, static-asset validation, import, and removal
 

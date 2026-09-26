@@ -126,8 +126,6 @@ try {
         "Packages\$($installed.PackageFamilyName)\LocalState"
     $seedProject = Join-Path $PSScriptRoot `
         'DesktopGuides.ShellSeed\DesktopGuides.ShellSeed.csproj'
-    dotnet run --project $seedProject -c Release --no-restore -- seed $dataRoot
-    if ($LASTEXITCODE -ne 0) { throw 'Could not seed shell route metadata.' }
 
     $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
         -LogonType Interactive -RunLevel Limited
@@ -137,6 +135,12 @@ try {
     Register-ScheduledTask -TaskName $launchTask -Action $launchAction `
         -Principal $principal -Force | Out-Null
 
+    Start-InstalledShell
+    $report.empty = Run-ShellSmoke 'empty'
+
+    Stop-InstalledShell
+    dotnet run --project $seedProject -c Release --no-restore -- seed $dataRoot
+    if ($LASTEXITCODE -ne 0) { throw 'Could not seed shell route metadata.' }
     Start-InstalledShell
     $report.normal = Run-ShellSmoke 'normal'
 

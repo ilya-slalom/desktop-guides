@@ -40,7 +40,8 @@
                 <TextBlock x:Name="LibraryEmpty"
                            Grid.Row="2"
                            Text="No games in your library."
-                           TextWrapping="Wrap" />
+                           TextWrapping="Wrap"
+                           AutomationProperties.AutomationId="LibraryEmpty" />
                 <ListView x:Name="GameList"
                           Grid.Row="3"
                           DisplayMemberPath="Title"
