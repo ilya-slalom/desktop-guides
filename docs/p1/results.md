@@ -441,3 +441,19 @@ from [push run 36238917270](https://github.com/ilya-slalom/desktop-guides/action
 records successful delayed and follow-up smokes, with the test package
 and temporary certificate removed. The complete P1 installed workflow
 remains T17.2 work.
+
+The next review follow-up at code head `a1f7ee5` transfers foreground
+permission from a second user launch to the existing window, rejects
+stale smoke results by invocation and process identity, and checks that
+all test-owned scheduled tasks are removed. On the Windows 11 x64 host,
+PowerShell 5.1 parsing, a read-only result check, a retained-task check,
+an unsigned x64 production MSIX build, and production-package inspection
+passed. The signed Windows 11 x64
+[install record](evidence/ci/production-shell/foreground-result-cleanup/signed-install.json)
+from [push run 36240550121](https://github.com/ilya-slalom/desktop-guides/actions/runs/36240550121)
+shows a separate test window in the foreground before a duplicate
+launch and the original shell in the foreground afterward. The
+[focus trace](evidence/ci/production-shell/foreground-result-cleanup/second-launch.json.foreground.json)
+records the two window handles and the duplicate's exit. The installed
+run passed with no test package or temporary certificate left behind.
+The complete P1 installed workflow remains T17.2 work.
