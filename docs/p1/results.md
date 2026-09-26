@@ -219,18 +219,21 @@ Two temporary self-signed x64 install attempts
 ([first record](evidence/production-shell-host-install-1.json),
 [retry record](evidence/production-shell-host-install-2.json))
 passed signature verification but `Add-AppxPackage` failed with `0x80070005`
-while initializing Windows Process Lifetime Manager. The deployment log also records access failures
-when Windows attempted cleanup under `C:\Program Files\WindowsApps\Deleted`
-for unrelated WhatsApp and Clipchamp packages. Both attempts removed the
-temporary certificate and left no preview app installed. No installed shell
-behavior is claimed from this host.
+while initializing Windows Process Lifetime Manager. The deployment log also
+records access failures when Windows attempted cleanup under
+`C:\Program Files\WindowsApps\Deleted` for unrelated WhatsApp and Clipchamp
+packages. Both attempts removed the temporary certificate and left no
+preview app installed. No installed shell behavior is claimed from this host.
 
-The new production-shell UI job passed on the PR #6 Windows 11 x64 runner,
-build `10.0.26100.0`, in interactive session 2. The
+The [current-head production-shell UI job](https://github.com/ilya-slalom/desktop-guides/actions/runs/36217602539)
+passed on the PR #6 Windows 11 x64 runner, build `10.0.26100.0`, in
+interactive session 2. The
 [signed install record](evidence/ci/production-shell/signed-install.json)
 shows package SHA-256
-`21102F8C953E9A4B5F1DB4BA4BD5A1893E7FDA3FA0D292DE5A0B865006BCAA5D`
+`E78CC2C24856A0DD094C78006B7B4CDBD5FC511B3B9F59CC27C9CE43BC57D6E4`
 and successful package/certificate cleanup. The
+[empty-Library trace](evidence/ci/production-shell/empty.json) verifies
+fresh startup before seeding. The
 [normal UIA trace](evidence/ci/production-shell/normal.json) verifies
 Library, explicit Resume, Reader → Game → Library, Settings → Library,
 and Library → Game → Reader → Game. The
@@ -243,9 +246,8 @@ The duplicate push workflow exposed a smoke-test race after Settings → Library
 the test selected a game while the Library list was still loading
 ([failure trace](evidence/ci/production-shell/smoke-race-before-fix.json)).
 A route-ready wait alone did not resolve the race in the next two CI runs:
-UI Automation exposed the selectable row after the status became ready. The
-smoke script now polls for the visible row and its selection pattern. The
-expanded route suite also checks that a stale Game or Reader route clears its
-Back history. The installed script now launches before seeding; its
-[first empty-Library trace](evidence/ci/production-shell/empty.json) passed.
-The combined installed result with row polling is pending.
+the smoke test still could not find the row immediately after the status
+became ready. The smoke script now polls for a visible row that supports
+selection. The combined empty → seeded → stale installed test passed with
+this change. The expanded route suite also checks that a stale Game or
+Reader route clears its Back history.
