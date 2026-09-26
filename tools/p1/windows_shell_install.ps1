@@ -47,9 +47,15 @@ function Start-InstalledShell {
         $appProcess = Get-CimInstance Win32_Process `
             -Filter "Name = 'DesktopGuides.Production.exe'" |
             Where-Object { $_.ExecutablePath -like "$($installed.InstallLocation)*" } |
-            Select-Object -First 1
+            Where-Object {
+                $windowProcess = Get-Process -Id $_.ProcessId `
+                    -ErrorAction SilentlyContinue
+                $windowProcess -and $windowProcess.MainWindowHandle -ne 0
+            } | Select-Object -First 1
     } while (-not $appProcess -and (Get-Date) -lt $deadline)
-    if (-not $appProcess) { throw 'Installed production shell did not launch.' }
+    if (-not $appProcess) {
+        throw 'Installed production shell did not open a window.'
+    }
     $report.launchedProcessId = $appProcess.ProcessId
     $report.launchedSessionId = $appProcess.SessionId
 }
@@ -198,8 +204,9 @@ try {
         -Principal $principal -Force | Out-Null
 
     Start-InstalledShell
-    Assert-SingleInstance
     $report.empty = Run-ShellSmoke 'empty'
+    Assert-SingleInstance
+    $report.emptyAfterSecondLaunch = Run-ShellSmoke 'empty'
 
     Stop-InstalledShell
     dotnet run --project $seedProject -c Release --no-restore -- seed $dataRoot
