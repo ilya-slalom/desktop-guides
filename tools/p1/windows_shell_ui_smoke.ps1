@@ -103,9 +103,18 @@ try {
         if (-not $element -or $element.Current.IsOffscreen) {
             throw 'Expected a visible element for pointer input.'
         }
-        $point = $element.GetClickablePoint()
+        $bounds = $element.Current.BoundingRectangle
+        $window = $root.Current.BoundingRectangle
+        $left = [Math]::Max($bounds.Left, $window.Left)
+        $top = [Math]::Max($bounds.Top, $window.Top)
+        $right = [Math]::Min($bounds.Right, $window.Right)
+        $bottom = [Math]::Min($bounds.Bottom, $window.Bottom)
+        if ($right -le $left -or $bottom -le $top) {
+            throw "Element has no visible pointer bounds: $bounds."
+        }
         [DesktopGuidesForegroundProbe]::Click(
-            [int][Math]::Round($point.X), [int][Math]::Round($point.Y))
+            [int][Math]::Floor(($left + $right) / 2),
+            [int][Math]::Floor(($top + $bottom) / 2))
     }
 
     function Press-Enter($element) {
