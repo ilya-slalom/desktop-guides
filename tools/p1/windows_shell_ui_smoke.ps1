@@ -360,7 +360,7 @@ try {
     }
     elseif ($Mode -eq 'queue-guide') {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        Select-Element 'Blocked Write Guide'
+        Open-GuideFromGame 'Blocked Write Guide'
         [void](Wait-Name 'ShellStatus' 'Opening guide...')
         $report.phases += 'guide-action-started'
     }
