@@ -137,6 +137,24 @@ through package, certificate, and final-report checks even when an owned
 process exits between lookup and stop. Verify these cases with the signed
 installed x64 lane and a missing-PID PowerShell check.
 
+The next review identified two remaining acknowledgment races. A close after
+the UI accepts a launch must not make that launch reopen the app, and a late
+callback for one launch must not acknowledge another. The current preview
+package registers launch activation only. Keep `AppInstance` for owner
+selection, and use a same-user pipe connection per secondary launch for the
+shell's bring-to-front request. The UI callback writes that connection's
+acceptance reply before it can handle a later close; a closing target closes
+pending connections so those launches retry ownership. Keep the installed
+queued-before-close check, add an accepted-before-close check, and test that
+a late reply on one connection cannot complete a different launch. When file
+or protocol activation is introduced, define payload forwarding separately.
+
+`Stop-Process` only requests termination. Before database seeding or package
+removal, wait a bounded time for each validated test-owned PID to exit. Retain
+ownership on timeout so final cleanup can retry, and report a failure if the
+process still remains. Verify a slow exit and an already-exited process in
+PowerShell, then rerun the signed installed Windows 11 x64 gate.
+
 ## M2 — catalog, static-asset validation, import, and removal
 
 Exit: two independent managed guides can be added under one game, retain

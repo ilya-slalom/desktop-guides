@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+using DesktopGuides.Infrastructure.Activation;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
@@ -18,16 +18,15 @@ internal static class Program
         @"Local\DesktopGuides.Preview.ActivationQueued";
     private const string ActivationContinueProbeName =
         @"Local\DesktopGuides.Preview.ActivationContinue";
+    private const string AcceptanceReceivedProbeName =
+        @"Local\DesktopGuides.Preview.AcceptanceReceived";
+    private const string AcceptanceContinueProbeName =
+        @"Local\DesktopGuides.Preview.AcceptanceContinue";
     private static AppInstance? primaryInstance;
     private static EventWaitHandle? closingSignal;
-    private static EventWaitHandle? activationAcceptedSignal;
+    private static LaunchActivationPipe? activationPipe;
     private static DispatcherQueue? uiQueue;
     private static App? app;
-
-    [DllImport("ole32.dll")]
-    private static extern int CoWaitForMultipleObjects(
-        uint flags, uint timeoutMilliseconds, uint handleCount,
-        IntPtr[] handles, out uint index);
 
     [STAThread]
     private static void Main(string[] args)
@@ -40,36 +39,43 @@ internal static class Program
 
         AppInstance current = AppInstance.GetCurrent();
         AppActivationArguments activation = current.GetActivatedEventArgs();
-        AppInstance? main = FindPrimaryOrRedirect(activation);
+        if (activation.Kind != ExtendedActivationKind.Launch)
+        {
+            throw new NotSupportedException(
+                $"This preview shell does not handle {activation.Kind} activation.");
+        }
+        AppInstance? main = FindPrimaryOrActivate();
         if (main is null)
         {
             return;
         }
 
         primaryInstance = main;
-        closingSignal = new EventWaitHandle(
-            false, EventResetMode.ManualReset, ClosingSignalName(Environment.ProcessId));
-        closingSignal.Reset();
-        activationAcceptedSignal = new EventWaitHandle(
-            false, EventResetMode.AutoReset,
-            ActivationAcceptedName(Environment.ProcessId));
-        activationAcceptedSignal.Reset();
-        primaryInstance.Activated += (_, _) =>
-        {
-            Volatile.Read(ref uiQueue)?.TryEnqueue(
-                async () =>
-                {
-                    await PauseQueuedActivationForTestAsync();
-                    if (app?.ActivateMainWindow() == true)
-                    {
-                        activationAcceptedSignal?.Set();
-                        SignalActivationProbe();
-                    }
-                });
-        };
-
         try
         {
+            closingSignal = new EventWaitHandle(
+                false, EventResetMode.ManualReset,
+                ClosingSignalName(Environment.ProcessId));
+            closingSignal.Reset();
+            activationPipe = new LaunchActivationPipe(
+                ActivationPipeName(Environment.ProcessId),
+                request => Volatile.Read(ref uiQueue)?.TryEnqueue(
+                    async () =>
+                    {
+                        await PauseQueuedActivationForTestAsync();
+                        if (app?.ActivateMainWindow() == true)
+                        {
+                            if (request.Complete(true))
+                            {
+                                SignalActivationProbe();
+                            }
+                        }
+                        else
+                        {
+                            request.Complete(false);
+                        }
+                    }) == true);
+
             Application.Start(initialization =>
             {
                 DispatcherQueue dispatcher = DispatcherQueue.GetForCurrentThread();
@@ -82,9 +88,9 @@ internal static class Program
         finally
         {
             ReleaseInstanceKey();
-            activationAcceptedSignal.Dispose();
-            activationAcceptedSignal = null;
-            closingSignal.Dispose();
+            activationPipe?.Dispose();
+            activationPipe = null;
+            closingSignal?.Dispose();
             closingSignal = null;
         }
     }
@@ -92,15 +98,14 @@ internal static class Program
     internal static void ReleaseInstanceKey()
     {
         closingSignal?.Set();
+        activationPipe?.Stop();
         primaryInstance?.UnregisterKey();
         primaryInstance = null;
     }
 
-    private static AppInstance? FindPrimaryOrRedirect(
-        AppActivationArguments activation)
+    private static AppInstance? FindPrimaryOrActivate()
     {
         DateTime deadline = DateTime.UtcNow.AddSeconds(60);
-        Exception? lastError = null;
         while (DateTime.UtcNow < deadline)
         {
             AppInstance target = AppInstance.FindOrRegisterForKey(InstanceKey);
@@ -109,100 +114,28 @@ internal static class Program
                 return target;
             }
             PauseAfterSelectingTargetForTest();
-            using Mutex redirectGate = new(
-                false, RedirectGateName((int)target.ProcessId));
-            bool gateHeld;
-            try
+            if (IsClosing(target))
             {
-                gateHeld = redirectGate.WaitOne(1000);
-            }
-            catch (AbandonedMutexException)
-            {
-                gateHeld = true;
-            }
-            if (!gateHeld)
-            {
+                Thread.Sleep(50);
                 continue;
             }
-            try
+            if (LaunchActivationPipe.TryRequest(
+                ActivationPipeName((int)target.ProcessId), deadline))
             {
-                AppInstance owner = AppInstance.FindOrRegisterForKey(InstanceKey);
-                if (owner.IsCurrent)
-                {
-                    return owner;
-                }
-                if (owner.ProcessId != target.ProcessId || IsClosing(target))
-                {
-                    continue;
-                }
-                if (!EventWaitHandle.TryOpenExisting(
-                    ActivationAcceptedName((int)target.ProcessId),
-                    out EventWaitHandle? accepted))
-                {
-                    Thread.Sleep(50);
-                    continue;
-                }
-                using (accepted)
-                {
-                    accepted.Reset();
-                    try
-                    {
-                        RedirectActivation(activation, target);
-                        lastError = null;
-                    }
-                    catch (Exception error)
-                    {
-                        lastError = error;
-                    }
-                    if (lastError is null &&
-                        WaitForActivationAcceptance(accepted, target, deadline))
-                    {
-                        return null;
-                    }
-                }
-            }
-            finally
-            {
-                redirectGate.ReleaseMutex();
+                PauseAfterAcceptanceForTest();
+                return null;
             }
             Thread.Sleep(50);
         }
         throw new TimeoutException(
-            "Could not redirect or take over application activation.", lastError);
+            "Could not activate or take over the application window.");
     }
 
     private static string ClosingSignalName(int processId) =>
         $@"Local\DesktopGuides.Preview.Closing.{processId}";
 
-    private static string ActivationAcceptedName(int processId) =>
-        $@"Local\DesktopGuides.Preview.ActivationAccepted.{processId}";
-
-    private static string RedirectGateName(int processId) =>
-        $@"Local\DesktopGuides.Preview.RedirectGate.{processId}";
-
-    private static bool WaitForActivationAcceptance(
-        EventWaitHandle accepted, AppInstance target, DateTime deadline)
-    {
-        DateTime acceptanceDeadline = DateTime.UtcNow.AddSeconds(10);
-        while (DateTime.UtcNow < deadline &&
-            DateTime.UtcNow < acceptanceDeadline)
-        {
-            if (IsClosing(target))
-            {
-                return false;
-            }
-            if (accepted.WaitOne(50))
-            {
-                return !IsClosing(target);
-            }
-            AppInstance owner = AppInstance.FindOrRegisterForKey(InstanceKey);
-            if (owner.IsCurrent || owner.ProcessId != target.ProcessId)
-            {
-                return false;
-            }
-        }
-        return false;
-    }
+    private static string ActivationPipeName(int processId) =>
+        $"DesktopGuides.Preview.Activation.{processId}";
 
     private static void PauseAfterSelectingTargetForTest()
     {
@@ -262,6 +195,35 @@ internal static class Program
         }
     }
 
+    private static void PauseAfterAcceptanceForTest()
+    {
+        try
+        {
+            if (!EventWaitHandle.TryOpenExisting(
+                AcceptanceReceivedProbeName, out EventWaitHandle? received))
+            {
+                return;
+            }
+            using (received)
+            {
+                if (!EventWaitHandle.TryOpenExisting(
+                    AcceptanceContinueProbeName, out EventWaitHandle? resume))
+                {
+                    return;
+                }
+                using (resume)
+                {
+                    received.Set();
+                    resume.WaitOne(15_000);
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The optional test gate must not affect normal activation.
+        }
+    }
+
     private static bool IsClosing(AppInstance instance)
     {
         try
@@ -302,32 +264,4 @@ internal static class Program
         }
     }
 
-    private static void RedirectActivation(
-        AppActivationArguments activation, AppInstance main)
-    {
-        using EventWaitHandle completed = new(false, EventResetMode.ManualReset);
-        Task redirect = Task.Run(async () =>
-            await main.RedirectActivationToAsync(activation));
-        _ = redirect.ContinueWith(_ =>
-        {
-            try
-            {
-                completed.Set();
-            }
-            catch (ObjectDisposedException)
-            {
-                // A timed-out redirect no longer has a waiting entry point.
-            }
-        }, TaskScheduler.Default);
-
-        int result = CoWaitForMultipleObjects(
-            0, 30_000, 1, [completed.SafeWaitHandle.DangerousGetHandle()],
-            out _);
-        if (result != 0)
-        {
-            throw new TimeoutException(
-                $"Activation redirection failed or timed out: 0x{result:X8}.");
-        }
-        redirect.GetAwaiter().GetResult();
-    }
 }

@@ -56,37 +56,7 @@ function Get-InstalledShellProcesses {
         }
 }
 
-function Stop-InstalledShell([switch] $BestEffort) {
-    $before = $cleanupErrors.Count
-    foreach ($ownedId in @($ownedProcesses.Keys)) {
-        try {
-            $process = Get-InstalledShellProcesses |
-                Where-Object { $_.ProcessId -eq $ownedId } |
-                Select-Object -First 1
-            if ($process -and
-                [Math]::Abs(($process.CreationDate.ToUniversalTime() -
-                    $ownedProcesses[$ownedId]).TotalSeconds) -lt 2) {
-                try {
-                    Stop-Process -Id $ownedId -Force -ErrorAction Stop
-                }
-                catch {
-                    if (Get-Process -Id $ownedId -ErrorAction SilentlyContinue) {
-                        throw
-                    }
-                }
-            }
-        }
-        catch {
-            $cleanupErrors.Add("Could not stop test process ${ownedId}: $_")
-        }
-        finally {
-            [void]$ownedProcesses.Remove($ownedId)
-        }
-    }
-    if (-not $BestEffort -and $cleanupErrors.Count -gt $before) {
-        throw 'Could not stop all test-owned shell processes.'
-    }
-}
+. (Join-Path $PSScriptRoot 'windows_shell_process.ps1')
 
 function Wait-LaunchResult([string] $ResultPath) {
     $deadline = (Get-Date).AddSeconds(30)
@@ -339,6 +309,41 @@ function Assert-QueuedActivationClose {
     }
 }
 
+function Assert-AcceptedThenClose {
+    $closingProcessId = $report.launchedProcessId
+    $received = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::AutoReset,
+        'Local\DesktopGuides.Preview.AcceptanceReceived')
+    $resume = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::ManualReset,
+        'Local\DesktopGuides.Preview.AcceptanceContinue')
+    try {
+        $received.Reset() | Out-Null
+        $resume.Reset() | Out-Null
+        Remove-Item $secondLaunchResultPath -ErrorAction SilentlyContinue
+        Start-ScheduledTask -TaskName $secondLaunchTask
+        $secondLaunch = Wait-LaunchResult $secondLaunchResultPath
+        if (-not $received.WaitOne(15000)) {
+            throw 'Second launch did not receive UI acceptance.'
+        }
+        $report.acceptedBeforeClose = $true
+        Request-InstalledShellClose $closingProcessId
+        Wait-InstalledShellExit $closingProcessId
+        $resume.Set() | Out-Null
+        Wait-InstalledShellExit ([int]$secondLaunch.processId)
+        $remaining = @(Get-InstalledShellProcesses)
+        if ($remaining.Count -ne 0) {
+            throw 'An accepted second launch reopened the closing shell.'
+        }
+        $report.acceptedCloseDidNotRelaunch = $true
+    }
+    finally {
+        $resume.Set() | Out-Null
+        $resume.Dispose()
+        $received.Dispose()
+    }
+}
+
 function Run-ShellSmoke(
     [string] $mode,
     [string] $expectedResumeGuide = 'Route Test Guide') {
@@ -446,6 +451,7 @@ try {
     Assert-RelaunchDuringClose
     Assert-ClosingTargetRedirect
     Assert-QueuedActivationClose
+    Assert-AcceptedThenClose
 
     Stop-InstalledShell
     dotnet run --project $seedProject -c Release --no-restore -- stale $dataRoot

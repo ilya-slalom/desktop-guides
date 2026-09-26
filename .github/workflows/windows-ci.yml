@@ -72,6 +72,9 @@ jobs:
             --logger "trx;LogFileName=infrastructure-tests.trx" `
             --results-directory artifacts/test-results
           exit $LASTEXITCODE
+      - name: Check installed-shell process cleanup
+        shell: pwsh
+        run: ./tools/p1/test_windows_shell_process.ps1
       - name: Upload test result
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
