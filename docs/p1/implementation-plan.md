@@ -65,9 +65,10 @@ with transactional v1→v2 upgrade and a consistent recovery copy under
 `DataRoot/.recovery`. T15.2 was merged through
 [PR #5](https://github.com/ilya-slalom/desktop-guides/pull/5), merge commit
 `47c9e906c01e85eb9ce9f9759f6359390d809e52`. Startup reconciliation
-now precedes M2 file mutation. T11.1 is implemented for review in
-[PR #6](https://github.com/ilya-slalom/desktop-guides/pull/6); reader
-controls and package identity remain separate gates.
+now precedes M2 file mutation. T11.1 was merged through
+[PR #6](https://github.com/ilya-slalom/desktop-guides/pull/6), merge commit
+`1f89fb054b523b9e51a0fba0687e0c5c601397ae`. Reader controls and package
+identity remain separate gates.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
@@ -100,6 +101,39 @@ harder to detect. The public package identity is finalized in T17.1.
 | Production WinUI shell | Route coordinator | A `NavigationView` window loads `SqliteLibraryRepository` under packaged `ApplicationData.LocalFolder`, renders empty Library/Game/Reader/Settings routes, and handles loading/errors without fixture controls. Register one app instance before library startup; queue navigation and drain pending work before repository disposal on close. T04/T05 and M3 later fill in catalog actions and reader adapters. |
 | Package separation | Production shell | Build distinct production and diagnostic MSIX packages. Inspect production package contents for fixture/probe strings and files; the diagnostic P0 workflow remains available. |
 | Installed Windows exit | Package separation | On Windows 11 x64 install production MSIX, verify an empty Library on first launch, then exercise Library → Game → Reader → Game, Settings and Back through UI Automation with seeded local metadata. Verify a second launch reuses the original process and window, a stale last-guide ID is ignored, and fixture controls are absent. Queue tests hold a pending navigation while closing begins. Run locked Core/Infrastructure tests and both package builds in CI; retain installed ARM64 P0 regression. |
+
+### T11.3 reader shell sequence
+
+The visual direction is a quiet guide workspace. The guide title is the
+dominant line; its game name and format supply context. A visible `Back to
+game` action returns to the selected guide row. The app's `NavigationView`
+pane closes on entering Reader and remains available through its native
+toggle. The reading surface takes the remaining height. An adaptive
+`CommandBar` puts page movement and text or zoom controls first, with page
+jump, fit width, and find in overflow; it hides commands that the active
+reader does not support. Until M3 connects an adapter, the unavailable
+message remains visible and no reader command is offered.
+
+| Design token | Light reference | WinUI implementation |
+| --- | --- | --- |
+| Canvas | `#F8F9FB` | System window background |
+| Reading surface | `#FFFFFF` | Theme surface brush |
+| Primary text | `#1C1C1C` | Theme primary text brush |
+| Secondary text | `#616161` | Theme secondary text brush |
+| Action accent | `#0067C0` | System accent and focus brushes |
+
+Use left alignment and the WinUI system type family for the shell; reserve
+monospace text for the TXT adapter. The layout is `Back | title, game |
+format`, followed by the compact toolbar and the reading surface. The first
+sketch gave every command a permanent slot, which crowded the narrow
+reader. Capability visibility and overflow keep the content dominant
+without presenting unavailable actions.
+
+| Step | Dependency | Output and check |
+| --- | --- | --- |
+| Reader header and pane | T11.1 | Add the in-reader Back action, guide/game context, and collapsed reader navigation pane. Returning to Game retains the guide's selected ID and keyboard focus. |
+| Capability toolbar | T11.2 | Bind command visibility and dispatch to `IReaderSession` capabilities, refresh on capability changes, and use the CommandBar overflow at narrow widths. No adapter means no command controls. |
+| Installed exit | Header and toolbar | Extend the signed Windows 11 x64 shell smoke with Back, selection/focus, placeholder-command, and pane checks. Keep the existing route and close-handoff checks passing. |
 
 ### T11.1 review follow-up: close handoff and installed gate
 

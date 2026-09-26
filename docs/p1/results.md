@@ -473,3 +473,22 @@ and process cleanup. The
 [focus trace](evidence/ci/production-shell/foreground-exit-transition/second-launch.json.foreground.json)
 again records the test window before launch and the original shell after
 the duplicate exited.
+
+## M1 T11.3 reader shell — 26 September 2026
+
+The `feat/p1-m1-reader-shell` branch adds a guide title/game/format header,
+in-reader Back, a reading-surface host, and a capability-driven CommandBar.
+The preview shell has no reader adapter yet, so it offers no reader
+commands. Returning to Game retains the selected guide and restores focus
+to its row; activating the selected row can reopen it.
+
+On the Windows 11 x64 host, build `10.0.26200.0`, with source staged under
+`E:\work\desktop-guides`, locked production restore and the unsigned Release
+x64 MSIX build passed. The MSIX SHA-256 is
+`71a7dfed551cb3ba6f4f8b6612aca86812a29e88b8a12de1536cab07cbf25152`.
+The build reported only the existing missing-`mspdbcmf.exe` symbols warning.
+The updated installed-smoke script passed Windows PowerShell 5.1 parsing.
+The host retains an installed Preview package, so its fresh-profile M1
+installer was not run there. Signed installed Reader → Game, selection,
+focus, and reopen checks remain pending on the clean CI runner; dynamic
+toolbar behavior remains an M3 adapter integration check.

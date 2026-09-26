@@ -17,7 +17,9 @@ public sealed partial class ShellWindow : Window
     private LibrarySessionLease? libraryLease;
     private SqliteLibraryRepository? repository;
     private Guid? resumeGuideId;
+    private Guid? pendingGuideFocus;
     private int renderGeneration;
+    private bool settingGuideSelection;
     private bool ready;
     private bool closeRequested;
     private bool allowClose;
@@ -27,6 +29,7 @@ public sealed partial class ShellWindow : Window
         InitializeComponent();
         Title = "Desktop Guides Preview";
         Navigation.SelectedItem = LibraryItem;
+        ReaderActions.CommandFailed += message => ShellStatus.Text = message;
         AppWindow.Closing += WindowClosing;
     }
 
@@ -145,13 +148,27 @@ public sealed partial class ShellWindow : Window
     private async void NavigationBackRequested(
         NavigationView sender, NavigationViewBackRequestedEventArgs args)
     {
-        await RunNavigationAsync(async () =>
+        await RunNavigationAsync(GoBackAsync);
+    }
+
+    private async void ReaderBackClicked(object sender, RoutedEventArgs args)
+    {
+        await RunNavigationAsync(GoBackAsync);
+    }
+
+    private async Task GoBackAsync()
+    {
+        ReaderRoute? reader = navigator.Current as ReaderRoute;
+        if (!navigator.GoBack())
         {
-            if (navigator.GoBack())
-            {
-                await RenderCurrentAsync();
-            }
-        });
+            return;
+        }
+        if (reader is not null && navigator.Current is GameRoute game &&
+            game.GameId == reader.GameId)
+        {
+            pendingGuideFocus = reader.GuideId;
+        }
+        await RenderCurrentAsync();
     }
 
     private async void GameSelected(object sender, SelectionChangedEventArgs args)
@@ -164,9 +181,19 @@ public sealed partial class ShellWindow : Window
 
     private async void GuideSelected(object sender, SelectionChangedEventArgs args)
     {
-        if (GuideList.SelectedItem is Guide guide)
+        if (!settingGuideSelection && GuideList.SelectedItem is Guide guide)
         {
             await RunNavigationAsync(() => OpenGuideAsync(guide.Id));
+        }
+    }
+
+    private async void GuideClicked(object sender, ItemClickEventArgs args)
+    {
+        if (args.ClickedItem is Guide clicked &&
+            GuideList.SelectedItem is Guide selected &&
+            selected.Id == clicked.Id)
+        {
+            await RunNavigationAsync(() => OpenGuideAsync(clicked.Id));
         }
     }
 
@@ -207,6 +234,10 @@ public sealed partial class ShellWindow : Window
 
     private async Task OpenGuideAsync(Guid guideId)
     {
+        if (navigator.Current is ReaderRoute current && current.GuideId == guideId)
+        {
+            return;
+        }
         ShellStatus.Text = "Opening guide...";
         try
         {
@@ -239,6 +270,10 @@ public sealed partial class ShellWindow : Window
         Navigation.SelectedItem = navigator.Current is SettingsRoute
             ? Navigation.SettingsItem
             : LibraryItem;
+        if (navigator.Current is ReaderRoute)
+        {
+            Navigation.IsPaneOpen = false;
+        }
 
         SqliteLibraryRepository library = RequireRepository();
         try
@@ -293,9 +328,47 @@ public sealed partial class ShellWindow : Window
                     }
                     GameHeading.Text = game.Title;
                     GamePlatform.Text = game.Platform ?? string.Empty;
-                    GuideList.ItemsSource = guides;
+                    Guid? selectedGuideId = pendingGuideFocus ??
+                        (GuideList.SelectedItem as Guide)?.Id;
+                    Guide? selectedGuide = selectedGuideId is Guid id
+                        ? guides.FirstOrDefault(item => item.Id == id)
+                        : null;
+                    settingGuideSelection = true;
+                    try
+                    {
+                        GuideList.ItemsSource = guides;
+                        GuideList.SelectedItem = selectedGuide;
+                    }
+                    finally
+                    {
+                        settingGuideSelection = false;
+                    }
                     GameEmpty.Visibility =
                         guides.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+                    if (pendingGuideFocus is not null && selectedGuide is not null)
+                    {
+                        GuideList.ScrollIntoView(selectedGuide);
+                        DispatcherQueue.TryEnqueue(() =>
+                        {
+                            if (navigator.Current is GameRoute current &&
+                                current.GameId == gameRoute.GameId &&
+                                (GuideList.SelectedItem as Guide)?.Id ==
+                                selectedGuide.Id)
+                            {
+                                GuideList.UpdateLayout();
+                                if (GuideList.ContainerFromItem(selectedGuide) is
+                                    Control container)
+                                {
+                                    container.Focus(FocusState.Programmatic);
+                                }
+                                else
+                                {
+                                    GuideList.Focus(FocusState.Programmatic);
+                                }
+                            }
+                        });
+                    }
+                    pendingGuideFocus = null;
                     ShellStatus.Text = "Game ready.";
                     break;
 
@@ -314,9 +387,22 @@ public sealed partial class ShellWindow : Window
                         ShellStatus.Text = "This guide is no longer in your library.";
                         return;
                     }
+                    Game? readerGame = await library.GetGameAsync(readerRoute.GameId);
+                    if (generation != renderGeneration)
+                    {
+                        return;
+                    }
+                    if (readerGame is null)
+                    {
+                        navigator.ResetToLibrary();
+                        await RenderCurrentAsync();
+                        ShellStatus.Text = "This game is no longer in your library.";
+                        return;
+                    }
                     ReaderHeading.Text = guide.Title;
+                    ReaderGameName.Text = readerGame.Title;
                     ReaderFormat.Text = guide.Format.ToString().ToUpperInvariant();
-                    ShellStatus.Text = "Guide ready.";
+                    ShellStatus.Text = "Guide details ready.";
                     break;
 
                 case SettingsRoute:

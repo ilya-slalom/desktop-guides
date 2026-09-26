@@ -138,6 +138,59 @@ try {
         Invoke-Element $button
     }
 
+    function Wait-SelectedGuide([string] $expected) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $list = Find-ById 'GuideList'
+            if ($list -and -not $list.Current.IsOffscreen) {
+                $selection = $list.GetCurrentPattern(
+                    [System.Windows.Automation.SelectionPattern]::Pattern)
+                foreach ($item in $selection.Current.GetSelection()) {
+                    if ($item.Current.Name -eq $expected) {
+                        return $item
+                    }
+                }
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected selected guide '$expected' after returning to Game."
+    }
+
+    function Wait-FocusedGuide([string] $expected) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+            if ($focused -and $focused.Current.Name -eq $expected) {
+                return
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected keyboard focus on '$expected' after Back."
+    }
+
+    function Save-ReaderScreenshot {
+        Add-Type -AssemblyName System.Drawing
+        $bounds = $root.Current.BoundingRectangle
+        $width = [int][Math]::Ceiling($bounds.Width)
+        $height = [int][Math]::Ceiling($bounds.Height)
+        if ($width -lt 1 -or $height -lt 1) {
+            throw 'The reader window has no visible screenshot bounds.'
+        }
+        $bitmap = [System.Drawing.Bitmap]::new($width, $height)
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        try {
+            $graphics.CopyFromScreen(
+                [int]$bounds.X, [int]$bounds.Y, 0, 0, $bitmap.Size)
+            $path = [System.IO.Path]::ChangeExtension($ResultPath, 'reader.png')
+            $bitmap.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
+            return $path
+        }
+        finally {
+            $graphics.Dispose()
+            $bitmap.Dispose()
+        }
+    }
+
     if ($Mode -eq 'waiting-handoff') {
         [void](Wait-Name 'ShellStatus' 'Waiting for previous window...')
         $report.phases += 'waiting-for-library-lease'
@@ -176,13 +229,37 @@ try {
         $resume = Wait-Name 'ResumeGuide' "Resume $ExpectedResumeGuide"
         Invoke-Element $resume
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
-        [void](Wait-Name 'ShellStatus' 'Guide ready.')
+        [void](Wait-Name 'ReaderGameName' 'Route Test Game')
+        [void](Wait-Name 'ReaderFormat' 'TXT')
+        [void](Wait-Name 'ReaderPlaceholder' `
+            'Reading this guide is unavailable in this preview.')
+        $commands = Find-ById 'ReaderCommands'
+        if ($commands -and -not $commands.Current.IsOffscreen) {
+            throw 'The preview reader exposed commands without an adapter.'
+        }
+        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        try {
+            $report.readerScreenshot = Save-ReaderScreenshot
+        }
+        catch {
+            $report.readerScreenshotError = $_ | Out-String
+        }
         $report.phases += 'resume-reader'
 
-        Go-Back
+        $readerBack = Wait-Name 'ReaderBackToGame' 'Back to game'
+        Invoke-Element $readerBack
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Name 'ShellStatus' 'Game ready.')
+        $selectedGuide = Wait-SelectedGuide $ExpectedResumeGuide
+        Wait-FocusedGuide $ExpectedResumeGuide
         $report.phases += 'reader-back-game'
+
+        Invoke-Element $selectedGuide
+        [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
+        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        $report.phases += 'reopen-selected-guide'
+        Go-Back
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
         [void](Wait-Name 'ShellStatus' 'Library ready.')
@@ -211,7 +288,7 @@ try {
         [void](Wait-Name 'ShellStatus' 'Settings ready.')
         Go-Back
         [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
-        [void](Wait-Name 'ShellStatus' 'Guide ready.')
+        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
         $report.phases += 'rapid-guide-settings-back-reader'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
