@@ -8,6 +8,7 @@ internal static class Program
 {
     private static AppInstance? primaryInstance;
     private static DispatcherQueue? uiQueue;
+    private static App? app;
 
     [STAThread]
     private static async Task Main(string[] args)
@@ -27,7 +28,7 @@ internal static class Program
         primaryInstance.Activated += (_, _) =>
         {
             Volatile.Read(ref uiQueue)?.TryEnqueue(
-                () => (Application.Current as App)?.ActivateMainWindow());
+                () => app?.ActivateMainWindow());
         };
 
         Application.Start(initialization =>
@@ -36,7 +37,7 @@ internal static class Program
             SynchronizationContext.SetSynchronizationContext(
                 new DispatcherQueueSynchronizationContext(dispatcher));
             Volatile.Write(ref uiQueue, dispatcher);
-            _ = new App();
+            app = new App();
         });
     }
 }

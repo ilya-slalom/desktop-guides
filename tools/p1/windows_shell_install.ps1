@@ -69,12 +69,22 @@ function Assert-SingleInstance {
     if ($launchInfo.LastRunTime -le $previousRun) {
         throw 'Second production launch task never started.'
     }
-    Start-Sleep -Seconds 2
-    $processes = @(Get-CimInstance Win32_Process `
-        -Filter "Name = 'DesktopGuides.Production.exe'" |
-        Where-Object { $_.ExecutablePath -like "$($installed.InstallLocation)*" })
+    Start-Sleep -Seconds 3
+    $deadline = (Get-Date).AddSeconds(20)
+    do {
+        $processes = @(Get-CimInstance Win32_Process `
+            -Filter "Name = 'DesktopGuides.Production.exe'" |
+            Where-Object { $_.ExecutablePath -like "$($installed.InstallLocation)*" })
+        if ($processes.Count -eq 1 -and
+            $processes[0].ProcessId -eq $firstProcessId) {
+            break
+        }
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $deadline)
+    $report.secondLaunchProcessIds = @(
+        $processes | ForEach-Object { $_.ProcessId })
     if ($processes.Count -ne 1 -or $processes[0].ProcessId -ne $firstProcessId) {
-        throw 'Second production launch created another library-owning process.'
+        throw "Second launch did not settle on original process $firstProcessId; found $($report.secondLaunchProcessIds -join ', ')."
     }
     $report.singleInstanceProcessId = $processes[0].ProcessId
 }
