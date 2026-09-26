@@ -532,3 +532,27 @@ shows the closed pane and unavailable-reading preview. The first review
 follow-up run failed because WinUI's pane toggle did not expose a UI
 Automation clickable point; using its visible bounds for the physical click
 passed the installed rerun.
+
+### T11.3 focused-row review follow-up — 26 September 2026
+
+At code head `e81db1a81a23ac6bf13562a8daabfe9415b3a49d`, Enter now opens
+the guide row that received the key even when another row remains selected.
+The Windows 11 x64 host build under `E:\work\desktop-guides` passed the
+unsigned Release MSIX build, and Windows PowerShell 5.1 parsed the updated
+smoke script. The signed installed shell jobs passed in
+[push run 36249362118](https://github.com/ilya-slalom/desktop-guides/actions/runs/36249362118)
+and [PR run 36249364872](https://github.com/ilya-slalom/desktop-guides/actions/runs/36249364872).
+The retained [install record](evidence/ci/production-shell/reader-shell/focused-enter/signed-install.json)
+reports Windows build `10.0.26100.0`, AMD64, success, and removal of the
+temporary package and signer. Its four normal route scenarios all include
+the [focused-row trace](evidence/ci/production-shell/reader-shell/focused-enter/normal.json):
+Ctrl+Arrow moves focus to the other guide without changing selection, Enter
+opens that focused guide, and the test restores the original Resume guide
+before later route checks. The [Reader screenshot](evidence/ci/production-shell/reader-shell/focused-enter/normal.reader.png)
+was retained.
+
+The T11.3 exit check now covers guide selection and focus. Library query
+retention remains required and is assigned to T05.3 after T05.2 adds search.
+In the PR run, the first native ARM64 P0 diagnostic attempt failed when
+`pdf-short` could not read its startup status; the unchanged P0 lane passed
+all 14 fixtures in the push run and in [PR attempt 2](https://github.com/ilya-slalom/desktop-guides/actions/runs/36249364872/attempts/2).
