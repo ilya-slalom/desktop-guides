@@ -42,6 +42,7 @@ try {
     Add-Type -AssemblyName UIAutomationClient
     Add-Type -AssemblyName UIAutomationTypes
     Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -Path (Join-Path $PSScriptRoot 'windows_shell_foreground_probe.cs')
     $deadline = (Get-Date).AddSeconds(30)
     do {
         $installedProcess = Get-CimInstance Win32_Process `
@@ -96,6 +97,43 @@ try {
         $pattern = $element.GetCurrentPattern(
             [System.Windows.Automation.InvokePattern]::Pattern)
         $pattern.Invoke()
+    }
+
+    function Click-Element($element) {
+        if (-not $element -or $element.Current.IsOffscreen) {
+            throw 'Expected a visible element for pointer input.'
+        }
+        $point = $element.GetClickablePoint()
+        [DesktopGuidesForegroundProbe]::Click(
+            [int][Math]::Round($point.X), [int][Math]::Round($point.Y))
+    }
+
+    function Press-Enter($element) {
+        if (-not $element -or $element.Current.IsOffscreen) {
+            throw 'Expected a visible element for keyboard input.'
+        }
+        $element.SetFocus()
+        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    }
+
+    function Wait-PaneState([string] $expected) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $navigation = Find-ById 'Navigation'
+            if ($navigation -and $navigation.Current.ItemStatus -eq $expected) {
+                return
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected navigation pane state '$expected'."
+    }
+
+    function Find-PaneToggle {
+        $toggle = Find-ById 'TogglePaneButton'
+        if (-not $toggle) {
+            throw 'Expected the NavigationView pane toggle button.'
+        }
+        return $toggle
     }
 
     function Select-Element([string] $name) {
@@ -194,6 +232,10 @@ try {
 
     function Save-ReaderScreenshot {
         Add-Type -AssemblyName System.Drawing
+        $path = [System.IO.Path]::ChangeExtension($ResultPath, 'reader.png')
+        if (Test-Path -LiteralPath $path) {
+            Remove-Item -LiteralPath $path -ErrorAction Stop
+        }
         $bounds = $root.Current.BoundingRectangle
         $width = [int][Math]::Ceiling($bounds.Width)
         $height = [int][Math]::Ceiling($bounds.Height)
@@ -205,8 +247,11 @@ try {
         try {
             $graphics.CopyFromScreen(
                 [int]$bounds.X, [int]$bounds.Y, 0, 0, $bitmap.Size)
-            $path = [System.IO.Path]::ChangeExtension($ResultPath, 'reader.png')
             $bitmap.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
+            if (-not (Test-Path -LiteralPath $path) -or
+                (Get-Item -LiteralPath $path).Length -eq 0) {
+                throw 'The Reader screenshot was not saved.'
+            }
             return $path
         }
         finally {
@@ -262,26 +307,37 @@ try {
             throw 'The preview reader exposed commands without an adapter.'
         }
         [void](Wait-Name 'ShellStatus' 'Guide details ready.')
-        try {
-            $report.readerScreenshot = Save-ReaderScreenshot
-        }
-        catch {
-            $report.readerScreenshotError = $_ | Out-String
-        }
+        Wait-PaneState 'Navigation pane closed'
+        $report.readerScreenshot = Save-ReaderScreenshot
         $report.phases += 'resume-reader'
 
+        $paneToggle = Find-PaneToggle
+        Click-Element $paneToggle
+        Wait-PaneState 'Navigation pane open'
+        Click-Element (Find-PaneToggle)
+        Wait-PaneState 'Navigation pane closed'
+        $report.phases += 'reader-pane-toggle'
+
         $readerBack = Wait-Name 'ReaderBackToGame' 'Back to game'
-        Invoke-Element $readerBack
+        Click-Element $readerBack
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Name 'ShellStatus' 'Game ready.')
         [void](Wait-SelectedGuide $ExpectedResumeGuide)
         Wait-FocusedGuide $ExpectedResumeGuide
         $report.phases += 'reader-back-game'
 
+        Click-Element (Wait-SelectedGuide $ExpectedResumeGuide)
+        [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
+        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        $report.phases += 'pointer-reopen-selected-guide'
+        Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-SelectedGuide $ExpectedResumeGuide)
+        Wait-FocusedGuide $ExpectedResumeGuide
         Activate-SelectedGuide $ExpectedResumeGuide
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
         [void](Wait-Name 'ShellStatus' 'Guide details ready.')
-        $report.phases += 'reopen-selected-guide'
+        $report.phases += 'keyboard-reopen-selected-guide'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         Go-Back

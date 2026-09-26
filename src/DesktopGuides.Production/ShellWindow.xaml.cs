@@ -3,6 +3,7 @@ using DesktopGuides.Core.Navigation;
 using DesktopGuides.Infrastructure.Storage;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -36,9 +37,17 @@ public sealed partial class ShellWindow : Window
             UIElement.TappedEvent, new TappedEventHandler(GuideTapped), true);
         GuideList.AddHandler(
             UIElement.KeyDownEvent, new KeyEventHandler(GuideKeyDown), true);
+        Navigation.RegisterPropertyChangedCallback(
+            NavigationView.IsPaneOpenProperty, (_, _) => UpdatePaneStatus());
+        UpdatePaneStatus();
         ReaderActions.CommandFailed += message => ShellStatus.Text = message;
         AppWindow.Closing += WindowClosing;
     }
+
+    private void UpdatePaneStatus() =>
+        AutomationProperties.SetItemStatus(
+            Navigation,
+            Navigation.IsPaneOpen ? "Navigation pane open" : "Navigation pane closed");
 
     public Task InitializeAsync()
     {

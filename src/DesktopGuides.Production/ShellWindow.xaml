@@ -8,6 +8,7 @@
                     PaneDisplayMode="Auto"
                     IsBackButtonVisible="Visible"
                     IsSettingsVisible="True"
+                    AutomationProperties.AutomationId="Navigation"
                     ItemInvoked="NavigationInvoked"
                     BackRequested="NavigationBackRequested">
         <NavigationView.MenuItems>
