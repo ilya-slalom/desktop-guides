@@ -33,6 +33,10 @@ public sealed partial class ShellWindow : Window
         InitializeComponent();
         Title = "Desktop Guides Preview";
         Navigation.SelectedItem = LibraryItem;
+        GameList.AddHandler(
+            UIElement.TappedEvent, new TappedEventHandler(GameTapped), true);
+        GameList.AddHandler(
+            UIElement.KeyDownEvent, new KeyEventHandler(GameKeyDown), true);
         GuideList.AddHandler(
             UIElement.TappedEvent, new TappedEventHandler(GuideTapped), true);
         GuideList.AddHandler(
@@ -195,6 +199,37 @@ public sealed partial class ShellWindow : Window
         }
     }
 
+    private async void GameTapped(object sender, TappedRoutedEventArgs args)
+    {
+        if (GameFromRow(args.OriginalSource as DependencyObject) is Game game)
+        {
+            await RunNavigationAsync(() => OpenGameAsync(game.Id));
+        }
+    }
+
+    private Game? GameFromRow(DependencyObject? source)
+    {
+        while (source is not null && !ReferenceEquals(source, GameList))
+        {
+            if (source is ListViewItem row && row.Content is Game game)
+            {
+                return game;
+            }
+            source = VisualTreeHelper.GetParent(source);
+        }
+        return null;
+    }
+
+    private async void GameKeyDown(object sender, KeyRoutedEventArgs args)
+    {
+        if (args.Key == VirtualKey.Enter &&
+            GameFromRow(args.OriginalSource as DependencyObject) is Game game)
+        {
+            args.Handled = true;
+            await RunNavigationAsync(() => OpenGameAsync(game.Id));
+        }
+    }
+
     private async void GuideSelected(object sender, SelectionChangedEventArgs args)
     {
         if (!settingGuideSelection && GuideList.SelectedItem is Guide guide)
@@ -253,6 +288,10 @@ public sealed partial class ShellWindow : Window
 
     private async Task OpenGameAsync(Guid gameId)
     {
+        if (navigator.Current is GameRoute current && current.GameId == gameId)
+        {
+            return;
+        }
         try
         {
             if (await RequireRepository().GetGameAsync(gameId) is null)

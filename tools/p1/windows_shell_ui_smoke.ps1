@@ -204,6 +204,30 @@ try {
         throw "Expected selected guide '$expected' after returning to Game."
     }
 
+    function Wait-GameRow([string] $expected) {
+        $condition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::NameProperty, $expected)
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $list = Find-ById 'GameList'
+            if ($list -and -not $list.Current.IsOffscreen) {
+                foreach ($item in $list.FindAll($scope, $condition)) {
+                    try {
+                        if ($item.Current.IsOffscreen) { continue }
+                        [void]$item.GetCurrentPattern(
+                            [System.Windows.Automation.SelectionItemPattern]::Pattern)
+                        return $item
+                    }
+                    catch {
+                        continue
+                    }
+                }
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected visible game row '$expected'."
+    }
+
     function Wait-GuideRow([string] $expected) {
         $condition = [System.Windows.Automation.PropertyCondition]::new(
             [System.Windows.Automation.AutomationElement]::NameProperty, $expected)
@@ -417,6 +441,34 @@ try {
         [void](Wait-Name 'ShellStatus' 'Library ready.')
         $report.phases += 'game-back-library'
 
+        Click-Element (Wait-GameRow 'Route Test Game')
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        Click-Element (Wait-GuideRow 'Route Test Guide')
+        [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
+        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        Click-Element (Wait-Name 'ReaderBackToGame' 'Back to game')
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        $report.phases += 'pointer-library-game-reader-game'
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Name 'ShellStatus' 'Library ready.')
+
+        Press-Enter (Wait-GameRow 'Route Test Game')
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        Press-Enter (Wait-GuideRow 'Route Test Guide')
+        [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
+        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        $report.phases += 'keyboard-library-game-reader-game'
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Name 'ShellStatus' 'Library ready.')
+
         Select-Element 'Settings'
         [void](Wait-Name 'SettingsHeading' 'Settings')
         $report.phases += 'settings'
@@ -425,7 +477,7 @@ try {
         [void](Wait-Name 'ShellStatus' 'Library ready.')
         $report.phases += 'settings-back-library'
 
-        Select-Element 'Route Test Game'
+        Press-Enter (Wait-GameRow 'Route Test Game')
         Select-Element 'Settings'
         [void](Wait-Name 'SettingsHeading' 'Settings')
         [void](Wait-Name 'ShellStatus' 'Settings ready.')

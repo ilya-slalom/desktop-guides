@@ -136,7 +136,16 @@ without presenting unavailable actions.
 | --- | --- | --- |
 | Reader header and pane | T11.1 | Add the in-reader Back action, guide/game context, and collapsed reader navigation pane. Returning to Game retains the guide's selected ID and keyboard focus. |
 | Capability toolbar | T11.2 | Bind command visibility and dispatch to `IReaderSession` capabilities, refresh on capability changes, and use the CommandBar overflow at narrow widths. No adapter means no command controls. |
-| Installed exit | Header and toolbar | Extend the signed Windows 11 x64 shell smoke with Back, selection/focus, placeholder-command, and pane checks. Keep the existing route and close-handoff checks passing. |
+| Capability toolbar exit | Capability toolbar | Build a separate packaged WinUI test window that links the production toolbar XAML and code, attaches a fake `IReaderSession`, changes capabilities on a worker thread, and checks visible commands, action dispatch, and narrow-width overflow with UI Automation. Keep the fake and test window outside the production project and MSIX. A conditional production test mode would make accidental fixture inclusion harder to rule out. |
+| Installed route exit | Header and toolbar | Extend the signed Windows 11 x64 shell smoke with actual pointer and keyboard Library → Game → Reader → Game traces, Back, selection/focus, placeholder-command, and pane checks. Keep the existing route and close-handoff checks passing. |
+
+The [Windows 11 x64 toolbar host run](evidence/host/reader-toolbar-review-followup/toolbar-ui.json)
+passed capability changes from a worker thread, command dispatch, and
+primary-command overflow after narrowing the linked production toolbar. Its
+[install result](evidence/host/reader-toolbar-review-followup/signed-install.json)
+records an interactive session 1 install and cleanup of the test package,
+certificate, and scheduled task. The CI `reader-toolbar-ui` job repeats this
+gate; the extended production route trace awaits its installed CI run.
 
 ### T11.1 review follow-up: close handoff and installed gate
 
