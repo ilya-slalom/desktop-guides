@@ -426,3 +426,18 @@ certificate without a process cleanup error. Both the push and
 passed 8/8 jobs, including the native ARM64 P0 UI regression. This closes
 the M1 review findings; the complete P1 installed workflow remains T17.2
 work.
+
+The next review fix at code head `b5e8aec` waits for the registered
+installed UI smoke task to reach `Ready` after its result is written,
+before another scenario reuses the task name. The first empty-library
+smoke keeps its helper alive for two seconds after publishing its result;
+the next empty-library smoke starts immediately after the task becomes
+ready. Both changed scripts passed Windows PowerShell 5.1 parsing on the
+Windows 11 x64 host.
+
+The signed Windows 11 x64
+[install record](evidence/ci/production-shell/smoke-idle/signed-install.json)
+from [push run 36238917270](https://github.com/ilya-slalom/desktop-guides/actions/runs/36238917270)
+records successful delayed and follow-up smokes, with the test package
+and temporary certificate removed. The complete P1 installed workflow
+remains T17.2 work.
