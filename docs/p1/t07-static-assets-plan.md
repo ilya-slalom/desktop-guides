@@ -8,15 +8,18 @@ revalidation, and user-facing warnings before an import can publish.
 
 The scanner takes an HTML entry path and a caller-provided, path-keyed stream
 source. It never opens a URL or the network. AngleSharp parses HTML and
-AngleSharp.Css parses CSS rules and declarations. A small URL-function lexer
-walks the CSS declaration values supplied by the parser, including multiple
-background images. This keeps comment, selector, and rule handling with a
-real parser while retaining references in CSS custom properties.
+AngleSharp.Css identifies CSS imports and bounds the rule traversal. A small
+lexer reads URL functions from declaration values in the original CSS text,
+including nested rules, custom properties, and escaped URL function names.
+It skips comments, quoted strings, and at-rule preludes. Path checks receive
+the original URL target without escape decoding.
 
-An alternative was to parse CSS by regex. It can misread comments, quoted
-strings, and nested functions. Traversing only typed CSS values was also
-considered, but the parser exposes custom property values as untyped text,
-so that approach would miss references that a browser could later use.
+Parsing CSS by regex can misread comments, quoted strings, and nested
+functions. Traversing only typed CSS values misses references in custom
+properties. A parser-only walk of serialized rules also loses URLs in CSS
+nesting that AngleSharp.Css omits. Reading declaration values from the source
+text keeps those references while the parser still handles imports and rule
+structure.
 
 Pin AngleSharp `1.8.2` and AngleSharp.Css `1.1.2` through central NuGet
 versions and locked restore. Their package metadata declares MIT licenses;

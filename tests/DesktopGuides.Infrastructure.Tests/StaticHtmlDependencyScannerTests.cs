@@ -101,6 +101,87 @@ public sealed class StaticHtmlDependencyScannerTests
     }
 
     [Fact]
+    public async Task NestedStyleRuleImageIsIncluded()
+    {
+        MemorySource source = new(
+            ("guide.html", """
+                <style>.chapter { & .map { background: url(map.png) } }</style>
+                """),
+            ("map.png", "map"));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner()
+            .ScanAsync("guide.html", source);
+
+        Assert.Equal(
+            ["guide.html", "map.png"],
+            manifest.Assets.Select(asset => asset.RelativePath));
+    }
+
+    [Fact]
+    public async Task EscapedUrlFunctionsInCssDeclarationsAreIncluded()
+    {
+        MemorySource source = new(
+            ("guide.html", """
+                <style>.map { --image: u\72l(map.png); background: var(--image) }</style>
+                <div style="background: u\72l(inline.gif)"></div>
+                """),
+            ("map.png", "map"),
+            ("inline.gif", "inline"));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner()
+            .ScanAsync("guide.html", source);
+
+        Assert.Equal(
+            ["guide.html", "inline.gif", "map.png"],
+            manifest.Assets.Select(asset => asset.RelativePath));
+    }
+
+    [Fact]
+    public async Task NamespaceAndConditionUrlsAreNotImageResources()
+    {
+        MemorySource source = new(
+            ("guide.html", """
+                <style>
+                    @namespace url("private.png");
+                    @supports (background: url(fake.png)) {
+                        .map { background: url(map.png) }
+                    }
+                </style>
+                """),
+            ("private.png", "private"),
+            ("fake.png", "fake"),
+            ("map.png", "map"));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner()
+            .ScanAsync("guide.html", source);
+
+        Assert.Equal(
+            ["guide.html", "map.png"],
+            manifest.Assets.Select(asset => asset.RelativePath));
+    }
+
+    [Fact]
+    public async Task MissingAssetAfterAssetCapIsReportedAsMissing()
+    {
+        MemorySource source = new(
+            ("guide.html", """
+                <img src="one.png"><img src="missing.png">
+                """),
+            ("one.png", "one"));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner(
+                new StaticHtmlScanLimits(MaxAssets: 1))
+            .ScanAsync("guide.html", source);
+
+        Assert.Equal(
+            ["guide.html", "one.png"],
+            manifest.Assets.Select(asset => asset.RelativePath));
+        Assert.Equal(
+            [StaticReferenceStatus.Included, StaticReferenceStatus.Missing],
+            manifest.References.Select(reference => reference.Status));
+    }
+
+    [Fact]
     public async Task MissingRemoteUnsupportedAndUnsafeTargetsAreNotOpened()
     {
         MemorySource source = new(

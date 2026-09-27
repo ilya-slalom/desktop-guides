@@ -27,3 +27,14 @@ was generated. Both Windows CI runs for commit `37bcacb`
 Infrastructure tests, and x64/ARM64 test and production package builds.
 The CI UI jobs were still running when this result was recorded. No
 installed reader or import scenario is claimed by T07.1.
+
+## PR #9 review follow-up
+
+Four review regressions were reproduced and fixed: images in nested CSS
+rules and escaped `url()` functions are now included; `@namespace` and
+condition-prelude URLs are excluded; missing files remain classified as
+missing after the distinct-asset cap is reached. The Windows 11 x64 staged
+source passed **62/62 Infrastructure tests**, including all four permanent
+regression tests. The unsigned Release x64 production MSIX build passed
+with zero errors and the same `mspdbcmf.exe` symbols warning. This scanner
+is still disconnected from the installed import workflow.

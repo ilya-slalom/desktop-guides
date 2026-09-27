@@ -125,13 +125,8 @@ public sealed class StaticHtmlDependencyScanner
                 }
                 if (element.GetAttribute("style") is string inlineStyle)
                 {
-                    ICssStyleDeclaration? declaration =
-                        cssParser.ParseDeclaration(inlineStyle);
-                    if (declaration is not null)
-                    {
-                        await ScanCssUrlsAsync(
-                            entryPath, declaration.CssText);
-                    }
+                    await ScanCssUrlsAsync(
+                        entryPath, inlineStyle, inlineStyle: true);
                 }
             }
             return new StaticHtmlManifest(
@@ -198,11 +193,8 @@ public sealed class StaticHtmlDependencyScanner
                         sourcePath, import.Href,
                         StaticAssetKind.StyleSheet, depth + 1);
                 }
-                else
-                {
-                    await ScanCssUrlsAsync(sourcePath, rule.CssText);
-                }
             }
+            await ScanCssUrlsAsync(sourcePath, css);
         }
 
         private void CountRules(IEnumerable<ICssRule> rules)
@@ -233,9 +225,13 @@ public sealed class StaticHtmlDependencyScanner
             }
         }
 
-        private async Task ScanCssUrlsAsync(string sourcePath, string css)
+        private async Task ScanCssUrlsAsync(
+            string sourcePath,
+            string css,
+            bool inlineStyle = false)
         {
-            foreach (string target in CssUrlReferences.Extract(css))
+            foreach (string target in CssUrlReferences.ExtractDeclarations(
+                css, inlineStyle))
             {
                 await ReadHtmlReferenceAsync(
                     sourcePath, target, StaticAssetKind.Image, 0);
@@ -334,17 +330,17 @@ public sealed class StaticHtmlDependencyScanner
             string path,
             StaticAssetKind kind)
         {
-            if (assets.Count - 1 >= limits.MaxAssets &&
-                kind != StaticAssetKind.EntryHtml)
-            {
-                throw Limit(
-                    StaticScanLimit.AssetCount, "Too many static assets.");
-            }
             await using Stream? input = await source.OpenReadAsync(
                 path, cancellationToken);
             if (input is null)
             {
                 return null;
+            }
+            if (assets.Count - 1 >= limits.MaxAssets &&
+                kind != StaticAssetKind.EntryHtml)
+            {
+                throw Limit(
+                    StaticScanLimit.AssetCount, "Too many static assets.");
             }
             long maximum = kind == StaticAssetKind.EntryHtml
                 ? limits.MaxEntryBytes : limits.MaxAssetBytes;

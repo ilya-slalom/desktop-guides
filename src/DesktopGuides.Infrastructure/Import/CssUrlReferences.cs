@@ -1,13 +1,19 @@
 namespace DesktopGuides.Infrastructure.Import;
 
 /// <summary>
-/// Reads url() arguments from CSS text emitted by AngleSharp.Css. It does not
-/// resolve or decode a target; the scanner rejects unsafe escape syntax.
+/// Reads url() arguments from CSS declaration values in source text, including
+/// nested rules that the CSS parser may omit. It decodes escapes in the function
+/// name, but leaves targets unchanged for the scanner's path checks.
 /// </summary>
 internal static class CssUrlReferences
 {
-    public static IEnumerable<string> Extract(string css)
+    public static IEnumerable<string> ExtractDeclarations(
+        string css,
+        bool inlineStyle = false)
     {
+        int blockDepth = inlineStyle ? 1 : 0;
+        bool inDeclarationValue = false;
+        bool inAtRulePrelude = false;
         for (int index = 0; index < css.Length;)
         {
             if (css[index] == '/' && index + 1 < css.Length &&
@@ -22,19 +28,55 @@ internal static class CssUrlReferences
                 index = SkipString(css, index);
                 continue;
             }
-            if (!IsIdentifierCharacter(css[index]))
+            switch (css[index])
+            {
+                case '@' when !inDeclarationValue:
+                    inAtRulePrelude = true;
+                    index++;
+                    continue;
+                case '{':
+                    blockDepth++;
+                    inDeclarationValue = false;
+                    inAtRulePrelude = false;
+                    index++;
+                    continue;
+                case '}':
+                    blockDepth = Math.Max(0, blockDepth - 1);
+                    inDeclarationValue = false;
+                    inAtRulePrelude = false;
+                    index++;
+                    continue;
+                case ';':
+                    inDeclarationValue = false;
+                    inAtRulePrelude = false;
+                    index++;
+                    continue;
+                case ':' when blockDepth > 0 && !inAtRulePrelude:
+                    inDeclarationValue = true;
+                    index++;
+                    continue;
+            }
+            if (!inDeclarationValue)
             {
                 index++;
                 continue;
             }
 
-            int start = index;
-            while (index < css.Length && IsIdentifierCharacter(css[index]))
+            int identifierLength = 0;
+            bool isUrl = true;
+            while (TryReadIdentifierCharacter(css, ref index,
+                out char character))
+            {
+                isUrl &= identifierLength < 3 &&
+                    char.ToLowerInvariant(character) == "url"[identifierLength];
+                identifierLength++;
+            }
+            if (identifierLength == 0)
             {
                 index++;
+                continue;
             }
-            if (!css.AsSpan(start, index - start).Equals(
-                    "url".AsSpan(), StringComparison.OrdinalIgnoreCase))
+            if (!isUrl || identifierLength != 3)
             {
                 continue;
             }
@@ -58,6 +100,53 @@ internal static class CssUrlReferences
             }
         }
     }
+
+    private static bool TryReadIdentifierCharacter(
+        string css,
+        ref int index,
+        out char character)
+    {
+        if (index >= css.Length)
+        {
+            character = default;
+            return false;
+        }
+        if (IsIdentifierCharacter(css[index]))
+        {
+            character = css[index++];
+            return true;
+        }
+        if (css[index] != '\\' || index + 1 >= css.Length ||
+            css[index + 1] is '\r' or '\n' or '\f')
+        {
+            character = default;
+            return false;
+        }
+        index++;
+        int value = 0;
+        int digits = 0;
+        while (index < css.Length && digits < 6 &&
+            Uri.IsHexDigit(css[index]))
+        {
+            value = value * 16 + HexValue(css[index++]);
+            digits++;
+        }
+        if (digits == 0)
+        {
+            character = css[index++];
+            return true;
+        }
+        if (index < css.Length && char.IsWhiteSpace(css[index]))
+        {
+            index++;
+        }
+        character = value <= char.MaxValue ? (char)value : '\0';
+        return true;
+    }
+
+    private static int HexValue(char character) =>
+        character <= '9' ? character - '0' :
+        char.ToLowerInvariant(character) - 'a' + 10;
 
     private static bool TryReadArgument(
         string css,
