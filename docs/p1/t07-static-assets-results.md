@@ -22,5 +22,8 @@ reference, depth, and CSS-rule budgets.
 
 The unsigned Release x64 production MSIX build passed with zero errors.
 It reported the host's existing `mspdbcmf.exe` warning, so no symbols package
-was generated. ARM64 headless and package builds still need CI results for
-this change. No installed reader or import scenario is claimed by T07.1.
+was generated. Both Windows CI runs for commit `37bcacb`
+(`36311213988` and `36311226103`) passed native ARM64 Core and
+Infrastructure tests, and x64/ARM64 test and production package builds.
+The CI UI jobs were still running when this result was recorded. No
+installed reader or import scenario is claimed by T07.1.
