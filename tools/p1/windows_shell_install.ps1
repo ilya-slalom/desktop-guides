@@ -347,7 +347,7 @@ function Assert-RelaunchDuringClose {
     $lockProcess = Start-ShellDatabaseLock `
         'hold-write-lock' $lockReady $lockRelease
     try {
-        $report.pendingGuide = Run-ShellSmoke 'queue-guide'
+        $report.pendingGuide = Run-ShellSmoke 'queue-guide-write'
         Request-InstalledShellClose $closingProcessId
         Start-Sleep -Milliseconds 300
         if (-not (Get-Process -Id $closingProcessId -ErrorAction SilentlyContinue)) {

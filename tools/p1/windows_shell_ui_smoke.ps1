@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('empty', 'normal', 'stale', 'long-list', 'switch-game',
         'switch-game-prepare', 'switch-game-loading', 'queue-guide',
-        'queue-later-guide', 'later-guide-result', 'later-guide-failed-result',
+        'queue-guide-write', 'queue-later-guide', 'later-guide-result',
+        'later-guide-failed-result',
         'late-guide-after-close', 'waiting-handoff')]
     [string] $Mode,
 
@@ -366,6 +367,13 @@ try {
         Open-GuideFromGame 'Blocked Write Guide'
         [void](Wait-Name 'ShellStatus' 'Opening guide...')
         $report.phases += 'guide-action-started'
+    }
+    elseif ($Mode -eq 'queue-guide-write') {
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        Open-GuideFromGame 'Blocked Write Guide'
+        [void](Wait-Name 'ReaderHeading' 'Blocked Write Guide')
+        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        $report.phases += 'guide-reader-open-while-save-blocked'
     }
     elseif ($Mode -eq 'queue-later-guide') {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
