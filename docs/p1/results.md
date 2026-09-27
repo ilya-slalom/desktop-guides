@@ -31,7 +31,9 @@ Infrastructure, and Production restores passed; Release Core tests passed
 Production MSIX build passed. The host's existing `mspdbcmf.exe`
 symbols-package warning remains. Both changed PowerShell UI/installer
 scripts passed a Windows PowerShell parser check. The signed installed UI
-scenario and its screenshots are still pending CI.
+scenario is still pending CI. Its [Add game screenshot](evidence/ci/game-editor/add-game.png)
+and [Edit game screenshot](evidence/ci/game-editor/edit-game.png) were captured
+from the installed WinUI shell in CI.
 
 ## M0 task results
 

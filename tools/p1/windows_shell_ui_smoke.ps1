@@ -287,6 +287,22 @@ try {
         throw "Expected visible game row '$expected'."
     }
 
+    function Count-GameRows([string] $name) {
+        $list = Wait-VisibleById 'GameList'
+        $condition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::NameProperty, $name)
+        $count = 0
+        foreach ($item in $list.FindAll($scope, $condition)) {
+            $pattern = $null
+            if ($item.TryGetCurrentPattern(
+                [System.Windows.Automation.SelectionItemPattern]::Pattern,
+                [ref]$pattern)) {
+                $count++
+            }
+        }
+        return $count
+    }
+
     function Wait-GuideRow([string] $expected) {
         $condition = [System.Windows.Automation.PropertyCondition]::new(
             [System.Windows.Automation.AutomationElement]::NameProperty, $expected)
@@ -546,21 +562,17 @@ try {
         [void](Wait-Name 'GameHeading' $renamed)
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
-        $list = Wait-VisibleById 'GameList'
-        $condition = [System.Windows.Automation.PropertyCondition]::new(
-            [System.Windows.Automation.AutomationElement]::NameProperty, $renamed)
-        if ($list.FindAll($scope, $condition).Count -ne 2) {
-            throw 'Library did not show two distinct games with the same title.'
+        $count = Count-GameRows $renamed
+        if ($count -ne 2) {
+            throw "Library showed $count selectable duplicate-title games, expected two."
         }
         $report.phases += 'duplicate-title-games-are-distinct'
     }
     elseif ($Mode -eq 'game-editor-persisted') {
         $renamed = "Pok$([char]0x00E9)mon Mystery Dungeon DX"
-        $list = Wait-VisibleById 'GameList'
-        $condition = [System.Windows.Automation.PropertyCondition]::new(
-            [System.Windows.Automation.AutomationElement]::NameProperty, $renamed)
-        if ($list.FindAll($scope, $condition).Count -ne 2) {
-            throw 'Edited and duplicate games were not persisted after relaunch.'
+        $count = Count-GameRows $renamed
+        if ($count -ne 2) {
+            throw "Relaunched library showed $count duplicate-title games, expected two."
         }
         $report.phases += 'edited-and-duplicate-games-survive-relaunch'
     }
