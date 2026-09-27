@@ -816,3 +816,23 @@ and [toolbar UI trace](evidence/host/reader-toolbar-process-scope/toolbar-ui.jso
 passed with no test-owned package or process left; its
 [handoff](evidence/host/reader-toolbar-process-scope/normal-process.json)
 matches the install invocation.
+
+At code head `c6a5aa3`, all nine jobs passed in
+[PR run 36301957589](https://github.com/ilya-slalom/desktop-guides/actions/runs/36301957589)
+and in [push run 36301955579, attempt 2](https://github.com/ilya-slalom/desktop-guides/actions/runs/36301955579).
+The signed PR
+[overlap trace](evidence/ci/reader-toolbar-process-scope/overlap-result.json)
+records the rejected contender and surviving unrelated process. Its
+[timeout handoff](evidence/ci/reader-toolbar-process-scope/timeout-process.json)
+matches the process stopped in the
+[timeout install record](evidence/ci/reader-toolbar-process-scope/timeout-install.json).
+The [normal install](evidence/ci/reader-toolbar-process-scope/normal-install.json)
+and [toolbar UI trace](evidence/ci/reader-toolbar-process-scope/toolbar-ui.json)
+passed, and the [normal handoff](evidence/ci/reader-toolbar-process-scope/normal-process.json)
+matches the install invocation. The signed production shell and retained
+native ARM64 P0 suite passed.
+
+Push attempt 1 failed in the unchanged production-shell UI smoke while
+waiting for `ReaderHeading` during the rapid Settings path. The same path
+passed in the parallel PR run and push attempt 2. No shell source changed
+in this follow-up.
