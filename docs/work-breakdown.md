@@ -193,10 +193,11 @@ missing assets are reported during import. Scripts, remote images, remote CSS
 imports, forms, new windows, and off-root file paths cannot initiate embedded
 reader activity. Supported local nested CSS imports remain inside the guide.
 
-- **T07.1** Resolve relative asset references against the selected import root
-  and stage supported static images and CSS while preserving safe paths.
-- **T07.2** Reject traversal and symlink escape; warn about missing or
-  unsupported assets before import confirmation.
+- **T07.1** Scan entry HTML and reachable local CSS into a bounded dependency
+  graph; return a preview manifest of supported static images and CSS with
+  safe relative paths, sizes, and hashes.
+- **T07.2** Enforce the selected import root, reject traversal and symlink
+  escape, and warn about missing or unsupported assets before confirmation.
 - **T07.3** Configure WebView2 navigation/resource restrictions and explicit
   external-link handling; test nested CSS URLs.
 - **TR07.1** Only the guide's managed root can serve embedded content. Absolute
