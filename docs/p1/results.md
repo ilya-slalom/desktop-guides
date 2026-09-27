@@ -911,3 +911,18 @@ receipt wait, beyond the former 30-second cutoff. Its
 matches the [UI trace](evidence/host/reader-toolbar-install-receipt/normal/toolbar-ui.json);
 all eight toolbar phases passed. Both installed runs removed their temporary
 packages, processes, scheduled tasks, and certificate trust entries.
+
+At code head `1d1e614`, all nine jobs passed in
+[push run 36306328232](https://github.com/ilya-slalom/desktop-guides/actions/runs/36306328232)
+and [PR run 36306330461](https://github.com/ilya-slalom/desktop-guides/actions/runs/36306330461).
+The signed PR [overlap result](evidence/ci/reader-toolbar-install-receipt/timeout/overlap-result.json)
+confirms the bounded contender's lock rejection and the unrelated process's
+survival. The [timeout install](evidence/ci/reader-toolbar-install-receipt/timeout/signed-install.json)
+and [receipt](evidence/ci/reader-toolbar-install-receipt/timeout/toolbar-install-receipt.json)
+confirm receipt-backed package and process cleanup. The
+[normal install](evidence/ci/reader-toolbar-install-receipt/signed-install.json)
+records a 36.18-second receipt wait after the 31-second artificial delay;
+its [receipt](evidence/ci/reader-toolbar-install-receipt/toolbar-install-receipt.json)
+and [UI trace](evidence/ci/reader-toolbar-install-receipt/toolbar-ui.json)
+confirm identity, all eight toolbar phases, and final cleanup. The signed
+production shell and native ARM64 UI regression jobs also passed.

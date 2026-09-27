@@ -1,0 +1,23 @@
+﻿{
+    "invocationId":  "d44be88699a5401cb43504089f48eb21",
+    "observedAt":  "2026-09-27T08:32:31.8723141Z",
+    "sessionId":  2,
+    "success":  true,
+    "phases":  [
+                   "initial-no-session-capabilities",
+                   "worker-capability-change-text-dispatch",
+                   "page-dialog-restores-overflow-focus",
+                   "find-dialog-restores-overflow-focus",
+                   "all-capabilities-dispatch",
+                   "narrow-primary-command-overflow",
+                   "worker-capability-removal",
+                   "detached-session-event-ignored"
+               ],
+    "packageFullName":  "DesktopGuides.ReaderToolbarSmoke_0.1.0.0_x64__en8r599z3n35j",
+    "installReceiptWritten":  true,
+    "processId":  7352,
+    "startedAt":  "2026-09-27T08:33:07.4073424Z",
+    "executablePath":  "C:\\Program Files\\WindowsApps\\DesktopGuides.ReaderToolbarSmoke_0.1.0.0_x64__en8r599z3n35j\\DesktopGuides.ReaderToolbarSmoke.exe",
+    "handoffAcknowledged":  true,
+    "packageStillInstalled":  false
+}
