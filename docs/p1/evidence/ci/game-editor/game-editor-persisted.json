@@ -1,0 +1,13 @@
+﻿{
+    "mode":  "game-editor-persisted",
+    "invocationId":  "b6b5497cf0894ec588fe37fe41b28bf6",
+    "observedAt":  "2026-09-27T16:10:25.6738915Z",
+    "processId":  8252,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "edited-and-duplicate-games-survive-relaunch"
+               ]
+}

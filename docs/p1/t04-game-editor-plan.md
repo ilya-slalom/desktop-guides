@@ -1,7 +1,8 @@
 # T04.1 game editor implementation plan
 
-Status: implementation in progress, 27 September 2026. T03.2 and T11.1 are
-merged. T07.2 merged through PR #10 at `72f43785fad2b01b3f79b739017f0623d46b6665`.
+Status: implemented and signed installed Windows x64 checks passed,
+27 September 2026; pending PR #11 merge. T03.2 and T11.1 are merged. T07.2
+merged through PR #10 at `72f43785fad2b01b3f79b739017f0623d46b6665`.
 
 ## Decision
 

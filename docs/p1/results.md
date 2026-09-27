@@ -18,7 +18,8 @@ The T07.2 Windows implementation check is recorded in the
 T07.2 was merged into `main` through PR #10 on 27 September 2026 at
 `72f43785fad2b01b3f79b739017f0623d46b6665`. Its final Windows 11 x64
 run passed 89/89 Infrastructure tests and an unsigned Release x64 MSIX build;
-all 18 CI checks passed. T04.1 is in progress.
+all 18 CI checks passed. T04.1's Windows x64 checks passed in PR #11,
+pending merge.
 
 ## M2 T04.1 game editor — implementation check, 27 September 2026
 
@@ -30,10 +31,23 @@ Infrastructure, and Production restores passed; Release Core tests passed
 **73/73**, Infrastructure tests **90/90**, and an unsigned Release x64
 Production MSIX build passed. The host's existing `mspdbcmf.exe`
 symbols-package warning remains. Both changed PowerShell UI/installer
-scripts passed a Windows PowerShell parser check. The signed installed UI
-scenario is still pending CI. Its [Add game screenshot](evidence/ci/game-editor/add-game.png)
-and [Edit game screenshot](evidence/ci/game-editor/edit-game.png) were captured
-from the installed WinUI shell in CI.
+scripts passed a Windows PowerShell parser check.
+
+The signed installed `production-shell-ui` job passed on the Windows CI
+runner (Windows build `10.0.26100.0`, x64, .NET SDK `10.0.401`) for source
+`76a762724b260d3b028a94691ae259f673894455`, in
+[push run 36331946181](https://github.com/ilya-slalom/desktop-guides/actions/runs/36331946181).
+The [game editor UI trace](evidence/ci/game-editor/game-editor.json) shows
+invalid-title and canceled drafts left an empty library, keyboard submission
+created a trimmed Unicode title and optional fields, canceled Edit preserved
+the game, an ID-bound edit cleared optional fields, and two selectable
+duplicate-title games appeared. The
+[relaunch trace](evidence/ci/game-editor/game-editor-persisted.json) found both
+games again. The signed test package and temporary trust were removed after
+the run. The [Add game screenshot](evidence/ci/game-editor/add-game.png) and
+[Edit game screenshot](evidence/ci/game-editor/edit-game.png) show the installed
+WinUI form. T04.1's listed Windows x64 exit checks passed; the complete P1
+workflow and Windows 10/ARM64 runtime checks remain later gates.
 
 ## M0 task results
 
