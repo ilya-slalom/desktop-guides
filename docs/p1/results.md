@@ -836,3 +836,29 @@ Push attempt 1 failed in the unchanged production-shell UI smoke while
 waiting for `ReaderHeading` during the rapid Settings path. The same path
 passed in the parallel PR run and push attempt 2. No shell source changed
 in this follow-up.
+
+### T11.3 toolbar handoff and overlap review follow-up — 27 September 2026
+
+The overlap fixture starts an unrelated same-name process before the first
+install and identifies the first app through its verified process handoff.
+The toolbar parent now opens and retains the app's verified process handle
+before acknowledging the handoff token. The child keeps its launch handle
+until it receives that acknowledgment, so the parent does not reopen a PID
+after the child has released it.
+
+The Windows 11 x64 host under `E:\work\desktop-guides` parsed all three
+changed PowerShell scripts. Its
+[interactive result](evidence/host/reader-toolbar-handoff/review-result.json)
+reports a successful session 1 overlap, timeout cleanup, and normal
+reinstall. The [overlap trace](evidence/host/reader-toolbar-handoff/overlap-result.json)
+shows that the decoy was present before installation and survived cleanup.
+The [timeout handoff](evidence/host/reader-toolbar-handoff/timeout-process.json)
+matches the app stopped in the
+[timeout install record](evidence/host/reader-toolbar-handoff/timeout-install.json).
+The [normal install](evidence/host/reader-toolbar-handoff/normal-install.json)
+records an acquired parent handle, and its
+[UI trace](evidence/host/reader-toolbar-handoff/toolbar-ui.json)
+records child acknowledgment. The
+[normal handoff](evidence/host/reader-toolbar-handoff/normal-process.json)
+matches both records. No test package, process, scheduled task, or temporary
+trust entry remained.

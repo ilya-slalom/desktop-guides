@@ -62,6 +62,7 @@ $signed = Join-Path $ResultDirectory 'reader-toolbar-signed-x64.msix'
 $public = Join-Path $ResultDirectory 'test-certificate.cer'
 $smokeResult = Join-Path $ResultDirectory 'toolbar-ui.json'
 $processHandoff = Join-Path $ResultDirectory 'toolbar-process.json'
+$processHandoffAck = "$processHandoff.ack"
 $pauseMarker = Join-Path $ResultDirectory 'installed-before-timeout.txt'
 $invocationId = [Guid]::NewGuid().ToString('N')
 $taskName = 'DesktopGuides-P1-Toolbar-' + $invocationId
@@ -71,12 +72,15 @@ $report = [ordered]@{
     sourcePackageSha256 = (Get-FileHash $PackagePath -Algorithm SHA256).Hash
     parentStoppedProcess = $false
     parentRemovedPackage = $false
+    processHandleAcquired = $false
     simulatedProcessExit = $false
     success = $false
 }
 $certificate = $null
 $imported = $false
 $registered = $false
+$ownedProcess = $null
+$handoff = $null
 if (-not ('DesktopGuidesOwnedProcess' -as [type])) {
     Add-Type -Path (Join-Path $PSScriptRoot 'windows_owned_process.cs')
 }
@@ -132,8 +136,54 @@ try {
     $registered = $true
     Clear-ToolbarSmokeResult $smokeResult
     Remove-Item -LiteralPath $pauseMarker, $processHandoff,
-        "$processHandoff.tmp" -ErrorAction SilentlyContinue
+        "$processHandoff.tmp", $processHandoffAck,
+        "$processHandoffAck.tmp" -ErrorAction SilentlyContinue
     Start-ScheduledTask -TaskName $taskName
+    $handoffDeadline = (Get-Date).AddSeconds(30)
+    do {
+        if (Test-Path -LiteralPath $processHandoff) { break }
+        if (Test-Path -LiteralPath $smokeResult) {
+            throw 'Interactive toolbar smoke ended before process handoff.'
+        }
+        Start-Sleep -Milliseconds 200
+    } while ((Get-Date) -lt $handoffDeadline)
+    if (-not (Test-Path -LiteralPath $processHandoff)) {
+        throw 'Interactive toolbar smoke did not provide a process handoff.'
+    }
+    $handoffCandidate = Get-Content -LiteralPath $processHandoff -Raw |
+        ConvertFrom-Json
+    $installedForHandoff =
+        @(Get-AppxPackage -Name DesktopGuides.ReaderToolbarSmoke)
+    if ($installedForHandoff.Count -ne 1 -or
+        $installedForHandoff[0].Version.ToString() -ne $expectedVersion -or
+        $installedForHandoff[0].Architecture.ToString() -ne 'X64') {
+        throw 'Interactive toolbar handoff has no matching installed package.'
+    }
+    $expectedExecutable = Join-Path $installedForHandoff[0].InstallLocation `
+        'DesktopGuides.ReaderToolbarSmoke.exe'
+    if ($handoffCandidate.invocationId -ne $invocationId -or
+        $handoffCandidate.handoffToken -notmatch '^[0-9a-f]{32}$' -or
+        $handoffCandidate.packageFullName -ne
+            $installedForHandoff[0].PackageFullName -or
+        $handoffCandidate.sessionId -ne
+            [System.Diagnostics.Process]::GetCurrentProcess().SessionId -or
+        -not [string]::Equals([string]$handoffCandidate.executablePath,
+            $expectedExecutable,
+            [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Interactive toolbar process handoff identity did not match.'
+    }
+    $ownedProcess = [DesktopGuidesOwnedProcess]::OpenVerified(
+        [int]$handoffCandidate.processId, [datetime]$handoffCandidate.startedAt,
+        [int]$handoffCandidate.sessionId, $expectedExecutable)
+    if (-not $ownedProcess) {
+        throw 'Toolbar app exited before its process handoff was accepted.'
+    }
+    $handoff = $handoffCandidate
+    $report.processHandleAcquired = $true
+    @{ handoffToken = $handoff.handoffToken } | ConvertTo-Json -Compress |
+        Set-Content -LiteralPath "$processHandoffAck.tmp" -Encoding UTF8
+    Move-Item -LiteralPath "$processHandoffAck.tmp" `
+        -Destination $processHandoffAck -Force
     if ($SimulateSmokeTimeoutAfterInstall) {
         $deadline = (Get-Date).AddSeconds(30)
         do {
@@ -182,6 +232,10 @@ try {
     if (-not $smoke.success) {
         throw "Interactive toolbar smoke failed: $($smoke.error)"
     }
+    if (-not $smoke.handoffAcknowledged -or
+        $smoke.processId -ne $handoff.processId) {
+        throw 'Interactive toolbar smoke did not retain the verified process.'
+    }
     $report.phases = $smoke.phases
     $report.success = $true
 }
@@ -190,7 +244,6 @@ catch {
 }
 finally {
     $taskReady = $true
-    $ownedProcess = $null
     if ($registered) {
         $task = Get-ScheduledTask -TaskName $taskName `
             -ErrorAction SilentlyContinue
@@ -217,43 +270,34 @@ finally {
         $_.Version.ToString() -eq $expectedVersion -and
         $_.Architecture.ToString() -eq 'X64'
     })
-    if (Test-Path -LiteralPath $processHandoff) {
+    if (-not $report.processHandleAcquired -and
+        ($installedNow.Count -gt 0 -or
+            (Test-Path -LiteralPath $pauseMarker))) {
+        $report.processCleanupError =
+            'Interactive toolbar smoke had no verified process handoff.'
+    }
+    if ($ownedProcess -and $taskReady) {
         try {
-            $handoff = Get-Content -LiteralPath $processHandoff -Raw |
-                ConvertFrom-Json
-            $expectedExecutable = if ($ownedPackage.Count -eq 1) {
-                Join-Path $ownedPackage[0].InstallLocation `
-                    'DesktopGuides.ReaderToolbarSmoke.exe'
-            } else {
-                [string]$handoff.executablePath
+            if ($SimulateProcessExitDuringInspection -and
+                -not $report.simulatedProcessExit) {
+                if (-not $ownedProcess.TerminateAndWait(10000)) {
+                    throw "Toolbar process $($handoff.processId) did not exit."
+                }
+                $report.parentStoppedProcess = $true
+                $report.simulatedProcessExit = $true
+                throw [InvalidOperationException]::new(
+                    'Simulated process exit during module inspection.')
             }
-            $expectedFullName =
-                "^DesktopGuides\.ReaderToolbarSmoke_$(
-                    [regex]::Escape($expectedVersion))_x64__"
-            if ($handoff.invocationId -ne $invocationId -or
-                $handoff.packageFullName -notmatch $expectedFullName -or
-                ($ownedPackage.Count -eq 1 -and
-                    $handoff.packageFullName -ne
-                        $ownedPackage[0].PackageFullName) -or
-                $handoff.sessionId -ne
-                    [System.Diagnostics.Process]::GetCurrentProcess().SessionId -or
-                -not [string]::Equals([string]$handoff.executablePath,
-                    $expectedExecutable,
-                    [System.StringComparison]::OrdinalIgnoreCase)) {
-                throw 'Interactive toolbar process handoff identity did not match.'
+            if (-not $ownedProcess.HasExited) {
+                if (-not $ownedProcess.TerminateAndWait(10000)) {
+                    throw "Toolbar process $($handoff.processId) did not exit."
+                }
+                $report.parentStoppedProcess = $true
             }
-            $ownedProcess = [DesktopGuidesOwnedProcess]::OpenVerified(
-                [int]$handoff.processId, [datetime]$handoff.startedAt,
-                [int]$handoff.sessionId, $expectedExecutable)
         }
         catch {
             $report.processCleanupError = $_ | Out-String
         }
-    }
-    elseif ($installedNow.Count -gt 0 -or $report.success -or
-        (Test-Path -LiteralPath $pauseMarker)) {
-        $report.processCleanupError =
-            'Interactive toolbar smoke did not provide a process handoff.'
     }
     if ($installedNow.Count -gt 0 -and
         ($installedNow.Count -ne 1 -or $ownedPackage.Count -ne 1)) {
@@ -261,29 +305,6 @@ finally {
             'A toolbar package not confirmed as test-owned remains untouched.'
     }
     elseif ($ownedPackage.Count -eq 1 -and $taskReady) {
-        if ($ownedProcess) {
-            try {
-                if ($SimulateProcessExitDuringInspection -and
-                    -not $report.simulatedProcessExit) {
-                    if (-not $ownedProcess.TerminateAndWait(10000)) {
-                        throw "Toolbar process $($handoff.processId) did not exit."
-                    }
-                    $report.parentStoppedProcess = $true
-                    $report.simulatedProcessExit = $true
-                    throw [InvalidOperationException]::new(
-                        'Simulated process exit during module inspection.')
-                }
-                if (-not $ownedProcess.HasExited) {
-                    if (-not $ownedProcess.TerminateAndWait(10000)) {
-                        throw "Toolbar process $($handoff.processId) did not exit."
-                    }
-                    $report.parentStoppedProcess = $true
-                }
-            }
-            catch {
-                $report.processCleanupError = $_ | Out-String
-            }
-        }
         try {
             Remove-AppxPackage -Package $ownedPackage[0].PackageFullName `
                 -ErrorAction Stop

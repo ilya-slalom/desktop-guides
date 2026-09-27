@@ -24,7 +24,11 @@ $decoyDirectory = Join-Path $ResultDirectory 'unrelated-process'
 $decoyExecutable = Join-Path $decoyDirectory `
     'DesktopGuides.ReaderToolbarSmoke.exe'
 $first = $null
+$firstApp = $null
 $decoy = $null
+if (-not ('DesktopGuidesOwnedProcess' -as [type])) {
+    Add-Type -Path (Join-Path $PSScriptRoot 'windows_owned_process.cs')
+}
 $report = [ordered]@{
     observedAt = (Get-Date).ToUniversalTime().ToString('o')
     shellExecutable = $shellExecutable
@@ -32,6 +36,7 @@ $report = [ordered]@{
     firstPackagePreserved = $false
     firstProcessPreserved = $false
     firstCleanupVerified = $false
+    unrelatedProcessPresentBeforeInstall = $false
     unrelatedProcessPreserved = $false
     success = $false
 }
@@ -47,6 +52,19 @@ try {
         $firstOutput, $firstError, $contenderOutput, $contenderError,
         (Join-Path $ResultDirectory 'signed-install.json') `
         -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Path $decoyDirectory | Out-Null
+    Copy-Item -LiteralPath (Join-Path $env:WINDIR 'System32\cmd.exe') `
+        -Destination $decoyExecutable
+    $decoy = Start-Process -FilePath $decoyExecutable `
+        -ArgumentList '/c ping -n 300 127.0.0.1 > nul' `
+        -PassThru -WindowStyle Hidden
+    $report.unrelatedProcessPresentBeforeInstall =
+        -not $decoy.HasExited -and
+        $decoy.ProcessName -eq 'DesktopGuides.ReaderToolbarSmoke'
+    if (-not $report.unrelatedProcessPresentBeforeInstall) {
+        throw 'The unrelated same-name process did not start.'
+    }
+
     $firstArguments = '-NoProfile -ExecutionPolicy Bypass -File "' +
         $installer + '" -PackagePath "' + $PackagePath +
         '" -ResultDirectory "' + $ResultDirectory +
@@ -71,33 +89,26 @@ try {
     }
 
     $installed = @(Get-AppxPackage -Name DesktopGuides.ReaderToolbarSmoke)
-    $processes = @(Get-Process -Name DesktopGuides.ReaderToolbarSmoke `
-        -ErrorAction SilentlyContinue)
     $markerPackage = (Get-Content -LiteralPath $marker -Raw).Trim()
     if ($installed.Count -ne 1 -or
-        $installed[0].PackageFullName -ne $markerPackage -or
-        $processes.Count -ne 1) {
-        throw 'The first toolbar package and process were not installed.'
+        $installed[0].PackageFullName -ne $markerPackage) {
+        throw 'The first toolbar package was not installed.'
     }
     $report.firstPackageFullName = $markerPackage
-    $report.firstProcessId = $processes[0].Id
     $handoff = Get-Content -LiteralPath $processHandoff -Raw |
         ConvertFrom-Json
-    if ($handoff.packageFullName -ne $markerPackage -or
-        $handoff.processId -ne $report.firstProcessId) {
+    if ($handoff.packageFullName -ne $markerPackage) {
         throw 'The first toolbar process handoff did not match its app.'
     }
-
-    New-Item -ItemType Directory -Path $decoyDirectory | Out-Null
-    Copy-Item -LiteralPath (Join-Path $env:WINDIR 'System32\cmd.exe') `
-        -Destination $decoyExecutable
-    $decoy = Start-Process -FilePath $decoyExecutable `
-        -ArgumentList '/c ping -n 300 127.0.0.1 > nul' `
-        -PassThru -WindowStyle Hidden
-    if ($decoy.HasExited -or
-        $decoy.ProcessName -ne 'DesktopGuides.ReaderToolbarSmoke') {
-        throw 'The unrelated same-name process did not start.'
+    $expectedExecutable = Join-Path $installed[0].InstallLocation `
+        'DesktopGuides.ReaderToolbarSmoke.exe'
+    $firstApp = [DesktopGuidesOwnedProcess]::OpenVerified(
+        [int]$handoff.processId, [datetime]$handoff.startedAt,
+        [int]$handoff.sessionId, $expectedExecutable)
+    if (-not $firstApp) {
+        throw 'The first toolbar app exited before the overlap check.'
     }
+    $report.firstProcessId = [int]$handoff.processId
 
     $contenderArguments = '-NoProfile -ExecutionPolicy Bypass -File "' +
         $installer + '" -PackagePath "' + $PackagePath +
@@ -120,11 +131,9 @@ try {
     $report.contenderRejected = $true
 
     $installedAfter = @(Get-AppxPackage -Name DesktopGuides.ReaderToolbarSmoke)
-    $firstProcess = Get-Process -Id $report.firstProcessId `
-        -ErrorAction SilentlyContinue
     $report.firstPackagePreserved = $installedAfter.Count -eq 1 -and
         $installedAfter[0].PackageFullName -eq $markerPackage
-    $report.firstProcessPreserved = [bool]$firstProcess
+    $report.firstProcessPreserved = -not $firstApp.HasExited
     if (-not $report.firstPackagePreserved -or
         -not $report.firstProcessPreserved) {
         throw 'The overlapping run changed the first package or process.'
@@ -149,7 +158,8 @@ try {
         -not $installedResult.packageStillInstalled -and
         -not $installedResult.processStillRunning -and
         -not $installedResult.certificateStillTrusted -and
-        -not $installedResult.taskStillRegistered
+        -not $installedResult.taskStillRegistered -and
+        $installedResult.processHandleAcquired -and $firstApp.HasExited
     if (-not $report.firstCleanupVerified) {
         throw 'The first toolbar install did not clean up after the overlap.'
     }
@@ -178,6 +188,7 @@ finally {
         }
         $first.Dispose()
     }
+    if ($firstApp) { $firstApp.Dispose() }
     if ($decoy) {
         try {
             $decoy.Refresh()

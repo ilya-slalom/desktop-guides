@@ -52,8 +52,10 @@ try {
     $report.processId = $process.Id
     $report.startedAt = $process.StartTime.ToUniversalTime().ToString('o')
     $report.executablePath = $executable
+    $handoffToken = [Guid]::NewGuid().ToString('N')
     [ordered]@{
         invocationId = $InvocationId
+        handoffToken = $handoffToken
         packageFullName = $installed.PackageFullName
         processId = $report.processId
         startedAt = $report.startedAt
@@ -63,6 +65,25 @@ try {
         Set-Content -LiteralPath "$ProcessHandoffPath.tmp" -Encoding UTF8
     Move-Item -LiteralPath "$ProcessHandoffPath.tmp" `
         -Destination $ProcessHandoffPath -Force
+    $handoffAckPath = "$ProcessHandoffPath.ack"
+    $handoffDeadline = (Get-Date).AddSeconds(45)
+    do {
+        if (Test-Path -LiteralPath $handoffAckPath) { break }
+        $process.Refresh()
+        if ($process.HasExited) {
+            throw 'Toolbar app exited before its process handoff was acknowledged.'
+        }
+        Start-Sleep -Milliseconds 200
+    } while ((Get-Date) -lt $handoffDeadline)
+    if (-not (Test-Path -LiteralPath $handoffAckPath)) {
+        throw 'Toolbar process handoff was not acknowledged.'
+    }
+    $ack = Get-Content -LiteralPath $handoffAckPath -Raw |
+        ConvertFrom-Json
+    if ($ack.handoffToken -ne $handoffToken) {
+        throw 'Toolbar process handoff acknowledgment did not match.'
+    }
+    $report.handoffAcknowledged = $true
     $deadline = (Get-Date).AddSeconds(30)
     do {
         $process.Refresh()

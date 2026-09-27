@@ -357,10 +357,10 @@ PID to its creation time, session, and executable path.
 After launching the toolbar app, the interactive smoke task writes an atomic
 handoff with its invocation ID, package identity, and process identity. The
 parent clears old handoffs before starting the task, validates the new
-handoff after the task stops, and holds only that verified process handle
-through cleanup. If no handoff exists, package cleanup may proceed, but the
-parent must not guess a process to kill. A failed identity check is a cleanup
-error and must never fall back to a name-wide process scan.
+handoff, and holds only that verified process handle through cleanup. If no
+handoff exists, package cleanup may proceed, but the parent must not guess a
+process to kill. A failed identity check is a cleanup error and must never
+fall back to a name-wide process scan.
 
 The installed timeout and overlap fixture adds a same-name process outside
 the test package. It must survive parent cleanup, and the parent must not
@@ -368,6 +368,30 @@ report it as a leaked test process. The original timeout process and package
 must still be removed; a normal reinstall on the same runner must pass.
 Verify the PowerShell 5.1 parser, Windows 11 x64 installed host sequence, and
 the signed CI toolbar job.
+
+### T11.3 handoff and overlap review follow-up
+
+The overlap fixture's machine-wide process count rejects an unrelated
+same-name process before it checks the first app. Start that decoy before
+the first install, then identify the app by its invocation-bound handoff,
+package, start time, session, and executable. Require the decoy to survive
+the contender and timeout cleanup.
+
+Opening the handoff PID after the task finishes permits PID reuse after the
+child releases its process handle. The parent could treat a creation-time
+mismatch as an exited process, but an access failure cannot distinguish a
+reused PID from the original app. Instead, the child waits with its handle
+open after writing a tokenized handoff. The parent opens a verified handle
+to the live app, writes an atomic acknowledgment for that token, then
+continues the timeout or normal smoke. Hold the parent handle through
+cleanup. A missing or wrong acknowledgment makes the child clean up and
+fail; the parent must never fall back to a name-wide process scan.
+
+The exit check requires the decoy to exist before installation, the parent
+to acknowledge a verified handle before the child continues, the
+same-user contender to be rejected, timeout cleanup to stop only its own
+app, and a normal reinstall to pass. Run the PowerShell 5.1 parser and
+interactive Windows 11 x64 installed sequence, followed by signed CI.
 
 ### T11.1 review follow-up: close handoff and installed gate
 
