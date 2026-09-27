@@ -556,3 +556,39 @@ retention remains required and is assigned to T05.3 after T05.2 adds search.
 In the PR run, the first native ARM64 P0 diagnostic attempt failed when
 `pdf-short` could not read its startup status; the unchanged P0 lane passed
 all 14 fixtures in the push run and in [PR attempt 2](https://github.com/ilya-slalom/desktop-guides/actions/runs/36249364872/attempts/2).
+
+### T11.3 queued guide and loading-state review follow-up — 27 September 2026
+
+At code head `ce6e823c879781325b53f4c41a3751d975a18a37`, Game-view guide
+actions retain the later selection when an earlier settings write is delayed.
+The [queued-action trace](evidence/ci/production-shell/reader-shell/queued-guide-loading/queue-later-guide.json)
+selects guide B while A is still opening. The
+[result trace](evidence/ci/production-shell/reader-shell/queued-guide-loading/later-guide-result.json)
+confirms B opens, Back selects and focuses B, and Library offers Resume B.
+
+The [preparation trace](evidence/ci/production-shell/reader-shell/queued-guide-loading/switch-game-prepare.json)
+leaves the previous game's selected guide in the shell. With the next
+game's read held by an exclusive SQLite lock, the
+[loading trace](evidence/ci/production-shell/reader-shell/queued-guide-loading/switch-game-loading.json)
+confirms the previous guide row and selected-guide action are unavailable
+while the guide list is disabled. After release, the
+[two-game trace](evidence/ci/production-shell/reader-shell/queued-guide-loading/switch-game.json)
+confirms the second game's guide and Reader context.
+
+The signed installed Windows 11 x64
+[PR run 36286711186](https://github.com/ilya-slalom/desktop-guides/actions/runs/36286711186)
+passed the production-shell UI job. Its
+[install record](evidence/ci/production-shell/reader-shell/queued-guide-loading/signed-install.json)
+reports OS build `10.0.26100.0`, AMD64, success, and removal of the
+temporary package and certificate. On the local Windows 11 x64 host,
+Windows PowerShell 5.1 parsed both changed scripts, the locked fixture
+restore and Release fixture build passed, and the unsigned Release x64
+production MSIX built. A separate disposable database probe confirmed
+that the fixture's exclusive read lock blocks another read and releases
+normally. The host's existing Preview package and profile precluded a
+fresh-profile installed run there.
+
+The first installed attempt at `aad96a9` stopped in the smoke runner:
+its later-guide continuation started from Reader but still applied the
+Library precheck. The `ce6e823` test correction removed that precheck,
+and the installed scenario passed.
