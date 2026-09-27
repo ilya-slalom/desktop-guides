@@ -1,0 +1,18 @@
+{
+  "invocationId": "840a764911344fc59ffccec97d3244ee",
+  "observedAt": "2026-09-27T07:39:59.4308016Z",
+  "sourcePackageSha256": "41389ADB4986FF10FE54A15AD47C2F02434EE50B8E0B014C99979E512A630093",
+  "parentStoppedProcess": true,
+  "parentRemovedPackage": true,
+  "processHandleAcquired": true,
+  "simulatedProcessExit": true,
+  "success": false,
+  "certificateThumbprint": "82B26EEAD24FBDEB30A7673CE43CE7001ECE2487",
+  "signedPackageSha256": "FA968A290FA8B6B80A97694D3DCB5E7C80EBD7471DC8CF913627611CB1416086",
+  "error": "Exception: D:\\a\\desktop-guides\\desktop-guides\\tools\\p1\\windows_reader_toolbar_install.ps1:211\r\nLine |\r\n 211 |          throw 'Simulated toolbar smoke timeout after installation.'\r\n     |          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n     | Simulated toolbar smoke timeout after installation.\r\n\r\n",
+  "processCleanupError": "OperationStopped: D:\\a\\desktop-guides\\desktop-guides\\tools\\p1\\windows_reader_toolbar_install.ps1:288\r\nLine |\r\n 288 |                  throw [InvalidOperationException]::new(\r\n     |                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n     | Simulated process exit during module inspection.\r\n\r\n",
+  "packageStillInstalled": false,
+  "processStillRunning": false,
+  "certificateStillTrusted": false,
+  "taskStillRegistered": false
+}

@@ -1,0 +1,12 @@
+﻿{
+    "mode":  "switch-game-loading",
+    "invocationId":  "17abb1779cef4c49bfd5c1d7befdbcbf",
+    "observedAt":  "2026-09-27T01:55:03.1144078Z",
+    "processId":  832,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "game-switch-loading-clears-old-guide"
+               ]
+}

@@ -526,7 +526,8 @@ project uses a provisional package identity until T17.1 sets the public one.
   capability-based command slots. Narrow windows move secondary commands
   to overflow; essential Back and reader movement remain available. Verify
   Library → Game → Reader → Game by keyboard and pointer without losing
-  query, selection, or guide state.
+  selection or guide state. T05.3 verifies the Library query survives the
+  Library → Game → Reader → Game → Library route after T05.2 adds search.
 
 ## 8. Task design: tracking, preferences, and recovery
 

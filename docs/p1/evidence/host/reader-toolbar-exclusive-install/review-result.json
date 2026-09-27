@@ -1,0 +1,47 @@
+﻿{
+    "observedAt":  "2026-09-27T06:27:25.3838834Z",
+    "sessionId":  1,
+    "success":  true,
+    "timeoutExit":  0,
+    "overlap":  {
+                    "observedAt":  "2026-09-27T06:27:25.6565698Z",
+                    "shellExecutable":  "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+                    "contenderRejected":  true,
+                    "firstPackagePreserved":  true,
+                    "firstProcessPreserved":  true,
+                    "firstCleanupVerified":  true,
+                    "success":  true,
+                    "firstPackageFullName":  "DesktopGuides.ReaderToolbarSmoke_0.1.0.0_x64__en8r599z3n35j",
+                    "firstProcessId":  60464,
+                    "contenderExitCode":  1
+                },
+    "timeoutCleanup":  {
+                           "parentStoppedProcess":  true,
+                           "parentRemovedPackage":  true,
+                           "simulatedProcessExit":  true,
+                           "processCleanupError":  "Simulated process exit during module inspection.\r\nAt E:\\work\\desktop-guides\\tools\\p1\\windows_reader_toolbar_install.ps1:237 char:21\r\n+                     throw [InvalidOperationException]::new(\r\n+                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : OperationStopped: (:) [], InvalidOperationException\r\n    + FullyQualifiedErrorId : Simulated process exit during module inspection.\r\n \r\n",
+                           "packageStillInstalled":  false,
+                           "processStillRunning":  false,
+                           "certificateStillTrusted":  false,
+                           "taskStillRegistered":  false,
+                           "error":  "Simulated toolbar smoke timeout after installation.\r\nAt E:\\work\\desktop-guides\\tools\\p1\\windows_reader_toolbar_install.ps1:155 char:9\r\n+         throw \u0027Simulated toolbar smoke timeout after installation.\u0027\r\n+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : OperationStopped: (Simulated toolb...r installation.:String) [], RuntimeException\r\n    + FullyQualifiedErrorId : Simulated toolbar smoke timeout after installation.\r\n \r\n"
+                       },
+    "normalExit":  0,
+    "normalSuccess":  true,
+    "normalPhases":  [
+                         "initial-no-session-capabilities",
+                         "worker-capability-change-text-dispatch",
+                         "page-dialog-restores-overflow-focus",
+                         "find-dialog-restores-overflow-focus",
+                         "all-capabilities-dispatch",
+                         "narrow-primary-command-overflow",
+                         "worker-capability-removal",
+                         "detached-session-event-ignored"
+                     ],
+    "normalCleanup":  {
+                          "packageStillInstalled":  false,
+                          "processStillRunning":  false,
+                          "certificateStillTrusted":  false,
+                          "taskStillRegistered":  false
+                      }
+}

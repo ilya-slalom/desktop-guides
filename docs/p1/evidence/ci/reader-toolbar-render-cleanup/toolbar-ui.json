@@ -1,0 +1,19 @@
+﻿{
+    "invocationId":  "24a12e82e779450f8b86d68b6583f587",
+    "observedAt":  "2026-09-27T03:28:17.3008827Z",
+    "sessionId":  2,
+    "success":  true,
+    "phases":  [
+                   "initial-no-session-capabilities",
+                   "worker-capability-change-text-dispatch",
+                   "page-dialog-restores-overflow-focus",
+                   "find-dialog-restores-overflow-focus",
+                   "all-capabilities-dispatch",
+                   "narrow-primary-command-overflow",
+                   "worker-capability-removal",
+                   "detached-session-event-ignored"
+               ],
+    "packageFullName":  "DesktopGuides.ReaderToolbarSmoke_0.1.0.0_x64__en8r599z3n35j",
+    "processId":  2780,
+    "packageStillInstalled":  false
+}

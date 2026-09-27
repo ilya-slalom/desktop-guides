@@ -3,8 +3,12 @@ using DesktopGuides.Core.Navigation;
 using DesktopGuides.Infrastructure.Storage;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.Storage;
+using Windows.System;
 
 namespace DesktopGuides.Production;
 
@@ -17,7 +21,11 @@ public sealed partial class ShellWindow : Window
     private LibrarySessionLease? libraryLease;
     private SqliteLibraryRepository? repository;
     private Guid? resumeGuideId;
+    private Guid? pendingGuideFocus;
+    private int guideFocusRenderGeneration = -1;
     private int renderGeneration;
+    private long gameGuideIntentVersion;
+    private bool settingGuideSelection;
     private bool ready;
     private bool closeRequested;
     private bool allowClose;
@@ -27,8 +35,26 @@ public sealed partial class ShellWindow : Window
         InitializeComponent();
         Title = "Desktop Guides Preview";
         Navigation.SelectedItem = LibraryItem;
+        GameList.AddHandler(
+            UIElement.TappedEvent, new TappedEventHandler(GameTapped), true);
+        GameList.AddHandler(
+            UIElement.KeyDownEvent, new KeyEventHandler(GameKeyDown), true);
+        GuideList.AddHandler(
+            UIElement.TappedEvent, new TappedEventHandler(GuideTapped), true);
+        GuideList.AddHandler(
+            UIElement.KeyDownEvent, new KeyEventHandler(GuideKeyDown), true);
+        GuideList.LayoutUpdated += GuideListLayoutUpdated;
+        Navigation.RegisterPropertyChangedCallback(
+            NavigationView.IsPaneOpenProperty, (_, _) => UpdatePaneStatus());
+        UpdatePaneStatus();
+        ReaderActions.CommandFailed += message => ShellStatus.Text = message;
         AppWindow.Closing += WindowClosing;
     }
+
+    private void UpdatePaneStatus() =>
+        AutomationProperties.SetItemStatus(
+            Navigation,
+            Navigation.IsPaneOpen ? "Navigation pane open" : "Navigation pane closed");
 
     public Task InitializeAsync()
     {
@@ -145,13 +171,27 @@ public sealed partial class ShellWindow : Window
     private async void NavigationBackRequested(
         NavigationView sender, NavigationViewBackRequestedEventArgs args)
     {
-        await RunNavigationAsync(async () =>
+        await RunNavigationAsync(GoBackAsync);
+    }
+
+    private async void ReaderBackClicked(object sender, RoutedEventArgs args)
+    {
+        await RunNavigationAsync(GoBackAsync);
+    }
+
+    private async Task GoBackAsync()
+    {
+        ReaderRoute? reader = navigator.Current as ReaderRoute;
+        if (!navigator.GoBack())
         {
-            if (navigator.GoBack())
-            {
-                await RenderCurrentAsync();
-            }
-        });
+            return;
+        }
+        if (reader is not null && navigator.Current is GameRoute game &&
+            game.GameId == reader.GameId)
+        {
+            pendingGuideFocus = reader.GuideId;
+        }
+        await RenderCurrentAsync();
     }
 
     private async void GameSelected(object sender, SelectionChangedEventArgs args)
@@ -162,11 +202,145 @@ public sealed partial class ShellWindow : Window
         }
     }
 
+    private async void GameTapped(object sender, TappedRoutedEventArgs args)
+    {
+        if (GameFromRow(args.OriginalSource as DependencyObject) is Game game)
+        {
+            await RunNavigationAsync(() => OpenGameAsync(game.Id));
+        }
+    }
+
+    private Game? GameFromRow(DependencyObject? source)
+    {
+        while (source is not null && !ReferenceEquals(source, GameList))
+        {
+            if (source is ListViewItem row && row.Content is Game game)
+            {
+                return game;
+            }
+            source = VisualTreeHelper.GetParent(source);
+        }
+        return null;
+    }
+
+    private async void GameKeyDown(object sender, KeyRoutedEventArgs args)
+    {
+        if (args.Key == VirtualKey.Enter &&
+            GameFromRow(args.OriginalSource as DependencyObject) is Game game)
+        {
+            args.Handled = true;
+            await RunNavigationAsync(() => OpenGameAsync(game.Id));
+        }
+    }
+
     private async void GuideSelected(object sender, SelectionChangedEventArgs args)
+    {
+        if (settingGuideSelection)
+        {
+            return;
+        }
+        UpdateOpenSelectedGuideAction();
+        if (GuideList.SelectedItem is Guide guide)
+        {
+            await OpenGuideFromGameAsync(guide);
+        }
+    }
+
+    private async void GuideTapped(object sender, TappedRoutedEventArgs args)
+    {
+        if (GuideFromRow(args.OriginalSource as DependencyObject) is Guide guide)
+        {
+            await OpenGuideFromGameAsync(guide);
+        }
+    }
+
+    private Guide? GuideFromRow(DependencyObject? source)
+    {
+        while (source is not null && !ReferenceEquals(source, GuideList))
+        {
+            if (source is Button)
+            {
+                return null;
+            }
+            if (source is ListViewItem row && row.Content is Guide guide)
+            {
+                return guide;
+            }
+            source = VisualTreeHelper.GetParent(source);
+        }
+        return null;
+    }
+
+    private async void GuideKeyDown(object sender, KeyRoutedEventArgs args)
+    {
+        if (args.Key == VirtualKey.Enter &&
+            GuideFromRow(args.OriginalSource as DependencyObject) is Guide guide)
+        {
+            args.Handled = true;
+            await OpenGuideFromGameAsync(guide);
+        }
+    }
+
+    private async void OpenSelectedGuideClicked(object sender, RoutedEventArgs args)
     {
         if (GuideList.SelectedItem is Guide guide)
         {
-            await RunNavigationAsync(() => OpenGuideAsync(guide.Id));
+            await OpenGuideFromGameAsync(guide);
+        }
+    }
+
+    private Task OpenGuideFromGameAsync(Guide guide)
+    {
+        if (closeRequested)
+        {
+            return Task.CompletedTask;
+        }
+        long intentVersion = ++gameGuideIntentVersion;
+        return RunNavigationAsync(
+            () => OpenGuideAsync(guide.Id, guide.GameId, intentVersion));
+    }
+
+    private void UpdateOpenSelectedGuideAction()
+    {
+        if (GuideList.IsEnabled &&
+            navigator.Current is GameRoute game &&
+            GuideList.SelectedItem is Guide guide &&
+            guide.GameId == game.GameId)
+        {
+            AutomationProperties.SetName(
+                OpenSelectedGuideButton, $"Open {guide.Title}");
+            OpenSelectedGuideButton.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            OpenSelectedGuideButton.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void GuideListLayoutUpdated(object? sender, object args) =>
+        TryRestoreGuideFocus();
+
+    private void TryRestoreGuideFocus()
+    {
+        if (pendingGuideFocus is not Guid guideId ||
+            guideFocusRenderGeneration != renderGeneration ||
+            navigator.Current is not GameRoute game ||
+            GuideList.SelectedItem is not Guide selected ||
+            selected.Id != guideId ||
+            selected.GameId != game.GameId ||
+            GuideList.ContainerFromItem(selected) is not Control container)
+        {
+            return;
+        }
+        // Focus can cause another layout pass. Suspend the callback while it runs.
+        guideFocusRenderGeneration = -1;
+        if (container.Focus(FocusState.Programmatic))
+        {
+            pendingGuideFocus = null;
+        }
+        else
+        {
+            guideFocusRenderGeneration = renderGeneration;
         }
     }
 
@@ -189,13 +363,12 @@ public sealed partial class ShellWindow : Window
 
     private async Task OpenGameAsync(Guid gameId)
     {
+        if (navigator.Current is GameRoute current && current.GameId == gameId)
+        {
+            return;
+        }
         try
         {
-            if (await RequireRepository().GetGameAsync(gameId) is null)
-            {
-                ShellStatus.Text = "This game is no longer in your library.";
-                return;
-            }
             navigator.OpenGame(gameId);
             await RenderCurrentAsync();
         }
@@ -205,22 +378,104 @@ public sealed partial class ShellWindow : Window
         }
     }
 
-    private async Task OpenGuideAsync(Guid guideId)
+    private bool IsSupersededGameGuideIntent(long? intentVersion) =>
+        intentVersion is long version && version != gameGuideIntentVersion;
+
+    private static async Task PauseReaderMetadataReadForTestAsync()
     {
+        string prefix = $@"Local\DesktopGuides.Preview.ReaderLoad.{Environment.ProcessId}";
+        try
+        {
+            if (!EventWaitHandle.TryOpenExisting(
+                $"{prefix}.Reached", out EventWaitHandle? reached))
+            {
+                return;
+            }
+            using (reached)
+            {
+                if (!EventWaitHandle.TryOpenExisting(
+                    $"{prefix}.Continue", out EventWaitHandle? resume))
+                {
+                    return;
+                }
+                using (resume)
+                {
+                    reached.Set();
+                    if (!await Task.Run(() => resume.WaitOne(30_000)))
+                    {
+                        throw new TimeoutException("Reader metadata test gate timed out.");
+                    }
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Optional installed-test synchronization must not affect normal reading.
+        }
+    }
+
+    private async Task OpenGuideAsync(
+        Guid guideId, Guid? sourceGameId = null, long? intentVersion = null)
+    {
+        if (IsSupersededGameGuideIntent(intentVersion) ||
+            sourceGameId is Guid expectedGameId &&
+            (navigator.Current is not GameRoute game ||
+             game.GameId != expectedGameId ||
+             !GuideList.IsEnabled))
+        {
+            return;
+        }
+        if (navigator.Current is ReaderRoute current && current.GuideId == guideId)
+        {
+            return;
+        }
         ShellStatus.Text = "Opening guide...";
         try
         {
             SqliteLibraryRepository library = RequireRepository();
             Guide? guide = await library.GetGuideAsync(guideId);
-            if (guide is null || await library.GetGameAsync(guide.GameId) is null)
+            if (IsSupersededGameGuideIntent(intentVersion))
+            {
+                return;
+            }
+            if (guide is null ||
+                (sourceGameId is Guid source && guide.GameId != source))
+            {
+                ShellStatus.Text = "This guide is no longer in your library.";
+                return;
+            }
+            Game? ownerGame = await library.GetGameAsync(guide.GameId);
+            if (IsSupersededGameGuideIntent(intentVersion))
+            {
+                return;
+            }
+            if (ownerGame is null)
             {
                 ShellStatus.Text = "This guide is no longer in your library.";
                 return;
             }
             AppSettings settings = await library.GetSettingsAsync();
-            await library.SaveSettingsAsync(settings with { LastActiveGuideId = guide.Id });
+            if (IsSupersededGameGuideIntent(intentVersion))
+            {
+                return;
+            }
             navigator.OpenReader(guide.Id, guide.GameId);
-            await RenderCurrentAsync();
+            bool rendered = await RenderCurrentAsync();
+            if (rendered &&
+                navigator.Current is ReaderRoute opened &&
+                opened.GuideId == guide.Id &&
+                opened.GameId == guide.GameId)
+            {
+                try
+                {
+                    await library.SaveSettingsAsync(
+                        settings with { LastActiveGuideId = guide.Id });
+                }
+                catch (Exception error)
+                {
+                    ShellStatus.Text = $"Could not save Resume: {error.Message}";
+                }
+            }
         }
         catch (Exception error)
         {
@@ -228,17 +483,27 @@ public sealed partial class ShellWindow : Window
         }
     }
 
-    private async Task RenderCurrentAsync()
+    private async Task<bool> RenderCurrentAsync()
     {
         int generation = ++renderGeneration;
+        guideFocusRenderGeneration = -1;
+        if (navigator.Current is not GameRoute)
+        {
+            pendingGuideFocus = null;
+        }
         LibraryPanel.Visibility = Visibility.Collapsed;
         GamePanel.Visibility = Visibility.Collapsed;
         ReaderPanel.Visibility = Visibility.Collapsed;
         SettingsPanel.Visibility = Visibility.Collapsed;
+        OpenSelectedGuideButton.Visibility = Visibility.Collapsed;
         Navigation.IsBackEnabled = navigator.CanGoBack;
         Navigation.SelectedItem = navigator.Current is SettingsRoute
             ? Navigation.SettingsItem
             : LibraryItem;
+        if (navigator.Current is ReaderRoute)
+        {
+            Navigation.IsPaneOpen = false;
+        }
 
         SqliteLibraryRepository library = RequireRepository();
         try
@@ -255,7 +520,7 @@ public sealed partial class ShellWindow : Window
                         : null;
                     if (generation != renderGeneration)
                     {
-                        return;
+                        return false;
                     }
                     GameList.ItemsSource = games;
                     LibraryEmpty.Visibility =
@@ -273,50 +538,114 @@ public sealed partial class ShellWindow : Window
                 case GameRoute gameRoute:
                     GamePanel.Visibility = Visibility.Visible;
                     ShellStatus.Text = "Loading game…";
+                    Guid? selectedGuideId = pendingGuideFocus ??
+                        (GuideList.SelectedItem as Guide)?.Id;
+                    GameHeading.Text = "Loading game…";
+                    GamePlatform.Text = string.Empty;
+                    GameEmpty.Visibility = Visibility.Collapsed;
+                    GuideList.IsEnabled = false;
+                    settingGuideSelection = true;
+                    try
+                    {
+                        GuideList.ItemsSource = null;
+                        GuideList.SelectedItem = null;
+                    }
+                    finally
+                    {
+                        settingGuideSelection = false;
+                    }
                     Game? game = await library.GetGameAsync(gameRoute.GameId);
                     if (generation != renderGeneration)
                     {
-                        return;
+                        return false;
                     }
                     if (game is null)
                     {
                         navigator.ResetToLibrary();
                         await RenderCurrentAsync();
                         ShellStatus.Text = "This game is no longer in your library.";
-                        return;
+                        return false;
                     }
                     IReadOnlyList<Guide> guides =
                         await library.ListGuidesAsync(gameRoute.GameId);
                     if (generation != renderGeneration)
                     {
-                        return;
+                        return false;
                     }
                     GameHeading.Text = game.Title;
                     GamePlatform.Text = game.Platform ?? string.Empty;
-                    GuideList.ItemsSource = guides;
+                    Guide? selectedGuide = selectedGuideId is Guid id
+                        ? guides.FirstOrDefault(item => item.Id == id)
+                        : null;
+                    settingGuideSelection = true;
+                    try
+                    {
+                        GuideList.ItemsSource = guides;
+                        GuideList.SelectedItem = selectedGuide;
+                    }
+                    finally
+                    {
+                        settingGuideSelection = false;
+                    }
+                    GuideList.IsEnabled = true;
                     GameEmpty.Visibility =
                         guides.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+                    UpdateOpenSelectedGuideAction();
+                    if (pendingGuideFocus is not null && selectedGuide is not null)
+                    {
+                        guideFocusRenderGeneration = generation;
+                        GuideList.UpdateLayout();
+                        GuideList.ScrollIntoView(selectedGuide);
+                        GuideList.UpdateLayout();
+                        TryRestoreGuideFocus();
+                        DispatcherQueue.TryEnqueue(() =>
+                        {
+                            if (guideFocusRenderGeneration == generation)
+                            {
+                                GuideList.UpdateLayout();
+                                TryRestoreGuideFocus();
+                            }
+                        });
+                    }
+                    else
+                    {
+                        pendingGuideFocus = null;
+                    }
                     ShellStatus.Text = "Game ready.";
                     break;
 
                 case ReaderRoute readerRoute:
                     ReaderPanel.Visibility = Visibility.Visible;
                     ShellStatus.Text = "Loading guide…";
+                    await PauseReaderMetadataReadForTestAsync();
                     Guide? guide = await library.GetGuideAsync(readerRoute.GuideId);
                     if (generation != renderGeneration)
                     {
-                        return;
+                        return false;
                     }
                     if (guide is null || guide.GameId != readerRoute.GameId)
                     {
                         navigator.ResetToLibrary();
                         await RenderCurrentAsync();
                         ShellStatus.Text = "This guide is no longer in your library.";
-                        return;
+                        return false;
+                    }
+                    Game? readerGame = await library.GetGameAsync(readerRoute.GameId);
+                    if (generation != renderGeneration)
+                    {
+                        return false;
+                    }
+                    if (readerGame is null)
+                    {
+                        navigator.ResetToLibrary();
+                        await RenderCurrentAsync();
+                        ShellStatus.Text = "This game is no longer in your library.";
+                        return false;
                     }
                     ReaderHeading.Text = guide.Title;
+                    ReaderGameName.Text = readerGame.Title;
                     ReaderFormat.Text = guide.Format.ToString().ToUpperInvariant();
-                    ShellStatus.Text = "Guide ready.";
+                    ShellStatus.Text = "Guide details ready.";
                     break;
 
                 case SettingsRoute:
@@ -324,6 +653,7 @@ public sealed partial class ShellWindow : Window
                     ShellStatus.Text = "Settings ready.";
                     break;
             }
+            return true;
         }
         catch (Exception error)
         {
@@ -331,6 +661,7 @@ public sealed partial class ShellWindow : Window
             {
                 ShellStatus.Text = $"Could not load this view: {error.Message}";
             }
+            return false;
         }
     }
 

@@ -1,0 +1,471 @@
+{
+  "runId": "afac244f7e17484d95120b6fce95362c",
+  "observedAt": "2026-09-27T04:13:37.5548715Z",
+  "osBuild": "10.0.26100.0",
+  "cpuArchitecture": "AMD64",
+  "success": true,
+  "windowsAppRuntime": [],
+  "dotnetSdk": "10.0.401",
+  "sourcePackageSha256": "682E01D6467C6D8C5D74E0EC31ED3E9E5AA917F61959A7110F2C450ADEA7BF65",
+  "certificateThumbprint": "98F9B9F0C194E5F85F5A706C8C9B4334D126FECA",
+  "signedPackageSha256": "F853A8BCE442237E307227899DB10D6D6B6997AB2B68BB84E1A8CAD1B254A39A",
+  "packageFullName": "DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+  "packageFamilyName": "DesktopGuides.Preview_en8r599z3n35j",
+  "installLocation": "C:\\Program Files\\WindowsApps\\DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+  "launchedProcessId": 8756,
+  "launchedSessionId": 2,
+  "empty": {
+    "mode": "empty",
+    "invocationId": "88769fb89eb544c78b3239387a0ecfe2",
+    "observedAt": "2026-09-27T04:13:59.5616777Z",
+    "processId": 8616,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 2000,
+    "success": true,
+    "phases": [
+      "library",
+      "empty-library"
+    ]
+  },
+  "emptyAfterDelayedTask": {
+    "mode": "empty",
+    "invocationId": "fe7245ca28ab4d7080594da05d05d83a",
+    "observedAt": "2026-09-27T04:14:04.013492Z",
+    "processId": 8616,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "empty-library"
+    ]
+  },
+  "secondLaunchProcessId": 2760,
+  "backgroundActivation": {
+    "handoffToken": "320d21318bac4dcea7276bef9c2d6813",
+    "foregroundTargetProcessId": 8616,
+    "probeWindowHandle": 131620,
+    "foregroundWindowBefore": 131620,
+    "targetWindowHandle": 197010,
+    "foregroundWindowHandle": 197010,
+    "childExited": true,
+    "success": true
+  },
+  "redirectedActivationObserved": true,
+  "secondLaunchProcessIds": [
+    8616
+  ],
+  "singleInstanceProcessId": 8616,
+  "emptyAfterSecondLaunch": {
+    "mode": "empty",
+    "invocationId": "ba9f917cdfa14b158d7ab5eb5a9adb5b",
+    "observedAt": "2026-09-27T04:14:07.8457015Z",
+    "processId": 8616,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "empty-library"
+    ]
+  },
+  "normal": {
+    "mode": "normal",
+    "invocationId": "cd44dd50153a408f938325d09e3f51d4",
+    "observedAt": "2026-09-27T04:14:21.7302975Z",
+    "processId": 8212,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-pane-toggle",
+      "reader-back-game",
+      "uia-reopen-selected-guide",
+      "pointer-reopen-selected-guide",
+      "keyboard-reopen-selected-guide",
+      "focused-guide-enter",
+      "restore-route-guide",
+      "game-back-library",
+      "pointer-library-game-reader-game",
+      "keyboard-library-game-reader-game",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game",
+      "restore-last-guide-for-relaunch"
+    ],
+    "readerScreenshot": "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.reader.png",
+    "gameScreenshot": "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.game.png"
+  },
+  "pendingGuide": {
+    "mode": "queue-guide-write",
+    "invocationId": "d02adb462284445d865fbaef7bbd28d4",
+    "observedAt": "2026-09-27T04:14:28.9224233Z",
+    "processId": 8212,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "guide-reader-open-while-save-blocked"
+    ]
+  },
+  "closeHandoffOverlapObserved": true,
+  "waitingDuringClose": {
+    "mode": "waiting-handoff",
+    "invocationId": "f0c4dc83068b449293cc6011a7164034",
+    "observedAt": "2026-09-27T04:14:33.8610372Z",
+    "processId": 8700,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "waiting-for-library-lease"
+    ]
+  },
+  "relaunchDuringCloseProcessId": 8700,
+  "normalAfterCloseRelaunch": {
+    "mode": "normal",
+    "invocationId": "f7af8f5b4ee64de9aab4f998e3e91542",
+    "observedAt": "2026-09-27T04:14:35.5127795Z",
+    "processId": 8700,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-pane-toggle",
+      "reader-back-game",
+      "uia-reopen-selected-guide",
+      "pointer-reopen-selected-guide",
+      "keyboard-reopen-selected-guide",
+      "focused-guide-enter",
+      "restore-route-guide",
+      "game-back-library",
+      "pointer-library-game-reader-game",
+      "keyboard-library-game-reader-game",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game",
+      "restore-last-guide-for-relaunch"
+    ],
+    "readerScreenshot": "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.reader.png",
+    "gameScreenshot": "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.game.png"
+  },
+  "closingTargetSelected": true,
+  "closingTargetRelaunchProcessId": 7652,
+  "normalAfterClosingTarget": {
+    "mode": "normal",
+    "invocationId": "11e159ca010d48daac26b3ba2f69ac01",
+    "observedAt": "2026-09-27T04:14:43.9040424Z",
+    "processId": 7652,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-pane-toggle",
+      "reader-back-game",
+      "uia-reopen-selected-guide",
+      "pointer-reopen-selected-guide",
+      "keyboard-reopen-selected-guide",
+      "focused-guide-enter",
+      "restore-route-guide",
+      "game-back-library",
+      "pointer-library-game-reader-game",
+      "keyboard-library-game-reader-game",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game",
+      "restore-last-guide-for-relaunch"
+    ],
+    "readerScreenshot": "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.reader.png",
+    "gameScreenshot": "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.game.png"
+  },
+  "activationQueuedBeforeClose": true,
+  "queuedActivationRelaunchProcessId": 5056,
+  "normalAfterQueuedActivation": {
+    "mode": "normal",
+    "invocationId": "7e4e171ea38447cfaeab40474f9b3c94",
+    "observedAt": "2026-09-27T04:14:51.9348714Z",
+    "processId": 5056,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-pane-toggle",
+      "reader-back-game",
+      "uia-reopen-selected-guide",
+      "pointer-reopen-selected-guide",
+      "keyboard-reopen-selected-guide",
+      "focused-guide-enter",
+      "restore-route-guide",
+      "game-back-library",
+      "pointer-library-game-reader-game",
+      "keyboard-library-game-reader-game",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game",
+      "restore-last-guide-for-relaunch"
+    ],
+    "readerScreenshot": "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.reader.png",
+    "gameScreenshot": "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.game.png"
+  },
+  "pendingBeforeLateClose": {
+    "mode": "queue-guide",
+    "invocationId": "dd563a9bf0434016b725fc3047fcce6f",
+    "observedAt": "2026-09-27T04:14:58.140935Z",
+    "processId": 5056,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "guide-action-started"
+    ]
+  },
+  "lateGuideAfterClose": {
+    "mode": "late-guide-after-close",
+    "invocationId": "8edab98b25a040fa82ecb76c3a7b6c8c",
+    "observedAt": "2026-09-27T04:14:59.6033525Z",
+    "processId": 5056,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "guide-selected-after-close-request"
+    ]
+  },
+  "normalAfterLateClose": {
+    "mode": "normal",
+    "invocationId": "f98f95b01761474096caaeb96bf738c8",
+    "observedAt": "2026-09-27T04:15:03.4847974Z",
+    "processId": 6924,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-pane-toggle",
+      "reader-back-game",
+      "uia-reopen-selected-guide",
+      "pointer-reopen-selected-guide",
+      "keyboard-reopen-selected-guide",
+      "focused-guide-enter",
+      "restore-route-guide",
+      "game-back-library",
+      "pointer-library-game-reader-game",
+      "keyboard-library-game-reader-game",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game",
+      "restore-last-guide-for-relaunch"
+    ],
+    "readerScreenshot": "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.reader.png",
+    "gameScreenshot": "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.game.png"
+  },
+  "queuedLaterGuide": {
+    "mode": "queue-later-guide",
+    "invocationId": "4a56c6dbc4754f5181c906542dcb4cde",
+    "observedAt": "2026-09-27T04:15:09.7593737Z",
+    "processId": 6924,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "later-guide-selected-while-first-read-blocked"
+    ]
+  },
+  "laterGuideResult": {
+    "mode": "later-guide-result",
+    "invocationId": "bd8ad10f73fa4b7ea29f7f9d65f492e6",
+    "observedAt": "2026-09-27T04:15:11.875459Z",
+    "processId": 6924,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "later-guide-opened",
+      "later-guide-back-selection-and-focus",
+      "later-guide-persisted-for-resume"
+    ]
+  },
+  "acceptedBeforeClose": true,
+  "acceptedCloseDidNotRelaunch": true,
+  "normalBeforeFailedGuide": {
+    "mode": "normal",
+    "invocationId": "9a1db8ba2aef47e0b65e5f194df9c04e",
+    "observedAt": "2026-09-27T04:15:18.0755283Z",
+    "processId": 5068,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "resume-reader",
+      "reader-pane-toggle",
+      "reader-back-game",
+      "uia-reopen-selected-guide",
+      "pointer-reopen-selected-guide",
+      "keyboard-reopen-selected-guide",
+      "focused-guide-enter",
+      "restore-route-guide",
+      "game-back-library",
+      "pointer-library-game-reader-game",
+      "keyboard-library-game-reader-game",
+      "settings",
+      "settings-back-library",
+      "rapid-game-settings-back-game",
+      "rapid-guide-settings-back-reader",
+      "library-game-reader-game",
+      "restore-last-guide-for-relaunch"
+    ],
+    "readerScreenshot": "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.reader.png",
+    "gameScreenshot": "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\normal.game.png"
+  },
+  "queuedBeforeFailedGuide": {
+    "mode": "queue-later-guide",
+    "invocationId": "694dad61806b4ab3945edc0cd32d605e",
+    "observedAt": "2026-09-27T04:15:26.401779Z",
+    "processId": 5068,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "later-guide-selected-while-first-read-blocked"
+    ]
+  },
+  "failedLaterGuideResult": {
+    "mode": "later-guide-failed-result",
+    "invocationId": "06eac4dee2fb4cb98f90ee5c87f68a45",
+    "observedAt": "2026-09-27T04:15:27.840822Z",
+    "processId": 5068,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "later-guide-failed-without-opening-reader",
+      "superseded-guide-not-saved-as-resume"
+    ]
+  },
+  "closedGracefully": true,
+  "queuedBeforeRenderError": {
+    "mode": "queue-reader-render-error",
+    "invocationId": "085c6aaf828c46ef9dd4bc7dab4b4de9",
+    "observedAt": "2026-09-27T04:15:31.6813926Z",
+    "processId": 7416,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "reader-route-open-before-render-fault"
+    ]
+  },
+  "readerRenderError": {
+    "mode": "reader-render-error-observed",
+    "invocationId": "3650b059f4984d188d01b225ee62260a",
+    "observedAt": "2026-09-27T04:15:35.9979752Z",
+    "processId": 7416,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "reader-render-read-failed-on-reader-route"
+    ]
+  },
+  "readerRenderRecovery": {
+    "mode": "reader-render-error-result",
+    "invocationId": "a1caefcb50314238a637f477d5bc28e4",
+    "observedAt": "2026-09-27T04:15:39.8230107Z",
+    "processId": 7416,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "reader-render-error-did-not-save-resume"
+    ]
+  },
+  "stale": {
+    "mode": "stale",
+    "invocationId": "c17c2b694140424985bcef4a646e232b",
+    "observedAt": "2026-09-27T04:15:46.5973358Z",
+    "processId": 5748,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "stale-resume-hidden"
+    ]
+  },
+  "longList": {
+    "mode": "long-list",
+    "invocationId": "8d9e822e13d64c7892d39eae813e1430",
+    "observedAt": "2026-09-27T04:15:55.6890499Z",
+    "processId": 3124,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "tail-guide-outside-initial-viewport",
+      "virtualized-guide-back-focus",
+      "virtualized-guide-enter-reopen"
+    ]
+  },
+  "switchGamePreparation": {
+    "mode": "switch-game-prepare",
+    "invocationId": "e2d983d5a066458c8fcc4f13e3750631",
+    "observedAt": "2026-09-27T04:16:03.1151022Z",
+    "processId": 8756,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "library",
+      "first-game-guide-retained-before-switch"
+    ]
+  },
+  "switchGameLoading": {
+    "mode": "switch-game-loading",
+    "invocationId": "bd7331b36b3040e083d41e627d434e69",
+    "observedAt": "2026-09-27T04:16:05.2756661Z",
+    "processId": 8756,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "game-switch-loading-clears-old-guide"
+    ]
+  },
+  "switchGame": {
+    "mode": "switch-game",
+    "invocationId": "c6c516e626db4b2faef50043bd2b24a1",
+    "observedAt": "2026-09-27T04:16:06.7629097Z",
+    "processId": 8756,
+    "sessionId": 2,
+    "exitDelayMilliseconds": 0,
+    "success": true,
+    "phases": [
+      "game-switch-clears-old-guide",
+      "game-switch-opens-current-guide",
+      "game-switch-uia-reopen"
+    ]
+  },
+  "packageStillInstalled": false,
+  "certificateStillTrusted": false
+}

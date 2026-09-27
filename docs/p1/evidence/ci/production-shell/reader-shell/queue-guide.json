@@ -1,0 +1,12 @@
+﻿{
+    "mode":  "queue-guide",
+    "invocationId":  "feb5c9c71f61491aad36e5399615fa08",
+    "observedAt":  "2026-09-26T13:19:38.2683386Z",
+    "processId":  5528,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "guide-action-started"
+               ]
+}

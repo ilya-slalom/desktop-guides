@@ -1,0 +1,14 @@
+﻿{
+    "mode":  "switch-game",
+    "invocationId":  "b1c2fd433ebe4139ba8bbea2caad2930",
+    "observedAt":  "2026-09-27T01:55:04.6184025Z",
+    "processId":  832,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "game-switch-clears-old-guide",
+                   "game-switch-opens-current-guide",
+                   "game-switch-uia-reopen"
+               ]
+}

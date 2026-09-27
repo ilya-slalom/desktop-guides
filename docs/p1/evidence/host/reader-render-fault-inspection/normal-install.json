@@ -1,0 +1,25 @@
+﻿{
+    "invocationId":  "9da6beaacdd448d78abf5bc2d8a5002e",
+    "observedAt":  "2026-09-27T03:56:16.9725460Z",
+    "sourcePackageSha256":  "9AA9BED299A85FEE64DC245DA113F49C9DBE3EA8A09C96D96D253CF559A28F29",
+    "parentStoppedProcess":  false,
+    "parentRemovedPackage":  false,
+    "simulatedProcessExit":  false,
+    "success":  true,
+    "certificateThumbprint":  "D5B24591C4697FE6A89A3FBD8B3110D65A1FBB4B",
+    "signedPackageSha256":  "A155145D1A688AF0F0A50CCC7B739FD602ED87010DA81B49C9DB37291A7F905D",
+    "phases":  [
+                   "initial-no-session-capabilities",
+                   "worker-capability-change-text-dispatch",
+                   "page-dialog-restores-overflow-focus",
+                   "find-dialog-restores-overflow-focus",
+                   "all-capabilities-dispatch",
+                   "narrow-primary-command-overflow",
+                   "worker-capability-removal",
+                   "detached-session-event-ignored"
+               ],
+    "packageStillInstalled":  false,
+    "processStillRunning":  false,
+    "certificateStillTrusted":  false,
+    "taskStillRegistered":  false
+}

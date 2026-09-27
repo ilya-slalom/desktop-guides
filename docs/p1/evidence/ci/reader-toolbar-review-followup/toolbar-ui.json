@@ -1,0 +1,16 @@
+﻿{
+    "observedAt":  "2026-09-26T15:47:52.4167213Z",
+    "sessionId":  2,
+    "success":  true,
+    "phases":  [
+                   "initial-no-session-capabilities",
+                   "worker-capability-change-text-dispatch",
+                   "all-capabilities-dispatch",
+                   "narrow-primary-command-overflow",
+                   "worker-capability-removal",
+                   "detached-session-event-ignored"
+               ],
+    "packageFullName":  "DesktopGuides.ReaderToolbarSmoke_0.1.0.0_x64__en8r599z3n35j",
+    "processId":  9008,
+    "packageStillInstalled":  false
+}

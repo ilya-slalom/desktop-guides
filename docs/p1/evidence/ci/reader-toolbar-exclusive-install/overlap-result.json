@@ -1,0 +1,12 @@
+{
+  "observedAt": "2026-09-27T06:31:36.3255834Z",
+  "shellExecutable": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+  "contenderRejected": true,
+  "firstPackagePreserved": true,
+  "firstProcessPreserved": true,
+  "firstCleanupVerified": true,
+  "success": true,
+  "firstPackageFullName": "DesktopGuides.ReaderToolbarSmoke_0.1.0.0_x64__en8r599z3n35j",
+  "firstProcessId": 3420,
+  "contenderExitCode": 1
+}

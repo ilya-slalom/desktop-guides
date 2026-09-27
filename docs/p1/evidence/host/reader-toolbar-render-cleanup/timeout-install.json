@@ -1,0 +1,15 @@
+﻿{
+    "invocationId":  "0d4e66927f854679a3343ceada922c60",
+    "observedAt":  "2026-09-27T03:23:02.1396077Z",
+    "sourcePackageSha256":  "E06C195B62E252C596D8BC6D777AD793C4338A983D7C367A444746601CB56FEA",
+    "parentStoppedProcess":  true,
+    "parentRemovedPackage":  true,
+    "success":  false,
+    "certificateThumbprint":  "D9C0D35CACD812FF404B401BD452B58B1300EE6F",
+    "signedPackageSha256":  "2BD4BDA34EDC361D595A29C61A24FAD8CE8B8AE35FBADBC03BEFEC6901D5790D",
+    "error":  "Simulated toolbar smoke timeout after installation.\r\nAt E:\\work\\desktop-guides\\tools\\p1\\windows_reader_toolbar_install.ps1:118 char:9\r\n+         throw \u0027Simulated toolbar smoke timeout after installation.\u0027\r\n+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : OperationStopped: (Simulated toolb...r installation.:String) [], RuntimeException\r\n    + FullyQualifiedErrorId : Simulated toolbar smoke timeout after installation.\r\n \r\n",
+    "packageStillInstalled":  false,
+    "processStillRunning":  false,
+    "certificateStillTrusted":  false,
+    "taskStillRegistered":  false
+}

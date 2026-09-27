@@ -1,0 +1,12 @@
+﻿{
+    "mode":  "reader-render-error-result",
+    "invocationId":  "a1caefcb50314238a637f477d5bc28e4",
+    "observedAt":  "2026-09-27T04:15:39.8230107Z",
+    "processId":  7416,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "reader-render-error-did-not-save-resume"
+               ]
+}

@@ -284,34 +284,70 @@ function Close-InstalledShell {
     $report.closedGracefully = $true
 }
 
-function Assert-RelaunchDuringClose {
-    $closingProcessId = $report.launchedProcessId
-    $lockReady = Join-Path $ResultDirectory 'write-lock-ready'
-    $lockRelease = Join-Path $ResultDirectory 'write-lock-release'
-    Remove-Item $lockReady, $lockRelease -ErrorAction SilentlyContinue
+function Start-ShellDatabaseLock(
+    [string] $Mode,
+    [string] $ReadyPath,
+    [string] $ReleasePath) {
+    if ($Mode -notin @('hold-write-lock', 'hold-read-lock')) {
+        throw "Unsupported shell database lock mode $Mode."
+    }
     $seedDll = Join-Path $PSScriptRoot `
         'DesktopGuides.ShellSeed\bin\Release\net10.0\DesktopGuides.ShellSeed.dll'
     if (-not (Test-Path $seedDll)) {
-        throw 'Shell seed executable is unavailable for the close handoff.'
+        throw 'Shell seed executable is unavailable for the database lock.'
     }
     $lockArguments = @(
-        ('"{0}"' -f $seedDll), 'hold-write-lock', ('"{0}"' -f $dataRoot),
-        ('"{0}"' -f $lockReady), ('"{0}"' -f $lockRelease)
+        ('"{0}"' -f $seedDll), $Mode, ('"{0}"' -f $dataRoot),
+        ('"{0}"' -f $ReadyPath), ('"{0}"' -f $ReleasePath)
     )
     $lockProcess = Start-Process -FilePath 'dotnet.exe' `
         -ArgumentList $lockArguments -PassThru -WindowStyle Hidden
     try {
         $deadline = (Get-Date).AddSeconds(15)
         do {
-            Start-Sleep -Milliseconds 100
             if ($lockProcess.HasExited) {
-                throw "Write-lock helper exited early: $($lockProcess.ExitCode)."
+                throw "$Mode helper exited early: $($lockProcess.ExitCode)."
             }
-        } while (-not (Test-Path $lockReady) -and (Get-Date) -lt $deadline)
-        if (-not (Test-Path $lockReady)) {
-            throw 'Write-lock helper did not acquire the database.'
+            if (Test-Path -LiteralPath $ReadyPath) {
+                return $lockProcess
+            }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+        throw "$Mode helper did not acquire the database."
+    }
+    catch {
+        New-Item -ItemType File -Force $ReleasePath | Out-Null
+        if (-not $lockProcess.WaitForExit(10000)) {
+            [void][DesktopGuidesOwnedProcess]::TerminateAndWait(
+                $lockProcess.Handle, 10000)
         }
-        $report.pendingGuide = Run-ShellSmoke 'queue-guide'
+        throw
+    }
+}
+
+function Release-ShellDatabaseLock(
+    [System.Diagnostics.Process] $LockProcess,
+    [string] $ReleasePath) {
+    New-Item -ItemType File -Force $ReleasePath | Out-Null
+    if (-not $LockProcess.WaitForExit(10000)) {
+        if (-not [DesktopGuidesOwnedProcess]::TerminateAndWait(
+            $LockProcess.Handle, 10000)) {
+            throw 'Database-lock helper did not exit after handle termination.'
+        }
+    }
+    if ($LockProcess.ExitCode -ne 0) {
+        throw "Database-lock helper failed: $($LockProcess.ExitCode)."
+    }
+}
+
+function Assert-RelaunchDuringClose {
+    $closingProcessId = $report.launchedProcessId
+    $lockReady = Join-Path $ResultDirectory "write-lock-ready-$runId"
+    $lockRelease = Join-Path $ResultDirectory "write-lock-release-$runId"
+    $lockProcess = Start-ShellDatabaseLock `
+        'hold-write-lock' $lockReady $lockRelease
+    try {
+        $report.pendingGuide = Run-ShellSmoke 'queue-guide-write'
         Request-InstalledShellClose $closingProcessId
         Start-Sleep -Milliseconds 300
         if (-not (Get-Process -Id $closingProcessId -ErrorAction SilentlyContinue)) {
@@ -326,20 +362,135 @@ function Assert-RelaunchDuringClose {
         $report.waitingDuringClose = Run-ShellSmoke 'waiting-handoff'
     }
     finally {
-        New-Item -ItemType File -Force $lockRelease | Out-Null
-        if (-not $lockProcess.WaitForExit(10000)) {
-            if (-not [DesktopGuidesOwnedProcess]::TerminateAndWait(
-                $lockProcess.Handle, 10000)) {
-                throw 'Write-lock helper did not exit after handle termination.'
-            }
-        }
-    }
-    if ($lockProcess.ExitCode -ne 0) {
-        throw "Write-lock helper failed: $($lockProcess.ExitCode)."
+        Release-ShellDatabaseLock $lockProcess $lockRelease
     }
     Wait-InstalledShellExit $closingProcessId
     $report.relaunchDuringCloseProcessId = $report.launchedProcessId
     $report.normalAfterCloseRelaunch = Run-ShellSmoke 'normal' 'Blocked Write Guide'
+}
+
+function Assert-LaterGuideWins {
+    $lockReady = Join-Path $ResultDirectory "later-guide-lock-ready-$runId"
+    $lockRelease = Join-Path $ResultDirectory "later-guide-lock-release-$runId"
+    $lockProcess = Start-ShellDatabaseLock `
+        'hold-read-lock' $lockReady $lockRelease
+    try {
+        $report.queuedLaterGuide = Run-ShellSmoke 'queue-later-guide'
+    }
+    finally {
+        Release-ShellDatabaseLock $lockProcess $lockRelease
+    }
+    $report.laterGuideResult = Run-ShellSmoke 'later-guide-result'
+}
+
+function Assert-LateGuideAfterClose {
+    $closingProcessId = $report.launchedProcessId
+    $lockReady = Join-Path $ResultDirectory "late-close-lock-ready-$runId"
+    $lockRelease = Join-Path $ResultDirectory "late-close-lock-release-$runId"
+    $lockProcess = Start-ShellDatabaseLock `
+        'hold-read-lock' $lockReady $lockRelease
+    try {
+        $report.pendingBeforeLateClose = Run-ShellSmoke 'queue-guide'
+        Request-InstalledShellClose $closingProcessId
+        $report.lateGuideAfterClose = Run-ShellSmoke 'late-guide-after-close'
+    }
+    finally {
+        Release-ShellDatabaseLock $lockProcess $lockRelease
+    }
+    Wait-InstalledShellExit $closingProcessId
+    Start-InstalledShell
+    $report.normalAfterLateClose = Run-ShellSmoke 'normal' 'Blocked Write Guide'
+}
+
+function Assert-FailedLaterGuideDoesNotSaveEarlier {
+    Start-InstalledShell
+    $report.normalBeforeFailedGuide = Run-ShellSmoke 'normal' 'Blocked Write Guide'
+    $seedProject = Join-Path $PSScriptRoot `
+        'DesktopGuides.ShellSeed\DesktopGuides.ShellSeed.csproj'
+    dotnet run --project $seedProject -c Release --no-restore -- `
+        invalidate-blocked-guide $dataRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not invalidate the displayed guide for the failure case.'
+    }
+    $lockReady = Join-Path $ResultDirectory "failed-guide-lock-ready-$runId"
+    $lockRelease = Join-Path $ResultDirectory "failed-guide-lock-release-$runId"
+    $lockProcess = Start-ShellDatabaseLock `
+        'hold-read-lock' $lockReady $lockRelease
+    try {
+        $report.queuedBeforeFailedGuide = Run-ShellSmoke 'queue-later-guide'
+    }
+    finally {
+        Release-ShellDatabaseLock $lockProcess $lockRelease
+    }
+    $report.failedLaterGuideResult = Run-ShellSmoke 'later-guide-failed-result'
+    Close-InstalledShell
+}
+
+function Assert-ReaderRenderErrorDoesNotSaveResume {
+    Start-InstalledShell
+    $processId = $report.launchedProcessId
+    $reached = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::AutoReset,
+        "Local\DesktopGuides.Preview.ReaderLoad.$($processId).Reached")
+    $resume = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::ManualReset,
+        "Local\DesktopGuides.Preview.ReaderLoad.$($processId).Continue")
+    $seedProject = Join-Path $PSScriptRoot `
+        'DesktopGuides.ShellSeed\DesktopGuides.ShellSeed.csproj'
+    $fixtureCorrupted = $false
+    try {
+        $report.queuedBeforeRenderError = Run-ShellSmoke 'queue-reader-render-error'
+        if (-not $reached.WaitOne(15000)) {
+            throw 'Reader route did not reach its second metadata read.'
+        }
+        dotnet run --project $seedProject -c Release --no-restore -- `
+            corrupt-reader-guide $dataRoot
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Could not corrupt the disposable Reader metadata fixture.'
+        }
+        $fixtureCorrupted = $true
+        $resume.Set() | Out-Null
+        $report.readerRenderError = Run-ShellSmoke 'reader-render-error-observed'
+        dotnet run --project $seedProject -c Release --no-restore -- `
+            restore-reader-guide $dataRoot
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Could not restore the Reader metadata fixture.'
+        }
+        $fixtureCorrupted = $false
+        $report.readerRenderRecovery = Run-ShellSmoke 'reader-render-error-result'
+        Close-InstalledShell
+    }
+    finally {
+        try {
+            $resume.Set() | Out-Null
+            if ($fixtureCorrupted) {
+                dotnet run --project $seedProject -c Release --no-restore -- `
+                    restore-reader-guide $dataRoot
+                if ($LASTEXITCODE -ne 0) {
+                    throw 'Reader metadata fixture recovery failed during cleanup.'
+                }
+            }
+        }
+        finally {
+            $resume.Dispose()
+            $reached.Dispose()
+        }
+    }
+}
+
+function Assert-GameSwitchClearsWhileLoading {
+    $report.switchGamePreparation = Run-ShellSmoke 'switch-game-prepare'
+    $lockReady = Join-Path $ResultDirectory "read-lock-ready-$runId"
+    $lockRelease = Join-Path $ResultDirectory "read-lock-release-$runId"
+    $lockProcess = Start-ShellDatabaseLock `
+        'hold-read-lock' $lockReady $lockRelease
+    try {
+        $report.switchGameLoading = Run-ShellSmoke 'switch-game-loading'
+    }
+    finally {
+        Release-ShellDatabaseLock $lockProcess $lockRelease
+    }
+    $report.switchGame = Run-ShellSmoke 'switch-game'
 }
 
 function Assert-ClosingTargetRedirect {
@@ -557,13 +708,29 @@ try {
     Assert-RelaunchDuringClose
     Assert-ClosingTargetRedirect
     Assert-QueuedActivationClose
+    Assert-LateGuideAfterClose
+    Assert-LaterGuideWins
     Assert-AcceptedThenClose
+    Assert-FailedLaterGuideDoesNotSaveEarlier
+    Assert-ReaderRenderErrorDoesNotSaveResume
 
     Stop-InstalledShell
     dotnet run --project $seedProject -c Release --no-restore -- stale $dataRoot
     if ($LASTEXITCODE -ne 0) { throw 'Could not set stale last-guide ID.' }
     Start-InstalledShell
     $report.stale = Run-ShellSmoke 'stale'
+    Close-InstalledShell
+
+    dotnet run --project $seedProject -c Release --no-restore -- seed-long $dataRoot
+    if ($LASTEXITCODE -ne 0) { throw 'Could not seed the long guide list.' }
+    Start-InstalledShell
+    $report.longList = Run-ShellSmoke 'long-list'
+    Close-InstalledShell
+
+    dotnet run --project $seedProject -c Release --no-restore -- seed-second $dataRoot
+    if ($LASTEXITCODE -ne 0) { throw 'Could not seed the second game.' }
+    Start-InstalledShell
+    Assert-GameSwitchClearsWhileLoading
     Close-InstalledShell
     $report.success = $true
 }

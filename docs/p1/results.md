@@ -473,3 +473,456 @@ and process cleanup. The
 [focus trace](evidence/ci/production-shell/foreground-exit-transition/second-launch.json.foreground.json)
 again records the test window before launch and the original shell after
 the duplicate exited.
+
+## M1 T11.3 reader shell — 26 September 2026
+
+The `feat/p1-m1-reader-shell` branch adds a guide title/game/format header,
+in-reader Back, a reading-surface host, and a capability-driven CommandBar.
+The preview shell has no reader adapter yet, so it offers no reader
+commands. Returning to Game retains the selected guide and restores focus
+to its row; activating the selected row can reopen it.
+
+On the Windows 11 x64 host, build `10.0.26200.0`, with source staged under
+`E:\work\desktop-guides`, locked production restore and the unsigned Release
+x64 MSIX build passed. The MSIX SHA-256 is
+`1b20ada10646f124dd6e2f716df9fcf6ee8c84a7d9e411bbd95569fb2be6e293`.
+The build reported only the existing missing-`mspdbcmf.exe` symbols warning.
+The updated installed-smoke script passed Windows PowerShell 5.1 parsing.
+The host retains an installed Preview package, so its fresh-profile M1
+installer was not run there.
+
+The signed installed Windows 11 x64
+[push run 36244519302](https://github.com/ilya-slalom/desktop-guides/actions/runs/36244519302)
+passed its shell job for code head `2187a0492aa0c1aa5218510289ffc8a8458d292f`.
+The [install record](evidence/ci/production-shell/reader-shell/signed-install.json)
+reports Windows build `10.0.26100.0`, signed MSIX SHA-256
+`11f6bff9f38bccdf62cc5a3c911d972dbcdce37ece9b96ef207b4e5fb5d45827`,
+all normal and close-handoff route smokes, stale Resume, and graceful exit.
+The [normal trace](evidence/ci/production-shell/reader-shell/normal.json)
+includes Reader → Game with selected-row focus, Enter to reopen the same
+guide, and Settings round trips. The
+[Reader screenshot](evidence/ci/production-shell/reader-shell/normal.reader.png)
+shows the compact title/game/format header, collapsed pane, and honest
+unavailable-reading message. The install record confirms that the temporary
+package and signer were removed. Both x64 and ARM64 production package
+builds, Core/Infrastructure tests, and the native ARM64 P0 installed
+fixture regression passed in the eight-job run. The ARM64 result is a
+diagnostic P0 check, not the complete P1 installed workflow.
+
+The installed checks exposed two smoke assumptions that were corrected
+before the passing run: reselecting an already selected guide does not
+activate it, and the blocked-write handoff temporarily changes the Resume
+guide. The final smoke activates a selected row with Enter and explicitly
+returns to the route guide before later relaunches. Dynamic toolbar actions
+remain an M3 adapter integration check; this M1 preview has no adapter.
+
+The T11.3 review follow-up at code head
+`920324342d0947bc3c04237f783dbfee479f2339` passed the signed installed
+Windows 11 x64 shell job in [PR run 36247566880](https://github.com/ilya-slalom/desktop-guides/actions/runs/36247566880)
+and [push run 36247564409](https://github.com/ilya-slalom/desktop-guides/actions/runs/36247564409).
+The [install record](evidence/ci/production-shell/reader-shell/review-followup/signed-install.json)
+reports Windows build `10.0.26100.0`, AMD64, success, and removal of the
+temporary package and certificate. The [normal trace](evidence/ci/production-shell/reader-shell/review-followup/normal.json)
+checks that Reader closes the navigation pane, its toggle opens and closes
+it, pointer Back restores guide selection and focus, pointer input reopens
+the selected row, and keyboard Back and Enter reopen it again. Screenshot
+capture now fails the smoke if it cannot save a nonempty image; the retained
+[Reader screenshot](evidence/ci/production-shell/reader-shell/review-followup/normal.reader.png)
+shows the closed pane and unavailable-reading preview. The first review
+follow-up run failed because WinUI's pane toggle did not expose a UI
+Automation clickable point; using its visible bounds for the physical click
+passed the installed rerun.
+
+### T11.3 focused-row review follow-up — 26 September 2026
+
+At code head `e81db1a81a23ac6bf13562a8daabfe9415b3a49d`, Enter now opens
+the guide row that received the key even when another row remains selected.
+The Windows 11 x64 host build under `E:\work\desktop-guides` passed the
+unsigned Release MSIX build, and Windows PowerShell 5.1 parsed the updated
+smoke script. The signed installed shell jobs passed in
+[push run 36249362118](https://github.com/ilya-slalom/desktop-guides/actions/runs/36249362118)
+and [PR run 36249364872](https://github.com/ilya-slalom/desktop-guides/actions/runs/36249364872).
+The retained [install record](evidence/ci/production-shell/reader-shell/focused-enter/signed-install.json)
+reports Windows build `10.0.26100.0`, AMD64, success, and removal of the
+temporary package and signer. Its four normal route scenarios all include
+the [focused-row trace](evidence/ci/production-shell/reader-shell/focused-enter/normal.json):
+Ctrl+Arrow moves focus to the other guide without changing selection, Enter
+opens that focused guide, and the test restores the original Resume guide
+before later route checks. The [Reader screenshot](evidence/ci/production-shell/reader-shell/focused-enter/normal.reader.png)
+was retained.
+
+The T11.3 exit check now covers guide selection and focus. Library query
+retention remains required and is assigned to T05.3 after T05.2 adds search.
+In the PR run, the first native ARM64 P0 diagnostic attempt failed when
+`pdf-short` could not read its startup status; the unchanged P0 lane passed
+all 14 fixtures in the push run and in [PR attempt 2](https://github.com/ilya-slalom/desktop-guides/actions/runs/36249364872/attempts/2).
+
+### T11.3 queued guide and loading-state review follow-up — 27 September 2026
+
+At code head `ce6e823c879781325b53f4c41a3751d975a18a37`, Game-view guide
+actions retain the later selection when an earlier settings write is delayed.
+The [queued-action trace](evidence/ci/production-shell/reader-shell/queued-guide-loading/queue-later-guide.json)
+selects guide B while A is still opening. The
+[result trace](evidence/ci/production-shell/reader-shell/queued-guide-loading/later-guide-result.json)
+confirms B opens, Back selects and focuses B, and Library offers Resume B.
+
+The [preparation trace](evidence/ci/production-shell/reader-shell/queued-guide-loading/switch-game-prepare.json)
+leaves the previous game's selected guide in the shell. With the next
+game's read held by an exclusive SQLite lock, the
+[loading trace](evidence/ci/production-shell/reader-shell/queued-guide-loading/switch-game-loading.json)
+confirms the previous guide row and selected-guide action are unavailable
+while the guide list is disabled. After release, the
+[two-game trace](evidence/ci/production-shell/reader-shell/queued-guide-loading/switch-game.json)
+confirms the second game's guide and Reader context.
+
+The signed installed Windows 11 x64
+[PR run 36286711186](https://github.com/ilya-slalom/desktop-guides/actions/runs/36286711186)
+passed the production-shell UI job. Its
+[install record](evidence/ci/production-shell/reader-shell/queued-guide-loading/signed-install.json)
+reports OS build `10.0.26100.0`, AMD64, success, and removal of the
+temporary package and certificate. On the local Windows 11 x64 host,
+Windows PowerShell 5.1 parsed both changed scripts, the locked fixture
+restore and Release fixture build passed, and the unsigned Release x64
+production MSIX built. A separate disposable database probe confirmed
+that the fixture's exclusive read lock blocks another read and releases
+normally. The host's existing Preview package and profile precluded a
+fresh-profile installed run there.
+
+The first installed attempt at `aad96a9` stopped in the smoke runner:
+its later-guide continuation started from Reader but still applied the
+Library precheck. The `ce6e823` test correction removed that precheck,
+and the installed scenario passed.
+
+### T11.3 close admission and Resume review follow-up — 27 September 2026
+
+At code head `8839d15a4a47d03866914ea1b203a921c032fde3`, Game-view guide
+actions stop registering a new selection once Close has stopped the
+navigation queue. Resume is saved after the selected Reader route renders,
+and a failed settings save leaves that Reader visible with an error. The
+installed selection test now holds the first guide's database read until
+the later guide is selected; it no longer relies on a 300 ms delay.
+
+The signed installed Windows 11 x64
+[PR run 36289417891](https://github.com/ilya-slalom/desktop-guides/actions/runs/36289417891)
+passed all nine jobs, including the signed shell job and the retained native
+ARM64 P0 regression. The
+[late-close traces](evidence/ci/production-shell/reader-shell/close-resume-review/late-guide-after-close.json)
+select a second guide after Close is requested, while the first accepted
+guide is held by a read lock; the
+[install record](evidence/ci/production-shell/reader-shell/close-resume-review/signed-install.json)
+includes the successful relaunch check that expects the first guide as
+Resume after drain. The
+[later-selection trace](evidence/ci/production-shell/reader-shell/close-resume-review/queue-later-guide.json)
+and [result](evidence/ci/production-shell/reader-shell/close-resume-review/later-guide-result.json)
+confirm the later guide's Reader, Back focus, and persisted Resume. The
+[failed-later-guide trace](evidence/ci/production-shell/reader-shell/close-resume-review/later-guide-failed-result.json)
+confirms that a removed later guide opens no Reader and leaves Resume
+empty instead of saving the superseded guide. The existing close/relaunch
+scenario now waits for the Reader to appear while its Resume write is held,
+as recorded in the
+[write-lock trace](evidence/ci/production-shell/reader-shell/close-resume-review/queue-guide-write.json).
+
+The install record reports OS build `10.0.26100.0`, AMD64, success, and
+removal of the temporary package and certificate. The Windows 11 x64 host
+under `E:\work\desktop-guides` passed Windows PowerShell 5.1 parsing,
+the locked ShellSeed restore and Release build, an unsigned Release x64
+production MSIX build, and an isolated invalid-guide fixture probe. Its
+existing Preview package and profile prevented a fresh-profile installed
+run there. An earlier CI attempt at `2f3c740` used the old `"Opening
+guide..."` expectation for the held-write scenario; it was updated to
+observe the rendered Reader before the passing run.
+
+### T11.3 render, cleanup, and focus review follow-up — 27 September 2026
+
+At code head `9c4457f`, `RenderCurrentAsync` reports whether its requested
+route finished loading. `OpenGuideAsync` saves Resume only when that result
+is successful and the matching Reader remains current. The toolbar
+installer now stops a timed-out test task, waits for it to leave `Running`,
+then stops the test-owned app process and removes the test-owned MSIX
+before checking for leftover package, process, task, and certificate.
+Go to page and Find in guide reopen the CommandBar overflow after their
+dialogs and restore keyboard focus to the command when it is still
+available.
+
+The Windows 11 x64 host, build `10.0.26200.0`, under
+`E:\work\desktop-guides` passed Windows PowerShell 5.1 parsing, locked
+restores, and unsigned Release x64 builds for the production shell and
+linked toolbar test app. Each build reported only the host's existing
+missing-`mspdbcmf.exe` symbols warning. The
+[interactive host record](evidence/host/reader-toolbar-render-cleanup/review-result.json)
+ran in desktop session 1. Its
+[forced-timeout record](evidence/host/reader-toolbar-render-cleanup/timeout-install.json)
+confirms that the parent stopped the still-running toolbar app and
+removed its package after stopping the scheduled task. The following
+[normal install](evidence/host/reader-toolbar-render-cleanup/normal-install.json)
+passed with no test package, process, task, or certificate left behind.
+The [UI trace](evidence/host/reader-toolbar-render-cleanup/toolbar-ui.json)
+includes keyboard focus returning to both overflow dialog commands.
+An initial host attempt exposed a smoke assumption: WinUI names the open
+overflow toggle `Less app bar`; the passing test closes it by its
+automation ID. The Reader render-error path was checked in code and built
+on Windows; the host fixture did not inject a second-read exception.
+
+The review-fix evidence head `fdffd08` passed all nine jobs in
+[push run 36291334420](https://github.com/ilya-slalom/desktop-guides/actions/runs/36291334420)
+and [PR run 36291336239](https://github.com/ilya-slalom/desktop-guides/actions/runs/36291336239).
+The [CI timeout record](evidence/ci/reader-toolbar-render-cleanup/timeout-install.json)
+confirms that the parent stopped the running test app and removed its
+package; the following
+[signed toolbar install](evidence/ci/reader-toolbar-render-cleanup/signed-install.json)
+and [focus trace](evidence/ci/reader-toolbar-render-cleanup/toolbar-ui.json)
+passed with cleanup. The
+[signed production shell](evidence/ci/production-shell/reader-shell/render-cleanup-review/signed-install.json)
+passed its route and Resume checks and removed its package and
+certificate. Both architecture package builds, x64 and native ARM64
+headless tests, and the retained native ARM64 P0 installed regression
+passed. The native ARM64 installed result remains a P0 diagnostic check.
+
+### T11.3 Reader render fault and toolbar inspection cleanup — 27 September 2026
+
+At code head `41511d3`, the installed shell fixture pauses after the Reader
+route opens and before its second guide metadata read. The disposable
+fixture clears Resume and stores an invalid guide format, then releases the
+read. The shell smoke requires the Reader loading error and, after restoring
+the guide format and returning to Library, no Resume action. This checks
+the render-success gate through the repository's actual read error. The
+toolbar timeout fixture simulates a process exit during cleanup inspection
+and requires removal of the confirmed test-owned package despite the
+inspection error, followed by a successful normal install.
+
+The Windows 11 x64 host, build `10.0.26200.0`, under
+`E:\work\desktop-guides` passed PowerShell 5.1 parsing, locked restores,
+and unsigned Release x64 builds of Production and the toolbar test app,
+plus a Release ShellSeed build. Each MSIX build had only the existing
+missing-`mspdbcmf.exe` symbols warning. In a separate disposable
+database, ShellSeed changed the route guide from TXT to invalid format,
+cleared Resume, and restored TXT while keeping Resume empty. The
+[interactive host record](evidence/host/reader-render-fault-inspection/review-result.json)
+reports session 1 and a passing timeout-to-reinstall sequence. Its
+[timeout record](evidence/host/reader-render-fault-inspection/timeout-install.json)
+shows the simulated inspection error, process stop, package removal, and
+no remaining package, process, certificate, or task. The subsequent
+[normal install](evidence/host/reader-render-fault-inspection/normal-install.json)
+passed and cleaned up. The host's existing Preview package and profile
+precluded a fresh-profile installed Reader run there.
+
+The signed installed Windows 11 x64 shell in
+[push run 36292903300](https://github.com/ilya-slalom/desktop-guides/actions/runs/36292903300)
+passed all nine jobs at `41511d3`. Its
+[route-open trace](evidence/ci/reader-render-fault-inspection/queue-reader-render-error.json),
+[render-error trace](evidence/ci/reader-render-fault-inspection/reader-render-error-observed.json),
+and [Resume result](evidence/ci/reader-render-fault-inspection/reader-render-error-result.json)
+confirm the second-read error left Reader visible and did not save
+Resume. The [production install record](evidence/ci/reader-render-fault-inspection/production-signed-install.json)
+reports package and certificate cleanup. The
+[toolbar timeout record](evidence/ci/reader-render-fault-inspection/toolbar-timeout-install.json)
+reports the simulated inspection error and successful package removal;
+the subsequent
+[normal toolbar install](evidence/ci/reader-render-fault-inspection/toolbar-signed-install.json)
+and [UI trace](evidence/ci/reader-render-fault-inspection/toolbar-ui.json)
+passed. The parallel PR run `36292904629` passed the new toolbar gate but
+stopped in the older later-guide Back check because a name-only UIA search
+selected an element without an Invoke pattern. The smoke helper now
+prefers the back button automation ID and requires an Invoke pattern.
+
+At test-fix head `c94f54d`, all nine jobs passed in
+[push run 36293452654](https://github.com/ilya-slalom/desktop-guides/actions/runs/36293452654)
+and [PR run 36293454522](https://github.com/ilya-slalom/desktop-guides/actions/runs/36293454522).
+The final PR
+[later-guide trace](evidence/ci/reader-render-fault-inspection/final/later-guide-result.json)
+passed Reader → Game → Library with guide selection, keyboard focus,
+and Resume restored. Its
+[Reader route](evidence/ci/reader-render-fault-inspection/final/queue-reader-render-error.json),
+[read-error](evidence/ci/reader-render-fault-inspection/final/reader-render-error-observed.json),
+and [empty-Resume](evidence/ci/reader-render-fault-inspection/final/reader-render-error-result.json)
+traces repeated the new regression. The
+[signed production install](evidence/ci/reader-render-fault-inspection/final/production-signed-install.json)
+passed and removed its temporary package and certificate. The signed
+toolbar job and retained native ARM64 P0 installed suite passed in both
+runs. Windows 10 and the complete P1 ARM64 workflow remain deferred.
+
+### T11.3 toolbar install ownership review follow-up — 27 September 2026
+
+The toolbar installer now holds an exclusive per-user file lock before
+its package-absent preflight and through all cleanup. A concurrent
+invocation exits before creating a task, certificate, or result directory
+and cannot classify the first run's package as its own. The installed
+timeout fixture holds the first package and process while invoking a
+second installer, then releases the first and runs a normal install.
+
+The Windows 11 x64 host under `E:\work\desktop-guides` parsed the
+PowerShell scripts and passed locked restores and unsigned Release x64
+production and toolbar MSIX builds. The
+[interactive result](evidence/host/reader-toolbar-exclusive-install/review-result.json)
+reports desktop session 1 and a passing overlap-to-reinstall sequence.
+Its [overlap result](evidence/host/reader-toolbar-exclusive-install/overlap-result.json)
+confirms the second invocation was rejected while the first package and
+process remained present. The
+[first timeout cleanup](evidence/host/reader-toolbar-exclusive-install/timeout-install.json)
+removed the package after the simulated process-inspection error, and
+the [normal install](evidence/host/reader-toolbar-exclusive-install/normal-install.json)
+passed with no test package, process, task, or certificate left behind.
+An initial host attempt exposed that asynchronous `Start-Process` in
+Windows PowerShell 5.1 returned no exit-code property; the helper now
+uses the first installer's signed report to verify its expected timeout
+and cleanup.
+
+At code head `8b6008a`, all nine jobs passed in
+[push run 36300190195](https://github.com/ilya-slalom/desktop-guides/actions/runs/36300190195)
+and [PR run 36300193536](https://github.com/ilya-slalom/desktop-guides/actions/runs/36300193536).
+The signed PR
+[overlap trace](evidence/ci/reader-toolbar-exclusive-install/overlap-result.json)
+records a rejected second installer, the first package and process
+still present, and verified first-run cleanup. Its
+[timeout install record](evidence/ci/reader-toolbar-exclusive-install/timeout-install.json)
+shows removal after the simulated inspection error. The
+[normal install](evidence/ci/reader-toolbar-exclusive-install/normal-install.json)
+and [toolbar UI trace](evidence/ci/reader-toolbar-exclusive-install/toolbar-ui.json)
+passed with no test package, process, task, or certificate remaining.
+The signed production shell and retained native ARM64 P0 installed
+suite also passed.
+
+The first CI overlap attempt launched Windows PowerShell 5.1 from the
+`pwsh` CI controller and exited before setup because `Get-FileHash`
+could not be resolved, as recorded in its
+[diagnostic trace](evidence/ci/reader-toolbar-exclusive-install/ci-startup-failure.json).
+The controller now starts child installers with its own PowerShell
+executable, matching both the CI and local-host environments.
+
+### T11.3 toolbar process-scope review follow-up — 27 September 2026
+
+The toolbar test task now writes a fresh process handoff after launching
+its app. Parent cleanup validates the invocation, package, PID, creation
+time, session, and executable before opening an owned process handle.
+Only that handle can be terminated or counted as a leftover. The installed
+overlap fixture keeps an unrelated process with the same name alive through
+timeout cleanup and requires it to survive.
+
+The Windows 11 x64 host under `E:\work\desktop-guides` parsed all three
+changed PowerShell scripts. Its
+[interactive result](evidence/host/reader-toolbar-process-scope/review-result.json)
+reports desktop session 1, matching timeout and normal handoffs, and a
+passing timeout-to-reinstall sequence. The
+[overlap trace](evidence/host/reader-toolbar-process-scope/overlap-result.json)
+records that the contender was rejected while the first app survived,
+and that the unrelated same-name process survived the first cleanup.
+The [timeout handoff](evidence/host/reader-toolbar-process-scope/timeout-process.json)
+identifies the stopped process. The
+[timeout cleanup](evidence/host/reader-toolbar-process-scope/timeout-install.json)
+removed its package, task, and temporary trust entry after the simulated
+inspection error. The
+[normal install](evidence/host/reader-toolbar-process-scope/normal-install.json)
+and [toolbar UI trace](evidence/host/reader-toolbar-process-scope/toolbar-ui.json)
+passed with no test-owned package or process left; its
+[handoff](evidence/host/reader-toolbar-process-scope/normal-process.json)
+matches the install invocation.
+
+At code head `c6a5aa3`, all nine jobs passed in
+[PR run 36301957589](https://github.com/ilya-slalom/desktop-guides/actions/runs/36301957589)
+and in [push run 36301955579, attempt 2](https://github.com/ilya-slalom/desktop-guides/actions/runs/36301955579).
+The signed PR
+[overlap trace](evidence/ci/reader-toolbar-process-scope/overlap-result.json)
+records the rejected contender and surviving unrelated process. Its
+[timeout handoff](evidence/ci/reader-toolbar-process-scope/timeout-process.json)
+matches the process stopped in the
+[timeout install record](evidence/ci/reader-toolbar-process-scope/timeout-install.json).
+The [normal install](evidence/ci/reader-toolbar-process-scope/normal-install.json)
+and [toolbar UI trace](evidence/ci/reader-toolbar-process-scope/toolbar-ui.json)
+passed, and the [normal handoff](evidence/ci/reader-toolbar-process-scope/normal-process.json)
+matches the install invocation. The signed production shell and retained
+native ARM64 P0 suite passed.
+
+Push attempt 1 failed in the unchanged production-shell UI smoke while
+waiting for `ReaderHeading` during the rapid Settings path. The same path
+passed in the parallel PR run and push attempt 2. No shell source changed
+in this follow-up.
+
+### T11.3 toolbar handoff and overlap review follow-up — 27 September 2026
+
+The overlap fixture starts an unrelated same-name process before the first
+install and identifies the first app through its verified process handoff.
+The toolbar parent now opens and retains the app's verified process handle
+before acknowledging the handoff token. The child keeps its launch handle
+until it receives that acknowledgment, so the parent does not reopen a PID
+after the child has released it.
+
+The Windows 11 x64 host under `E:\work\desktop-guides` parsed all three
+changed PowerShell scripts. Its
+[interactive result](evidence/host/reader-toolbar-handoff/review-result.json)
+reports a successful session 1 overlap, timeout cleanup, and normal
+reinstall. The [overlap trace](evidence/host/reader-toolbar-handoff/overlap-result.json)
+shows that the decoy was present before installation and survived cleanup.
+The [timeout handoff](evidence/host/reader-toolbar-handoff/timeout-process.json)
+matches the app stopped in the
+[timeout install record](evidence/host/reader-toolbar-handoff/timeout-install.json).
+The [normal install](evidence/host/reader-toolbar-handoff/normal-install.json)
+records an acquired parent handle, and its
+[UI trace](evidence/host/reader-toolbar-handoff/toolbar-ui.json)
+records child acknowledgment. The
+[normal handoff](evidence/host/reader-toolbar-handoff/normal-process.json)
+matches both records. No test package, process, scheduled task, or temporary
+trust entry remained.
+
+At code head `4690078`, all nine jobs passed in
+[PR run 36303623358](https://github.com/ilya-slalom/desktop-guides/actions/runs/36303623358)
+and [push run 36303620766, attempt 2](https://github.com/ilya-slalom/desktop-guides/actions/runs/36303620766).
+The signed PR
+[overlap trace](evidence/ci/reader-toolbar-handoff/overlap-result.json)
+shows the pre-existing decoy, rejected contender, and verified first-app
+cleanup. The [timeout handoff](evidence/ci/reader-toolbar-handoff/timeout-process.json)
+matches the process stopped in the
+[timeout install record](evidence/ci/reader-toolbar-handoff/timeout-install.json).
+The [normal install](evidence/ci/reader-toolbar-handoff/normal-install.json),
+[process handoff](evidence/ci/reader-toolbar-handoff/normal-process.json),
+and [toolbar UI trace](evidence/ci/reader-toolbar-handoff/toolbar-ui.json)
+record parent handle acquisition, child acknowledgment, all toolbar phases,
+and final cleanup.
+
+Push attempt 1 failed in the retained native ARM64 P0 installed suite
+because its app opened no interactive window, as recorded in the
+[failure report](evidence/ci/reader-toolbar-handoff/arm64-first-attempt.json).
+The parallel PR job and push attempt 2 passed on the same code head.
+No P0 source changed in this follow-up.
+
+### T11.3 toolbar receipt and bounded-wait review follow-up — 27 September 2026
+
+The interactive child now writes an atomic, invocation-bound package
+receipt after installation. Parent cleanup requires that receipt and the
+installed package's full identity before removal. A missing, stale,
+malformed, or different-package receipt is rejected by the
+[headless ownership check](../../tools/p1/test_windows_reader_toolbar_install_receipt.ps1).
+The parent waits separately for installation and process handoff. The
+overlap contender has bounded process and output waits and is stopped
+before the first installer is released.
+
+The Windows 11 x64 host under `E:\work\desktop-guides` parsed the changed
+PowerShell scripts and passed the receipt check. Its
+[interactive result](evidence/host/reader-toolbar-install-receipt/review-result.json)
+records a session 1 overlap, simulated timeout cleanup, and delayed normal
+reinstall. The [overlap trace](evidence/host/reader-toolbar-install-receipt/timeout/overlap-result.json)
+records the rejected contender and surviving unrelated same-name process.
+The [timeout install record](evidence/host/reader-toolbar-install-receipt/timeout/signed-install.json)
+and [receipt](evidence/host/reader-toolbar-install-receipt/timeout/toolbar-install-receipt.json)
+show that the parent removed only the package installed by that invocation.
+The [normal install record](evidence/host/reader-toolbar-install-receipt/normal/signed-install.json)
+reports a 31-second artificial pre-install delay and a 33.07-second
+receipt wait, beyond the former 30-second cutoff. Its
+[receipt](evidence/host/reader-toolbar-install-receipt/normal/toolbar-install-receipt.json)
+matches the [UI trace](evidence/host/reader-toolbar-install-receipt/normal/toolbar-ui.json);
+all eight toolbar phases passed. Both installed runs removed their temporary
+packages, processes, scheduled tasks, and certificate trust entries.
+
+At code head `1d1e614`, all nine jobs passed in
+[push run 36306328232](https://github.com/ilya-slalom/desktop-guides/actions/runs/36306328232)
+and [PR run 36306330461](https://github.com/ilya-slalom/desktop-guides/actions/runs/36306330461).
+The signed PR [overlap result](evidence/ci/reader-toolbar-install-receipt/timeout/overlap-result.json)
+confirms the bounded contender's lock rejection and the unrelated process's
+survival. The [timeout install](evidence/ci/reader-toolbar-install-receipt/timeout/signed-install.json)
+and [receipt](evidence/ci/reader-toolbar-install-receipt/timeout/toolbar-install-receipt.json)
+confirm receipt-backed package and process cleanup. The
+[normal install](evidence/ci/reader-toolbar-install-receipt/signed-install.json)
+records a 36.18-second receipt wait after the 31-second artificial delay;
+its [receipt](evidence/ci/reader-toolbar-install-receipt/toolbar-install-receipt.json)
+and [UI trace](evidence/ci/reader-toolbar-install-receipt/toolbar-ui.json)
+confirm identity, all eight toolbar phases, and final cleanup. The signed
+production shell and native ARM64 UI regression jobs also passed.

@@ -1,0 +1,12 @@
+﻿{
+    "mode":  "queue-guide-write",
+    "invocationId":  "16dea430ab9b4ea085adcf654ec9d824",
+    "observedAt":  "2026-09-27T02:49:28.2952374Z",
+    "processId":  7372,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "guide-reader-open-while-save-blocked"
+               ]
+}

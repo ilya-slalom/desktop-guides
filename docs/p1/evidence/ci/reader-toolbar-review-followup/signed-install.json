@@ -1,0 +1,18 @@
+{
+  "observedAt": "2026-09-26T15:47:44.4248077Z",
+  "sourcePackageSha256": "E44AB209D7719652F9C30FBC8553BD75023D52BC2A99A7FF4FFB60A333AC2510",
+  "success": true,
+  "certificateThumbprint": "1AD202CEE835C7DCEFD93A56C1DC9F3EBA20AAA9",
+  "signedPackageSha256": "F85029FD2481DD4CA9F46CDA380EE4ECDA3DA96674901385D2AC3376E55ED79B",
+  "phases": [
+    "initial-no-session-capabilities",
+    "worker-capability-change-text-dispatch",
+    "all-capabilities-dispatch",
+    "narrow-primary-command-overflow",
+    "worker-capability-removal",
+    "detached-session-event-ignored"
+  ],
+  "packageStillInstalled": false,
+  "certificateStillTrusted": false,
+  "taskStillRegistered": false
+}

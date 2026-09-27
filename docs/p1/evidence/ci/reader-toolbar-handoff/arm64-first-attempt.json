@@ -1,0 +1,27 @@
+{
+  "observedAt": "2026-09-27T07:45:27.2400452Z",
+  "osBuild": "10.0.26200.0",
+  "cpuArchitecture": "ARM64",
+  "packageArchitecture": "arm64",
+  "success": false,
+  "windowsAppRuntime": [
+    "2.5.1.0"
+  ],
+  "webView2Versions": [
+    "153.0.4234.48",
+    "PlatformExperiencesHelper",
+    "SetupMetrics"
+  ],
+  "dotnetSdk": "10.0.401",
+  "sourcePackageSha256": "19E1398E4D1C4665AF942D55B2B39A04A5794910BD1D1BCFD76DE414441AE5EA",
+  "certificateThumbprint": "1A3C586B2FE5A0EE2934DA4776B144B0AC77BEA1",
+  "signedPackageSha256": "1F46D443684F27BD001CD4436D5853D1EE05175E5A0267387C69DB2AED977278",
+  "packageFullName": "DesktopGuides.ReaderSpike_0.1.0.0_arm64__en8r599z3n35j",
+  "packageFamilyName": "DesktopGuides.ReaderSpike_en8r599z3n35j",
+  "installLocation": "C:\\Program Files\\WindowsApps\\DesktopGuides.ReaderSpike_0.1.0.0_arm64__en8r599z3n35j",
+  "launchedProcessId": 1532,
+  "launchedSessionId": 2,
+  "error": "Exception: C:\\a\\desktop-guides\\desktop-guides\\tools\\p0\\windows_signed_install.ps1:129\r\nLine |\r\n 129 |  … wProcess) { throw 'Installed app process has no interactive window.'  …\r\n     |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n     | Installed app process has no interactive window.\r\n\r\n",
+  "packageStillInstalled": false,
+  "certificateStillTrusted": false
+}

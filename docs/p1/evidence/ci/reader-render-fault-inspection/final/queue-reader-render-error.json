@@ -1,0 +1,12 @@
+﻿{
+    "mode":  "queue-reader-render-error",
+    "invocationId":  "085c6aaf828c46ef9dd4bc7dab4b4de9",
+    "observedAt":  "2026-09-27T04:15:31.6813926Z",
+    "processId":  7416,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "reader-route-open-before-render-fault"
+               ]
+}

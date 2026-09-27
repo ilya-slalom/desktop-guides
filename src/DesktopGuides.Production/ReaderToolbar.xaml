@@ -1,0 +1,56 @@
+<UserControl
+    x:Class="DesktopGuides.Production.ReaderToolbar"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <CommandBar x:Name="Commands"
+                IsDynamicOverflowEnabled="True"
+                Visibility="Collapsed"
+                AutomationProperties.AutomationId="ReaderCommands">
+        <CommandBar.PrimaryCommands>
+            <AppBarButton x:Name="PreviousPage"
+                          Icon="Back"
+                          Label="Previous page"
+                          Visibility="Collapsed"
+                          Click="PreviousPageClicked" />
+            <AppBarButton x:Name="NextPage"
+                          Icon="Forward"
+                          Label="Next page"
+                          Visibility="Collapsed"
+                          Click="NextPageClicked" />
+            <AppBarButton x:Name="SmallerText"
+                          Icon="Remove"
+                          Label="Smaller text"
+                          Visibility="Collapsed"
+                          Click="SmallerTextClicked" />
+            <AppBarButton x:Name="LargerText"
+                          Icon="Add"
+                          Label="Larger text"
+                          Visibility="Collapsed"
+                          Click="LargerTextClicked" />
+            <AppBarButton x:Name="ZoomOut"
+                          Icon="ZoomOut"
+                          Label="Zoom out"
+                          Visibility="Collapsed"
+                          Click="ZoomOutClicked" />
+            <AppBarButton x:Name="ZoomIn"
+                          Icon="ZoomIn"
+                          Label="Zoom in"
+                          Visibility="Collapsed"
+                          Click="ZoomInClicked" />
+        </CommandBar.PrimaryCommands>
+        <CommandBar.SecondaryCommands>
+            <AppBarButton x:Name="GoToPage"
+                          Label="Go to page"
+                          Visibility="Collapsed"
+                          Click="GoToPageClicked" />
+            <AppBarButton x:Name="FitToWidth"
+                          Label="Fit to width"
+                          Visibility="Collapsed"
+                          Click="FitToWidthClicked" />
+            <AppBarButton x:Name="FindInGuide"
+                          Label="Find in guide"
+                          Visibility="Collapsed"
+                          Click="FindInGuideClicked" />
+        </CommandBar.SecondaryCommands>
+    </CommandBar>
+</UserControl>

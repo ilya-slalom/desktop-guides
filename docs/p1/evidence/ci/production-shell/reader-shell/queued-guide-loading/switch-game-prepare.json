@@ -1,0 +1,13 @@
+﻿{
+    "mode":  "switch-game-prepare",
+    "invocationId":  "fc466773a33e40e78bc13cd496d1e220",
+    "observedAt":  "2026-09-27T01:55:00.9863860Z",
+    "processId":  832,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "first-game-guide-retained-before-switch"
+               ]
+}
