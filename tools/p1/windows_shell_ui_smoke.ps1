@@ -186,9 +186,31 @@ try {
     }
 
     function Go-Back {
-        $button = Find-ByName 'Back'
-        if (-not $button) { $button = Find-ById 'NavigationViewBackButton' }
-        Invoke-Element $button
+        $namedButton = [System.Windows.Automation.AndCondition]::new(
+            [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::NameProperty,
+                'Back'),
+            [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::Button))
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            foreach ($button in @(
+                (Find-ById 'NavigationViewBackButton'),
+                ($root.FindFirst($scope, $namedButton)))) {
+                if ($button -and -not $button.Current.IsOffscreen) {
+                    $pattern = $null
+                    if ($button.TryGetCurrentPattern(
+                        [System.Windows.Automation.InvokePattern]::Pattern,
+                        [ref]$pattern)) {
+                        $pattern.Invoke()
+                        return
+                    }
+                }
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw 'Expected an invokable Back button.'
     }
 
     function Wait-SelectedGuide([string] $expected) {

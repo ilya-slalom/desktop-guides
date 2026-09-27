@@ -319,6 +319,10 @@ checks. Simulate a process exit during inspection in the installed
 timeout fixture, require package removal, then run a fresh normal
 install on the same runner.
 
+The installed Back helper should prefer the NavigationView back button's
+automation ID, then a visible button named Back, and wait for an Invoke
+pattern. A name-only search can select a non-invokable child.
+
 ### T11.1 review follow-up: close handoff and installed gate
 
 The shell must allow a new window to appear while the old one drains, but

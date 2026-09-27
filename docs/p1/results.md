@@ -677,3 +677,50 @@ passed its route and Resume checks and removed its package and
 certificate. Both architecture package builds, x64 and native ARM64
 headless tests, and the retained native ARM64 P0 installed regression
 passed. The native ARM64 installed result remains a P0 diagnostic check.
+
+### T11.3 Reader render fault and toolbar inspection cleanup — 27 September 2026
+
+At code head `41511d3`, the installed shell fixture pauses after the Reader
+route opens and before its second guide metadata read. The disposable
+fixture clears Resume and stores an invalid guide format, then releases the
+read. The shell smoke requires the Reader loading error and, after restoring
+the guide format and returning to Library, no Resume action. This checks
+the render-success gate through the repository's actual read error. The
+toolbar timeout fixture simulates a process exit during cleanup inspection
+and requires removal of the confirmed test-owned package despite the
+inspection error, followed by a successful normal install.
+
+The Windows 11 x64 host, build `10.0.26200.0`, under
+`E:\work\desktop-guides` passed PowerShell 5.1 parsing, locked restores,
+and unsigned Release x64 builds of Production and the toolbar test app,
+plus a Release ShellSeed build. Each MSIX build had only the existing
+missing-`mspdbcmf.exe` symbols warning. In a separate disposable
+database, ShellSeed changed the route guide from TXT to invalid format,
+cleared Resume, and restored TXT while keeping Resume empty. The
+[interactive host record](evidence/host/reader-render-fault-inspection/review-result.json)
+reports session 1 and a passing timeout-to-reinstall sequence. Its
+[timeout record](evidence/host/reader-render-fault-inspection/timeout-install.json)
+shows the simulated inspection error, process stop, package removal, and
+no remaining package, process, certificate, or task. The subsequent
+[normal install](evidence/host/reader-render-fault-inspection/normal-install.json)
+passed and cleaned up. The host's existing Preview package and profile
+precluded a fresh-profile installed Reader run there.
+
+The signed installed Windows 11 x64 shell in
+[push run 36292903300](https://github.com/ilya-slalom/desktop-guides/actions/runs/36292903300)
+passed all nine jobs at `41511d3`. Its
+[route-open trace](evidence/ci/reader-render-fault-inspection/queue-reader-render-error.json),
+[render-error trace](evidence/ci/reader-render-fault-inspection/reader-render-error-observed.json),
+and [Resume result](evidence/ci/reader-render-fault-inspection/reader-render-error-result.json)
+confirm the second-read error left Reader visible and did not save
+Resume. The [production install record](evidence/ci/reader-render-fault-inspection/production-signed-install.json)
+reports package and certificate cleanup. The
+[toolbar timeout record](evidence/ci/reader-render-fault-inspection/toolbar-timeout-install.json)
+reports the simulated inspection error and successful package removal;
+the subsequent
+[normal toolbar install](evidence/ci/reader-render-fault-inspection/toolbar-signed-install.json)
+and [UI trace](evidence/ci/reader-render-fault-inspection/toolbar-ui.json)
+passed. The parallel PR run `36292904629` passed the new toolbar gate but
+stopped in the older later-guide Back check because a name-only UIA search
+selected an element without an Invoke pattern. The smoke helper now
+prefers the back button automation ID and requires an Invoke pattern.
