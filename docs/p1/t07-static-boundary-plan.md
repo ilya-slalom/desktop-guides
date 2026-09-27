@@ -1,0 +1,38 @@
+# T07.2 static HTML import boundary
+
+Status: implementation plan, 27 September 2026. T03.3 and T07.1 are merged.
+T06.1 will display preview warnings, and T06.3 will call the post-copy check
+before publishing a managed guide.
+
+## Decision
+
+Treat the directory containing the selected HTML entry as the source root.
+The T07.1 scanner receives only a root-relative, disk-backed stream source.
+For each open, validate the managed relative name and every existing path
+segment, reject reparse points, open one handle, and on Windows compare that
+handle's final path with the requested path. A path-only check would leave a
+link-swap window between inspection and opening. No source file is changed.
+
+Return T07.1's non-included references as typed preview warnings for missing,
+remote, unsafe, and unsupported assets. A warning means the referenced
+resource is excluded from the static import; T06.1 supplies its display UI.
+Reject two included asset names that differ only in Windows case, because
+they would collide at a managed destination. Keep the source root and
+preview manifest transient; do not persist the selected absolute path.
+
+T06.3 will copy only manifest-listed assets into an isolated stage. A
+post-copy check reopens each listed source and staged file through the same
+boundary, compares bounded length and SHA-256 with the preview manifest,
+and fails with a typed changed-source or changed-stage error before database
+publication. Hashing the stage alone would miss a source changed after
+preview. This task proves that contract with a simulated stage; T06.3 owns
+the copy and journal.
+
+## Sequence and exit
+
+| Step | Output and check |
+| --- | --- |
+| Source boundary | Absolute selected HTML file becomes a safe root and entry name. Missing paths return `Missing`; parent traversal, encoded paths, and link traversal never open outside files. NTFS symlink and junction fixtures fail closed. |
+| Preview | Scanner result plus typed warnings; remote and unsupported references remain visible. Included assets have unique case-folded destinations. |
+| Post-copy check | Matching source/stage copies pass. A changed, removed, linked, or case-colliding file fails before publication, including a change after preview but before a simulated copy. Verification reads at most one byte beyond the recorded length to detect growth. |
+| Windows exit | Locked Release Infrastructure tests and a Release x64 production MSIX build pass on Windows 11 x64. ARM64 headless and package CI jobs pass. No installed import claim is made before T06.1 and T06.3. |

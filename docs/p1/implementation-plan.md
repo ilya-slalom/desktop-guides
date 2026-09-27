@@ -1,6 +1,7 @@
 # P1 implementation plan and exit gates
 
-Status: M0 merged; M1 in progress; M2–M6 planned, 27 September 2026.
+Status: M0 merged; M1 in progress; M2 in progress; M3–M6 planned,
+27 September 2026.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
 This plan orders all **16 P1 stories and 49 tasks** in the
@@ -571,6 +572,11 @@ and be removed through the recoverable trash protocol. Every failed or
 canceled import leaves no visible partial guide. Establish crash recovery
 before first publication. Implement T07.1–T07.2 before import validation;
 complete S07's WebView2 policy in M3.
+
+T07.1 was merged through PR #9 on 27 September 2026, merge commit
+`7039aef8127f4fcf45f1547344b4e88dad849b59`. The
+[T07.2 boundary plan](t07-static-boundary-plan.md) follows its scanner
+contract.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |

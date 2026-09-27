@@ -9,6 +9,12 @@ this file records checks actually run.
 
 The M2 T07.1 scanner verification is recorded in the
 [static-asset result](t07-static-assets-results.md).
+T07.1 was merged into `main` through PR #9 on 27 September 2026 at
+`7039aef8127f4fcf45f1547344b4e88dad849b59`. Its last Windows 11 x64
+run passed 74/74 Infrastructure tests and an unsigned Release x64 MSIX
+build; all 18 CI checks passed. T07.2 is now in progress.
+The T07.2 Windows implementation check is recorded in the
+[static-boundary result](t07-static-boundary-results.md).
 
 ## M0 task results
 
