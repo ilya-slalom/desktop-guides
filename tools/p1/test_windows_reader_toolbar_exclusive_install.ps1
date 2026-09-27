@@ -7,6 +7,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$shellExecutable = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
 New-Item -ItemType Directory -Force $ResultDirectory | Out-Null
 $ResultDirectory = (Resolve-Path $ResultDirectory).Path
 $installer = Join-Path $PSScriptRoot 'windows_reader_toolbar_install.ps1'
@@ -21,6 +22,7 @@ $contenderError = Join-Path $ResultDirectory 'contender-stderr.txt'
 $first = $null
 $report = [ordered]@{
     observedAt = (Get-Date).ToUniversalTime().ToString('o')
+    shellExecutable = $shellExecutable
     contenderRejected = $false
     firstPackagePreserved = $false
     firstProcessPreserved = $false
@@ -42,7 +44,7 @@ try {
         '" -SimulateSmokeTimeoutAfterInstall' +
         ' -SimulateProcessExitDuringInspection' +
         ' -PauseTimeoutCleanupUntilPath "' + $release + '"'
-    $first = Start-Process -FilePath 'powershell.exe' `
+    $first = Start-Process -FilePath $shellExecutable `
         -ArgumentList $firstArguments -PassThru -WindowStyle Hidden `
         -RedirectStandardOutput $firstOutput -RedirectStandardError $firstError
 
@@ -74,7 +76,7 @@ try {
     $contenderArguments = '-NoProfile -ExecutionPolicy Bypass -File "' +
         $installer + '" -PackagePath "' + $PackagePath +
         '" -ResultDirectory "' + $contenderDirectory + '"'
-    $contender = Start-Process -FilePath 'powershell.exe' `
+    $contender = Start-Process -FilePath $shellExecutable `
         -ArgumentList $contenderArguments -PassThru -Wait -WindowStyle Hidden `
         -RedirectStandardOutput $contenderOutput `
         -RedirectStandardError $contenderError
@@ -145,17 +147,19 @@ finally {
         }
         $first.Dispose()
     }
-    if (Test-Path -LiteralPath $firstOutput) {
-        $report.firstStdout = Get-Content -LiteralPath $firstOutput -Raw
-    }
-    if (Test-Path -LiteralPath $firstError) {
-        $report.firstStderr = Get-Content -LiteralPath $firstError -Raw
-    }
-    $firstInstallPath = Join-Path $ResultDirectory 'signed-install.json'
-    if (Test-Path -LiteralPath $firstInstallPath) {
-        $firstInstall = Get-Content -LiteralPath $firstInstallPath -Raw |
-            ConvertFrom-Json
-        $report.firstInstallError = $firstInstall.error
+    if (-not $report.success) {
+        if (Test-Path -LiteralPath $firstOutput) {
+            $report.firstStdout = Get-Content -LiteralPath $firstOutput -Raw
+        }
+        if (Test-Path -LiteralPath $firstError) {
+            $report.firstStderr = Get-Content -LiteralPath $firstError -Raw
+        }
+        $firstInstallPath = Join-Path $ResultDirectory 'signed-install.json'
+        if (Test-Path -LiteralPath $firstInstallPath) {
+            $firstInstall = Get-Content -LiteralPath $firstInstallPath -Raw |
+                ConvertFrom-Json
+            $report.firstInstallError = $firstInstall.error
+        }
     }
     $report | ConvertTo-Json -Depth 6 |
         Set-Content -LiteralPath $resultPath -Encoding UTF8
