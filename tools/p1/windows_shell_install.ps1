@@ -373,7 +373,7 @@ function Assert-LaterGuideWins {
     $lockReady = Join-Path $ResultDirectory "later-guide-lock-ready-$runId"
     $lockRelease = Join-Path $ResultDirectory "later-guide-lock-release-$runId"
     $lockProcess = Start-ShellDatabaseLock `
-        'hold-write-lock' $lockReady $lockRelease
+        'hold-read-lock' $lockReady $lockRelease
     try {
         $report.queuedLaterGuide = Run-ShellSmoke 'queue-later-guide'
     }
@@ -381,6 +381,49 @@ function Assert-LaterGuideWins {
         Release-ShellDatabaseLock $lockProcess $lockRelease
     }
     $report.laterGuideResult = Run-ShellSmoke 'later-guide-result'
+}
+
+function Assert-LateGuideAfterClose {
+    $closingProcessId = $report.launchedProcessId
+    $lockReady = Join-Path $ResultDirectory "late-close-lock-ready-$runId"
+    $lockRelease = Join-Path $ResultDirectory "late-close-lock-release-$runId"
+    $lockProcess = Start-ShellDatabaseLock `
+        'hold-read-lock' $lockReady $lockRelease
+    try {
+        $report.pendingBeforeLateClose = Run-ShellSmoke 'queue-guide'
+        Request-InstalledShellClose $closingProcessId
+        $report.lateGuideAfterClose = Run-ShellSmoke 'late-guide-after-close'
+    }
+    finally {
+        Release-ShellDatabaseLock $lockProcess $lockRelease
+    }
+    Wait-InstalledShellExit $closingProcessId
+    Start-InstalledShell
+    $report.normalAfterLateClose = Run-ShellSmoke 'normal' 'Blocked Write Guide'
+}
+
+function Assert-FailedLaterGuideDoesNotSaveEarlier {
+    Start-InstalledShell
+    $report.normalBeforeFailedGuide = Run-ShellSmoke 'normal' 'Blocked Write Guide'
+    $seedProject = Join-Path $PSScriptRoot `
+        'DesktopGuides.ShellSeed\DesktopGuides.ShellSeed.csproj'
+    dotnet run --project $seedProject -c Release --no-restore -- `
+        invalidate-blocked-guide $dataRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not invalidate the displayed guide for the failure case.'
+    }
+    $lockReady = Join-Path $ResultDirectory "failed-guide-lock-ready-$runId"
+    $lockRelease = Join-Path $ResultDirectory "failed-guide-lock-release-$runId"
+    $lockProcess = Start-ShellDatabaseLock `
+        'hold-read-lock' $lockReady $lockRelease
+    try {
+        $report.queuedBeforeFailedGuide = Run-ShellSmoke 'queue-later-guide'
+    }
+    finally {
+        Release-ShellDatabaseLock $lockProcess $lockRelease
+    }
+    $report.failedLaterGuideResult = Run-ShellSmoke 'later-guide-failed-result'
+    Close-InstalledShell
 }
 
 function Assert-GameSwitchClearsWhileLoading {
@@ -613,8 +656,10 @@ try {
     Assert-RelaunchDuringClose
     Assert-ClosingTargetRedirect
     Assert-QueuedActivationClose
+    Assert-LateGuideAfterClose
     Assert-LaterGuideWins
     Assert-AcceptedThenClose
+    Assert-FailedLaterGuideDoesNotSaveEarlier
 
     Stop-InstalledShell
     dotnet run --project $seedProject -c Release --no-restore -- stale $dataRoot

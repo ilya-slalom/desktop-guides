@@ -249,6 +249,32 @@ and assert that old rows and the selected-guide action are unavailable
 Reader context. The exit requires the signed installed Windows 11 x64
 shell job plus locked headless tests and both production package builds.
 
+### T11.3 close admission and Resume review follow-up
+
+The queued-guide fix still admits a version change after Close has stopped
+the navigation queue. Guard Game-view guide intent registration when
+closing starts, then hold a pre-route guide read in the installed shell,
+request Close, select another visible guide, and verify the accepted guide
+becomes Resume after the window drains. The canceled Closing event keeps
+the window visible while its accepted navigation finishes.
+
+Persisting Resume before a Reader route opens can also save a superseded
+guide. A compensating settings write would leave a crash window and could
+restore an older theme value. Open and render the validated Reader first;
+save Resume only for the route that opened. Keep the guide readable if
+the later settings save fails and report that Resume was not saved. Hold
+the first guide's lookup with the test fixture's exclusive read lock,
+select a later guide, and verify its Reader, Back focus, and Resume. For
+the failure path, clear the prior Resume and remove a still-displayed
+second guide in the disposable test profile; its failed lookup must not
+turn the superseded first guide into Resume.
+
+The earlier 300 ms smoke delay did not establish that a settings write
+had started. The revised test waits with a held pre-route read, so the
+first Reader cannot open before the later selection. The installed shell
+checks, locked headless suite, and Release x64/ARM64 production package
+builds remain the exit gate.
+
 ### T11.1 review follow-up: close handoff and installed gate
 
 The shell must allow a new window to appear while the old one drains, but

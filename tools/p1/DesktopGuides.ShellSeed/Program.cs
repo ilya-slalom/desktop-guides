@@ -56,11 +56,51 @@ if (args.Length == 4 &&
     return 0;
 }
 
+if (args.Length == 2 && args[0] == "invalidate-blocked-guide")
+{
+    ManagedPathResolver fixturePaths = new(args[1]);
+    using SqliteConnection connection = new(new SqliteConnectionStringBuilder
+    {
+        DataSource = fixturePaths.DatabasePath,
+        Mode = SqliteOpenMode.ReadWrite,
+        Pooling = false,
+        ForeignKeys = true
+    }.ToString());
+    connection.Open();
+    using SqliteTransaction transaction = connection.BeginTransaction();
+    using (SqliteCommand clearResume = connection.CreateCommand())
+    {
+        clearResume.Transaction = transaction;
+        clearResume.CommandText = "DELETE FROM Settings WHERE Key = 'LastActiveGuideId'";
+        clearResume.ExecuteNonQuery();
+    }
+    using (SqliteCommand removeGuide = connection.CreateCommand())
+    {
+        removeGuide.Transaction = transaction;
+        removeGuide.CommandText = """
+            DELETE FROM Guides
+            WHERE Title = 'Blocked Write Guide'
+              AND GameId = (
+                  SELECT Id FROM Games WHERE Title = 'Route Test Game'
+              )
+            """;
+        if (removeGuide.ExecuteNonQuery() != 1)
+        {
+            throw new InvalidOperationException(
+                "Expected one blocked guide in the shell fixture.");
+        }
+    }
+    transaction.Commit();
+    Console.WriteLine("Cleared Resume and invalidated the displayed blocked guide.");
+    return 0;
+}
+
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second"))
 {
     Console.Error.WriteLine(
         "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second <app-data-root> " +
+        "or invalidate-blocked-guide <app-data-root> " +
         "or hold-write-lock|hold-read-lock <app-data-root> <ready-path> <release-path>");
     return 2;
 }

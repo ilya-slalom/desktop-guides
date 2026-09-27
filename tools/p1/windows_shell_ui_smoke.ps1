@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('empty', 'normal', 'stale', 'long-list', 'switch-game',
         'switch-game-prepare', 'switch-game-loading', 'queue-guide',
-        'queue-later-guide', 'later-guide-result', 'waiting-handoff')]
+        'queue-later-guide', 'later-guide-result', 'later-guide-failed-result',
+        'late-guide-after-close', 'waiting-handoff')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -372,16 +373,24 @@ try {
         [void](Wait-SelectedGuide 'Route Test Guide')
         Invoke-Element (Wait-Name 'OpenSelectedGuide' 'Open Route Test Guide')
         [void](Wait-Name 'ShellStatus' 'Opening guide...')
-        Start-Sleep -Milliseconds 300
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         Select-Element 'Blocked Write Guide'
         [void](Wait-SelectedGuide 'Blocked Write Guide')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Name 'ShellStatus' 'Opening guide...')
-        $report.phases += 'later-guide-selected-while-first-write-blocked'
+        $report.phases += 'later-guide-selected-while-first-read-blocked'
     }
-    elseif ($Mode -in @('later-guide-result', 'switch-game-loading',
-        'switch-game')) {
+    elseif ($Mode -eq 'late-guide-after-close') {
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Opening guide...')
+        [void](Wait-SelectedGuide 'Blocked Write Guide')
+        Select-Element 'Route Test Guide'
+        [void](Wait-SelectedGuide 'Route Test Guide')
+        [void](Wait-Name 'ShellStatus' 'Opening guide...')
+        $report.phases += 'guide-selected-after-close-request'
+    }
+    elseif ($Mode -in @('later-guide-result', 'later-guide-failed-result',
+        'switch-game-loading', 'switch-game')) {
         # These modes continue a shell left on Reader, Game, or Library.
     }
     else {
@@ -518,6 +527,23 @@ try {
         [void](Wait-Name 'ShellStatus' 'Library ready.')
         [void](Wait-Name 'ResumeGuide' 'Resume Blocked Write Guide')
         $report.phases += 'later-guide-persisted-for-resume'
+    }
+    elseif ($Mode -eq 'later-guide-failed-result') {
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'This guide is no longer in your library.')
+        $reader = Find-ById 'ReaderHeading'
+        if ($reader -and -not $reader.Current.IsOffscreen) {
+            throw 'A Reader opened after the later guide was removed.'
+        }
+        $report.phases += 'later-guide-failed-without-opening-reader'
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        $resume = Find-ById 'ResumeGuide'
+        if ($resume -and -not $resume.Current.IsOffscreen) {
+            throw 'A superseded guide became Resume after the later guide failed.'
+        }
+        $report.phases += 'superseded-guide-not-saved-as-resume'
     }
     elseif ($Mode -eq 'normal') {
         $resume = Wait-Name 'ResumeGuide' "Resume $ExpectedResumeGuide"

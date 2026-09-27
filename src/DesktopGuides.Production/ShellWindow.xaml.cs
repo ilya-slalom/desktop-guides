@@ -291,6 +291,10 @@ public sealed partial class ShellWindow : Window
 
     private Task OpenGuideFromGameAsync(Guide guide)
     {
+        if (closeRequested)
+        {
+            return Task.CompletedTask;
+        }
         long intentVersion = ++gameGuideIntentVersion;
         return RunNavigationAsync(
             () => OpenGuideAsync(guide.Id, guide.GameId, intentVersion));
@@ -422,13 +426,22 @@ public sealed partial class ShellWindow : Window
             {
                 return;
             }
-            await library.SaveSettingsAsync(settings with { LastActiveGuideId = guide.Id });
-            if (IsSupersededGameGuideIntent(intentVersion))
-            {
-                return;
-            }
             navigator.OpenReader(guide.Id, guide.GameId);
             await RenderCurrentAsync();
+            if (navigator.Current is ReaderRoute opened &&
+                opened.GuideId == guide.Id &&
+                opened.GameId == guide.GameId)
+            {
+                try
+                {
+                    await library.SaveSettingsAsync(
+                        settings with { LastActiveGuideId = guide.Id });
+                }
+                catch (Exception error)
+                {
+                    ShellStatus.Text = $"Could not save Resume: {error.Message}";
+                }
+            }
         }
         catch (Exception error)
         {
