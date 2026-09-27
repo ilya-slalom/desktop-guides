@@ -1,0 +1,13 @@
+﻿{
+    "mode":  "later-guide-failed-result",
+    "invocationId":  "0c387f918fd8451aa4f97eb3fa2a3771",
+    "observedAt":  "2026-09-27T02:50:28.4370829Z",
+    "processId":  2296,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "later-guide-failed-without-opening-reader",
+                   "superseded-guide-not-saved-as-resume"
+               ]
+}

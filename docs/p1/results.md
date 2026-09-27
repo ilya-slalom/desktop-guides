@@ -592,3 +592,42 @@ The first installed attempt at `aad96a9` stopped in the smoke runner:
 its later-guide continuation started from Reader but still applied the
 Library precheck. The `ce6e823` test correction removed that precheck,
 and the installed scenario passed.
+
+### T11.3 close admission and Resume review follow-up — 27 September 2026
+
+At code head `8839d15a4a47d03866914ea1b203a921c032fde3`, Game-view guide
+actions stop registering a new selection once Close has stopped the
+navigation queue. Resume is saved after the selected Reader route renders,
+and a failed settings save leaves that Reader visible with an error. The
+installed selection test now holds the first guide's database read until
+the later guide is selected; it no longer relies on a 300 ms delay.
+
+The signed installed Windows 11 x64
+[PR run 36289417891](https://github.com/ilya-slalom/desktop-guides/actions/runs/36289417891)
+passed all nine jobs, including the signed shell job and the retained native
+ARM64 P0 regression. The
+[late-close traces](evidence/ci/production-shell/reader-shell/close-resume-review/late-guide-after-close.json)
+select a second guide after Close is requested, while the first accepted
+guide is held by a read lock; the
+[install record](evidence/ci/production-shell/reader-shell/close-resume-review/signed-install.json)
+includes the successful relaunch check that expects the first guide as
+Resume after drain. The
+[later-selection trace](evidence/ci/production-shell/reader-shell/close-resume-review/queue-later-guide.json)
+and [result](evidence/ci/production-shell/reader-shell/close-resume-review/later-guide-result.json)
+confirm the later guide's Reader, Back focus, and persisted Resume. The
+[failed-later-guide trace](evidence/ci/production-shell/reader-shell/close-resume-review/later-guide-failed-result.json)
+confirms that a removed later guide opens no Reader and leaves Resume
+empty instead of saving the superseded guide. The existing close/relaunch
+scenario now waits for the Reader to appear while its Resume write is held,
+as recorded in the
+[write-lock trace](evidence/ci/production-shell/reader-shell/close-resume-review/queue-guide-write.json).
+
+The install record reports OS build `10.0.26100.0`, AMD64, success, and
+removal of the temporary package and certificate. The Windows 11 x64 host
+under `E:\work\desktop-guides` passed Windows PowerShell 5.1 parsing,
+the locked ShellSeed restore and Release build, an unsigned Release x64
+production MSIX build, and an isolated invalid-guide fixture probe. Its
+existing Preview package and profile prevented a fresh-profile installed
+run there. An earlier CI attempt at `2f3c740` used the old `"Opening
+guide..."` expectation for the held-write scenario; it was updated to
+observe the rendered Reader before the passing run.

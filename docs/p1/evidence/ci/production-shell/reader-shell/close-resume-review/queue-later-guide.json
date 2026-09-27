@@ -1,0 +1,12 @@
+﻿{
+    "mode":  "queue-later-guide",
+    "invocationId":  "13e02365b8134b54b0c1bb23e9b19bf2",
+    "observedAt":  "2026-09-27T02:50:26.5426705Z",
+    "processId":  2296,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "later-guide-selected-while-first-read-blocked"
+               ]
+}

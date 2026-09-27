@@ -1,0 +1,14 @@
+﻿{
+    "mode":  "later-guide-result",
+    "invocationId":  "9c7a3536ddd54ff081760506300625f3",
+    "observedAt":  "2026-09-27T02:50:11.0528471Z",
+    "processId":  5696,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "later-guide-opened",
+                   "later-guide-back-selection-and-focus",
+                   "later-guide-persisted-for-resume"
+               ]
+}

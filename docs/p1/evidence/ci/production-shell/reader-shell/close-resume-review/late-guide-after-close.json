@@ -1,0 +1,12 @@
+﻿{
+    "mode":  "late-guide-after-close",
+    "invocationId":  "552221d4a6fa485f9fcc042dddc15a1e",
+    "observedAt":  "2026-09-27T02:49:59.0041418Z",
+    "processId":  2656,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "guide-selected-after-close-request"
+               ]
+}
