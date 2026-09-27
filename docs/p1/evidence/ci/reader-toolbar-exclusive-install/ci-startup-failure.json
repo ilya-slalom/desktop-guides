@@ -1,0 +1,11 @@
+{
+  "observedAt": "2026-09-27T06:26:18.1991166Z",
+  "contenderRejected": false,
+  "firstPackagePreserved": false,
+  "firstProcessPreserved": false,
+  "firstCleanupVerified": false,
+  "success": false,
+  "error": "Exception: D:\\a\\desktop-guides\\desktop-guides\\tools\\p1\\test_windows_reader_toolbar_exclusive_install.ps1:53\r\nLine |\r\n  53 |              throw 'First toolbar install exited before its hold.'\r\n     |              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n     | First toolbar install exited before its hold.\r\n\r\n",
+  "firstStdout": null,
+  "firstStderr": "D:\\a\\desktop-guides\\desktop-guides\\tools\\p1\\windows_reader_toolbar_install.ps1 : The term \r\n'Get-FileHash' is not recognized as the name of a cmdlet, function, script file, or operable \r\nprogram. Check the spelling of the name, or if a path was included, verify that the path is \r\ncorrect and try again.\r\n    + CategoryInfo          : ObjectNotFound: (Get-FileHash:String) [windows_reader_toolbar_insta \r\n   ll.ps1], CommandNotFoundException\r\n    + FullyQualifiedErrorId : CommandNotFoundException,windows_reader_toolbar_install.ps1\r\n \r\n"
+}

@@ -1,13 +1,13 @@
 ﻿{
-    "invocationId":  "1bb6a5b896464204806a76a7ca11377a",
-    "observedAt":  "2026-09-27T06:15:38.0598488Z",
-    "sourcePackageSha256":  "7CC25381BEB4483451C281D2321027B49664EA83C4C33861CBF33A730535D372",
+    "invocationId":  "aec05cbb80bb4b37a800bffcee0463d4",
+    "observedAt":  "2026-09-27T06:27:36.4353998Z",
+    "sourcePackageSha256":  "151CF8A0A3F9E0DF6A9236F5D77DA98C4C6F9D99625B21D2EC0EBFAC2A1B38EB",
     "parentStoppedProcess":  false,
     "parentRemovedPackage":  false,
     "simulatedProcessExit":  false,
     "success":  true,
-    "certificateThumbprint":  "A08986D7029E59FF811AAD54B6A49FBC9D31FFCD",
-    "signedPackageSha256":  "DA0CF661BE1E5ED671092F84AFCBFE4BE7781EF9FF10125BF1D91C2D670EADB3",
+    "certificateThumbprint":  "CDF6DE7F9C9747E2C11721922AC48C569F1890F6",
+    "signedPackageSha256":  "EBC9A403BDCCEAB12819E1C447F9E927BCCE9DA015EECE4890531727F0F370FA",
     "phases":  [
                    "initial-no-session-capabilities",
                    "worker-capability-change-text-dispatch",

@@ -766,3 +766,25 @@ An initial host attempt exposed that asynchronous `Start-Process` in
 Windows PowerShell 5.1 returned no exit-code property; the helper now
 uses the first installer's signed report to verify its expected timeout
 and cleanup.
+
+At code head `8b6008a`, all nine jobs passed in
+[push run 36300190195](https://github.com/ilya-slalom/desktop-guides/actions/runs/36300190195)
+and [PR run 36300193536](https://github.com/ilya-slalom/desktop-guides/actions/runs/36300193536).
+The signed PR
+[overlap trace](evidence/ci/reader-toolbar-exclusive-install/overlap-result.json)
+records a rejected second installer, the first package and process
+still present, and verified first-run cleanup. Its
+[timeout install record](evidence/ci/reader-toolbar-exclusive-install/timeout-install.json)
+shows removal after the simulated inspection error. The
+[normal install](evidence/ci/reader-toolbar-exclusive-install/normal-install.json)
+and [toolbar UI trace](evidence/ci/reader-toolbar-exclusive-install/toolbar-ui.json)
+passed with no test package, process, task, or certificate remaining.
+The signed production shell and retained native ARM64 P0 installed
+suite also passed.
+
+The first CI overlap attempt launched Windows PowerShell 5.1 from the
+`pwsh` CI controller and exited before setup because `Get-FileHash`
+could not be resolved, as recorded in its
+[diagnostic trace](evidence/ci/reader-toolbar-exclusive-install/ci-startup-failure.json).
+The controller now starts child installers with its own PowerShell
+executable, matching both the CI and local-host environments.

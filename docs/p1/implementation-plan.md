@@ -341,6 +341,10 @@ process remain present. Release the first, verify its normal timeout
 cleanup, then perform the existing successful install on the same
 runner. A version match alone remains insufficient as an ownership
 check without this serialized preflight.
+Start both overlapping controller children with the controller's own
+PowerShell executable: CI runs `pwsh`, while the local host runs Windows
+PowerShell 5.1. Switching shells inside CI lost `Get-FileHash` before
+the first installer could report its result.
 
 ### T11.1 review follow-up: close handoff and installed gate
 
