@@ -72,6 +72,9 @@ jobs:
             --logger "trx;LogFileName=infrastructure-tests.trx" `
             --results-directory artifacts/test-results
           exit $LASTEXITCODE
+      - name: Check public signing identity guard
+        shell: pwsh
+        run: ./tools/p1/test_sign_production_package.ps1
       - name: Check installed-shell process cleanup
         shell: pwsh
         run: ./tools/p1/test_windows_shell_process.ps1

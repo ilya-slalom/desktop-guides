@@ -48,8 +48,11 @@ if ($DevelopmentTest -and $ExpectedName -notmatch '(\.Preview|Test)$') {
     throw 'The development signing mode requires a Preview or test package identity.'
 }
 if (-not $DevelopmentTest) {
-    if ($ExpectedName -match '\.Preview$') {
-        throw 'A public release cannot use the Preview package identity.'
+    if ($ExpectedName -match '(\.Preview|Test)$') {
+        throw 'A public release cannot use a Preview or test package identity.'
+    }
+    if ($ExpectedPublisher -eq 'CN=DesktopGuides Development') {
+        throw 'A public release cannot use the development publisher.'
     }
     if ($ExpectedVersion -notmatch '^[1-9][0-9]*\.[0-9]+\.[0-9]+\.0$') {
         throw 'A public release version must be major.minor.patch.0 with a nonzero major version.'

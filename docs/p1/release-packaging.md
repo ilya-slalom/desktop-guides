@@ -52,8 +52,10 @@ deployment and user-data continuity.
    private key, validity, code-signing purpose, signed package trust,
    timestamp presence, and packed identity. The `-DevelopmentTest` switch
    is only for disposable development certificates and accepts Preview or
-   test identities without a timestamp. A public signing run requires a
-   non-Preview identity and timestamp.
+   test identities without a timestamp. A public signing run rejects Preview
+   and test package names and the development Publisher, and requires a
+   timestamp. The final public Name and Publisher still need to be pinned
+   when the signing identity is chosen.
 4. Record commit, source and signed MSIX SHA-256, identity, architecture,
    Windows App Runtime minimum from the packed manifest, signer thumbprint
    and validity, and timestamp status. Never export a private key into the
