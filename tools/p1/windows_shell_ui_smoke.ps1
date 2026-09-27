@@ -380,9 +380,9 @@ try {
         [void](Wait-Name 'ShellStatus' 'Opening guide...')
         $report.phases += 'later-guide-selected-while-first-write-blocked'
     }
-    elseif ($Mode -eq 'switch-game-loading' -or
-        $Mode -eq 'switch-game') {
-        # These modes continue a shell that the preparation smoke already opened.
+    elseif ($Mode -in @('later-guide-result', 'switch-game-loading',
+        'switch-game')) {
+        # These modes continue a shell left on Reader, Game, or Library.
     }
     else {
         [void](Wait-Name 'ShellStatus' 'Library ready.')
