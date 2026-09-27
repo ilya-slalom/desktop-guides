@@ -929,3 +929,46 @@ its [receipt](evidence/ci/reader-toolbar-install-receipt/toolbar-install-receipt
 and [UI trace](evidence/ci/reader-toolbar-install-receipt/toolbar-ui.json)
 confirm identity, all eight toolbar phases, and final cleanup. The signed
 production shell and native ARM64 UI regression jobs also passed.
+
+## M1 T17.1 packaging groundwork — 27 September 2026
+
+The production package remains on the `DesktopGuides.Preview` identity while
+the public signing certificate Subject is undecided. The
+[release procedure](release-packaging.md) records the public identity and
+version rules, the external signing boundary, Windows App Runtime and WebView2
+online/offline delivery, and the remaining release gates. CI now validates
+the packed identity, x64/ARM64 architecture, version, Windows App Runtime
+framework dependency, and P0 fixture isolation before uploading an unsigned
+production package. Its build manifest records the package identity and
+runtime minimum with the SHA-256.
+
+On the Windows 11 x64 host (build `10.0.26200.0`, .NET SDK `10.0.401`), a
+locked restore and fresh Release x64 MSIX build from the merged source passed
+with zero errors. The existing host symbols-tool warning prevented only a
+symbols package. The packed MSIX verifier found Preview version `0.1.0.0`,
+architecture `x64`, and `Microsoft.WindowsAppRuntime.2` minimum `2.5.1.0`.
+It also verified the previously built ARM64 package's static metadata; this
+does not establish an ARM64 installed release result. Deliberately wrong
+identity, changed upgrade Publisher, and non-increasing version checks
+failed as intended.
+
+The [signing record](evidence/host/p1-package-signing.json) shows that the
+fresh x64 package passed SignTool signing and trust verification with a
+temporary, non-exportable code-signing certificate. It was not timestamped
+and is not a public candidate. The signed test output and its temporary
+certificate were removed without changing the installed Preview package.
+
+The [interactive upgrade record](evidence/host/p1-package-upgrade.json)
+used a separate `DesktopGuides.PackageUpgradeTest` identity and a temporary
+certificate. Its scheduled task ran in desktop session 1, installed version
+`1.0.0.0`, seeded two guide files and a SQLite library, installed `1.0.1.0`
+over it without uninstalling, confirmed the package family and database
+hash stayed equal, and launched the upgraded app. It removed the test
+package, profile, task, and temporary trust. The host's existing Preview
+package remained at version `0.1.0.0`. The first attempt failed because the
+check looked for SQLite at `LocalState\library.sqlite`; it cleaned up, and
+the passing rerun checked the actual `LocalState\library\library.sqlite`.
+
+T17.1 still requires the final public Name and certificate Subject, protected
+public signing integration, and an upgrade of public candidate versions.
+The user-deferred runtime-free VM and Windows 10 checks remain T17.3 gates.

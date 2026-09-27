@@ -1,0 +1,26 @@
+{
+    "runId":  "ce3a1786522a41b6ae8267b5a4587076",
+    "observedAt":  "2026-09-27T09:20:39.8258088Z",
+    "success":  true,
+    "expectedSessionId":  1,
+    "testSignerThumbprint":  "D7346806527AF7B80E68E20791A0CAB163D5C61B",
+    "firstSignedSha256":  "8A6D7D3573AB61B00D102ADE02C7FBB8E7D16385EF98D89228737FC1FA9D800F",
+    "secondSignedSha256":  "010D87E9638F982E5AD1B6A0E4352863FCE267549D68A3ED8D031A106011D50C",
+    "interactiveResult":  {
+                              "sessionId":  1,
+                              "observedAt":  "2026-09-27T09:21:11.1712553Z",
+                              "success":  true,
+                              "firstPackage":  "DesktopGuides.PackageUpgradeTest_1.0.0.0_x64__b7wfrrrayneg0",
+                              "packageFamily":  "DesktopGuides.PackageUpgradeTest_b7wfrrrayneg0",
+                              "seededGuideCount":  2,
+                              "databaseSha256Before":  "BACC4D23D4A49E1BC24B4FD968339060B21C2E90B30282FB386714E50C11C93E",
+                              "secondPackage":  "DesktopGuides.PackageUpgradeTest_1.0.1.0_x64__b7wfrrrayneg0",
+                              "databaseSha256After":  "BACC4D23D4A49E1BC24B4FD968339060B21C2E90B30282FB386714E50C11C93E",
+                              "libraryPreserved":  true,
+                              "upgradedAppLaunched":  true,
+                              "packageStillInstalled":  false,
+                              "testProfileRemoved":  true
+                          },
+    "certificateStillTrusted":  false,
+    "packageStillInstalled":  false
+}
