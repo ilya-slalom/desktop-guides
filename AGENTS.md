@@ -15,3 +15,8 @@
   `docs/p1/e2e-testing.md`, including its data-backup and cleanup rules.
 - Preserve stable per-guide locators and an explicit completion state; do not
   infer completion from estimated reading percentage.
+- In each PR description, name the target task, the prerequisites and their
+  status, and the intended outcome. For UI changes, include a screenshot of
+  the changed interface in the PR description.
+- Review PRs primarily for functional defects and regressions; prioritize
+  test-harness details and small edge cases when they affect those outcomes.

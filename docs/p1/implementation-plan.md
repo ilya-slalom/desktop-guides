@@ -1,6 +1,6 @@
 # P1 implementation plan and exit gates
 
-Status: M0 merged; M1 in progress; M2–M6 planned, 26 September 2026.
+Status: M0 merged; M1 in progress; M2–M6 planned, 27 September 2026.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
 This plan orders all **16 P1 stories and 49 tasks** in the
@@ -67,11 +67,12 @@ with transactional v1→v2 upgrade and a consistent recovery copy under
 `47c9e906c01e85eb9ce9f9759f6359390d809e52`. Startup reconciliation
 now precedes M2 file mutation. T11.1 was merged through
 [PR #6](https://github.com/ilya-slalom/desktop-guides/pull/6), merge commit
-`1f89fb054b523b9e51a0fba0687e0c5c601397ae`. T11.3 reader controls are
-implemented for review in
-[PR #7](https://github.com/ilya-slalom/desktop-guides/pull/7) and passed
-the signed installed Windows 11 x64 shell gate. The public package identity
-remains T17.1 work.
+`1f89fb054b523b9e51a0fba0687e0c5c601397ae`. T11.3 reader controls
+were merged through
+[PR #7](https://github.com/ilya-slalom/desktop-guides/pull/7) on
+27 September 2026, merge commit
+`69c96d222bce243997f024a8dddbe820d99c2a2f`. The public package
+identity remains T17.1 work.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
@@ -80,6 +81,35 @@ remains T17.1 work.
 | T11.1 | T03.2, T11.2 | Library/Game/Reader/Settings route coordinator and separate diagnostic build mode. Launch, Back, stale-ID, duplicate-launch acknowledgment, close/relaunch handoff, and route tests pass on installed WinUI; production package has no fixtures. | TR11.1 |
 | T11.3 | T11.1, T11.2 | Capability-based reader bar, navigation pane, overflow, and status/focus behavior. Keyboard and pointer trace returns Reader → its Game with selection and focus retained. Query retention is verified in T05.3 after search exists. | TR11.1, TR11.2 |
 | T17.1 | T11.1 | Production MSIX identity/version/signing and prerequisite delivery plan, plus tested x64 packaging configuration. Install and upgrade use the same identity; credentials stay outside source/logs. Final signing and architecture claims remain gated by M6. | TR17.2 |
+
+### T17.1 implementation sequence
+
+The existing `DesktopGuides.Preview` package and its user data are a
+development lane. A package with a different Name or Publisher has a different
+identity and cannot serve as an in-place upgrade. Keep that lane available
+for installed shell checks. Set a separate, stable public Name and certificate
+Publisher before publishing any release candidate. Do not use a placeholder
+public Publisher or silently rebrand the Preview package.
+The [release procedure](release-packaging.md) records the tested package
+checks and the remaining public identity decision.
+
+Use a framework-dependent Windows App SDK package with a self-contained .NET
+runtime. A self-contained Windows App SDK package would simplify runtime
+setup but would make each app release responsible for servicing that runtime.
+Ship an offline Windows App Runtime installer and WebView2 Evergreen installer
+alongside the signed MSIX; document online acquisition, versions, hashes, and
+the order of installation. A protected signing step selects a certificate by
+thumbprint outside source control. It checks the exact manifest Publisher,
+certificate validity, and resulting signature before marking an artifact as
+signed. Public certificate material can be distributed for sideload trust;
+private key material must not enter the repository or logs.
+
+| Step | Dependency | Output and check |
+| --- | --- | --- |
+| Identity and version contract | T11.1, final signing-certificate subject | Fix the public package Name and Publisher, choose `major.minor.patch.0` versions, and keep that pair stable across upgrades. Validate the packed manifest, architecture, and strictly increasing upgrade version. Keep Preview isolated. |
+| Package and signature checks | Preview lane first; public identity for release | Verify the x64 MSIX payload and manifest, sign using an externally provisioned certificate, and verify the signature and publisher match. Package outputs include SHA-256 and identity/version/architecture metadata, without keys. |
+| Prerequisite delivery | Package check | Record framework-dependent Windows App SDK and WebView2 Evergreen online/offline setup, pinned release artifacts and hashes at candidate time, and missing-prerequisite behavior. The runtime-free VM check remains T17.3. |
+| Installed upgrade exit | Two signed package versions | On a disposable interactive Windows 11 x64 profile, install v1, populate library state, install v2 over it through an interactive scheduled task, and prove identity and data continuity after relaunch. Do not uninstall between versions or touch the shared Preview profile. Keep public signing, native ARM64, and clean-machine claims behind their later gates. |
 
 ### T15.2 implementation sequence
 

@@ -213,12 +213,21 @@ jobs:
           if ($packages.Count -ne 1) {
             throw "Expected one ${{ matrix.architecture }} production MSIX, found $($packages.Count)."
           }
-          python tools/p1/verify_production_package.py $packages[0].FullName
+          $identityJson = python tools/p1/verify_production_package.py $packages[0].FullName `
+            --name DesktopGuides.Preview `
+            --publisher 'CN=DesktopGuides Development' `
+            --version 0.1.0.0 `
+            --architecture '${{ matrix.architecture }}'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $packageIdentity = $identityJson | ConvertFrom-Json
           New-Item -ItemType Directory -Force artifacts/production-build | Out-Null
           [ordered]@{
             commit = $env:GITHUB_SHA
             architecture = '${{ matrix.architecture }}'
+            identityName = $packageIdentity.name
+            publisher = $packageIdentity.publisher
+            packageVersion = $packageIdentity.version
+            windowsAppRuntimeMinimum = $packageIdentity.windowsAppRuntimeMinimum
             runnerImage = "$env:ImageOS $env:ImageVersion"
             osBuild = [System.Environment]::OSVersion.Version.ToString()
             dotnetSdk = (dotnet --version)
@@ -264,6 +273,10 @@ jobs:
           $manifest = Get-Content artifacts/production-shell/download/manifest.json -Raw |
             ConvertFrom-Json
           if ($manifest.architecture -ne 'x64' -or
+              $manifest.identityName -ne 'DesktopGuides.Preview' -or
+              $manifest.publisher -ne 'CN=DesktopGuides Development' -or
+              $manifest.packageVersion -ne '0.1.0.0' -or
+              $manifest.windowsAppRuntimeMinimum -ne '2.5.1.0' -or
               $manifest.package -ne $packages[0].Name -or
               $manifest.packageSha256 -ne
                 (Get-FileHash $packages[0].FullName -Algorithm SHA256).Hash) {
