@@ -7,6 +7,9 @@ The P1 first usable release remains in progress. The
 [dependency plan](implementation-plan.md) defines all 49 task exit gates;
 this file records checks actually run.
 
+The M2 T07.1 scanner verification is recorded in the
+[static-asset result](t07-static-assets-results.md).
+
 ## M0 task results
 
 | Task | Implemented output | Verification and remaining scope |

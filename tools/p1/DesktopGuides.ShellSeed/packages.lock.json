@@ -43,8 +43,25 @@
       "desktopguides.infrastructure": {
         "type": "Project",
         "dependencies": {
+          "AngleSharp": "[1.8.2, )",
+          "AngleSharp.Css": "[1.1.2, )",
           "DesktopGuides.Core": "[1.0.0, )",
           "Microsoft.Data.Sqlite": "[10.0.12, )"
+        }
+      },
+      "AngleSharp": {
+        "type": "CentralTransitive",
+        "requested": "[1.8.2, )",
+        "resolved": "1.8.2",
+        "contentHash": "iRlkfBIhi+gTgTxBlYNT4PlmaiVEy7+qX3BmprAK4cYE1UjfSNFI4mEDyxC1qgtAKYg5rjGYgL3tJlzGF+Ukdg=="
+      },
+      "AngleSharp.Css": {
+        "type": "CentralTransitive",
+        "requested": "[1.1.2, )",
+        "resolved": "1.1.2",
+        "contentHash": "7o5yCTuURjxmjy+O5/2EDQihTwnVlbeg9cIO+Zq8zDLt/7AZWebOfIxij+cejBGUBMad95wl5VlY3XFo3VQuCg==",
+        "dependencies": {
+          "AngleSharp": "[1.5.0, 2.0.0)"
         }
       },
       "Microsoft.Data.Sqlite": {

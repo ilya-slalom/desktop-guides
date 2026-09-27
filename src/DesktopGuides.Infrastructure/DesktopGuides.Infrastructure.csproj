@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="AngleSharp" />
+    <PackageReference Include="AngleSharp.Css" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <ProjectReference Include="../DesktopGuides.Core/DesktopGuides.Core.csproj" />
   </ItemGroup>

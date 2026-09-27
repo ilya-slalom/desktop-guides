@@ -413,8 +413,9 @@ project uses a provisional package identity until T17.1 sets the public one.
 - **T07.1** Parse the selected entry HTML and reachable local CSS into a
   bounded dependency graph. Enumerate relevant `src`, `srcset`, stylesheet
   links, inline CSS `url()`, and nested `@import`; normalize fragment/query
-  handling before resolving a path. Stage only supported local CSS/images,
-  preserving safe relative names, then hash each file. Cycles terminate
+  handling before resolving a path. Hash supported local CSS/images in a
+  preview manifest with safe relative names; T06.3 stages the verified bytes
+  after T07.2 implements the filesystem boundary. Cycles terminate
   through a visited set; excess depth/count/bytes yields a preview error.
   Pin and license-review the chosen HTML/CSS parser and test nested CSS and
   image variants.
