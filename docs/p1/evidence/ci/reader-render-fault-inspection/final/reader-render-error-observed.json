@@ -1,0 +1,12 @@
+﻿{
+    "mode":  "reader-render-error-observed",
+    "invocationId":  "3650b059f4984d188d01b225ee62260a",
+    "observedAt":  "2026-09-27T04:15:35.9979752Z",
+    "processId":  7416,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "reader-render-read-failed-on-reader-route"
+               ]
+}

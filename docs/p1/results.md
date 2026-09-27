@@ -724,3 +724,19 @@ passed. The parallel PR run `36292904629` passed the new toolbar gate but
 stopped in the older later-guide Back check because a name-only UIA search
 selected an element without an Invoke pattern. The smoke helper now
 prefers the back button automation ID and requires an Invoke pattern.
+
+At test-fix head `c94f54d`, all nine jobs passed in
+[push run 36293452654](https://github.com/ilya-slalom/desktop-guides/actions/runs/36293452654)
+and [PR run 36293454522](https://github.com/ilya-slalom/desktop-guides/actions/runs/36293454522).
+The final PR
+[later-guide trace](evidence/ci/reader-render-fault-inspection/final/later-guide-result.json)
+passed Reader → Game → Library with guide selection, keyboard focus,
+and Resume restored. Its
+[Reader route](evidence/ci/reader-render-fault-inspection/final/queue-reader-render-error.json),
+[read-error](evidence/ci/reader-render-fault-inspection/final/reader-render-error-observed.json),
+and [empty-Resume](evidence/ci/reader-render-fault-inspection/final/reader-render-error-result.json)
+traces repeated the new regression. The
+[signed production install](evidence/ci/reader-render-fault-inspection/final/production-signed-install.json)
+passed and removed its temporary package and certificate. The signed
+toolbar job and retained native ARM64 P0 installed suite passed in both
+runs. Windows 10 and the complete P1 ARM64 workflow remain deferred.
