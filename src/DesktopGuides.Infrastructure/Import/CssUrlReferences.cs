@@ -1,20 +1,36 @@
+using System.Text;
+
 namespace DesktopGuides.Infrastructure.Import;
 
+internal enum CssDeclarationReferenceKind
+{
+    Image,
+    CustomPropertyImage,
+    VariableUse
+}
+
+internal readonly record struct CssDeclarationReference(
+    CssDeclarationReferenceKind Kind,
+    string Value,
+    string? CustomProperty);
+
 /// <summary>
-/// Reads url() arguments and quoted image-set() sources from CSS declaration
-/// values, including nested rules that the CSS parser may omit. Function-name
-/// escapes are decoded; target text stays unchanged for path checks.
+/// Reads image URLs and var() uses from CSS declaration values, including
+/// nested rules that the CSS parser may omit. Function-name escapes are
+/// decoded; target text stays unchanged for path checks.
 /// </summary>
 internal static class CssUrlReferences
 {
-    public static IEnumerable<string> ExtractDeclarations(
+    public static IEnumerable<CssDeclarationReference> ExtractDeclarations(
         string css,
         bool inlineStyle = false)
     {
         int blockDepth = inlineStyle ? 1 : 0;
         int parenthesisDepth = 0;
+        int declarationStart = 0;
         bool inDeclarationValue = false;
         bool inAtRulePrelude = false;
+        string? customProperty = null;
         Stack<ImageSetFrame> imageSets = new();
         for (int index = 0; index < css.Length;)
         {
@@ -41,7 +57,8 @@ internal static class CssUrlReferences
                     css[after - 1] == css[index])
                 {
                     imageSet.ExpectsImage = false;
-                    yield return css[(index + 1)..(after - 1)];
+                    yield return Image(
+                        css[(index + 1)..(after - 1)], customProperty);
                 }
                 index = after;
                 continue;
@@ -59,6 +76,8 @@ internal static class CssUrlReferences
                     parenthesisDepth = 0;
                     imageSets.Clear();
                     index++;
+                    declarationStart = index;
+                    customProperty = null;
                     continue;
                 case '}':
                     blockDepth = Math.Max(0, blockDepth - 1);
@@ -67,13 +86,20 @@ internal static class CssUrlReferences
                     parenthesisDepth = 0;
                     imageSets.Clear();
                     index++;
+                    declarationStart = index;
+                    customProperty = null;
                     continue;
                 case ';' when parenthesisDepth == 0:
                     inDeclarationValue = false;
                     inAtRulePrelude = false;
                     index++;
+                    declarationStart = index;
+                    customProperty = null;
                     continue;
-                case ':' when blockDepth > 0 && !inAtRulePrelude:
+                case ':' when blockDepth > 0 && !inAtRulePrelude &&
+                    !inDeclarationValue:
+                    customProperty = ReadCustomPropertyName(
+                        css, declarationStart, index);
                     inDeclarationValue = true;
                     index++;
                     continue;
@@ -110,6 +136,7 @@ internal static class CssUrlReferences
             bool isUrl = true;
             bool isImageSet = true;
             bool isWebkitImageSet = true;
+            bool isVar = true;
             while (TryReadIdentifierCharacter(css, ref index,
                 out char character))
             {
@@ -118,6 +145,7 @@ internal static class CssUrlReferences
                 isImageSet &= Matches("image-set", identifierLength, lower);
                 isWebkitImageSet &= Matches(
                     "-webkit-image-set", identifierLength, lower);
+                isVar &= Matches("var", identifierLength, lower);
                 identifierLength++;
             }
             if (identifierLength == 0)
@@ -129,7 +157,8 @@ internal static class CssUrlReferences
             MarkImageSlot(imageSets, parenthesisDepth);
             if ((!isUrl || identifierLength != 3) &&
                 (!isImageSet || identifierLength != 9) &&
-                (!isWebkitImageSet || identifierLength != 17))
+                (!isWebkitImageSet || identifierLength != 17) &&
+                (!isVar || identifierLength != 3))
             {
                 continue;
             }
@@ -146,14 +175,80 @@ internal static class CssUrlReferences
                 index = after;
                 if (valid && !string.IsNullOrWhiteSpace(argument))
                 {
-                    yield return argument;
+                    yield return Image(argument, customProperty);
                 }
+                continue;
+            }
+            if (isVar && identifierLength == 3)
+            {
+                string? name = ReadVariableName(css, cursor + 1);
+                if (name is not null)
+                {
+                    yield return new CssDeclarationReference(
+                        CssDeclarationReferenceKind.VariableUse,
+                        name, customProperty);
+                }
+                parenthesisDepth++;
+                index = cursor + 1;
                 continue;
             }
             parenthesisDepth++;
             imageSets.Push(new ImageSetFrame(parenthesisDepth));
             index = cursor + 1;
         }
+    }
+
+    private static CssDeclarationReference Image(
+        string target,
+        string? customProperty) => new(
+            customProperty is null
+                ? CssDeclarationReferenceKind.Image
+                : CssDeclarationReferenceKind.CustomPropertyImage,
+            target, customProperty);
+
+    private static string? ReadCustomPropertyName(
+        string css,
+        int start,
+        int colon)
+    {
+        int cursor = SkipTrivia(css, start);
+        if (cursor >= colon || css[cursor] is not ('-' or '\\'))
+        {
+            return null;
+        }
+        string? name = ReadIdentifier(css, ref cursor);
+        return name is not null && name.StartsWith("--", StringComparison.Ordinal) &&
+            name.Length > 2 && SkipTrivia(css, cursor) == colon
+            ? name : null;
+    }
+
+    private static string? ReadVariableName(string css, int start)
+    {
+        int cursor = SkipTrivia(css, start);
+        if (cursor >= css.Length || css[cursor] is not ('-' or '\\'))
+        {
+            return null;
+        }
+        string? name = ReadIdentifier(css, ref cursor);
+        if (name is null || !name.StartsWith("--", StringComparison.Ordinal) ||
+            name.Length < 3)
+        {
+            return null;
+        }
+        cursor = SkipTrivia(css, cursor);
+        return cursor < css.Length && (css[cursor] is ',' or ')')
+            ? name : null;
+    }
+
+    private static string? ReadIdentifier(string css, ref int cursor)
+    {
+        StringBuilder name = new();
+        while (TryReadIdentifierCharacter(css, ref cursor,
+            out char character))
+        {
+            name.Append(character);
+        }
+        return name.Length > 0 ? name.ToString() : null;
     }
 
     private sealed class ImageSetFrame(int depth)

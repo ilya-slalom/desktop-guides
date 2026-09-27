@@ -63,3 +63,19 @@ regression test and a string/comment false-positive check pass with the
 rest of the staged Windows x64 Infrastructure suite: **69/69 tests**. The
 unsigned Release x64 production MSIX build passed with zero errors and the
 existing `mspdbcmf.exe` symbols warning.
+
+## PR #9 fourth review follow-up
+
+A Windows 11 x64 probe showed that a custom property defined in
+`a/vars.css` and used in `b/main.css` caused the scanner to mark
+`a/icon.png` missing and omit the needed `b/icon.png`. The scanner now
+retains custom-property URLs and variable uses within the reference budget,
+then resolves URLs against each stylesheet or HTML entry where the variable
+is used. Unused custom-property URLs no longer create false missing
+references, and variable dependency cycles terminate.
+
+The staged Windows 11 x64 Infrastructure suite passed **74/74 tests**,
+including cross-stylesheet, inline-style, unused-variable, cycle, and
+repeated-use checks. The unsigned Release x64 production MSIX build passed
+with zero errors and the existing `mspdbcmf.exe` symbols warning. The scanner
+remains outside the installed import workflow until T07.2 and T06.3.

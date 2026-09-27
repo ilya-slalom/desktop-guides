@@ -61,3 +61,27 @@ case collisions, safe roots, and revalidation before a source file is read.
 T06.3 will stage verified bytes through its cross-boundary import journal.
 The T07.1 manifest is a preview snapshot, never authority to serve a later
 changed file.
+
+## PR #9 custom-property URL follow-up
+
+A relative URL inside an unregistered CSS custom property resolves when a
+`var()` use supplies a property value. Resolving it as soon as its declaration
+is read gives the wrong base path when the use is in another stylesheet.
+Dropping all custom-property URLs would regress the same-file image case.
+Computing the full CSS cascade is outside a static dependency scan.
+
+Collect custom-property image URLs, variable dependencies, and use sites
+while reading each declaration. After all reachable CSS and inline styles
+have been scanned, follow the bounded variable graph from each use site and
+resolve its image URLs against that site's document or stylesheet path. Do
+not import an unused custom-property URL from its definition path. Keep
+ordinary declaration URLs immediate and the existing asset/reference limits;
+cap retained variable tokens and terminate variable cycles. This is a
+conservative dependency scan across possible definitions, not a computed
+style evaluator.
+
+On Windows 11 x64, verify that a variable defined in `a/vars.css` and used
+in `b/main.css` includes `b/icon.png` without a false `a/icon.png` warning.
+Also cover same-file use, an HTML style-attribute use, an unused variable,
+and a variable cycle. Re-run the locked Infrastructure suite and production
+x64 package build.

@@ -138,6 +138,114 @@ public sealed class StaticHtmlDependencyScannerTests
     }
 
     [Fact]
+    public async Task CustomPropertyUrlUsesStylesheetWhereVariableIsUsed()
+    {
+        MemorySource source = new(
+            ("guide.html", """
+                <link rel="stylesheet" href="a/vars.css">
+                <link rel="stylesheet" href="b/main.css">
+                <div class="chapter"></div>
+                """),
+            ("a/vars.css", ":root { --bg: url(icon.png) }"),
+            ("b/main.css", ".chapter { background: var(--bg) }"),
+            ("b/icon.png", "image"));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner()
+            .ScanAsync("guide.html", source);
+
+        Assert.Equal(
+            ["a/vars.css", "b/icon.png", "b/main.css", "guide.html"],
+            manifest.Assets.Select(asset => asset.RelativePath));
+        Assert.Contains(manifest.References, reference =>
+            reference.RelativePath == "b/icon.png" &&
+            reference.Status == StaticReferenceStatus.Included);
+        Assert.DoesNotContain(manifest.References, reference =>
+            reference.RelativePath == "a/icon.png");
+    }
+
+    [Fact]
+    public async Task InlineStyleUsesCustomPropertyUrlAtHtmlEntry()
+    {
+        MemorySource source = new(
+            ("guide.html", """
+                <link rel="stylesheet" href="css/vars.css">
+                <div style="background: var(--bg)"></div>
+                """),
+            ("css/vars.css", """
+                :root { --inner: url(icon.png); --bg: var(--inner) }
+                """),
+            ("icon.png", "image"));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner()
+            .ScanAsync("guide.html", source);
+
+        Assert.Equal(
+            ["css/vars.css", "guide.html", "icon.png"],
+            manifest.Assets.Select(asset => asset.RelativePath));
+        Assert.DoesNotContain(manifest.References, reference =>
+            reference.RelativePath == "css/icon.png");
+    }
+
+    [Fact]
+    public async Task UnusedCustomPropertyUrlDoesNotBecomeMissingAsset()
+    {
+        MemorySource source = new(
+            ("guide.html", """<link rel="stylesheet" href="css/vars.css">"""),
+            ("css/vars.css", ":root { --unused: url(icon.png) }"));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner()
+            .ScanAsync("guide.html", source);
+
+        Assert.Equal(
+            ["css/vars.css", "guide.html"],
+            manifest.Assets.Select(asset => asset.RelativePath));
+        Assert.Single(manifest.References);
+    }
+
+    [Fact]
+    public async Task CustomPropertyDependencyCycleTerminates()
+    {
+        MemorySource source = new(
+            ("guide.html", """
+                <style>
+                    :root { --a: var(--b); --b: var(--a) }
+                    .chapter { background: var(--a) }
+                </style>
+                """));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner()
+            .ScanAsync("guide.html", source);
+
+        Assert.Equal(["guide.html"],
+            manifest.Assets.Select(asset => asset.RelativePath));
+        Assert.Empty(manifest.References);
+    }
+
+    [Fact]
+    public async Task RepeatedVariableUseSharesOneUseSite()
+    {
+        MemorySource source = new(
+            ("guide.html", """
+                <style>
+                    :root { --bg: url(icon.png) }
+                    .chapter {
+                        background: var(--bg);
+                        border-image: var(--bg);
+                    }
+                </style>
+                """),
+            ("icon.png", "image"));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner(
+                new StaticHtmlScanLimits(MaxReferences: 2))
+            .ScanAsync("guide.html", source);
+
+        Assert.Equal(["guide.html", "icon.png"],
+            manifest.Assets.Select(asset => asset.RelativePath));
+        Assert.Single(manifest.References);
+    }
+
+    [Fact]
     public async Task ImageSetStringsAndUrlFunctionsAreIncluded()
     {
         MemorySource source = new(

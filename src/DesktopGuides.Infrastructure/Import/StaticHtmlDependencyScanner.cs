@@ -54,11 +54,20 @@ public sealed class StaticHtmlDependencyScanner
         private readonly Dictionary<string, StaticAsset> assets =
             new(StringComparer.Ordinal);
         private readonly List<StaticAssetReference> references = [];
+        private readonly Dictionary<string, List<string>> customPropertyImages =
+            new(StringComparer.Ordinal);
+        private readonly Dictionary<string, List<string>> customPropertyVariables =
+            new(StringComparer.Ordinal);
+        private readonly HashSet<(CssDeclarationReferenceKind Kind,
+            string Property, string Value)> seenVariableDefinitions = [];
+        private readonly List<(string SourcePath, string Name)> variableUses = [];
+        private readonly HashSet<(string SourcePath, string Name)> seenVariableUses = [];
         private readonly HtmlParser htmlParser = new();
         private readonly CssParser cssParser = new();
         private long totalBytes;
         private int cssRuleCount;
         private long cssRuleCandidates;
+        private int variableTokenCount;
 
         public async Task<StaticHtmlManifest> ScanAsync(string entryPath)
         {
@@ -129,6 +138,7 @@ public sealed class StaticHtmlDependencyScanner
                         entryPath, inlineStyle, inlineStyle: true);
                 }
             }
+            await ScanCustomPropertyUrlsAsync();
             return new StaticHtmlManifest(
                 assets.Values.OrderBy(asset => asset.RelativePath,
                     StringComparer.Ordinal).ToArray(),
@@ -291,12 +301,92 @@ public sealed class StaticHtmlDependencyScanner
             string css,
             bool inlineStyle = false)
         {
-            foreach (string target in CssUrlReferences.ExtractDeclarations(
-                css, inlineStyle))
+            foreach (CssDeclarationReference reference in
+                CssUrlReferences.ExtractDeclarations(css, inlineStyle))
             {
-                await ReadHtmlReferenceAsync(
-                    sourcePath, target, StaticAssetKind.Image, 0);
+                if (reference.Kind == CssDeclarationReferenceKind.Image)
+                {
+                    await ReadHtmlReferenceAsync(
+                        sourcePath, reference.Value, StaticAssetKind.Image, 0);
+                    continue;
+                }
+                if (reference.CustomProperty is string property)
+                {
+                    if (!seenVariableDefinitions.Add(
+                        (reference.Kind, property, reference.Value)))
+                    {
+                        continue;
+                    }
+                    ReserveVariableToken();
+                    Dictionary<string, List<string>> map =
+                        reference.Kind == CssDeclarationReferenceKind.CustomPropertyImage
+                            ? customPropertyImages : customPropertyVariables;
+                    AddValue(map, property, reference.Value);
+                }
+                else if (reference.Kind == CssDeclarationReferenceKind.VariableUse &&
+                    seenVariableUses.Add((sourcePath, reference.Value)))
+                {
+                    ReserveVariableToken();
+                    variableUses.Add((sourcePath, reference.Value));
+                }
             }
+        }
+
+        private async Task ScanCustomPropertyUrlsAsync()
+        {
+            foreach (IGrouping<string, (string SourcePath, string Name)> sourceUses
+                in variableUses.GroupBy(use => use.SourcePath,
+                    StringComparer.Ordinal))
+            {
+                HashSet<string> visited = new(StringComparer.Ordinal);
+                Queue<string> pending = new(
+                    sourceUses.Select(use => use.Name));
+                while (pending.TryDequeue(out string? name))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!visited.Add(name)) continue;
+                    if (customPropertyImages.TryGetValue(name,
+                        out List<string>? targets))
+                    {
+                        foreach (string target in targets)
+                        {
+                            await ReadHtmlReferenceAsync(
+                                sourceUses.Key, target, StaticAssetKind.Image, 0);
+                        }
+                    }
+                    if (customPropertyVariables.TryGetValue(name,
+                        out List<string>? dependencies))
+                    {
+                        foreach (string dependency in dependencies)
+                        {
+                            pending.Enqueue(dependency);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void ReserveVariableToken()
+        {
+            if (++variableTokenCount > limits.MaxReferences)
+            {
+                throw Limit(
+                    StaticScanLimit.ReferenceCount,
+                    "Too many CSS variable references.");
+            }
+        }
+
+        private static void AddValue(
+            Dictionary<string, List<string>> map,
+            string key,
+            string value)
+        {
+            if (!map.TryGetValue(key, out List<string>? values))
+            {
+                values = [];
+                map.Add(key, values);
+            }
+            values.Add(value);
         }
 
         private void AddUnsupportedReference(string sourcePath, string target)
