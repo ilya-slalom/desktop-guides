@@ -317,6 +317,23 @@ jobs:
           if ($packages.Count -ne 1) {
             throw "Expected one x64 toolbar test package, found $($packages.Count)."
           }
+          & pwsh -NoProfile -File ./tools/p1/windows_reader_toolbar_install.ps1 `
+            -PackagePath $packages[0].FullName `
+            -ResultDirectory artifacts/reader-toolbar-ui/timeout `
+            -SimulateSmokeTimeoutAfterInstall
+          if ($LASTEXITCODE -ne 1) {
+            throw "Timeout fixture returned $LASTEXITCODE instead of its expected failure."
+          }
+          $timeout = Get-Content `
+            artifacts/reader-toolbar-ui/timeout/signed-install.json -Raw |
+            ConvertFrom-Json
+          if ($timeout.success -or -not $timeout.parentStoppedProcess -or
+              -not $timeout.parentRemovedPackage -or
+              $timeout.error -notmatch 'Simulated toolbar smoke timeout after installation' -or
+              $timeout.packageStillInstalled -or $timeout.processStillRunning -or
+              $timeout.certificateStillTrusted -or $timeout.taskStillRegistered) {
+            throw 'Timeout fixture did not clean up the installed toolbar package.'
+          }
           & ./tools/p1/windows_reader_toolbar_install.ps1 `
             -PackagePath $packages[0].FullName `
             -ResultDirectory artifacts/reader-toolbar-ui
@@ -326,7 +343,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: reader-toolbar-ui
-          path: artifacts/reader-toolbar-ui/*.json
+          path: |
+            artifacts/reader-toolbar-ui/*.json
+            artifacts/reader-toolbar-ui/timeout/*.json
           if-no-files-found: warn
 
   native-arm64-core:

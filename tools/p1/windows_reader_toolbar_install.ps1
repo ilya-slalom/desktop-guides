@@ -3,16 +3,20 @@ param(
     [string] $PackagePath,
 
     [Parameter(Mandatory = $true)]
-    [string] $ResultDirectory
+    [string] $ResultDirectory,
+
+    [switch] $SimulateSmokeTimeoutAfterInstall
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $packageName = Split-Path $PackagePath -Leaf
-if ($packageName -notmatch
-    '^DesktopGuides\.ReaderToolbarSmoke_[0-9]+(\.[0-9]+){3}_x64\.msix$') {
+$packageMatch = [regex]::Match($packageName,
+    '^DesktopGuides\.ReaderToolbarSmoke_(?<version>[0-9]+(?:\.[0-9]+){3})_x64\.msix$')
+if (-not $packageMatch.Success) {
     throw "Expected an x64 toolbar test MSIX, got $packageName."
 }
+$expectedVersion = $packageMatch.Groups['version'].Value
 if (-not @(Get-Process explorer -ErrorAction SilentlyContinue |
     Where-Object {
         $_.SessionId -eq [System.Diagnostics.Process]::GetCurrentProcess().SessionId
@@ -33,12 +37,15 @@ $ResultDirectory = (Resolve-Path $ResultDirectory).Path
 $signed = Join-Path $ResultDirectory 'reader-toolbar-signed-x64.msix'
 $public = Join-Path $ResultDirectory 'test-certificate.cer'
 $smokeResult = Join-Path $ResultDirectory 'toolbar-ui.json'
+$pauseMarker = Join-Path $ResultDirectory 'installed-before-timeout.txt'
 $invocationId = [Guid]::NewGuid().ToString('N')
 $taskName = 'DesktopGuides-P1-Toolbar-' + $invocationId
 $report = [ordered]@{
     invocationId = $invocationId
     observedAt = (Get-Date).ToUniversalTime().ToString('o')
     sourcePackageSha256 = (Get-FileHash $PackagePath -Algorithm SHA256).Hash
+    parentStoppedProcess = $false
+    parentRemovedPackage = $false
     success = $false
 }
 $certificate = $null
@@ -83,6 +90,9 @@ try {
         ' -PackagePath "' + $signed + '"' +
         ' -ResultPath "' + $smokeResult + '"' +
         ' -InvocationId ' + $invocationId
+    if ($SimulateSmokeTimeoutAfterInstall) {
+        $arguments += ' -PauseAfterInstallPath "' + $pauseMarker + '"'
+    }
     $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
         -Argument $arguments -WorkingDirectory $PSScriptRoot
     $interactive = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
@@ -91,7 +101,22 @@ try {
         -Principal $interactive -Force | Out-Null
     $registered = $true
     Clear-ToolbarSmokeResult $smokeResult
+    Remove-Item -LiteralPath $pauseMarker -ErrorAction SilentlyContinue
     Start-ScheduledTask -TaskName $taskName
+    if ($SimulateSmokeTimeoutAfterInstall) {
+        $deadline = (Get-Date).AddSeconds(30)
+        do {
+            if (Test-Path -LiteralPath $pauseMarker) { break }
+            if (Test-Path -LiteralPath $smokeResult) {
+                throw 'Toolbar smoke ended before the timeout fixture installed.'
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        if (-not (Test-Path -LiteralPath $pauseMarker)) {
+            throw 'Toolbar timeout fixture did not finish installing.'
+        }
+        throw 'Simulated toolbar smoke timeout after installation.'
+    }
     $deadline = (Get-Date).AddSeconds(180)
     do {
         if (Test-Path -LiteralPath $smokeResult) { break }
@@ -121,14 +146,71 @@ catch {
     $report.error = $_ | Out-String
 }
 finally {
+    $taskReady = $true
     if ($registered) {
         $task = Get-ScheduledTask -TaskName $taskName `
             -ErrorAction SilentlyContinue
         if ($task -and $task.State -ne 'Ready') {
             Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
         }
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $task = Get-ScheduledTask -TaskName $taskName `
+                -ErrorAction SilentlyContinue
+            if (-not $task -or $task.State -eq 'Ready') { break }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        if ($task -and $task.State -ne 'Ready') {
+            $taskReady = $false
+            $report.taskCleanupError =
+                'Interactive toolbar smoke task is still active.'
+        }
         Unregister-ScheduledTask -TaskName $taskName -Confirm:$false `
             -ErrorAction SilentlyContinue
+    }
+    $installedNow = @(Get-AppxPackage -Name DesktopGuides.ReaderToolbarSmoke)
+    $ownedPackage = @($installedNow | Where-Object {
+        $_.Version.ToString() -eq $expectedVersion -and
+        $_.Architecture.ToString() -eq 'X64'
+    })
+    if ($installedNow.Count -gt 0 -and
+        ($installedNow.Count -ne 1 -or $ownedPackage.Count -ne 1)) {
+        $report.packageCleanupError =
+            'A toolbar package not confirmed as test-owned remains untouched.'
+    }
+    elseif ($ownedPackage.Count -eq 1 -and $taskReady) {
+        $expectedExecutable = Join-Path $ownedPackage[0].InstallLocation `
+            'DesktopGuides.ReaderToolbarSmoke.exe'
+        foreach ($process in @(Get-Process -Name DesktopGuides.ReaderToolbarSmoke `
+            -ErrorAction SilentlyContinue)) {
+            try {
+                if (-not [string]::Equals($process.MainModule.FileName,
+                    $expectedExecutable,
+                    [System.StringComparison]::OrdinalIgnoreCase)) {
+                    continue
+                }
+                if (-not $process.HasExited) {
+                    $process.Kill()
+                    if (-not $process.WaitForExit(10000)) {
+                        throw "Toolbar process $($process.Id) did not exit."
+                    }
+                    $report.parentStoppedProcess = $true
+                }
+            }
+            catch {
+                $report.processCleanupError = $_ | Out-String
+            }
+        }
+        if (-not $report.processCleanupError) {
+            try {
+                Remove-AppxPackage -Package $ownedPackage[0].PackageFullName `
+                    -ErrorAction Stop
+                $report.parentRemovedPackage = $true
+            }
+            catch {
+                $report.packageCleanupError = $_ | Out-String
+            }
+        }
     }
     if ($certificate) {
         if ($imported) {
@@ -141,13 +223,18 @@ finally {
     Remove-Item -LiteralPath $public -ErrorAction SilentlyContinue
     $report.packageStillInstalled =
         [bool](Get-AppxPackage -Name DesktopGuides.ReaderToolbarSmoke)
+    $report.processStillRunning = [bool](
+        Get-Process -Name DesktopGuides.ReaderToolbarSmoke `
+            -ErrorAction SilentlyContinue)
     $report.certificateStillTrusted = if ($certificate) {
         Test-Path "Cert:\LocalMachine\TrustedPeople\$($certificate.Thumbprint)"
     } else { $false }
     $report.taskStillRegistered =
         [bool](Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)
-    if ($report.packageStillInstalled -or $report.certificateStillTrusted -or
-        $report.taskStillRegistered) {
+    if ($report.packageStillInstalled -or $report.processStillRunning -or
+        $report.certificateStillTrusted -or $report.taskStillRegistered -or
+        -not $taskReady -or $report.packageCleanupError -or
+        $report.processCleanupError) {
         $report.success = $false
     }
     $report | ConvertTo-Json -Depth 6 |

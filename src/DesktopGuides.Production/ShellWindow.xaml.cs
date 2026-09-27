@@ -427,8 +427,9 @@ public sealed partial class ShellWindow : Window
                 return;
             }
             navigator.OpenReader(guide.Id, guide.GameId);
-            await RenderCurrentAsync();
-            if (navigator.Current is ReaderRoute opened &&
+            bool rendered = await RenderCurrentAsync();
+            if (rendered &&
+                navigator.Current is ReaderRoute opened &&
                 opened.GuideId == guide.Id &&
                 opened.GameId == guide.GameId)
             {
@@ -449,7 +450,7 @@ public sealed partial class ShellWindow : Window
         }
     }
 
-    private async Task RenderCurrentAsync()
+    private async Task<bool> RenderCurrentAsync()
     {
         int generation = ++renderGeneration;
         guideFocusRenderGeneration = -1;
@@ -486,7 +487,7 @@ public sealed partial class ShellWindow : Window
                         : null;
                     if (generation != renderGeneration)
                     {
-                        return;
+                        return false;
                     }
                     GameList.ItemsSource = games;
                     LibraryEmpty.Visibility =
@@ -523,20 +524,20 @@ public sealed partial class ShellWindow : Window
                     Game? game = await library.GetGameAsync(gameRoute.GameId);
                     if (generation != renderGeneration)
                     {
-                        return;
+                        return false;
                     }
                     if (game is null)
                     {
                         navigator.ResetToLibrary();
                         await RenderCurrentAsync();
                         ShellStatus.Text = "This game is no longer in your library.";
-                        return;
+                        return false;
                     }
                     IReadOnlyList<Guide> guides =
                         await library.ListGuidesAsync(gameRoute.GameId);
                     if (generation != renderGeneration)
                     {
-                        return;
+                        return false;
                     }
                     GameHeading.Text = game.Title;
                     GamePlatform.Text = game.Platform ?? string.Empty;
@@ -586,26 +587,26 @@ public sealed partial class ShellWindow : Window
                     Guide? guide = await library.GetGuideAsync(readerRoute.GuideId);
                     if (generation != renderGeneration)
                     {
-                        return;
+                        return false;
                     }
                     if (guide is null || guide.GameId != readerRoute.GameId)
                     {
                         navigator.ResetToLibrary();
                         await RenderCurrentAsync();
                         ShellStatus.Text = "This guide is no longer in your library.";
-                        return;
+                        return false;
                     }
                     Game? readerGame = await library.GetGameAsync(readerRoute.GameId);
                     if (generation != renderGeneration)
                     {
-                        return;
+                        return false;
                     }
                     if (readerGame is null)
                     {
                         navigator.ResetToLibrary();
                         await RenderCurrentAsync();
                         ShellStatus.Text = "This game is no longer in your library.";
-                        return;
+                        return false;
                     }
                     ReaderHeading.Text = guide.Title;
                     ReaderGameName.Text = readerGame.Title;
@@ -618,6 +619,7 @@ public sealed partial class ShellWindow : Window
                     ShellStatus.Text = "Settings ready.";
                     break;
             }
+            return true;
         }
         catch (Exception error)
         {
@@ -625,6 +627,7 @@ public sealed partial class ShellWindow : Window
             {
                 ShellStatus.Text = $"Could not load this view: {error.Message}";
             }
+            return false;
         }
     }
 

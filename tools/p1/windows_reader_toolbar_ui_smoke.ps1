@@ -7,7 +7,9 @@ param(
 
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^[0-9a-f]{32}$')]
-    [string] $InvocationId
+    [string] $InvocationId,
+
+    [string] $PauseAfterInstallPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -56,6 +58,11 @@ try {
     } while ((Get-Date) -lt $deadline)
     if ($process.MainWindowHandle -eq 0) {
         throw 'Toolbar test app did not open a window.'
+    }
+    if ($PauseAfterInstallPath) {
+        Set-Content -LiteralPath $PauseAfterInstallPath `
+            -Value $installed.PackageFullName -Encoding ASCII
+        Start-Sleep -Seconds 60
     }
     $root = [System.Windows.Automation.AutomationElement]::FromHandle(
         $process.MainWindowHandle)
@@ -157,6 +164,23 @@ try {
         throw 'The CommandBar overflow button was not visible.'
     }
 
+    function Close-Overflow {
+        Invoke-Element (Find-ById 'MoreButton')
+        [void](Wait-HiddenByName 'Go to page')
+    }
+
+    function Wait-FocusedCommand([string] $name) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $element = Find-VisibleByName $name
+            if ($element -and $element.Current.HasKeyboardFocus) {
+                return $element
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Keyboard focus did not return to '$name' after its dialog."
+    }
+
     function Enter-DialogText([string] $value, [string] $submit) {
         $deadline = (Get-Date).AddSeconds(15)
         do {
@@ -195,12 +219,18 @@ try {
     Invoke-Element (Wait-VisibleByName 'Go to page')
     Enter-DialogText '3' 'Go'
     Wait-Action 'Page jump 3'
+    [void](Wait-FocusedCommand 'Go to page')
+    $report.phases += 'page-dialog-restores-overflow-focus'
+    Close-Overflow
     Open-Overflow
     Invoke-Command 'Fit to width' 'Fit to width'
     Open-Overflow
     Invoke-Element (Wait-VisibleByName 'Find in guide')
     Enter-DialogText 'boss' 'Find'
     Wait-Action 'Find boss'
+    [void](Wait-FocusedCommand 'Find in guide')
+    $report.phases += 'find-dialog-restores-overflow-focus'
+    Close-Overflow
     $report.phases += 'all-capabilities-dispatch'
 
     Invoke-Id 'NarrowToolbar'

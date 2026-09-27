@@ -275,6 +275,30 @@ first Reader cannot open before the later selection. The installed shell
 checks, locked headless suite, and Release x64/ARM64 production package
 builds remain the exit gate.
 
+### T11.3 render, cleanup, and keyboard-focus review follow-up
+
+`RenderCurrentAsync` catches view-loading errors. Checking only that the
+route still says Reader can therefore save Resume after the Reader failed
+to load. Return an explicit render success result and save Resume only
+when the matching Reader finishes rendering. Checking the status text
+would couple persistence to user-facing copy.
+
+The toolbar test worker normally uninstalls its MSIX. If the interactive
+task times out and is stopped, its `finally` block may not run. After the
+task has stopped, the parent installer must also remove the test-owned
+package and verify cleanup. Keep its fresh-package preflight so a package
+that existed before the run is never treated as test-owned. Exercise a
+controlled timeout after install and then a normal install on the same
+runner to prove recovery.
+
+Go to page and Find in guide live in the CommandBar overflow. On dialog
+close, reopen that overflow and restore keyboard focus to the invoking
+command while it remains available; if capabilities changed, try another
+visible reader command. The linked production-toolbar UI test must
+confirm focus returns after both dialogs, alongside its existing action
+and overflow checks. The intended visual direction remains the quiet
+guide workspace; this change adds no persistent chrome.
+
 ### T11.1 review follow-up: close handoff and installed gate
 
 The shell must allow a new window to appear while the old one drains, but

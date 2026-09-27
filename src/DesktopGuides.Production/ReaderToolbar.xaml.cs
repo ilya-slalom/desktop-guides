@@ -140,11 +140,45 @@ public sealed partial class ReaderToolbar : UserControl
         }
         finally
         {
-            if (ReferenceEquals(session, expectedSession))
-            {
-                invokingControl.Focus(FocusState.Programmatic);
-            }
+            RestorePromptFocus(invokingControl, expectedSession);
         }
+    }
+
+    private void RestorePromptFocus(
+        Control invokingControl, IReaderSession expectedSession)
+    {
+        if (!ReferenceEquals(session, expectedSession) ||
+            Commands.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        // Dialog commands live in overflow, which closes when they are invoked.
+        Commands.IsOpen = true;
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (!ReferenceEquals(session, expectedSession))
+            {
+                return;
+            }
+            if (invokingControl.Visibility == Visibility.Visible &&
+                invokingControl.Focus(FocusState.Keyboard))
+            {
+                return;
+            }
+            foreach (Control command in new Control[]
+            {
+                PreviousPage, NextPage, SmallerText, LargerText,
+                ZoomOut, ZoomIn, GoToPage, FitToWidth, FindInGuide
+            })
+            {
+                if (command.Visibility == Visibility.Visible &&
+                    command.Focus(FocusState.Keyboard))
+                {
+                    return;
+                }
+            }
+        });
     }
 
     private async void PreviousPageClicked(object sender, RoutedEventArgs args) =>
