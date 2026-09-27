@@ -28,11 +28,17 @@ public enum StaticScanLimit
     CssRuleCount
 }
 
+/// <summary>
+/// RelativePath is the safe managed-file path. RequestRelativePath is the
+/// decoded URL lookup path for the later reader allowlist; never open it as
+/// a filesystem path.
+/// </summary>
 public sealed record StaticAsset(
     string RelativePath,
     StaticAssetKind Kind,
     long ByteCount,
-    string Sha256);
+    string Sha256,
+    string RequestRelativePath);
 
 public sealed record StaticAssetReference(
     string SourceRelativePath,

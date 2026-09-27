@@ -1,6 +1,7 @@
 # P1 implementation plan and exit gates
 
-Status: M0 merged; M1 in progress; M2–M6 planned, 27 September 2026.
+Status: M0 merged; M1 in progress; M2 in progress; M3–M6 planned,
+27 September 2026.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
 This plan orders all **16 P1 stories and 49 tasks** in the
@@ -572,6 +573,11 @@ canceled import leaves no visible partial guide. Establish crash recovery
 before first publication. Implement T07.1–T07.2 before import validation;
 complete S07's WebView2 policy in M3.
 
+T07.1 was merged through PR #9 on 27 September 2026, merge commit
+`7039aef8127f4fcf45f1547344b4e88dad849b59`. The
+[T07.2 boundary plan](t07-static-boundary-plan.md) follows its scanner
+contract.
+
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
 | T04.1 | T03.2, T11.1 | Add/Edit game dialogs and validation. Unicode, duplicate-title, optional-field, cancel, and keyboard cases pass without unintended writes. | TR03.1 |
@@ -580,7 +586,7 @@ complete S07's WebView2 policy in M3.
 | T05.2 | T05.1 | Case-insensitive metadata title search with empty/loading/no-results states. Mixed-case and non-ASCII tests pass offline without reading guide bytes; unread rows say `Not started`. | TR05.1, TR05.2 |
 | T06.1 | T04.1, T11.1 | Window-owned file picker, game-scoped import preview, warnings, and cancelable progress UI. Cancel before Confirm creates neither a guide nor staged files. | TR06.1 |
 | T07.1 | T03.3 | Bounded HTML/CSS dependency parser and static-asset manifest with pinned, license-reviewed parser dependencies. Nested local CSS, `srcset`, cycles, and over-budget fixture tests pass. | TR07.1, TR07.3 |
-| T07.2 | T03.3, T07.1 | Preview warnings and path checks for missing, unsupported, remote, escaping, and changed assets. NTFS junction/case-collision tests and post-copy revalidation pass. | TR07.1, TR07.3 |
+| T07.2 | T03.3, T07.1 | Preview warnings and path checks for missing, unsupported, remote, escaping, and changed assets. A percent-named entry's matching `_files` assets receive safe managed names and validated request-path mappings. NTFS junction/case-collision tests and post-copy revalidation pass. | TR07.1, TR07.3 |
 | T06.2 | T06.1, T07.1, T07.2, T10.0 | Typed import validation for TXT encoding, one static HTML entry, and readable PDF/password cases. Unsupported, encrypted-unreadable, and size-limit inputs produce distinct errors before publication. | TR06.1, TR06.2 |
 | T06.3 | T03.2, T03.3, T06.2, T15.2 | Staged streaming copy, fingerprints, prepared journal, same-volume rename, and transactional metadata publication. Original-removal, cancellation, crash-point, disk/copy, and failed-commit tests show no partial listed guide. | TR06.1–TR06.3 |
 | T06.4 | T06.3 | Duplicate fingerprint choice (`Open existing` / `Import another copy`) and typed errors. Repeated import never overwrites; a second copy has its own Guide ID and state. | TR06.3 |

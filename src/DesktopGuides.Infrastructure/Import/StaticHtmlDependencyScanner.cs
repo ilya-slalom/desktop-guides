@@ -519,13 +519,16 @@ public sealed class StaticHtmlDependencyScanner
             }
             byte[] bytes = output.ToArray();
             totalBytes += bytes.Length;
+            string requestPath = source is IStaticHtmlRootPathMap pathMap
+                ? pathMap.ToRequestPath(path) : path;
             assets.Add(path, new StaticAsset(
                 path, kind, bytes.LongLength,
-                Convert.ToHexStringLower(SHA256.HashData(bytes))));
+                Convert.ToHexStringLower(SHA256.HashData(bytes)),
+                requestPath));
             return bytes;
         }
 
-        private static (string? Path, StaticReferenceStatus? Issue)
+        private (string? Path, StaticReferenceStatus? Issue)
             NormalizeReference(string sourcePath, string raw)
         {
             string target = raw.Trim();
@@ -554,7 +557,6 @@ public sealed class StaticHtmlDependencyScanner
             }
             if (target.StartsWith('/') ||
                 target.Contains('\\') ||
-                target.Contains('%') ||
                 target.Contains(':'))
             {
                 return (null, StaticReferenceStatus.Unsafe);
@@ -572,7 +574,25 @@ public sealed class StaticHtmlDependencyScanner
                 {
                     return (null, StaticReferenceStatus.Unsafe);
                 }
-                segments.Add(segment);
+                string managedSegment = segment;
+                if (segments.Count == 0 &&
+                    source is IStaticHtmlRootPathMap pathMap)
+                {
+                    if (pathMap.TryMapRootSegment(
+                        segment, out string mappedSegment))
+                    {
+                        managedSegment = mappedSegment;
+                    }
+                    else if (pathMap.IsManagedRootAlias(segment))
+                    {
+                        return (null, StaticReferenceStatus.Unsafe);
+                    }
+                }
+                if (managedSegment.Contains('%'))
+                {
+                    return (null, StaticReferenceStatus.Unsafe);
+                }
+                segments.Add(managedSegment);
             }
             string normalized = string.Join('/', segments);
             try
