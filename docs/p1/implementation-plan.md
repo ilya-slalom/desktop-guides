@@ -576,7 +576,10 @@ complete S07's WebView2 policy in M3.
 T07.1 was merged through PR #9 on 27 September 2026, merge commit
 `7039aef8127f4fcf45f1547344b4e88dad849b59`. The
 [T07.2 boundary plan](t07-static-boundary-plan.md) follows its scanner
-contract.
+contract. T07.2 was merged through PR #10 on 27 September 2026, merge
+commit `72f43785fad2b01b3f79b739017f0623d46b6665`. The
+[T04.1 game editor plan](t04-game-editor-plan.md) is the next M2 dependency
+for import UI.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |

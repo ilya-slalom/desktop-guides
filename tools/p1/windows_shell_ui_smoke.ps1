@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('empty', 'normal', 'stale', 'long-list', 'switch-game',
+    [ValidateSet('empty', 'game-editor', 'game-editor-persisted',
+        'normal', 'stale', 'long-list', 'switch-game',
         'switch-game-prepare', 'switch-game-loading', 'queue-guide',
         'queue-guide-write', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
@@ -95,6 +96,37 @@ try {
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
         throw "Expected visible '$id' named '$expected'."
+    }
+
+    function Wait-VisibleById([string] $id) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $element = Find-ById $id
+            if ($element -and -not $element.Current.IsOffscreen) {
+                return $element
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected visible '$id'."
+    }
+
+    function Set-Text([string] $id, [string] $value) {
+        $element = Wait-VisibleById $id
+        $pattern = $element.GetCurrentPattern(
+            [System.Windows.Automation.ValuePattern]::Pattern)
+        $pattern.SetValue($value)
+    }
+
+    function Wait-EditorClosed {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $element = Find-ById 'GameTitleInput'
+            if (-not $element -or $element.Current.IsOffscreen) {
+                return
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw 'Game editor stayed open after Cancel.'
     }
 
     function Invoke-Element($element) {
@@ -452,6 +484,81 @@ try {
             throw 'An empty library exposed Resume.'
         }
         $report.phases += 'empty-library'
+    }
+    elseif ($Mode -eq 'game-editor') {
+        $title = "Pok$([char]0x00E9)mon Mystery Dungeon"
+        $renamed = "$title DX"
+        Invoke-Element (Wait-Name 'AddGameButton' 'Add game')
+        [void](Wait-Name 'GameTitleFeedback' 'Enter a title to continue.')
+        $report.addGameScreenshot = Save-WindowScreenshot 'add-game'
+        Set-Text 'GameTitleInput' '   '
+        [void](Wait-Name 'GameTitleFeedback' 'Enter a title to continue.')
+        Press-Enter (Wait-VisibleById 'GameTitleInput')
+        [void](Wait-VisibleById 'GameTitleInput')
+        Set-Text 'GameTitleInput' 'Discarded game'
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+        Wait-EditorClosed
+        [void](Wait-Name 'LibraryEmpty' 'No games in your library.')
+        $report.phases += 'cancel-and-invalid-title-leave-empty-library'
+
+        Invoke-Element (Wait-Name 'AddGameButton' 'Add game')
+        Set-Text 'GameTitleInput' " $title "
+        Set-Text 'GamePlatformInput' ' Windows '
+        Set-Text 'GameNotesInput' '  Explore the postgame.  '
+        Press-Enter (Wait-VisibleById 'GameTitleInput')
+        [void](Wait-Name 'GameHeading' $title)
+        [void](Wait-Name 'GamePlatform' 'Windows')
+        [void](Wait-Name 'GameNotes' 'Explore the postgame.')
+        $report.phases += 'keyboard-add-unicode-and-optional-fields'
+
+        Invoke-Element (Wait-Name 'EditGameButton' 'Edit game')
+        $input = Wait-VisibleById 'GameTitleInput'
+        $value = $input.GetCurrentPattern(
+            [System.Windows.Automation.ValuePattern]::Pattern)
+        if ($value.Current.Value -ne $title) {
+            throw 'Edit game did not load the existing title.'
+        }
+        $report.editGameScreenshot = Save-WindowScreenshot 'edit-game'
+        Set-Text 'GameTitleInput' 'Discarded edit'
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+        Wait-EditorClosed
+        [void](Wait-Name 'GameHeading' $title)
+        $report.phases += 'cancel-edit-preserves-game'
+
+        Invoke-Element (Wait-Name 'EditGameButton' 'Edit game')
+        Set-Text 'GameTitleInput' $renamed
+        Set-Text 'GamePlatformInput' ''
+        Set-Text 'GameNotesInput' ''
+        Press-Enter (Wait-VisibleById 'GameTitleInput')
+        [void](Wait-Name 'GameHeading' $renamed)
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        $report.phases += 'edit-by-id-and-clear-optional-fields'
+
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        Invoke-Element (Wait-Name 'AddGameButton' 'Add game')
+        Set-Text 'GameTitleInput' $renamed
+        Press-Enter (Wait-VisibleById 'GameTitleInput')
+        [void](Wait-Name 'GameHeading' $renamed)
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        $list = Wait-VisibleById 'GameList'
+        $condition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::NameProperty, $renamed)
+        if ($list.FindAll($scope, $condition).Count -ne 2) {
+            throw 'Library did not show two distinct games with the same title.'
+        }
+        $report.phases += 'duplicate-title-games-are-distinct'
+    }
+    elseif ($Mode -eq 'game-editor-persisted') {
+        $renamed = "Pok$([char]0x00E9)mon Mystery Dungeon DX"
+        $list = Wait-VisibleById 'GameList'
+        $condition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::NameProperty, $renamed)
+        if ($list.FindAll($scope, $condition).Count -ne 2) {
+            throw 'Edited and duplicate games were not persisted after relaunch.'
+        }
+        $report.phases += 'edited-and-duplicate-games-survive-relaunch'
     }
     elseif ($Mode -eq 'stale') {
         $resume = Find-ById 'ResumeGuide'

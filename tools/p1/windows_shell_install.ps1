@@ -699,6 +699,10 @@ try {
     $report.emptyAfterDelayedTask = Run-ShellSmoke 'empty'
     Assert-SingleInstance
     $report.emptyAfterSecondLaunch = Run-ShellSmoke 'empty'
+    $report.gameEditor = Run-ShellSmoke 'game-editor'
+    Close-InstalledShell
+    Start-InstalledShell
+    $report.gameEditorPersisted = Run-ShellSmoke 'game-editor-persisted'
 
     Stop-InstalledShell
     dotnet run --project $seedProject -c Release --no-restore -- seed $dataRoot

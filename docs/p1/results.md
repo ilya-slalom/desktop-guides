@@ -12,9 +12,26 @@ The M2 T07.1 scanner verification is recorded in the
 T07.1 was merged into `main` through PR #9 on 27 September 2026 at
 `7039aef8127f4fcf45f1547344b4e88dad849b59`. Its last Windows 11 x64
 run passed 74/74 Infrastructure tests and an unsigned Release x64 MSIX
-build; all 18 CI checks passed. T07.2 is now in progress.
+build; all 18 CI checks passed.
 The T07.2 Windows implementation check is recorded in the
 [static-boundary result](t07-static-boundary-results.md).
+T07.2 was merged into `main` through PR #10 on 27 September 2026 at
+`72f43785fad2b01b3f79b739017f0623d46b6665`. Its final Windows 11 x64
+run passed 89/89 Infrastructure tests and an unsigned Release x64 MSIX build;
+all 18 CI checks passed. T04.1 is the next M2 implementation task.
+
+## M2 T04.1 game editor — implementation check, 27 September 2026
+
+The [game editor plan](t04-game-editor-plan.md) defines the shared Add/Edit
+dialog and repository contract. On the Windows 11 x64 host (build
+`10.0.26200.0`, .NET SDK `10.0.401`), the branch was staged under
+`E:\work\desktop-guides\t04-game-editor-20260927`. Locked Core,
+Infrastructure, and Production restores passed; Release Core tests passed
+**73/73**, Infrastructure tests **90/90**, and an unsigned Release x64
+Production MSIX build passed. The host's existing `mspdbcmf.exe`
+symbols-package warning remains. Both changed PowerShell UI/installer
+scripts passed a Windows PowerShell parser check. The signed installed UI
+scenario and its screenshots are still pending CI.
 
 ## M0 task results
 

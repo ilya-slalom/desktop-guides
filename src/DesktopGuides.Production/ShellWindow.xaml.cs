@@ -29,6 +29,8 @@ public sealed partial class ShellWindow : Window
     private bool ready;
     private bool closeRequested;
     private bool allowClose;
+    private bool gameEditorRequested;
+    private GameEditorDialog? activeGameEditor;
 
     public ShellWindow()
     {
@@ -101,6 +103,7 @@ public sealed partial class ShellWindow : Window
             return;
         }
         closeRequested = true;
+        activeGameEditor?.Hide();
         leaseWait.Cancel();
         Task pendingNavigation = navigationQueue.StopAndDrainAsync();
         Program.ReleaseInstanceKey();
@@ -352,6 +355,104 @@ public sealed partial class ShellWindow : Window
         }
     }
 
+    private async void AddGameClicked(object sender, RoutedEventArgs args)
+    {
+        if (gameEditorRequested || closeRequested)
+        {
+            return;
+        }
+        gameEditorRequested = true;
+        try
+        {
+            await RunNavigationAsync(async () =>
+            {
+                if (navigator.Current is not LibraryRoute)
+                {
+                    return;
+                }
+                Game? created = null;
+                GameEditorDialog editor = new(null, async details =>
+                {
+                    created = await RequireRepository().AddGameAsync(
+                        details.Title, details.Platform, details.Notes);
+                })
+                {
+                    XamlRoot = Navigation.XamlRoot
+                };
+                activeGameEditor = editor;
+                try
+                {
+                    if (await editor.ShowAsync() == ContentDialogResult.Primary &&
+                        created is not null && !closeRequested)
+                    {
+                        navigator.OpenGame(created.Id);
+                        await RenderCurrentAsync();
+                    }
+                }
+                finally
+                {
+                    activeGameEditor = null;
+                }
+            });
+        }
+        finally
+        {
+            gameEditorRequested = false;
+        }
+    }
+
+    private async void EditGameClicked(object sender, RoutedEventArgs args)
+    {
+        if (gameEditorRequested || closeRequested ||
+            navigator.Current is not GameRoute route)
+        {
+            return;
+        }
+        gameEditorRequested = true;
+        try
+        {
+            await RunNavigationAsync(async () =>
+            {
+                if (navigator.Current is not GameRoute current ||
+                    current.GameId != route.GameId)
+                {
+                    return;
+                }
+                Game? game = await RequireRepository().GetGameAsync(route.GameId);
+                if (game is null)
+                {
+                    ShellStatus.Text = "This game is no longer in your library.";
+                    return;
+                }
+                GameEditorDialog editor = new(game, async details =>
+                {
+                    await RequireRepository().UpdateGameAsync(
+                        game.Id, details.Title, details.Platform, details.Notes);
+                })
+                {
+                    XamlRoot = Navigation.XamlRoot
+                };
+                activeGameEditor = editor;
+                try
+                {
+                    if (await editor.ShowAsync() == ContentDialogResult.Primary &&
+                        !closeRequested)
+                    {
+                        await RenderCurrentAsync();
+                    }
+                }
+                finally
+                {
+                    activeGameEditor = null;
+                }
+            });
+        }
+        finally
+        {
+            gameEditorRequested = false;
+        }
+    }
+
     private Task RunNavigationAsync(Func<Task> action) =>
         navigationQueue.RunAsync(async () =>
         {
@@ -542,6 +643,8 @@ public sealed partial class ShellWindow : Window
                         (GuideList.SelectedItem as Guide)?.Id;
                     GameHeading.Text = "Loading game…";
                     GamePlatform.Text = string.Empty;
+                    GameNotes.Text = string.Empty;
+                    EditGameButton.IsEnabled = false;
                     GameEmpty.Visibility = Visibility.Collapsed;
                     GuideList.IsEnabled = false;
                     settingGuideSelection = true;
@@ -574,6 +677,8 @@ public sealed partial class ShellWindow : Window
                     }
                     GameHeading.Text = game.Title;
                     GamePlatform.Text = game.Platform ?? string.Empty;
+                    GameNotes.Text = game.Notes ?? string.Empty;
+                    EditGameButton.IsEnabled = true;
                     Guide? selectedGuide = selectedGuideId is Guid id
                         ? guides.FirstOrDefault(item => item.Id == id)
                         : null;

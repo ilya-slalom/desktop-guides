@@ -30,10 +30,22 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <TextBlock Text="Library"
-                           FontSize="32"
-                           FontWeight="SemiBold"
-                           AutomationProperties.AutomationId="LibraryHeading" />
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Library"
+                               FontSize="32"
+                               FontWeight="SemiBold"
+                               AutomationProperties.AutomationId="LibraryHeading" />
+                    <Button x:Name="AddGameButton"
+                            Grid.Column="1"
+                            Content="Add game"
+                            VerticalAlignment="Center"
+                            Click="AddGameClicked"
+                            AutomationProperties.AutomationId="AddGameButton" />
+                </Grid>
                 <Button x:Name="ResumeButton"
                         Grid.Row="1"
                         Visibility="Collapsed"
@@ -59,13 +71,31 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <TextBlock x:Name="GameHeading"
-                           FontSize="32"
-                           FontWeight="SemiBold"
-                           AutomationProperties.AutomationId="GameHeading" />
-                <TextBlock x:Name="GamePlatform"
-                           Grid.Row="1"
-                           TextWrapping="Wrap" />
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="GameHeading"
+                               FontSize="32"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap"
+                               AutomationProperties.AutomationId="GameHeading" />
+                    <Button x:Name="EditGameButton"
+                            Grid.Column="1"
+                            Content="Edit game"
+                            VerticalAlignment="Center"
+                            Click="EditGameClicked"
+                            AutomationProperties.AutomationId="EditGameButton" />
+                </Grid>
+                <StackPanel Grid.Row="1" Spacing="6">
+                    <TextBlock x:Name="GamePlatform"
+                               TextWrapping="Wrap"
+                               AutomationProperties.AutomationId="GamePlatform" />
+                    <TextBlock x:Name="GameNotes"
+                               TextWrapping="Wrap"
+                               AutomationProperties.AutomationId="GameNotes" />
+                </StackPanel>
                 <Grid Grid.Row="2">
                     <TextBlock x:Name="GameEmpty"
                                Text="No guides in this game."
