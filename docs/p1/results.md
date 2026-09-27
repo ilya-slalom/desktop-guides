@@ -788,3 +788,31 @@ could not be resolved, as recorded in its
 [diagnostic trace](evidence/ci/reader-toolbar-exclusive-install/ci-startup-failure.json).
 The controller now starts child installers with its own PowerShell
 executable, matching both the CI and local-host environments.
+
+### T11.3 toolbar process-scope review follow-up — 27 September 2026
+
+The toolbar test task now writes a fresh process handoff after launching
+its app. Parent cleanup validates the invocation, package, PID, creation
+time, session, and executable before opening an owned process handle.
+Only that handle can be terminated or counted as a leftover. The installed
+overlap fixture keeps an unrelated process with the same name alive through
+timeout cleanup and requires it to survive.
+
+The Windows 11 x64 host under `E:\work\desktop-guides` parsed all three
+changed PowerShell scripts. Its
+[interactive result](evidence/host/reader-toolbar-process-scope/review-result.json)
+reports desktop session 1, matching timeout and normal handoffs, and a
+passing timeout-to-reinstall sequence. The
+[overlap trace](evidence/host/reader-toolbar-process-scope/overlap-result.json)
+records that the contender was rejected while the first app survived,
+and that the unrelated same-name process survived the first cleanup.
+The [timeout handoff](evidence/host/reader-toolbar-process-scope/timeout-process.json)
+identifies the stopped process. The
+[timeout cleanup](evidence/host/reader-toolbar-process-scope/timeout-install.json)
+removed its package, task, and temporary trust entry after the simulated
+inspection error. The
+[normal install](evidence/host/reader-toolbar-process-scope/normal-install.json)
+and [toolbar UI trace](evidence/host/reader-toolbar-process-scope/toolbar-ui.json)
+passed with no test-owned package or process left; its
+[handoff](evidence/host/reader-toolbar-process-scope/normal-process.json)
+matches the install invocation.

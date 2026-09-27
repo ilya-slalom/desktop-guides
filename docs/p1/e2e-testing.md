@@ -145,6 +145,11 @@ preflight through cleanup. While the first timeout run holds its installed
 package and process, start a second run for the same identity. It must
 fail before setup and leave the first package and process intact; after
 releasing the first run, require its cleanup before the normal install.
+The toolbar task writes a fresh process handoff with its invocation ID, PID,
+start time, session, package, and executable path. Parent timeout cleanup
+stops only that verified process. Keep an unrelated same-name process alive
+during the overlap fixture; it must survive and must not count as a leaked
+test process.
 
 ## Scenario checklist
 

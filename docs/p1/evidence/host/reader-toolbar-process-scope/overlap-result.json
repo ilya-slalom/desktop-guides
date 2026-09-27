@@ -1,0 +1,13 @@
+﻿{
+    "observedAt":  "2026-09-27T07:01:51.2046713Z",
+    "shellExecutable":  "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "contenderRejected":  true,
+    "firstPackagePreserved":  true,
+    "firstProcessPreserved":  true,
+    "firstCleanupVerified":  true,
+    "unrelatedProcessPreserved":  true,
+    "success":  true,
+    "firstPackageFullName":  "DesktopGuides.ReaderToolbarSmoke_0.1.0.0_x64__en8r599z3n35j",
+    "firstProcessId":  60692,
+    "contenderExitCode":  1
+}

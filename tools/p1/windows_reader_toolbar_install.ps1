@@ -61,6 +61,7 @@ $ResultDirectory = (Resolve-Path $ResultDirectory).Path
 $signed = Join-Path $ResultDirectory 'reader-toolbar-signed-x64.msix'
 $public = Join-Path $ResultDirectory 'test-certificate.cer'
 $smokeResult = Join-Path $ResultDirectory 'toolbar-ui.json'
+$processHandoff = Join-Path $ResultDirectory 'toolbar-process.json'
 $pauseMarker = Join-Path $ResultDirectory 'installed-before-timeout.txt'
 $invocationId = [Guid]::NewGuid().ToString('N')
 $taskName = 'DesktopGuides-P1-Toolbar-' + $invocationId
@@ -76,6 +77,9 @@ $report = [ordered]@{
 $certificate = $null
 $imported = $false
 $registered = $false
+if (-not ('DesktopGuidesOwnedProcess' -as [type])) {
+    Add-Type -Path (Join-Path $PSScriptRoot 'windows_owned_process.cs')
+}
 . (Join-Path $PSScriptRoot 'windows_reader_toolbar_smoke_result.ps1')
 
 try {
@@ -114,7 +118,8 @@ try {
         '-ExecutionPolicy Bypass -File "' + $script + '"' +
         ' -PackagePath "' + $signed + '"' +
         ' -ResultPath "' + $smokeResult + '"' +
-        ' -InvocationId ' + $invocationId
+        ' -InvocationId ' + $invocationId +
+        ' -ProcessHandoffPath "' + $processHandoff + '"'
     if ($SimulateSmokeTimeoutAfterInstall) {
         $arguments += ' -PauseAfterInstallPath "' + $pauseMarker + '"'
     }
@@ -126,7 +131,8 @@ try {
         -Principal $interactive -Force | Out-Null
     $registered = $true
     Clear-ToolbarSmokeResult $smokeResult
-    Remove-Item -LiteralPath $pauseMarker -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $pauseMarker, $processHandoff,
+        "$processHandoff.tmp" -ErrorAction SilentlyContinue
     Start-ScheduledTask -TaskName $taskName
     if ($SimulateSmokeTimeoutAfterInstall) {
         $deadline = (Get-Date).AddSeconds(30)
@@ -184,6 +190,7 @@ catch {
 }
 finally {
     $taskReady = $true
+    $ownedProcess = $null
     if ($registered) {
         $task = Get-ScheduledTask -TaskName $taskName `
             -ErrorAction SilentlyContinue
@@ -210,37 +217,65 @@ finally {
         $_.Version.ToString() -eq $expectedVersion -and
         $_.Architecture.ToString() -eq 'X64'
     })
+    if (Test-Path -LiteralPath $processHandoff) {
+        try {
+            $handoff = Get-Content -LiteralPath $processHandoff -Raw |
+                ConvertFrom-Json
+            $expectedExecutable = if ($ownedPackage.Count -eq 1) {
+                Join-Path $ownedPackage[0].InstallLocation `
+                    'DesktopGuides.ReaderToolbarSmoke.exe'
+            } else {
+                [string]$handoff.executablePath
+            }
+            $expectedFullName =
+                "^DesktopGuides\.ReaderToolbarSmoke_$(
+                    [regex]::Escape($expectedVersion))_x64__"
+            if ($handoff.invocationId -ne $invocationId -or
+                $handoff.packageFullName -notmatch $expectedFullName -or
+                ($ownedPackage.Count -eq 1 -and
+                    $handoff.packageFullName -ne
+                        $ownedPackage[0].PackageFullName) -or
+                $handoff.sessionId -ne
+                    [System.Diagnostics.Process]::GetCurrentProcess().SessionId -or
+                -not [string]::Equals([string]$handoff.executablePath,
+                    $expectedExecutable,
+                    [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw 'Interactive toolbar process handoff identity did not match.'
+            }
+            $ownedProcess = [DesktopGuidesOwnedProcess]::OpenVerified(
+                [int]$handoff.processId, [datetime]$handoff.startedAt,
+                [int]$handoff.sessionId, $expectedExecutable)
+        }
+        catch {
+            $report.processCleanupError = $_ | Out-String
+        }
+    }
+    elseif ($installedNow.Count -gt 0 -or $report.success -or
+        (Test-Path -LiteralPath $pauseMarker)) {
+        $report.processCleanupError =
+            'Interactive toolbar smoke did not provide a process handoff.'
+    }
     if ($installedNow.Count -gt 0 -and
         ($installedNow.Count -ne 1 -or $ownedPackage.Count -ne 1)) {
         $report.packageCleanupError =
             'A toolbar package not confirmed as test-owned remains untouched.'
     }
     elseif ($ownedPackage.Count -eq 1 -and $taskReady) {
-        $expectedExecutable = Join-Path $ownedPackage[0].InstallLocation `
-            'DesktopGuides.ReaderToolbarSmoke.exe'
-        foreach ($process in @(Get-Process -Name DesktopGuides.ReaderToolbarSmoke `
-            -ErrorAction SilentlyContinue)) {
+        if ($ownedProcess) {
             try {
-                if (-not [string]::Equals($process.MainModule.FileName,
-                    $expectedExecutable,
-                    [System.StringComparison]::OrdinalIgnoreCase)) {
-                    continue
-                }
                 if ($SimulateProcessExitDuringInspection -and
                     -not $report.simulatedProcessExit) {
-                    $process.Kill()
-                    if (-not $process.WaitForExit(10000)) {
-                        throw "Toolbar process $($process.Id) did not exit."
+                    if (-not $ownedProcess.TerminateAndWait(10000)) {
+                        throw "Toolbar process $($handoff.processId) did not exit."
                     }
                     $report.parentStoppedProcess = $true
                     $report.simulatedProcessExit = $true
                     throw [InvalidOperationException]::new(
                         'Simulated process exit during module inspection.')
                 }
-                if (-not $process.HasExited) {
-                    $process.Kill()
-                    if (-not $process.WaitForExit(10000)) {
-                        throw "Toolbar process $($process.Id) did not exit."
+                if (-not $ownedProcess.HasExited) {
+                    if (-not $ownedProcess.TerminateAndWait(10000)) {
+                        throw "Toolbar process $($handoff.processId) did not exit."
                     }
                     $report.parentStoppedProcess = $true
                 }
@@ -269,9 +304,17 @@ finally {
     Remove-Item -LiteralPath $public -ErrorAction SilentlyContinue
     $report.packageStillInstalled =
         [bool](Get-AppxPackage -Name DesktopGuides.ReaderToolbarSmoke)
-    $report.processStillRunning = [bool](
-        Get-Process -Name DesktopGuides.ReaderToolbarSmoke `
-            -ErrorAction SilentlyContinue)
+    try {
+        $report.processStillRunning =
+            [bool]($ownedProcess -and -not $ownedProcess.HasExited)
+    }
+    catch {
+        $report.processStillRunning = $true
+        $report.processCleanupError = $_ | Out-String
+    }
+    finally {
+        if ($ownedProcess) { $ownedProcess.Dispose() }
+    }
     $report.certificateStillTrusted = if ($certificate) {
         Test-Path "Cert:\LocalMachine\TrustedPeople\$($certificate.Thumbprint)"
     } else { $false }

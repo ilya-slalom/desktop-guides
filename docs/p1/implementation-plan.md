@@ -346,6 +346,29 @@ PowerShell executable: CI runs `pwsh`, while the local host runs Windows
 PowerShell 5.1. Switching shells inside CI lost `Get-FileHash` before
 the first installer could report its result.
 
+### T11.3 toolbar process ownership follow-up
+
+The per-user install lock protects one account's package preflight, but
+Windows process enumeration includes other sessions. The toolbar parent must
+not terminate or count a process just because its name and package executable
+path match. Reuse the installed-shell owned-process verifier, which binds a
+PID to its creation time, session, and executable path.
+
+After launching the toolbar app, the interactive smoke task writes an atomic
+handoff with its invocation ID, package identity, and process identity. The
+parent clears old handoffs before starting the task, validates the new
+handoff after the task stops, and holds only that verified process handle
+through cleanup. If no handoff exists, package cleanup may proceed, but the
+parent must not guess a process to kill. A failed identity check is a cleanup
+error and must never fall back to a name-wide process scan.
+
+The installed timeout and overlap fixture adds a same-name process outside
+the test package. It must survive parent cleanup, and the parent must not
+report it as a leaked test process. The original timeout process and package
+must still be removed; a normal reinstall on the same runner must pass.
+Verify the PowerShell 5.1 parser, Windows 11 x64 installed host sequence, and
+the signed CI toolbar job.
+
 ### T11.1 review follow-up: close handoff and installed gate
 
 The shell must allow a new window to appear while the old one drains, but

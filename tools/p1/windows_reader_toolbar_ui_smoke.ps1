@@ -9,6 +9,9 @@ param(
     [ValidatePattern('^[0-9a-f]{32}$')]
     [string] $InvocationId,
 
+    [Parameter(Mandatory = $true)]
+    [string] $ProcessHandoffPath,
+
     [string] $PauseAfterInstallPath
 )
 
@@ -47,6 +50,19 @@ try {
         'DesktopGuides.ReaderToolbarSmoke.exe'
     $process = Start-Process -FilePath $executable -PassThru
     $report.processId = $process.Id
+    $report.startedAt = $process.StartTime.ToUniversalTime().ToString('o')
+    $report.executablePath = $executable
+    [ordered]@{
+        invocationId = $InvocationId
+        packageFullName = $installed.PackageFullName
+        processId = $report.processId
+        startedAt = $report.startedAt
+        sessionId = $report.sessionId
+        executablePath = $executable
+    } | ConvertTo-Json -Compress |
+        Set-Content -LiteralPath "$ProcessHandoffPath.tmp" -Encoding UTF8
+    Move-Item -LiteralPath "$ProcessHandoffPath.tmp" `
+        -Destination $ProcessHandoffPath -Force
     $deadline = (Get-Date).AddSeconds(30)
     do {
         $process.Refresh()

@@ -12,6 +12,7 @@ New-Item -ItemType Directory -Force $ResultDirectory | Out-Null
 $ResultDirectory = (Resolve-Path $ResultDirectory).Path
 $installer = Join-Path $PSScriptRoot 'windows_reader_toolbar_install.ps1'
 $marker = Join-Path $ResultDirectory 'installed-before-timeout.txt'
+$processHandoff = Join-Path $ResultDirectory 'toolbar-process.json'
 $release = Join-Path $ResultDirectory 'release-timeout-cleanup.txt'
 $contenderDirectory = Join-Path $ResultDirectory 'contender'
 $resultPath = Join-Path $ResultDirectory 'overlap-result.json'
@@ -19,7 +20,11 @@ $firstOutput = Join-Path $ResultDirectory 'first-stdout.txt'
 $firstError = Join-Path $ResultDirectory 'first-stderr.txt'
 $contenderOutput = Join-Path $ResultDirectory 'contender-stdout.txt'
 $contenderError = Join-Path $ResultDirectory 'contender-stderr.txt'
+$decoyDirectory = Join-Path $ResultDirectory 'unrelated-process'
+$decoyExecutable = Join-Path $decoyDirectory `
+    'DesktopGuides.ReaderToolbarSmoke.exe'
 $first = $null
+$decoy = $null
 $report = [ordered]@{
     observedAt = (Get-Date).ToUniversalTime().ToString('o')
     shellExecutable = $shellExecutable
@@ -27,12 +32,16 @@ $report = [ordered]@{
     firstPackagePreserved = $false
     firstProcessPreserved = $false
     firstCleanupVerified = $false
+    unrelatedProcessPreserved = $false
     success = $false
 }
 
 try {
     if (Test-Path -LiteralPath $contenderDirectory) {
         throw 'The contender result directory must be fresh.'
+    }
+    if (Test-Path -LiteralPath $decoyDirectory) {
+        throw 'The unrelated-process directory must be fresh.'
     }
     Remove-Item -LiteralPath $marker, $release, $resultPath,
         $firstOutput, $firstError, $contenderOutput, $contenderError,
@@ -72,6 +81,23 @@ try {
     }
     $report.firstPackageFullName = $markerPackage
     $report.firstProcessId = $processes[0].Id
+    $handoff = Get-Content -LiteralPath $processHandoff -Raw |
+        ConvertFrom-Json
+    if ($handoff.packageFullName -ne $markerPackage -or
+        $handoff.processId -ne $report.firstProcessId) {
+        throw 'The first toolbar process handoff did not match its app.'
+    }
+
+    New-Item -ItemType Directory -Path $decoyDirectory | Out-Null
+    Copy-Item -LiteralPath (Join-Path $env:WINDIR 'System32\cmd.exe') `
+        -Destination $decoyExecutable
+    $decoy = Start-Process -FilePath $decoyExecutable `
+        -ArgumentList '/c ping -n 300 127.0.0.1 > nul' `
+        -PassThru -WindowStyle Hidden
+    if ($decoy.HasExited -or
+        $decoy.ProcessName -ne 'DesktopGuides.ReaderToolbarSmoke') {
+        throw 'The unrelated same-name process did not start.'
+    }
 
     $contenderArguments = '-NoProfile -ExecutionPolicy Bypass -File "' +
         $installer + '" -PackagePath "' + $PackagePath +
@@ -127,6 +153,11 @@ try {
     if (-not $report.firstCleanupVerified) {
         throw 'The first toolbar install did not clean up after the overlap.'
     }
+    $decoy.Refresh()
+    $report.unrelatedProcessPreserved = -not $decoy.HasExited
+    if (-not $report.unrelatedProcessPreserved) {
+        throw 'Toolbar cleanup stopped the unrelated same-name process.'
+    }
     $report.success = $true
 }
 catch {
@@ -147,6 +178,24 @@ finally {
         }
         $first.Dispose()
     }
+    if ($decoy) {
+        try {
+            $decoy.Refresh()
+            if (-not $decoy.HasExited) {
+                $decoy.Kill()
+                if (-not $decoy.WaitForExit(10000)) {
+                    throw 'The unrelated same-name process did not exit.'
+                }
+            }
+        }
+        catch {
+            $report.unrelatedProcessCleanupError = $_ | Out-String
+            $report.success = $false
+        }
+        $decoy.Dispose()
+    }
+    Remove-Item -LiteralPath $decoyDirectory -Recurse -Force `
+        -ErrorAction SilentlyContinue
     if (-not $report.success) {
         if (Test-Path -LiteralPath $firstOutput) {
             $report.firstStdout = Get-Content -LiteralPath $firstOutput -Raw
