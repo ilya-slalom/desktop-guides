@@ -862,3 +862,24 @@ records child acknowledgment. The
 [normal handoff](evidence/host/reader-toolbar-handoff/normal-process.json)
 matches both records. No test package, process, scheduled task, or temporary
 trust entry remained.
+
+At code head `4690078`, all nine jobs passed in
+[PR run 36303623358](https://github.com/ilya-slalom/desktop-guides/actions/runs/36303623358)
+and [push run 36303620766, attempt 2](https://github.com/ilya-slalom/desktop-guides/actions/runs/36303620766).
+The signed PR
+[overlap trace](evidence/ci/reader-toolbar-handoff/overlap-result.json)
+shows the pre-existing decoy, rejected contender, and verified first-app
+cleanup. The [timeout handoff](evidence/ci/reader-toolbar-handoff/timeout-process.json)
+matches the process stopped in the
+[timeout install record](evidence/ci/reader-toolbar-handoff/timeout-install.json).
+The [normal install](evidence/ci/reader-toolbar-handoff/normal-install.json),
+[process handoff](evidence/ci/reader-toolbar-handoff/normal-process.json),
+and [toolbar UI trace](evidence/ci/reader-toolbar-handoff/toolbar-ui.json)
+record parent handle acquisition, child acknowledgment, all toolbar phases,
+and final cleanup.
+
+Push attempt 1 failed in the retained native ARM64 P0 installed suite
+because its app opened no interactive window, as recorded in the
+[failure report](evidence/ci/reader-toolbar-handoff/arm64-first-attempt.json).
+The parallel PR job and push attempt 2 passed on the same code head.
+No P0 source changed in this follow-up.
