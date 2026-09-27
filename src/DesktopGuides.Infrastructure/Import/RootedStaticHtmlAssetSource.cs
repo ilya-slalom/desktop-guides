@@ -15,8 +15,13 @@ internal sealed class RootedStaticHtmlAssetSource : IStaticHtmlAssetSource
 {
     private readonly string root;
     private readonly string rootPrefix;
+    private readonly string? entryAlias;
+    private readonly string? sourceEntryName;
 
-    public RootedStaticHtmlAssetSource(string absoluteRoot)
+    public RootedStaticHtmlAssetSource(
+        string absoluteRoot,
+        string? entryAlias = null,
+        string? sourceEntryName = null)
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -30,10 +35,29 @@ internal sealed class RootedStaticHtmlAssetSource : IStaticHtmlAssetSource
                 "An absolute HTML source directory is required.",
                 nameof(absoluteRoot));
         }
+        if ((entryAlias is null) != (sourceEntryName is null))
+        {
+            throw new ArgumentException(
+                "The entry alias and source name must be supplied together.");
+        }
+        if (entryAlias is not null)
+        {
+            ManagedRelativePath.Parse(entryAlias);
+            if (sourceEntryName != Path.GetFileName(sourceEntryName))
+            {
+                throw new ArgumentException(
+                    "The selected HTML entry must be in the source root.",
+                    nameof(sourceEntryName));
+            }
+            // Only a literal percent is allowed beyond managed path rules.
+            ManagedRelativePath.Parse(sourceEntryName!.Replace('%', '_'));
+        }
 
         root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(absoluteRoot));
         rootPrefix = Path.EndsInDirectorySeparator(root)
             ? root : root + Path.DirectorySeparatorChar;
+        this.entryAlias = entryAlias;
+        this.sourceEntryName = sourceEntryName;
         if (!CheckUnlinkedPath(root) ||
             (File.GetAttributes(root) & FileAttributes.Directory) == 0)
         {
@@ -48,8 +72,11 @@ internal sealed class RootedStaticHtmlAssetSource : IStaticHtmlAssetSource
     {
         cancellationToken.ThrowIfCancellationRequested();
         string normalized = ManagedRelativePath.Parse(safeRelativePath);
+        string sourceRelativePath = string.Equals(
+            normalized, entryAlias, StringComparison.Ordinal)
+            ? sourceEntryName! : normalized;
         string requested = Path.GetFullPath(Path.Combine(
-            root, normalized.Replace('/', Path.DirectorySeparatorChar)));
+            root, sourceRelativePath.Replace('/', Path.DirectorySeparatorChar)));
         if (!requested.StartsWith(
             rootPrefix, StringComparison.OrdinalIgnoreCase))
         {

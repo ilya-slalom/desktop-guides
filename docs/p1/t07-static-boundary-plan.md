@@ -12,6 +12,12 @@ For each open, validate the managed relative name and every existing path
 segment, reject reparse points, open one handle, and on Windows compare that
 handle's final path with the requested path. A path-only check would leave a
 link-swap window between inspection and opening. No source file is changed.
+Keep managed path validation strict for URL assets. A selected Windows HTML
+filename containing a literal `%` uses `guide.html` or `guide.htm` inside the
+manifest; the rooted source maps that alias to the selected file for preview,
+copy, and post-copy verification. T06.3 must stage the entry under the alias
+while opening the original through this mapping. Relative asset URLs still
+resolve from the same root directory.
 
 Return T07.1's non-included references as typed preview warnings for missing,
 remote, unsafe, and unsupported assets. A warning means the referenced

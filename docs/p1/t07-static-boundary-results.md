@@ -29,3 +29,12 @@ existing `mspdbcmf.exe` symbols-package warning.
 
 No installed import workflow or ARM64 runtime result is claimed here.
 The Windows CI headless and package jobs remain the branch exit check.
+
+The PR #10 review found that a selected source file named
+`100% Completion Guide.html` failed preview because `%` is forbidden in
+managed paths. The selected entry now uses a safe `guide.html` or
+`guide.htm` manifest name, with an internal mapping back to the original
+source for revalidation. URL asset paths still reject encoded escapes.
+On the same Windows 11 x64 host, the focused boundary tests passed **10/10**,
+the full Infrastructure suite passed **84/84**, and the unsigned Release
+x64 production MSIX build passed with the same symbols-package warning.

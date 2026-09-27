@@ -37,6 +37,63 @@ public sealed class StaticHtmlImportValidatorTests
             Assert.False(string.IsNullOrWhiteSpace(warning.Message)));
     }
 
+    [Theory]
+    [InlineData("100% Completion Guide.html", "guide.html")]
+    [InlineData("100% Completion Guide.htm", "guide.htm")]
+    public async Task PercentInSelectedEntryUsesSafeManagedNameAndRevalidates(
+        string sourceName,
+        string managedName)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using TestHtmlDirectory files = new();
+        files.WriteSource(sourceName, """
+            <img src="images/map.png">
+            <img src="images/%2e%2e/outside.png">
+            """);
+        files.WriteSource("images/map.png", "image");
+        StaticHtmlImportValidator validator = new();
+
+        StaticHtmlImportPreview preview = await validator.PreviewAsync(
+            Path.Combine(files.SourceRoot, sourceName));
+
+        Assert.Equal(managedName, preview.EntryRelativePath);
+        Assert.Equal(
+            [managedName, "images/map.png"],
+            preview.Manifest.Assets.Select(asset => asset.RelativePath));
+        Assert.Equal(
+            StaticReferenceStatus.Unsafe,
+            Assert.Single(preview.Warnings).Status);
+        Assert.False(File.Exists(Path.Combine(files.SourceRoot, managedName)));
+
+        files.Stage(preview);
+        await validator.VerifyStagedAsync(preview, files.StageRoot);
+        Assert.True(File.Exists(Path.Combine(files.StageRoot, managedName)));
+
+        files.WriteSource(sourceName, "changed");
+        StaticHtmlValidationException error = await Assert.ThrowsAsync<
+            StaticHtmlValidationException>(() =>
+                validator.VerifyStagedAsync(preview, files.StageRoot));
+        Assert.Equal(StaticHtmlValidationIssue.SourceChanged, error.Issue);
+    }
+
+    [Fact]
+    public async Task PercentNamedSelectedEntrySymlinkFailsClosed()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using TestHtmlDirectory files = new();
+        string outside = Path.Combine(files.Root, "outside.html");
+        File.WriteAllText(outside, "private");
+        string selected = Path.Combine(
+            files.SourceRoot, "100% Completion Guide.html");
+        File.CreateSymbolicLink(selected, outside);
+
+        StaticHtmlValidationException error = await Assert.ThrowsAsync<
+            StaticHtmlValidationException>(() =>
+                new StaticHtmlImportValidator().PreviewAsync(selected));
+
+        Assert.Equal(StaticHtmlValidationIssue.UnsafePath, error.Issue);
+    }
+
     [Fact]
     public async Task CaseCollidingAssetNamesFailPreview()
     {
@@ -212,7 +269,10 @@ public sealed class StaticHtmlImportValidatorTests
         {
             foreach (StaticAsset asset in preview.Manifest.Assets)
             {
-                string source = GetPath(SourceRoot, asset.RelativePath);
+                string source = GetPath(SourceRoot,
+                    asset.RelativePath == preview.EntryRelativePath
+                        ? preview.SourceEntryFileName
+                        : asset.RelativePath);
                 string target = GetPath(StageRoot, asset.RelativePath);
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
                 File.Copy(source, target);

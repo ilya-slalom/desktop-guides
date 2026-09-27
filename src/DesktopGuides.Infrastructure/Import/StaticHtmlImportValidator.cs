@@ -20,8 +20,12 @@ public sealed class StaticHtmlImportValidator(
         }
         string entryPath = Path.GetFullPath(selectedEntryPath);
         string root = Path.GetDirectoryName(entryPath)!;
-        string entryName = Path.GetFileName(entryPath);
-        RootedStaticHtmlAssetSource source = new(root);
+        string sourceEntryName = Path.GetFileName(entryPath);
+        string entryName = sourceEntryName.Contains('%')
+            ? "guide" + Path.GetExtension(sourceEntryName)
+            : sourceEntryName;
+        RootedStaticHtmlAssetSource source = new(
+            root, entryName, sourceEntryName);
         StaticHtmlManifest manifest = await scanner.ScanAsync(
             entryName, source, cancellationToken);
         RejectCaseCollisions(manifest);
@@ -30,7 +34,7 @@ public sealed class StaticHtmlImportValidator(
             .Select(ToWarning)
             .ToArray();
         return new StaticHtmlImportPreview(
-            root, entryName, manifest, warnings);
+            root, sourceEntryName, entryName, manifest, warnings);
     }
 
     public async Task VerifyStagedAsync(
@@ -51,7 +55,9 @@ public sealed class StaticHtmlImportValidator(
         RootedStaticHtmlAssetSource stage;
         try
         {
-            source = new RootedStaticHtmlAssetSource(preview.SourceRoot);
+            source = new RootedStaticHtmlAssetSource(
+                preview.SourceRoot, preview.EntryRelativePath,
+                preview.SourceEntryFileName);
         }
         catch (DirectoryNotFoundException)
         {
