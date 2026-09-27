@@ -668,6 +668,9 @@ project uses a provisional package identity until T17.1 sets the public one.
   job; keep private signing material out of source and logs. ARM64 output
   may be offered only after the complete P1 workflow passes natively.
   Preserve one package identity across upgrades and test version increase.
+  The [release packaging procedure](p1/release-packaging.md) records the
+  development-lane checks, prerequisite delivery, and remaining public
+  identity decision.
 - **T17.2** Keep locked restore, Core and Infrastructure headless tests,
   architecture-labeled package builds, and the P0 diagnostic fixture suite.
   Add a production-mode Windows UI workflow: create game, import each

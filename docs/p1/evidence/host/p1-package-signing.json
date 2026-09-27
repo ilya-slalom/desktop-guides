@@ -1,0 +1,13 @@
+{
+    "packagePath":  "E:\\work\\desktop-guides\\package-check-20260927\\artifacts\\p1-signing-check\\signed-preview-x64.msix",
+    "packageSha256":  "22FE9479F034D1B0AEAC2FCBD0C185492FCB3F98F7F0FA6EE97BF561830C5B7B",
+    "name":  "DesktopGuides.Preview",
+    "publisher":  "CN=DesktopGuides Development",
+    "version":  "0.1.0.0",
+    "previousVersion":  null,
+    "architecture":  "x64",
+    "windowsAppRuntimeMinimum":  "2.5.1.0",
+    "signerThumbprint":  "FA327AA0F89A947B2188D6336B5A766DC06C9CB2",
+    "signerNotAfter":  "2026-09-28T09:23:19.0000000Z",
+    "timestamped":  false
+}
