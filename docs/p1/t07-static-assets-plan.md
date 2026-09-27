@@ -16,6 +16,14 @@ and at-rule preludes. A failed URL argument advances the cursor past the
 failed span so malformed CSS cannot make repeated scans of the same suffix.
 Path checks receive the original target without escape decoding.
 
+Before AngleSharp.Css parses a stylesheet, a linear preflight counts block
+openings and at-rules at statement starts outside comments and strings.
+It stops when cumulative markers exceed twice `MaxCssRules`; an at-rule
+with a block can contribute both markers. This conservative guard bounds
+parser work on rule-heavy untrusted CSS. The parsed rule walk still enforces
+the exact configured rule count. A parser-level stopping hook would avoid
+the conservative margin but would couple the budget to parser internals.
+
 Linked CSS uses its byte-order mark or leading `@charset` declaration when
 present. Recognized code-page labels use the .NET code-page provider without
 process-wide registration; browser aliases for ISO-8859-1 and ASCII map to
@@ -44,7 +52,7 @@ for the pinned MIT license metadata.
 | Step | Dependency | Output and success check |
 | --- | --- | --- |
 | Parse and classify | T03.3 | Parse one `.html`/`.htm` entry, image `src`/`srcset`, stylesheet links, `<style>`, style attributes, CSS `url()`/quoted `image-set()` choices, and `@import`. Decode declared CSS encodings before scanning. Keep the referring document, original target, safe normalized target, and supported/unsupported classification. Fragment-only references need no asset. |
-| Bound traversal | Parse and classify | Visit each local CSS file once; terminate cycles; cap CSS depth, distinct asset count, entry/asset/total bytes, and rule count. Stop with a typed preview failure when a budget is exceeded. |
+| Bound traversal | Parse and classify | Visit each local CSS file once; terminate cycles; cap CSS depth, distinct asset count, entry/asset/total bytes, and rule count. A preparse CSS marker bound limits parser allocation, and the parsed rule count keeps the exact `MaxCssRules` contract. Stop with a typed preview failure when a budget is exceeded. |
 | Manifest | Bound traversal | Hash each distinct supported source file and return a deterministically ordered manifest of relative names, lengths, kinds, and SHA-256 values. Missing/blocked references remain visible to T07.2. No file is staged or published in this task. |
 | Windows exit | Manifest | On Windows 11 x64, locked Infrastructure tests cover nested CSS, cycles, multiple `srcset` and CSS URL images, local queries/fragments, unsupported targets, and each budget. Build Release x64 production MSIX. Locked ARM64 headless and package checks run in CI. |
 

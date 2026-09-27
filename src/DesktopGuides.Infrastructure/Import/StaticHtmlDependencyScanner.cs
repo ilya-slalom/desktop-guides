@@ -58,6 +58,7 @@ public sealed class StaticHtmlDependencyScanner
         private readonly CssParser cssParser = new();
         private long totalBytes;
         private int cssRuleCount;
+        private long cssRuleCandidates;
 
         public async Task<StaticHtmlManifest> ScanAsync(string entryPath)
         {
@@ -181,6 +182,7 @@ public sealed class StaticHtmlDependencyScanner
             string css,
             int depth)
         {
+            CheckCssRulePreflight(css);
             ICssStyleSheet sheet = cssParser.ParseStyleSheet(css);
             CountRules(sheet.Rules);
             foreach (ICssRule rule in sheet.Rules)
@@ -194,6 +196,66 @@ public sealed class StaticHtmlDependencyScanner
                 }
             }
             await ScanCssUrlsAsync(sourcePath, css);
+        }
+
+        private void CheckCssRulePreflight(string css)
+        {
+            // An at-rule may have both an @ token and a block. Allow two
+            // structural markers per configured rule before invoking the parser.
+            long maximum = 2L * limits.MaxCssRules;
+            bool statementStart = true;
+            for (int index = 0; index < css.Length;)
+            {
+                if ((index & 4095) == 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+                if (css[index] == '/' && index + 1 < css.Length &&
+                    css[index + 1] == '*')
+                {
+                    int end = css.IndexOf("*/", index + 2, StringComparison.Ordinal);
+                    index = end < 0 ? css.Length : end + 2;
+                    continue;
+                }
+                if (char.IsWhiteSpace(css[index]))
+                {
+                    index++;
+                    continue;
+                }
+                if (css[index] is '\'' or '"')
+                {
+                    char quote = css[index++];
+                    while (index < css.Length)
+                    {
+                        if (css[index] == '\\')
+                        {
+                            index = Math.Min(index + 2, css.Length);
+                        }
+                        else if (css[index++] == quote)
+                        {
+                            break;
+                        }
+                    }
+                    statementStart = false;
+                    continue;
+                }
+                if (css[index] == '\\')
+                {
+                    index = Math.Min(index + 2, css.Length);
+                    statementStart = false;
+                    continue;
+                }
+                char current = css[index++];
+                if (current == '{' || (current == '@' && statementStart))
+                {
+                    if (++cssRuleCandidates > maximum)
+                    {
+                        throw Limit(
+                            StaticScanLimit.CssRuleCount, "Too many CSS rules.");
+                    }
+                }
+                statementStart = current is '{' or '}' or ';';
+            }
         }
 
         private void CountRules(IEnumerable<ICssRule> rules)

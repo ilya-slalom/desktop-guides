@@ -51,3 +51,15 @@ also cover multiple image choices and BOM precedence. The staged Windows
 source passed **67/67 Infrastructure tests**. The unsigned Release x64
 production MSIX build passed with zero errors and the existing
 `mspdbcmf.exe` symbols warning.
+
+## PR #9 third review follow-up
+
+A Windows 11 x64 probe confirmed that the previous CSS rule limit allowed
+AngleSharp.Css to allocate roughly 20.7 MiB while parsing a 200 KB,
+50,000-rule stylesheet before a `MaxCssRules: 100` check. A source-text
+preflight now rejects excess rule markers before the parser runs, while
+the parsed rule walk retains the exact rule limit. A permanent allocation
+regression test and a string/comment false-positive check pass with the
+rest of the staged Windows x64 Infrastructure suite: **69/69 tests**. The
+unsigned Release x64 production MSIX build passed with zero errors and the
+existing `mspdbcmf.exe` symbols warning.

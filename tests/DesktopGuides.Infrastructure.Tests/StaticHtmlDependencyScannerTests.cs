@@ -358,6 +358,51 @@ public sealed class StaticHtmlDependencyScannerTests
         Assert.Equal(limit, error.Limit);
     }
 
+    [Fact]
+    public void CssRuleBudgetStopsBeforeParsingAnOversizedRuleTree()
+    {
+        string css = string.Concat(Enumerable.Repeat(".a{}", 50_000));
+        MemorySource source = new(
+            ("guide.html", """<link rel="stylesheet" href="many.css">"""),
+            ("many.css", css));
+        StaticHtmlDependencyScanner scanner = new(
+            new StaticHtmlScanLimits(MaxCssRules: 100));
+
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        StaticHtmlScanException error = Assert.Throws<StaticHtmlScanException>(
+            () => scanner.ScanAsync("guide.html", source)
+                .GetAwaiter().GetResult());
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(StaticScanLimit.CssRuleCount, error.Limit);
+        Assert.True(allocated < 8L * 1024 * 1024,
+            $"Rule budget check allocated {allocated} bytes.");
+    }
+
+    [Fact]
+    public async Task CssRulePreflightIgnoresStringsAndComments()
+    {
+        MemorySource source = new(
+            ("guide.html", """
+                <style>
+                    .a {
+                        content: "@{{{{{{{{";
+                        /* @{{{{{{{{ */
+                        background: url(real.png);
+                    }
+                </style>
+                """),
+            ("real.png", "image"));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner(
+                new StaticHtmlScanLimits(MaxCssRules: 1))
+            .ScanAsync("guide.html", source);
+
+        Assert.Equal(
+            ["guide.html", "real.png"],
+            manifest.Assets.Select(asset => asset.RelativePath));
+    }
+
     private sealed class MemorySource(params (string Path, string Text)[] files)
         : IStaticHtmlAssetSource
     {
