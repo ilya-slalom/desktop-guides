@@ -883,3 +883,31 @@ because its app opened no interactive window, as recorded in the
 [failure report](evidence/ci/reader-toolbar-handoff/arm64-first-attempt.json).
 The parallel PR job and push attempt 2 passed on the same code head.
 No P0 source changed in this follow-up.
+
+### T11.3 toolbar receipt and bounded-wait review follow-up — 27 September 2026
+
+The interactive child now writes an atomic, invocation-bound package
+receipt after installation. Parent cleanup requires that receipt and the
+installed package's full identity before removal. A missing, stale,
+malformed, or different-package receipt is rejected by the
+[headless ownership check](../../tools/p1/test_windows_reader_toolbar_install_receipt.ps1).
+The parent waits separately for installation and process handoff. The
+overlap contender has bounded process and output waits and is stopped
+before the first installer is released.
+
+The Windows 11 x64 host under `E:\work\desktop-guides` parsed the changed
+PowerShell scripts and passed the receipt check. Its
+[interactive result](evidence/host/reader-toolbar-install-receipt/review-result.json)
+records a session 1 overlap, simulated timeout cleanup, and delayed normal
+reinstall. The [overlap trace](evidence/host/reader-toolbar-install-receipt/timeout/overlap-result.json)
+records the rejected contender and surviving unrelated same-name process.
+The [timeout install record](evidence/host/reader-toolbar-install-receipt/timeout/signed-install.json)
+and [receipt](evidence/host/reader-toolbar-install-receipt/timeout/toolbar-install-receipt.json)
+show that the parent removed only the package installed by that invocation.
+The [normal install record](evidence/host/reader-toolbar-install-receipt/normal/signed-install.json)
+reports a 31-second artificial pre-install delay and a 33.07-second
+receipt wait, beyond the former 30-second cutoff. Its
+[receipt](evidence/host/reader-toolbar-install-receipt/normal/toolbar-install-receipt.json)
+matches the [UI trace](evidence/host/reader-toolbar-install-receipt/normal/toolbar-ui.json);
+all eight toolbar phases passed. Both installed runs removed their temporary
+packages, processes, scheduled tasks, and certificate trust entries.

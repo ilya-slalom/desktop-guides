@@ -151,7 +151,14 @@ stops only that verified process. The child retains its launch handle until
 the parent opens its own verified handle and acknowledges a fresh handoff
 token. Start an unrelated same-name process before the first install in
 the overlap fixture; it must survive and must not count as a leaked test
-process.
+process. The interactive child publishes an invocation-bound package
+receipt after installation. Parent cleanup removes a toolbar test package
+only when that receipt matches the installed package; otherwise the gate
+fails and preserves it. Wait separately for installation and process
+handoff, and bound the overlap contender so a stalled child cannot hold
+the fixture open. The signed normal toolbar run includes an artificial
+31-second pre-install delay to verify the installation wait exceeds the
+former 30-second cutoff.
 
 ## Scenario checklist
 

@@ -12,7 +12,13 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $ProcessHandoffPath,
 
-    [string] $PauseAfterInstallPath
+    [Parameter(Mandatory = $true)]
+    [string] $InstallReceiptPath,
+
+    [string] $PauseAfterInstallPath,
+
+    [ValidateRange(0, 60)]
+    [int] $SimulateSlowInstallSeconds = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -40,12 +46,28 @@ try {
     Add-Type -AssemblyName UIAutomationTypes
     Add-Type -AssemblyName System.Windows.Forms
 
-    Add-AppxPackage -Path $PackagePath
-    $installed = Get-AppxPackage -Name DesktopGuides.ReaderToolbarSmoke
-    if (-not $installed) {
-        throw 'Toolbar test package did not install.'
+    if ($SimulateSlowInstallSeconds -gt 0) {
+        Start-Sleep -Seconds $SimulateSlowInstallSeconds
+        if (Get-AppxPackage -Name DesktopGuides.ReaderToolbarSmoke) {
+            throw 'The toolbar test package appeared before installation.'
+        }
     }
+    Add-AppxPackage -Path $PackagePath
+    $installedPackages =
+        @(Get-AppxPackage -Name DesktopGuides.ReaderToolbarSmoke)
+    if ($installedPackages.Count -ne 1) {
+        throw 'Expected one installed toolbar test package.'
+    }
+    $installed = $installedPackages[0]
     $report.packageFullName = $installed.PackageFullName
+    [ordered]@{
+        invocationId = $InvocationId
+        packageFullName = $installed.PackageFullName
+    } | ConvertTo-Json -Compress |
+        Set-Content -LiteralPath "$InstallReceiptPath.tmp" -Encoding UTF8
+    Move-Item -LiteralPath "$InstallReceiptPath.tmp" `
+        -Destination $InstallReceiptPath -Force
+    $report.installReceiptWritten = $true
     $executable = Join-Path $installed.InstallLocation `
         'DesktopGuides.ReaderToolbarSmoke.exe'
     $process = Start-Process -FilePath $executable -PassThru

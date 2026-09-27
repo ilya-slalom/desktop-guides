@@ -24,6 +24,7 @@ $decoyDirectory = Join-Path $ResultDirectory 'unrelated-process'
 $decoyExecutable = Join-Path $decoyDirectory `
     'DesktopGuides.ReaderToolbarSmoke.exe'
 $first = $null
+$contender = $null
 $firstApp = $null
 $decoy = $null
 if (-not ('DesktopGuidesOwnedProcess' -as [type])) {
@@ -113,16 +114,34 @@ try {
     $contenderArguments = '-NoProfile -ExecutionPolicy Bypass -File "' +
         $installer + '" -PackagePath "' + $PackagePath +
         '" -ResultDirectory "' + $contenderDirectory + '"'
-    $contender = Start-Process -FilePath $shellExecutable `
-        -ArgumentList $contenderArguments -PassThru -Wait -WindowStyle Hidden `
-        -RedirectStandardOutput $contenderOutput `
-        -RedirectStandardError $contenderError
+    $contenderStart = [System.Diagnostics.ProcessStartInfo]::new()
+    $contenderStart.FileName = $shellExecutable
+    $contenderStart.Arguments = $contenderArguments
+    $contenderStart.UseShellExecute = $false
+    $contenderStart.CreateNoWindow = $true
+    $contenderStart.RedirectStandardOutput = $true
+    $contenderStart.RedirectStandardError = $true
+    $contender = [System.Diagnostics.Process]::new()
+    $contender.StartInfo = $contenderStart
+    if (-not $contender.Start()) {
+        throw 'The overlapping toolbar contender did not start.'
+    }
+    $stdoutRead = $contender.StandardOutput.ReadToEndAsync()
+    $stderrRead = $contender.StandardError.ReadToEndAsync()
+    if (-not $contender.WaitForExit(20000)) {
+        throw 'The overlapping toolbar contender did not exit in 20 seconds.'
+    }
+    if (-not $stdoutRead.Wait(5000) -or -not $stderrRead.Wait(5000)) {
+        throw 'The overlapping toolbar contender output did not drain.'
+    }
     $report.contenderExitCode = $contender.ExitCode
-    $contenderMessage = @(
-        Get-Content -LiteralPath $contenderOutput -Raw
-        Get-Content -LiteralPath $contenderError -Raw
-    ) -join "`n"
-    $contender.Dispose()
+    $contenderStdout = $stdoutRead.Result
+    $contenderStderr = $stderrRead.Result
+    $contenderMessage = @($contenderStdout, $contenderStderr) -join "`n"
+    Set-Content -LiteralPath $contenderOutput -Value $contenderStdout `
+        -Encoding UTF8
+    Set-Content -LiteralPath $contenderError -Value $contenderStderr `
+        -Encoding UTF8
     if ($report.contenderExitCode -ne 1 -or
         $contenderMessage -notmatch 'Toolbar install lock is unavailable' -or
         (Test-Path -LiteralPath $contenderDirectory)) {
@@ -159,6 +178,7 @@ try {
         -not $installedResult.processStillRunning -and
         -not $installedResult.certificateStillTrusted -and
         -not $installedResult.taskStillRegistered -and
+        $installedResult.installReceiptVerified -and
         $installedResult.processHandleAcquired -and $firstApp.HasExited
     if (-not $report.firstCleanupVerified) {
         throw 'The first toolbar install did not clean up after the overlap.'
@@ -174,6 +194,22 @@ catch {
     $report.error = $_ | Out-String
 }
 finally {
+    if ($contender) {
+        try {
+            $contender.Refresh()
+            if (-not $contender.HasExited) {
+                $contender.Kill()
+                if (-not $contender.WaitForExit(10000)) {
+                    throw 'The overlapping toolbar contender did not stop.'
+                }
+            }
+        }
+        catch {
+            $report.contenderCleanupError = $_ | Out-String
+            $report.success = $false
+        }
+        $contender.Dispose()
+    }
     if ($first) {
         try {
             Set-Content -LiteralPath $release -Value 'continue' -Encoding ASCII
@@ -208,6 +244,14 @@ finally {
     Remove-Item -LiteralPath $decoyDirectory -Recurse -Force `
         -ErrorAction SilentlyContinue
     if (-not $report.success) {
+        if (Test-Path -LiteralPath $contenderOutput) {
+            $report.contenderStdout =
+                Get-Content -LiteralPath $contenderOutput -Raw
+        }
+        if (Test-Path -LiteralPath $contenderError) {
+            $report.contenderStderr =
+                Get-Content -LiteralPath $contenderError -Raw
+        }
         if (Test-Path -LiteralPath $firstOutput) {
             $report.firstStdout = Get-Content -LiteralPath $firstOutput -Raw
         }

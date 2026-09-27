@@ -9,7 +9,10 @@ param(
 
     [switch] $SimulateProcessExitDuringInspection,
 
-    [string] $PauseTimeoutCleanupUntilPath
+    [string] $PauseTimeoutCleanupUntilPath,
+
+    [ValidateRange(0, 60)]
+    [int] $SimulateSlowInstallSeconds = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -61,6 +64,7 @@ $ResultDirectory = (Resolve-Path $ResultDirectory).Path
 $signed = Join-Path $ResultDirectory 'reader-toolbar-signed-x64.msix'
 $public = Join-Path $ResultDirectory 'test-certificate.cer'
 $smokeResult = Join-Path $ResultDirectory 'toolbar-ui.json'
+$installReceiptPath = Join-Path $ResultDirectory 'toolbar-install-receipt.json'
 $processHandoff = Join-Path $ResultDirectory 'toolbar-process.json'
 $processHandoffAck = "$processHandoff.ack"
 $pauseMarker = Join-Path $ResultDirectory 'installed-before-timeout.txt'
@@ -70,8 +74,10 @@ $report = [ordered]@{
     invocationId = $invocationId
     observedAt = (Get-Date).ToUniversalTime().ToString('o')
     sourcePackageSha256 = (Get-FileHash $PackagePath -Algorithm SHA256).Hash
+    simulatedSlowInstallSeconds = $SimulateSlowInstallSeconds
     parentStoppedProcess = $false
     parentRemovedPackage = $false
+    installReceiptVerified = $false
     processHandleAcquired = $false
     simulatedProcessExit = $false
     success = $false
@@ -85,6 +91,7 @@ if (-not ('DesktopGuidesOwnedProcess' -as [type])) {
     Add-Type -Path (Join-Path $PSScriptRoot 'windows_owned_process.cs')
 }
 . (Join-Path $PSScriptRoot 'windows_reader_toolbar_smoke_result.ps1')
+. (Join-Path $PSScriptRoot 'windows_reader_toolbar_install_receipt.ps1')
 
 try {
     Copy-Item -LiteralPath $PackagePath -Destination $signed -Force
@@ -123,9 +130,14 @@ try {
         ' -PackagePath "' + $signed + '"' +
         ' -ResultPath "' + $smokeResult + '"' +
         ' -InvocationId ' + $invocationId +
+        ' -InstallReceiptPath "' + $installReceiptPath + '"' +
         ' -ProcessHandoffPath "' + $processHandoff + '"'
     if ($SimulateSmokeTimeoutAfterInstall) {
         $arguments += ' -PauseAfterInstallPath "' + $pauseMarker + '"'
+    }
+    if ($SimulateSlowInstallSeconds -gt 0) {
+        $arguments += ' -SimulateSlowInstallSeconds ' +
+            $SimulateSlowInstallSeconds
     }
     $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
         -Argument $arguments -WorkingDirectory $PSScriptRoot
@@ -135,11 +147,36 @@ try {
         -Principal $interactive -Force | Out-Null
     $registered = $true
     Clear-ToolbarSmokeResult $smokeResult
-    Remove-Item -LiteralPath $pauseMarker, $processHandoff,
+    Remove-Item -LiteralPath $pauseMarker, $installReceiptPath,
+        "$installReceiptPath.tmp", $processHandoff,
         "$processHandoff.tmp", $processHandoffAck,
         "$processHandoffAck.tmp" -ErrorAction SilentlyContinue
+    $installStartedAt = Get-Date
     Start-ScheduledTask -TaskName $taskName
-    $handoffDeadline = (Get-Date).AddSeconds(30)
+    $installDeadline = (Get-Date).AddSeconds(120)
+    do {
+        if (Test-Path -LiteralPath $installReceiptPath) { break }
+        if (Test-Path -LiteralPath $smokeResult) {
+            throw 'Interactive toolbar smoke ended before installation.'
+        }
+        Start-Sleep -Milliseconds 200
+    } while ((Get-Date) -lt $installDeadline)
+    if (-not (Test-Path -LiteralPath $installReceiptPath)) {
+        throw 'Interactive toolbar smoke did not confirm installation.'
+    }
+    $installedForReceipt =
+        @(Get-AppxPackage -Name DesktopGuides.ReaderToolbarSmoke)
+    if ($installedForReceipt.Count -ne 1 -or
+        $installedForReceipt[0].Version.ToString() -ne $expectedVersion -or
+        $installedForReceipt[0].Architecture.ToString() -ne 'X64' -or
+        -not (Test-ToolbarInstallReceipt $installReceiptPath $invocationId `
+            $installedForReceipt[0].PackageFullName)) {
+        throw 'Interactive toolbar install receipt did not match its package.'
+    }
+    $report.installReceiptVerified = $true
+    $report.installReceiptElapsedSeconds =
+        [math]::Round(((Get-Date) - $installStartedAt).TotalSeconds, 2)
+    $handoffDeadline = (Get-Date).AddSeconds(45)
     do {
         if (Test-Path -LiteralPath $processHandoff) { break }
         if (Test-Path -LiteralPath $smokeResult) {
@@ -268,7 +305,9 @@ finally {
     $installedNow = @(Get-AppxPackage -Name DesktopGuides.ReaderToolbarSmoke)
     $ownedPackage = @($installedNow | Where-Object {
         $_.Version.ToString() -eq $expectedVersion -and
-        $_.Architecture.ToString() -eq 'X64'
+        $_.Architecture.ToString() -eq 'X64' -and
+        (Test-ToolbarInstallReceipt $installReceiptPath $invocationId `
+            $_.PackageFullName)
     })
     if (-not $report.processHandleAcquired -and
         ($installedNow.Count -gt 0 -or
@@ -302,7 +341,7 @@ finally {
     if ($installedNow.Count -gt 0 -and
         ($installedNow.Count -ne 1 -or $ownedPackage.Count -ne 1)) {
         $report.packageCleanupError =
-            'A toolbar package not confirmed as test-owned remains untouched.'
+            'A toolbar package without this install receipt remains untouched.'
     }
     elseif ($ownedPackage.Count -eq 1 -and $taskReady) {
         try {

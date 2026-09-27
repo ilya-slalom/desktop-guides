@@ -84,6 +84,9 @@ jobs:
       - name: Check toolbar smoke result identity
         shell: pwsh
         run: ./tools/p1/test_windows_reader_toolbar_smoke_result.ps1
+      - name: Check toolbar install receipt ownership
+        shell: pwsh
+        run: ./tools/p1/test_windows_reader_toolbar_install_receipt.ps1
       - name: Check test-owned scheduled task cleanup
         shell: pwsh
         run: ./tools/p1/test_windows_shell_task_cleanup.ps1
@@ -325,8 +328,16 @@ jobs:
           }
           & ./tools/p1/windows_reader_toolbar_install.ps1 `
             -PackagePath $packages[0].FullName `
-            -ResultDirectory artifacts/reader-toolbar-ui
-          exit $LASTEXITCODE
+            -ResultDirectory artifacts/reader-toolbar-ui `
+            -SimulateSlowInstallSeconds 31
+          $install = Get-Content artifacts/reader-toolbar-ui/signed-install.json `
+            -Raw | ConvertFrom-Json
+          if (-not $install.success -or
+              -not $install.installReceiptVerified -or
+              $install.simulatedSlowInstallSeconds -ne 31 -or
+              $install.installReceiptElapsedSeconds -le 30) {
+            throw 'Delayed toolbar install did not pass the receipt and timing checks.'
+          }
       - name: Upload toolbar UI evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

@@ -393,6 +393,33 @@ same-user contender to be rejected, timeout cleanup to stop only its own
 app, and a normal reinstall to pass. Run the PowerShell 5.1 parser and
 interactive Windows 11 x64 installed sequence, followed by signed CI.
 
+### T11.3 toolbar install receipt and bounded waits review follow-up
+
+The per-user lock serializes this test runner, but another installer can
+add the same test identity between the parent's empty-package check and the
+interactive child's check. A matching version and architecture cannot prove
+ownership. The child writes an atomic receipt containing its invocation ID
+and installed package full name only after `Add-AppxPackage` succeeds. The
+parent must require that exact receipt before removing any package, including
+when the child fails before process handoff. Missing, stale, malformed, or
+different-package receipts leave the installed package untouched and fail
+the gate. This favors preserving an uncertain package over automatic
+cleanup.
+
+A single longer handoff timeout would hide whether installation or launch
+stalled. Wait up to 120 seconds for the installation receipt, then up to 45
+seconds for the process handoff. On timeout, stop and drain the scheduled
+task before inspecting the package; cleanup may remove it only with the
+matching receipt. The overlap contender must use a 20-second process wait
+and be stopped in `finally` before releasing the first installer's hold.
+
+Exit: headless receipt checks reject missing, stale, malformed, and
+different-package files; a signed installed toolbar run delays installation
+past the former 30-second cutoff and completes all UI phases. The installed
+overlap and simulated-timeout sequence still verifies receipt-backed
+package removal, process cleanup, decoy survival, and normal reinstall.
+Repeat the Windows 11 x64 host sequence and all signed CI jobs.
+
 ### T11.1 review follow-up: close handoff and installed gate
 
 The shell must allow a new window to appear while the old one drains, but
