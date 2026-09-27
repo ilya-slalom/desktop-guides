@@ -145,6 +145,18 @@ finally {
         }
         $first.Dispose()
     }
+    if (Test-Path -LiteralPath $firstOutput) {
+        $report.firstStdout = Get-Content -LiteralPath $firstOutput -Raw
+    }
+    if (Test-Path -LiteralPath $firstError) {
+        $report.firstStderr = Get-Content -LiteralPath $firstError -Raw
+    }
+    $firstInstallPath = Join-Path $ResultDirectory 'signed-install.json'
+    if (Test-Path -LiteralPath $firstInstallPath) {
+        $firstInstall = Get-Content -LiteralPath $firstInstallPath -Raw |
+            ConvertFrom-Json
+        $report.firstInstallError = $firstInstall.error
+    }
     $report | ConvertTo-Json -Depth 6 |
         Set-Content -LiteralPath $resultPath -Encoding UTF8
 }
