@@ -631,3 +631,34 @@ existing Preview package and profile prevented a fresh-profile installed
 run there. An earlier CI attempt at `2f3c740` used the old `"Opening
 guide..."` expectation for the held-write scenario; it was updated to
 observe the rendered Reader before the passing run.
+
+### T11.3 render, cleanup, and focus review follow-up — 27 September 2026
+
+At code head `9c4457f`, `RenderCurrentAsync` reports whether its requested
+route finished loading. `OpenGuideAsync` saves Resume only when that result
+is successful and the matching Reader remains current. The toolbar
+installer now stops a timed-out test task, waits for it to leave `Running`,
+then stops the test-owned app process and removes the test-owned MSIX
+before checking for leftover package, process, task, and certificate.
+Go to page and Find in guide reopen the CommandBar overflow after their
+dialogs and restore keyboard focus to the command when it is still
+available.
+
+The Windows 11 x64 host, build `10.0.26200.0`, under
+`E:\work\desktop-guides` passed Windows PowerShell 5.1 parsing, locked
+restores, and unsigned Release x64 builds for the production shell and
+linked toolbar test app. Each build reported only the host's existing
+missing-`mspdbcmf.exe` symbols warning. The
+[interactive host record](evidence/host/reader-toolbar-render-cleanup/review-result.json)
+ran in desktop session 1. Its
+[forced-timeout record](evidence/host/reader-toolbar-render-cleanup/timeout-install.json)
+confirms that the parent stopped the still-running toolbar app and
+removed its package after stopping the scheduled task. The following
+[normal install](evidence/host/reader-toolbar-render-cleanup/normal-install.json)
+passed with no test package, process, task, or certificate left behind.
+The [UI trace](evidence/host/reader-toolbar-render-cleanup/toolbar-ui.json)
+includes keyboard focus returning to both overflow dialog commands.
+An initial host attempt exposed a smoke assumption: WinUI names the open
+overflow toggle `Less app bar`; the passing test closes it by its
+automation ID. The Reader render-error path was checked in code and built
+on Windows; the host fixture did not inject a second-read exception.

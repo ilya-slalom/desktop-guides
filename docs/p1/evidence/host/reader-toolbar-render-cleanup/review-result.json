@@ -1,0 +1,33 @@
+﻿{
+    "observedAt":  "2026-09-27T03:23:01.7820535Z",
+    "sessionId":  1,
+    "success":  true,
+    "timeoutExit":  1,
+    "timeoutCleanup":  {
+                           "parentStoppedProcess":  true,
+                           "parentRemovedPackage":  true,
+                           "packageStillInstalled":  false,
+                           "processStillRunning":  false,
+                           "certificateStillTrusted":  false,
+                           "taskStillRegistered":  false,
+                           "error":  "Simulated toolbar smoke timeout after installation.\r\nAt E:\\work\\desktop-guides\\tools\\p1\\windows_reader_toolbar_install.ps1:118 char:9\r\n+         throw \u0027Simulated toolbar smoke timeout after installation.\u0027\r\n+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : OperationStopped: (Simulated toolb...r installation.:String) [], RuntimeException\r\n    + FullyQualifiedErrorId : Simulated toolbar smoke timeout after installation.\r\n \r\n"
+                       },
+    "normalExit":  0,
+    "normalSuccess":  true,
+    "normalPhases":  [
+                         "initial-no-session-capabilities",
+                         "worker-capability-change-text-dispatch",
+                         "page-dialog-restores-overflow-focus",
+                         "find-dialog-restores-overflow-focus",
+                         "all-capabilities-dispatch",
+                         "narrow-primary-command-overflow",
+                         "worker-capability-removal",
+                         "detached-session-event-ignored"
+                     ],
+    "normalCleanup":  {
+                          "packageStillInstalled":  false,
+                          "processStillRunning":  false,
+                          "certificateStillTrusted":  false,
+                          "taskStillRegistered":  false
+                      }
+}
