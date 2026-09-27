@@ -24,6 +24,7 @@ public sealed partial class ShellWindow : Window
     private Guid? pendingGuideFocus;
     private int guideFocusRenderGeneration = -1;
     private int renderGeneration;
+    private long gameGuideIntentVersion;
     private bool settingGuideSelection;
     private bool ready;
     private bool closeRequested;
@@ -241,8 +242,7 @@ public sealed partial class ShellWindow : Window
         UpdateOpenSelectedGuideAction();
         if (GuideList.SelectedItem is Guide guide)
         {
-            await RunNavigationAsync(
-                () => OpenGuideAsync(guide.Id, guide.GameId));
+            await OpenGuideFromGameAsync(guide);
         }
     }
 
@@ -250,8 +250,7 @@ public sealed partial class ShellWindow : Window
     {
         if (GuideFromRow(args.OriginalSource as DependencyObject) is Guide guide)
         {
-            await RunNavigationAsync(
-                () => OpenGuideAsync(guide.Id, guide.GameId));
+            await OpenGuideFromGameAsync(guide);
         }
     }
 
@@ -278,8 +277,7 @@ public sealed partial class ShellWindow : Window
             GuideFromRow(args.OriginalSource as DependencyObject) is Guide guide)
         {
             args.Handled = true;
-            await RunNavigationAsync(
-                () => OpenGuideAsync(guide.Id, guide.GameId));
+            await OpenGuideFromGameAsync(guide);
         }
     }
 
@@ -287,9 +285,15 @@ public sealed partial class ShellWindow : Window
     {
         if (GuideList.SelectedItem is Guide guide)
         {
-            await RunNavigationAsync(
-                () => OpenGuideAsync(guide.Id, guide.GameId));
+            await OpenGuideFromGameAsync(guide);
         }
+    }
+
+    private Task OpenGuideFromGameAsync(Guide guide)
+    {
+        long intentVersion = ++gameGuideIntentVersion;
+        return RunNavigationAsync(
+            () => OpenGuideAsync(guide.Id, guide.GameId, intentVersion));
     }
 
     private void UpdateOpenSelectedGuideAction()
@@ -361,11 +365,6 @@ public sealed partial class ShellWindow : Window
         }
         try
         {
-            if (await RequireRepository().GetGameAsync(gameId) is null)
-            {
-                ShellStatus.Text = "This game is no longer in your library.";
-                return;
-            }
             navigator.OpenGame(gameId);
             await RenderCurrentAsync();
         }
@@ -375,9 +374,14 @@ public sealed partial class ShellWindow : Window
         }
     }
 
-    private async Task OpenGuideAsync(Guid guideId, Guid? sourceGameId = null)
+    private bool IsSupersededGameGuideIntent(long? intentVersion) =>
+        intentVersion is long version && version != gameGuideIntentVersion;
+
+    private async Task OpenGuideAsync(
+        Guid guideId, Guid? sourceGameId = null, long? intentVersion = null)
     {
-        if (sourceGameId is Guid expectedGameId &&
+        if (IsSupersededGameGuideIntent(intentVersion) ||
+            sourceGameId is Guid expectedGameId &&
             (navigator.Current is not GameRoute game ||
              game.GameId != expectedGameId ||
              !GuideList.IsEnabled))
@@ -393,15 +397,36 @@ public sealed partial class ShellWindow : Window
         {
             SqliteLibraryRepository library = RequireRepository();
             Guide? guide = await library.GetGuideAsync(guideId);
+            if (IsSupersededGameGuideIntent(intentVersion))
+            {
+                return;
+            }
             if (guide is null ||
-                (sourceGameId is Guid source && guide.GameId != source) ||
-                await library.GetGameAsync(guide.GameId) is null)
+                (sourceGameId is Guid source && guide.GameId != source))
+            {
+                ShellStatus.Text = "This guide is no longer in your library.";
+                return;
+            }
+            Game? ownerGame = await library.GetGameAsync(guide.GameId);
+            if (IsSupersededGameGuideIntent(intentVersion))
+            {
+                return;
+            }
+            if (ownerGame is null)
             {
                 ShellStatus.Text = "This guide is no longer in your library.";
                 return;
             }
             AppSettings settings = await library.GetSettingsAsync();
+            if (IsSupersededGameGuideIntent(intentVersion))
+            {
+                return;
+            }
             await library.SaveSettingsAsync(settings with { LastActiveGuideId = guide.Id });
+            if (IsSupersededGameGuideIntent(intentVersion))
+            {
+                return;
+            }
             navigator.OpenReader(guide.Id, guide.GameId);
             await RenderCurrentAsync();
         }

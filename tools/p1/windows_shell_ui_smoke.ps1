@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('empty', 'normal', 'stale', 'long-list', 'switch-game', 'queue-guide',
-        'waiting-handoff')]
+    [ValidateSet('empty', 'normal', 'stale', 'long-list', 'switch-game',
+        'switch-game-prepare', 'switch-game-loading', 'queue-guide',
+        'queue-later-guide', 'later-guide-result', 'waiting-handoff')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -365,6 +366,24 @@ try {
         [void](Wait-Name 'ShellStatus' 'Opening guide...')
         $report.phases += 'guide-action-started'
     }
+    elseif ($Mode -eq 'queue-later-guide') {
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-SelectedGuide 'Route Test Guide')
+        Invoke-Element (Wait-Name 'OpenSelectedGuide' 'Open Route Test Guide')
+        [void](Wait-Name 'ShellStatus' 'Opening guide...')
+        Start-Sleep -Milliseconds 300
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        Select-Element 'Blocked Write Guide'
+        [void](Wait-SelectedGuide 'Blocked Write Guide')
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Opening guide...')
+        $report.phases += 'later-guide-selected-while-first-write-blocked'
+    }
+    elseif ($Mode -eq 'switch-game-loading' -or
+        $Mode -eq 'switch-game') {
+        # These modes continue a shell that the preparation smoke already opened.
+    }
     else {
         [void](Wait-Name 'ShellStatus' 'Library ready.')
         [void](Wait-Name 'LibraryHeading' 'Library')
@@ -421,7 +440,7 @@ try {
         [void](Wait-Name 'ShellStatus' 'Guide details ready.')
         $report.phases += 'virtualized-guide-enter-reopen'
     }
-    elseif ($Mode -eq 'switch-game') {
+    elseif ($Mode -eq 'switch-game-prepare') {
         $target = 'ZZZ Focus Target Guide'
         Invoke-Element (Wait-Name 'ResumeGuide' "Resume $target")
         [void](Wait-Name 'ReaderHeading' $target)
@@ -432,12 +451,36 @@ try {
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
         [void](Wait-Name 'ShellStatus' 'Library ready.')
+        $report.phases += 'first-game-guide-retained-before-switch'
+    }
+    elseif ($Mode -eq 'switch-game-loading') {
+        $target = 'ZZZ Focus Target Guide'
+        $loading = 'Loading game' + [char]0x2026
         Select-Element 'Second Test Game'
+        [void](Wait-Name 'GameHeading' $loading)
+        [void](Wait-Name 'ShellStatus' $loading)
+        $list = Find-ById 'GuideList'
+        if (-not $list -or $list.Current.IsEnabled) {
+            throw 'The guide list was available while the second game loaded.'
+        }
+        $oldCondition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::NameProperty, $target)
+        if ($list.FindAll($scope, $oldCondition).Count -ne 0) {
+            throw 'The first game guide row was visible while the second game loaded.'
+        }
+        $open = Find-ById 'OpenSelectedGuide'
+        if ($open -and -not $open.Current.IsOffscreen) {
+            throw 'The first game selected-guide action was visible during loading.'
+        }
+        $report.phases += 'game-switch-loading-clears-old-guide'
+    }
+    elseif ($Mode -eq 'switch-game') {
         [void](Wait-Name 'GameHeading' 'Second Test Game')
         [void](Wait-Name 'ShellStatus' 'Game ready.')
         $list = Find-ById 'GuideList'
         $oldCondition = [System.Windows.Automation.PropertyCondition]::new(
-            [System.Windows.Automation.AutomationElement]::NameProperty, $target)
+            [System.Windows.Automation.AutomationElement]::NameProperty,
+            'ZZZ Focus Target Guide')
         if ($list.FindAll($scope, $oldCondition).Count -ne 0) {
             throw 'The second game retained a guide row from the first game.'
         }
@@ -458,6 +501,23 @@ try {
         [void](Wait-Name 'ReaderHeading' 'Second Test Guide')
         [void](Wait-Name 'ReaderGameName' 'Second Test Game')
         $report.phases += 'game-switch-uia-reopen'
+    }
+    elseif ($Mode -eq 'later-guide-result') {
+        [void](Wait-Name 'ReaderHeading' 'Blocked Write Guide')
+        [void](Wait-Name 'ReaderGameName' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        $report.phases += 'later-guide-opened'
+        Go-Back
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-SelectedGuide 'Blocked Write Guide')
+        Wait-FocusedGuide 'Blocked Write Guide'
+        $report.phases += 'later-guide-back-selection-and-focus'
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        [void](Wait-Name 'ResumeGuide' 'Resume Blocked Write Guide')
+        $report.phases += 'later-guide-persisted-for-resume'
     }
     elseif ($Mode -eq 'normal') {
         $resume = Wait-Name 'ResumeGuide' "Resume $ExpectedResumeGuide"

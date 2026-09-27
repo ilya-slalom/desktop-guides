@@ -3,7 +3,8 @@ using DesktopGuides.Core.Library;
 using DesktopGuides.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
 
-if (args.Length == 4 && args[0] == "hold-write-lock")
+if (args.Length == 4 &&
+    args[0] is "hold-write-lock" or "hold-read-lock")
 {
     ManagedPathResolver lockPaths = new(args[1]);
     using SqliteConnection lockConnection = new(new SqliteConnectionStringBuilder
@@ -14,8 +15,22 @@ if (args.Length == 4 && args[0] == "hold-write-lock")
     }.ToString());
     lockConnection.Open();
     using SqliteCommand lockCommand = lockConnection.CreateCommand();
-    lockCommand.CommandText = "BEGIN IMMEDIATE";
-    lockCommand.ExecuteNonQuery();
+    bool writeLock = args[0] == "hold-write-lock";
+    if (writeLock)
+    {
+        lockCommand.CommandText = "BEGIN IMMEDIATE";
+        lockCommand.ExecuteNonQuery();
+    }
+    else
+    {
+        lockCommand.CommandText = "PRAGMA locking_mode=EXCLUSIVE";
+        if (lockCommand.ExecuteScalar() is not string mode || mode != "exclusive")
+        {
+            throw new InvalidOperationException("Could not enable exclusive read lock.");
+        }
+        lockCommand.CommandText = "SELECT COUNT(*) FROM Games";
+        _ = lockCommand.ExecuteScalar();
+    }
     try
     {
         File.WriteAllText(args[2], "ready");
@@ -26,14 +41,17 @@ if (args.Length == 4 && args[0] == "hold-write-lock")
         }
         if (!File.Exists(args[3]))
         {
-            Console.Error.WriteLine("Write-lock release timed out.");
+            Console.Error.WriteLine("Database-lock release timed out.");
             return 3;
         }
     }
     finally
     {
-        lockCommand.CommandText = "ROLLBACK";
-        lockCommand.ExecuteNonQuery();
+        if (writeLock)
+        {
+            lockCommand.CommandText = "ROLLBACK";
+            lockCommand.ExecuteNonQuery();
+        }
     }
     return 0;
 }
@@ -43,7 +61,7 @@ if (args.Length != 2 ||
 {
     Console.Error.WriteLine(
         "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second <app-data-root> " +
-        "or hold-write-lock <app-data-root> <ready-path> <release-path>");
+        "or hold-write-lock|hold-read-lock <app-data-root> <ready-path> <release-path>");
     return 2;
 }
 

@@ -228,6 +228,27 @@ Windows 11 x64 host passed PowerShell parsing, all shell seed modes, a
 locked Release production package build, and the production fixture
 exclusion check.
 
+### T11.3 queued guide and loading-window review follow-up
+
+Selecting guide B while guide A waits on a settings write must leave B in
+Reader and Resume. Keep the navigation queue for ordered writes and close
+handoff; give Game-view guide actions a monotonically increasing intent
+version and stop an older action before route publication when a later
+choice arrives. Replacing Reader A with Reader B after both actions run
+would require changing the Reader Back stack and would display a guide the
+user already superseded.
+
+Show the Game loading state and clear/disable its guide list before
+requesting game metadata. The Game renderer already handles a missing game
+by returning to Library, so the earlier existence lookup is redundant.
+For the installed check, hold A's settings write while selecting B, then
+verify B's Reader, Game-row focus, and persisted Resume. Prepare a first
+game selection, hold an exclusive SQLite read lock, select the second game,
+and assert that old rows and the selected-guide action are unavailable
+*during* loading. Release the lock and verify the second game's guide and
+Reader context. The exit requires the signed installed Windows 11 x64
+shell job plus locked headless tests and both production package builds.
+
 ### T11.1 review follow-up: close handoff and installed gate
 
 The shell must allow a new window to appear while the old one drains, but
