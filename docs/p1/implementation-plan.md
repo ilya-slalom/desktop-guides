@@ -299,6 +299,26 @@ confirm focus returns after both dialogs, alongside its existing action
 and overflow checks. The intended visual direction remains the quiet
 guide workspace; this change adds no persistent chrome.
 
+### T11.3 render-fault and process-inspection follow-up
+
+The removed-guide fixture fails before the Reader route opens, so it
+cannot prove the render-success gate. Add an optional, process-scoped
+synchronization point immediately before the Reader's second metadata
+read. In a disposable installed profile, pause there, change the guide
+format to an invalid database value and clear Resume, then release the
+read. The Reader must report a loading error while its route remains
+open; after the fixture restores the format, returning to Library must
+still show no Resume. The synchronization point only waits when the
+test creates both named handles. A direct production fault branch would
+test its own special case rather than the real repository read.
+
+If inspecting a toolbar test process fails during cleanup, record that
+error and still attempt to remove the confirmed test-owned MSIX after
+the interactive task has stopped. Keep the ownership and task-idle
+checks. Simulate a process exit during inspection in the installed
+timeout fixture, require package removal, then run a fresh normal
+install on the same runner.
+
 ### T11.1 review follow-up: close handoff and installed gate
 
 The shell must allow a new window to appear while the old one drains, but

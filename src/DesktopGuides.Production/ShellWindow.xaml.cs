@@ -381,6 +381,39 @@ public sealed partial class ShellWindow : Window
     private bool IsSupersededGameGuideIntent(long? intentVersion) =>
         intentVersion is long version && version != gameGuideIntentVersion;
 
+    private static async Task PauseReaderMetadataReadForTestAsync()
+    {
+        string prefix = $@"Local\DesktopGuides.Preview.ReaderLoad.{Environment.ProcessId}";
+        try
+        {
+            if (!EventWaitHandle.TryOpenExisting(
+                $"{prefix}.Reached", out EventWaitHandle? reached))
+            {
+                return;
+            }
+            using (reached)
+            {
+                if (!EventWaitHandle.TryOpenExisting(
+                    $"{prefix}.Continue", out EventWaitHandle? resume))
+                {
+                    return;
+                }
+                using (resume)
+                {
+                    reached.Set();
+                    if (!await Task.Run(() => resume.WaitOne(30_000)))
+                    {
+                        throw new TimeoutException("Reader metadata test gate timed out.");
+                    }
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Optional installed-test synchronization must not affect normal reading.
+        }
+    }
+
     private async Task OpenGuideAsync(
         Guid guideId, Guid? sourceGameId = null, long? intentVersion = null)
     {
@@ -584,6 +617,7 @@ public sealed partial class ShellWindow : Window
                 case ReaderRoute readerRoute:
                     ReaderPanel.Visibility = Visibility.Visible;
                     ShellStatus.Text = "Loading guide…";
+                    await PauseReaderMetadataReadForTestAsync();
                     Guide? guide = await library.GetGuideAsync(readerRoute.GuideId);
                     if (generation != renderGeneration)
                     {

@@ -3,7 +3,8 @@ param(
     [ValidateSet('empty', 'normal', 'stale', 'long-list', 'switch-game',
         'switch-game-prepare', 'switch-game-loading', 'queue-guide',
         'queue-guide-write', 'queue-later-guide', 'later-guide-result',
-        'later-guide-failed-result',
+        'later-guide-failed-result', 'queue-reader-render-error',
+        'reader-render-error-observed', 'reader-render-error-result',
         'late-guide-after-close', 'waiting-handoff')]
     [string] $Mode,
 
@@ -397,7 +398,19 @@ try {
         [void](Wait-Name 'ShellStatus' 'Opening guide...')
         $report.phases += 'guide-selected-after-close-request'
     }
+    elseif ($Mode -eq 'queue-reader-render-error') {
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        Select-Element 'Route Test Game'
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        Open-GuideFromGame 'Route Test Guide'
+        [void](Wait-Name 'ReaderBackToGame' 'Back to game')
+        [void](Wait-Name 'ShellStatus' ('Loading guide' + [char]0x2026))
+        $report.phases += 'reader-route-open-before-render-fault'
+    }
     elseif ($Mode -in @('later-guide-result', 'later-guide-failed-result',
+        'reader-render-error-observed', 'reader-render-error-result',
         'switch-game-loading', 'switch-game')) {
         # These modes continue a shell left on Reader, Game, or Library.
     }
@@ -552,6 +565,27 @@ try {
             throw 'A superseded guide became Resume after the later guide failed.'
         }
         $report.phases += 'superseded-guide-not-saved-as-resume'
+    }
+    elseif ($Mode -eq 'reader-render-error-observed') {
+        [void](Wait-Name 'ReaderBackToGame' 'Back to game')
+        [void](Wait-Name 'ShellStatus' `
+            'Could not load this view: Stored guide format is invalid.')
+        $report.phases += 'reader-render-read-failed-on-reader-route'
+    }
+    elseif ($Mode -eq 'reader-render-error-result') {
+        [void](Wait-Name 'ShellStatus' `
+            'Could not load this view: Stored guide format is invalid.')
+        Go-Back
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        $resume = Find-ById 'ResumeGuide'
+        if ($resume -and -not $resume.Current.IsOffscreen) {
+            throw 'A guide whose Reader failed to render became Resume.'
+        }
+        $report.phases += 'reader-render-error-did-not-save-resume'
     }
     elseif ($Mode -eq 'normal') {
         $resume = Wait-Name 'ResumeGuide' "Resume $ExpectedResumeGuide"

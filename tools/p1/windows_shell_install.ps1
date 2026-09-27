@@ -426,6 +426,58 @@ function Assert-FailedLaterGuideDoesNotSaveEarlier {
     Close-InstalledShell
 }
 
+function Assert-ReaderRenderErrorDoesNotSaveResume {
+    Start-InstalledShell
+    $processId = $report.launchedProcessId
+    $reached = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::AutoReset,
+        "Local\DesktopGuides.Preview.ReaderLoad.$($processId).Reached")
+    $resume = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::ManualReset,
+        "Local\DesktopGuides.Preview.ReaderLoad.$($processId).Continue")
+    $seedProject = Join-Path $PSScriptRoot `
+        'DesktopGuides.ShellSeed\DesktopGuides.ShellSeed.csproj'
+    $fixtureCorrupted = $false
+    try {
+        $report.queuedBeforeRenderError = Run-ShellSmoke 'queue-reader-render-error'
+        if (-not $reached.WaitOne(15000)) {
+            throw 'Reader route did not reach its second metadata read.'
+        }
+        dotnet run --project $seedProject -c Release --no-restore -- `
+            corrupt-reader-guide $dataRoot
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Could not corrupt the disposable Reader metadata fixture.'
+        }
+        $fixtureCorrupted = $true
+        $resume.Set() | Out-Null
+        $report.readerRenderError = Run-ShellSmoke 'reader-render-error-observed'
+        dotnet run --project $seedProject -c Release --no-restore -- `
+            restore-reader-guide $dataRoot
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Could not restore the Reader metadata fixture.'
+        }
+        $fixtureCorrupted = $false
+        $report.readerRenderRecovery = Run-ShellSmoke 'reader-render-error-result'
+        Close-InstalledShell
+    }
+    finally {
+        try {
+            $resume.Set() | Out-Null
+            if ($fixtureCorrupted) {
+                dotnet run --project $seedProject -c Release --no-restore -- `
+                    restore-reader-guide $dataRoot
+                if ($LASTEXITCODE -ne 0) {
+                    throw 'Reader metadata fixture recovery failed during cleanup.'
+                }
+            }
+        }
+        finally {
+            $resume.Dispose()
+            $reached.Dispose()
+        }
+    }
+}
+
 function Assert-GameSwitchClearsWhileLoading {
     $report.switchGamePreparation = Run-ShellSmoke 'switch-game-prepare'
     $lockReady = Join-Path $ResultDirectory "read-lock-ready-$runId"
@@ -660,6 +712,7 @@ try {
     Assert-LaterGuideWins
     Assert-AcceptedThenClose
     Assert-FailedLaterGuideDoesNotSaveEarlier
+    Assert-ReaderRenderErrorDoesNotSaveResume
 
     Stop-InstalledShell
     dotnet run --project $seedProject -c Release --no-restore -- stale $dataRoot

@@ -95,12 +95,68 @@ if (args.Length == 2 && args[0] == "invalidate-blocked-guide")
     return 0;
 }
 
+if (args.Length == 2 &&
+    args[0] is "corrupt-reader-guide" or "restore-reader-guide")
+{
+    bool corrupt = args[0] == "corrupt-reader-guide";
+    ManagedPathResolver fixturePaths = new(args[1]);
+    using SqliteConnection connection = new(new SqliteConnectionStringBuilder
+    {
+        DataSource = fixturePaths.DatabasePath,
+        Mode = SqliteOpenMode.ReadWrite,
+        Pooling = false,
+        ForeignKeys = true
+    }.ToString());
+    connection.Open();
+    if (corrupt)
+    {
+        using SqliteCommand allowInvalidFormat = connection.CreateCommand();
+        allowInvalidFormat.CommandText = "PRAGMA ignore_check_constraints = ON";
+        allowInvalidFormat.ExecuteNonQuery();
+    }
+    using SqliteTransaction transaction = connection.BeginTransaction();
+    if (corrupt)
+    {
+        using SqliteCommand clearResume = connection.CreateCommand();
+        clearResume.Transaction = transaction;
+        clearResume.CommandText = "DELETE FROM Settings WHERE Key = 'LastActiveGuideId'";
+        clearResume.ExecuteNonQuery();
+    }
+    using (SqliteCommand updateGuide = connection.CreateCommand())
+    {
+        updateGuide.Transaction = transaction;
+        updateGuide.CommandText = """
+            UPDATE Guides SET Format = $newFormat
+            WHERE Title = 'Route Test Guide'
+              AND Format = $oldFormat
+              AND GameId = (
+                  SELECT Id FROM Games WHERE Title = 'Route Test Game'
+              )
+            """;
+        updateGuide.Parameters.AddWithValue(
+            "$newFormat", corrupt ? "Invalid" : "Txt");
+        updateGuide.Parameters.AddWithValue(
+            "$oldFormat", corrupt ? "Txt" : "Invalid");
+        if (updateGuide.ExecuteNonQuery() != 1)
+        {
+            throw new InvalidOperationException(
+                "Expected one route guide for the Reader render fault.");
+        }
+    }
+    transaction.Commit();
+    Console.WriteLine(corrupt
+        ? "Cleared Resume and invalidated the Reader metadata read."
+        : "Restored the Reader metadata fixture.");
+    return 0;
+}
+
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second"))
 {
     Console.Error.WriteLine(
         "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second <app-data-root> " +
         "or invalidate-blocked-guide <app-data-root> " +
+        "or corrupt-reader-guide|restore-reader-guide <app-data-root> " +
         "or hold-write-lock|hold-read-lock <app-data-root> <ready-path> <release-path>");
     return 2;
 }

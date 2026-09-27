@@ -5,11 +5,17 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $ResultDirectory,
 
-    [switch] $SimulateSmokeTimeoutAfterInstall
+    [switch] $SimulateSmokeTimeoutAfterInstall,
+
+    [switch] $SimulateProcessExitDuringInspection
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+if ($SimulateProcessExitDuringInspection -and
+    -not $SimulateSmokeTimeoutAfterInstall) {
+    throw 'Process-exit simulation requires the installed timeout fixture.'
+}
 $packageName = Split-Path $PackagePath -Leaf
 $packageMatch = [regex]::Match($packageName,
     '^DesktopGuides\.ReaderToolbarSmoke_(?<version>[0-9]+(?:\.[0-9]+){3})_x64\.msix$')
@@ -46,6 +52,7 @@ $report = [ordered]@{
     sourcePackageSha256 = (Get-FileHash $PackagePath -Algorithm SHA256).Hash
     parentStoppedProcess = $false
     parentRemovedPackage = $false
+    simulatedProcessExit = $false
     success = $false
 }
 $certificate = $null
@@ -189,6 +196,17 @@ finally {
                     [System.StringComparison]::OrdinalIgnoreCase)) {
                     continue
                 }
+                if ($SimulateProcessExitDuringInspection -and
+                    -not $report.simulatedProcessExit) {
+                    $process.Kill()
+                    if (-not $process.WaitForExit(10000)) {
+                        throw "Toolbar process $($process.Id) did not exit."
+                    }
+                    $report.parentStoppedProcess = $true
+                    $report.simulatedProcessExit = $true
+                    throw [InvalidOperationException]::new(
+                        'Simulated process exit during module inspection.')
+                }
                 if (-not $process.HasExited) {
                     $process.Kill()
                     if (-not $process.WaitForExit(10000)) {
@@ -201,15 +219,13 @@ finally {
                 $report.processCleanupError = $_ | Out-String
             }
         }
-        if (-not $report.processCleanupError) {
-            try {
-                Remove-AppxPackage -Package $ownedPackage[0].PackageFullName `
-                    -ErrorAction Stop
-                $report.parentRemovedPackage = $true
-            }
-            catch {
-                $report.packageCleanupError = $_ | Out-String
-            }
+        try {
+            Remove-AppxPackage -Package $ownedPackage[0].PackageFullName `
+                -ErrorAction Stop
+            $report.parentRemovedPackage = $true
+        }
+        catch {
+            $report.packageCleanupError = $_ | Out-String
         }
     }
     if ($certificate) {

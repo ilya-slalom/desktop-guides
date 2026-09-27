@@ -128,6 +128,20 @@ carry the current invocation ID, process ID, and session ID. Fail on an
 uncleared old result or a result with the wrong identity. Confirm that the
 runner's scheduled tasks were removed before reporting cleanup success.
 
+For the Reader render-failure fixture, open a guide in a disposable
+installed profile and pause its second metadata read with process-scoped
+named events. After the Reader route is visible, set that guide's database
+format to an invalid value and clear Resume, then release the read. Require
+the Reader loading error, restore the valid format, return to Library, and
+verify Resume remains empty. Always release the event and restore the
+fixture if the scenario fails.
+
+The toolbar installed gate also runs a simulated timeout after install and
+process exit during cleanup inspection. Require the parent to remove the
+confirmed test-owned package despite the inspection error, verify no test
+process, trust, or task remains, then perform a normal install on the same
+runner.
+
 ## Scenario checklist
 
 Each row needs a named UI trace or result file from the signed, installed
@@ -135,7 +149,7 @@ production app. Add cases as the dependent P1 tasks complete.
 
 | Scenario | Required observation | Task / requirement |
 | --- | --- | --- |
-| Shell smoke | Fresh empty Library, Library/Game/Reader/Settings routes, rapid Game/Guide → Settings selections and Back, stale Resume, no P0 fixture controls, and a positive UI-accepted second launch that brings a background window to the foreground. While guide A's lookup is held by a fixture read lock, select guide B and verify B's Reader, Back selection/focus, and persisted Resume. During another held lookup, request Close and select a later guide; the accepted earlier guide must still become Resume after drain. In a disposable fixture, remove a still-displayed later guide and clear Resume before the held lookup; its failed open must leave Resume empty. Hold the second game's metadata read and verify the previous guide row and selected-guide action are unavailable during loading, then check the second game's Reader after release. Launch a new window while an old guide write is blocked; verify the new window waits for the library lease and then shows the distinct guide saved by the old window. Pause a second launch after it selects the old instance, and pause a callback after it reaches the UI queue; close the old window in each case and verify the launch takes over. After a second launch receives UI acceptance, close the old window before the second process exits and verify it does not reopen. Retain verified process handles from the interactive launch handoff and wait for handle-confirmed exit before seeding or package cleanup. Reader is still a placeholder. | T11.1, T11.3, TR11.1 |
+| Shell smoke | Fresh empty Library, Library/Game/Reader/Settings routes, rapid Game/Guide → Settings selections and Back, stale Resume, no P0 fixture controls, and a positive UI-accepted second launch that brings a background window to the foreground. While guide A's lookup is held by a fixture read lock, select guide B and verify B's Reader, Back selection/focus, and persisted Resume. During another held lookup, request Close and select a later guide; the accepted earlier guide must still become Resume after drain. In a disposable fixture, remove a still-displayed later guide and clear Resume before the held lookup; its failed open must leave Resume empty. Also corrupt a guide after its Reader route opens but before its second metadata read; the render error must leave Resume empty after the format is restored and the user returns to Library. Hold the second game's metadata read and verify the previous guide row and selected-guide action are unavailable during loading, then check the second game's Reader after release. Launch a new window while an old guide write is blocked; verify the new window waits for the library lease and then shows the distinct guide saved by the old window. Pause a second launch after it selects the old instance, and pause a callback after it reaches the UI queue; close the old window in each case and verify the launch takes over. After a second launch receives UI acceptance, close the old window before the second process exits and verify it does not reopen. Retain verified process handles from the interactive launch handoff and wait for handle-confirmed exit before seeding or package cleanup. Reader is still a placeholder. | T11.1, T11.3, TR11.1 |
 | Install and upgrade | Signed MSIX installs in an interactive session; an older version upgrades under the same identity without losing a populated library. Verify package version, launch, and data after restart. | T17.1, T17.3, TR17.2 |
 | Import and offline reading | Add a game and import TXT, static HTML with local assets, and PDF through the UI. Remove the originals; while online in a fresh WebView2 profile, verify a reachable HTML canary receives zero guide-originated requests. Then remove all egress, relaunch, and open all three managed copies while recording disconnected state through the final check. | T04–T10, T17.3, TR17.1 |
 | Independent state | Move to different positions in two guides, restart, and verify their locators separately. Change layout/theme, check exact or labeled approximate restore, and toggle completion explicitly; reaching the end must not mark complete. | T12–T14, TR12.1–TR14.2 |
