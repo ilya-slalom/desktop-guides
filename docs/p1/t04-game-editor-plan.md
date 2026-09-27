@@ -10,7 +10,7 @@ game. A separate window would add navigation and ownership work to a short
 metadata form; two forms would let their validation drift. The dialog owns
 draft text only. Its primary action calls the repository once after all
 fields validate and keeps the dialog open with an actionable error if the
-write fails. Cancel never calls the repository.
+write fails. Cancel never issues a repository write.
 
 The visual direction is a quiet reading workspace. Use system theme
 surfaces and text brushes so high contrast remains native. Keep the shell's

@@ -505,6 +505,7 @@ try {
         Set-Text 'GameTitleInput' " $title "
         Set-Text 'GamePlatformInput' ' Windows '
         Set-Text 'GameNotesInput' '  Explore the postgame.  '
+        [void](Wait-Name 'GameTitleFeedback' "$($title.Length + 2) / 160 characters")
         Press-Enter (Wait-VisibleById 'GameTitleInput')
         [void](Wait-Name 'GameHeading' $title)
         [void](Wait-Name 'GamePlatform' 'Windows')
@@ -529,6 +530,7 @@ try {
         Set-Text 'GameTitleInput' $renamed
         Set-Text 'GamePlatformInput' ''
         Set-Text 'GameNotesInput' ''
+        [void](Wait-Name 'GameTitleFeedback' "$($renamed.Length) / 160 characters")
         Press-Enter (Wait-VisibleById 'GameTitleInput')
         [void](Wait-Name 'GameHeading' $renamed)
         [void](Wait-Name 'ShellStatus' 'Game ready.')
@@ -536,8 +538,10 @@ try {
 
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Name 'ShellStatus' 'Library ready.')
         Invoke-Element (Wait-Name 'AddGameButton' 'Add game')
         Set-Text 'GameTitleInput' $renamed
+        [void](Wait-Name 'GameTitleFeedback' "$($renamed.Length) / 160 characters")
         Press-Enter (Wait-VisibleById 'GameTitleInput')
         [void](Wait-Name 'GameHeading' $renamed)
         Go-Back
@@ -870,6 +874,24 @@ try {
 }
 catch {
     $report.error = $_ | Out-String
+    if ($Mode -eq 'game-editor' -and $root) {
+        try {
+            foreach ($id in @('ShellStatus', 'GameHeading',
+                'GameTitleFeedback', 'GameSaveError')) {
+                $element = Find-ById $id
+                if ($element) {
+                    $report["failure$id"] = [ordered]@{
+                        name = $element.Current.Name
+                        visible = -not $element.Current.IsOffscreen
+                    }
+                }
+            }
+            $report.failureScreenshot = Save-WindowScreenshot 'failure'
+        }
+        catch {
+            $report.failureInspectionError = $_ | Out-String
+        }
+    }
 }
 finally {
     $report | ConvertTo-Json -Depth 6 |

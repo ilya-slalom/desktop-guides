@@ -18,7 +18,7 @@ The T07.2 Windows implementation check is recorded in the
 T07.2 was merged into `main` through PR #10 on 27 September 2026 at
 `72f43785fad2b01b3f79b739017f0623d46b6665`. Its final Windows 11 x64
 run passed 89/89 Infrastructure tests and an unsigned Release x64 MSIX build;
-all 18 CI checks passed. T04.1 is the next M2 implementation task.
+all 18 CI checks passed. T04.1 is in progress.
 
 ## M2 T04.1 game editor — implementation check, 27 September 2026
 
