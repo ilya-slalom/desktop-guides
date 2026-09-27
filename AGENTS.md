@@ -20,3 +20,8 @@
   the changed interface in the PR description.
 - Review PRs primarily for functional defects and regressions; prioritize
   test-harness details and small edge cases when they affect those outcomes.
+- When triaging HTML or PDF review findings, assess whether a guide from a
+  major public game-guide website could realistically trigger the issue through
+  a supported import path. Check representative guides when feasible. Set
+  priority from likely frequency and user impact, and state uncertainty instead
+  of treating a contrived fixture as evidence of prevalence.
