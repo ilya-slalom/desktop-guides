@@ -323,6 +323,25 @@ The installed Back helper should prefer the NavigationView back button's
 automation ID, then a visible button named Back, and wait for an Invoke
 pattern. A name-only search can select a non-invokable child.
 
+### T11.3 toolbar install ownership follow-up
+
+Version and architecture identify the test package but do not identify
+which concurrent run installed it. Hold an exclusive per-user lock file
+before checking package absence and through package, process, task, and
+certificate cleanup. A second run must fail before creating a task or
+certificate, and it must not enter package cleanup. Keep the lock file
+after release so concurrent attempts always open the same file object.
+This uses the user's local app-data path across desktop sessions; the OS
+releases the open handle if the parent process exits.
+
+Extend the installed timeout scenario with a bounded hold after the first
+run reports its package and process. Start a second installer for the
+same identity and verify it is rejected while the first package and
+process remain present. Release the first, verify its normal timeout
+cleanup, then perform the existing successful install on the same
+runner. A version match alone remains insufficient as an ownership
+check without this serialized preflight.
+
 ### T11.1 review follow-up: close handoff and installed gate
 
 The shell must allow a new window to appear while the old one drains, but

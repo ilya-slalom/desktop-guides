@@ -740,3 +740,29 @@ traces repeated the new regression. The
 passed and removed its temporary package and certificate. The signed
 toolbar job and retained native ARM64 P0 installed suite passed in both
 runs. Windows 10 and the complete P1 ARM64 workflow remain deferred.
+
+### T11.3 toolbar install ownership review follow-up — 27 September 2026
+
+The toolbar installer now holds an exclusive per-user file lock before
+its package-absent preflight and through all cleanup. A concurrent
+invocation exits before creating a task, certificate, or result directory
+and cannot classify the first run's package as its own. The installed
+timeout fixture holds the first package and process while invoking a
+second installer, then releases the first and runs a normal install.
+
+The Windows 11 x64 host under `E:\work\desktop-guides` parsed the
+PowerShell scripts and passed locked restores and unsigned Release x64
+production and toolbar MSIX builds. The
+[interactive result](evidence/host/reader-toolbar-exclusive-install/review-result.json)
+reports desktop session 1 and a passing overlap-to-reinstall sequence.
+Its [overlap result](evidence/host/reader-toolbar-exclusive-install/overlap-result.json)
+confirms the second invocation was rejected while the first package and
+process remained present. The
+[first timeout cleanup](evidence/host/reader-toolbar-exclusive-install/timeout-install.json)
+removed the package after the simulated process-inspection error, and
+the [normal install](evidence/host/reader-toolbar-exclusive-install/normal-install.json)
+passed with no test package, process, task, or certificate left behind.
+An initial host attempt exposed that asynchronous `Start-Process` in
+Windows PowerShell 5.1 returned no exit-code property; the helper now
+uses the first installer's signed report to verify its expected timeout
+and cleanup.

@@ -140,7 +140,11 @@ The toolbar installed gate also runs a simulated timeout after install and
 process exit during cleanup inspection. Require the parent to remove the
 confirmed test-owned package despite the inspection error, verify no test
 process, trust, or task remains, then perform a normal install on the same
-runner.
+runner. Keep the per-user install lock open from the package-absent
+preflight through cleanup. While the first timeout run holds its installed
+package and process, start a second run for the same identity. It must
+fail before setup and leave the first package and process intact; after
+releasing the first run, require its cleanup before the normal install.
 
 ## Scenario checklist
 

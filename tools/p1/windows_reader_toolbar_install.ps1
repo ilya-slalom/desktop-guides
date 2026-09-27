@@ -7,7 +7,9 @@ param(
 
     [switch] $SimulateSmokeTimeoutAfterInstall,
 
-    [switch] $SimulateProcessExitDuringInspection
+    [switch] $SimulateProcessExitDuringInspection,
+
+    [string] $PauseTimeoutCleanupUntilPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,6 +17,10 @@ $ProgressPreference = 'SilentlyContinue'
 if ($SimulateProcessExitDuringInspection -and
     -not $SimulateSmokeTimeoutAfterInstall) {
     throw 'Process-exit simulation requires the installed timeout fixture.'
+}
+if ($PauseTimeoutCleanupUntilPath -and
+    -not $SimulateSmokeTimeoutAfterInstall) {
+    throw 'Cleanup pause requires the installed timeout fixture.'
 }
 $packageName = Split-Path $PackagePath -Leaf
 $packageMatch = [regex]::Match($packageName,
@@ -29,14 +35,26 @@ if (-not @(Get-Process explorer -ErrorAction SilentlyContinue |
     })) {
     throw 'Toolbar install test requires an interactive desktop session.'
 }
-if (Get-AppxPackage -Name DesktopGuides.ReaderToolbarSmoke) {
-    throw 'The toolbar test package is already installed.'
-}
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = [Security.Principal.WindowsPrincipal]::new($identity)
 if (-not $principal.IsInRole(
     [Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw 'Toolbar install test requires an elevated runner account.'
+}
+$lockDirectory = Join-Path $env:LOCALAPPDATA 'DesktopGuides.ReaderToolbarSmoke'
+New-Item -ItemType Directory -Force $lockDirectory | Out-Null
+$lockPath = Join-Path $lockDirectory 'install.lock'
+try {
+    $toolbarInstallLock = [System.IO.File]::Open(
+        $lockPath, [System.IO.FileMode]::OpenOrCreate,
+        [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+}
+catch {
+    throw "Toolbar install lock is unavailable: $($_.Exception.Message)"
+}
+try {
+if (Get-AppxPackage -Name DesktopGuides.ReaderToolbarSmoke) {
+    throw 'The toolbar test package is already installed.'
 }
 New-Item -ItemType Directory -Force $ResultDirectory | Out-Null
 $ResultDirectory = (Resolve-Path $ResultDirectory).Path
@@ -121,6 +139,18 @@ try {
         } while ((Get-Date) -lt $deadline)
         if (-not (Test-Path -LiteralPath $pauseMarker)) {
             throw 'Toolbar timeout fixture did not finish installing.'
+        }
+        if ($PauseTimeoutCleanupUntilPath) {
+            $deadline = (Get-Date).AddSeconds(45)
+            do {
+                if (Test-Path -LiteralPath $PauseTimeoutCleanupUntilPath) {
+                    break
+                }
+                Start-Sleep -Milliseconds 200
+            } while ((Get-Date) -lt $deadline)
+            if (-not (Test-Path -LiteralPath $PauseTimeoutCleanupUntilPath)) {
+                throw 'Toolbar timeout cleanup hold was not released.'
+            }
         }
         throw 'Simulated toolbar smoke timeout after installation.'
     }
@@ -256,5 +286,9 @@ finally {
     $report | ConvertTo-Json -Depth 6 |
         Set-Content -LiteralPath (Join-Path $ResultDirectory 'signed-install.json') `
             -Encoding UTF8
+}
+}
+finally {
+    $toolbarInstallLock.Dispose()
 }
 if (-not $report.success) { exit 1 }

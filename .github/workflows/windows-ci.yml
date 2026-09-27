@@ -317,25 +317,11 @@ jobs:
           if ($packages.Count -ne 1) {
             throw "Expected one x64 toolbar test package, found $($packages.Count)."
           }
-          & pwsh -NoProfile -File ./tools/p1/windows_reader_toolbar_install.ps1 `
+          & pwsh -NoProfile -File ./tools/p1/test_windows_reader_toolbar_exclusive_install.ps1 `
             -PackagePath $packages[0].FullName `
-            -ResultDirectory artifacts/reader-toolbar-ui/timeout `
-            -SimulateSmokeTimeoutAfterInstall `
-            -SimulateProcessExitDuringInspection
-          if ($LASTEXITCODE -ne 1) {
-            throw "Timeout fixture returned $LASTEXITCODE instead of its expected failure."
-          }
-          $timeout = Get-Content `
-            artifacts/reader-toolbar-ui/timeout/signed-install.json -Raw |
-            ConvertFrom-Json
-          if ($timeout.success -or -not $timeout.simulatedProcessExit -or
-              $timeout.processCleanupError -notmatch 'Simulated process exit during module inspection' -or
-              -not $timeout.parentStoppedProcess -or
-              -not $timeout.parentRemovedPackage -or
-              $timeout.error -notmatch 'Simulated toolbar smoke timeout after installation' -or
-              $timeout.packageStillInstalled -or $timeout.processStillRunning -or
-              $timeout.certificateStillTrusted -or $timeout.taskStillRegistered) {
-            throw 'Timeout fixture did not clean up the installed toolbar package.'
+            -ResultDirectory artifacts/reader-toolbar-ui/timeout
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Overlapping toolbar install or timeout cleanup failed.'
           }
           & ./tools/p1/windows_reader_toolbar_install.ps1 `
             -PackagePath $packages[0].FullName `
