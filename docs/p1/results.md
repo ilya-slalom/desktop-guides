@@ -662,3 +662,18 @@ An initial host attempt exposed a smoke assumption: WinUI names the open
 overflow toggle `Less app bar`; the passing test closes it by its
 automation ID. The Reader render-error path was checked in code and built
 on Windows; the host fixture did not inject a second-read exception.
+
+The review-fix evidence head `fdffd08` passed all nine jobs in
+[push run 36291334420](https://github.com/ilya-slalom/desktop-guides/actions/runs/36291334420)
+and [PR run 36291336239](https://github.com/ilya-slalom/desktop-guides/actions/runs/36291336239).
+The [CI timeout record](evidence/ci/reader-toolbar-render-cleanup/timeout-install.json)
+confirms that the parent stopped the running test app and removed its
+package; the following
+[signed toolbar install](evidence/ci/reader-toolbar-render-cleanup/signed-install.json)
+and [focus trace](evidence/ci/reader-toolbar-render-cleanup/toolbar-ui.json)
+passed with cleanup. The
+[signed production shell](evidence/ci/production-shell/reader-shell/render-cleanup-review/signed-install.json)
+passed its route and Resume checks and removed its package and
+certificate. Both architecture package builds, x64 and native ARM64
+headless tests, and the retained native ARM64 P0 installed regression
+passed. The native ARM64 installed result remains a P0 diagnostic check.
