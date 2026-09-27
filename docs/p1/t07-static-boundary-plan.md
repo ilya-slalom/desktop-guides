@@ -18,6 +18,15 @@ manifest; the rooted source maps that alias to the selected file for preview,
 copy, and post-copy verification. T06.3 must stage the entry under the alias
 while opening the original through this mapping. Relative asset URLs still
 resolve from the same root directory.
+For that entry, recognize its matching `<entry title>_files` companion
+directory in literal, percent-escaped, or fully URL-escaped form. Map it to
+`__desktop_guides_files` in the managed tree; a different percent-bearing
+path remains unsafe. Only the known root segment is remapped, so encoded
+traversal, a raw managed-alias request, and filesystem links still fail.
+Each included asset carries both a safe `RelativePath` for stage copies and
+a decoded `RequestRelativePath` for the later per-guide URL allowlist. T06.3
+must retain that mapping; T07.3 must serve only an allowlisted managed file
+for a validated request path, never read the original request path from disk.
 
 Return T07.1's non-included references as typed preview warnings for missing,
 remote, unsafe, and unsupported assets. A warning means the referenced
@@ -39,6 +48,6 @@ the copy and journal.
 | Step | Output and check |
 | --- | --- |
 | Source boundary | Absolute selected HTML file becomes a safe root and entry name. Missing paths return `Missing`; parent traversal, encoded paths, and link traversal never open outside files. NTFS symlink and junction fixtures fail closed. |
-| Preview | Scanner result plus typed warnings; remote and unsupported references remain visible. Included assets have unique case-folded destinations. |
-| Post-copy check | Matching source/stage copies pass. A changed, removed, linked, or case-colliding file fails before publication, including a change after preview but before a simulated copy. Verification reads at most one byte beyond the recorded length to detect growth. |
+| Preview | Scanner result plus typed warnings; remote and unsupported references remain visible. Included assets have unique case-folded destinations. A percent-named guide's matching companion CSS/images get safe managed names and retain their request-path mappings. |
+| Post-copy check | Matching source/stage copies pass. A changed, removed, linked, or case-colliding file fails before publication, including a change after preview but before a simulated copy. Verification reads at most one byte beyond the recorded length to detect growth. Mapped companion paths obey the same checks. |
 | Windows exit | Locked Release Infrastructure tests and a Release x64 production MSIX build pass on Windows 11 x64. ARM64 headless and package CI jobs pass. No installed import claim is made before T06.1 and T06.3. |

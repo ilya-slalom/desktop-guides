@@ -40,6 +40,8 @@ public sealed class StaticHtmlImportPreview
 
     internal string SourceRoot { get; }
     internal string SourceEntryFileName { get; }
+    internal RootedStaticHtmlAssetSource CreateSource() => new(
+        SourceRoot, EntryRelativePath, SourceEntryFileName);
     public string EntryRelativePath { get; }
     public StaticHtmlManifest Manifest { get; }
     public IReadOnlyList<StaticHtmlPreviewWarning> Warnings { get; }

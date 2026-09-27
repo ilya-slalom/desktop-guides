@@ -55,9 +55,7 @@ public sealed class StaticHtmlImportValidator(
         RootedStaticHtmlAssetSource stage;
         try
         {
-            source = new RootedStaticHtmlAssetSource(
-                preview.SourceRoot, preview.EntryRelativePath,
-                preview.SourceEntryFileName);
+            source = preview.CreateSource();
         }
         catch (DirectoryNotFoundException)
         {

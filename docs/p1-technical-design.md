@@ -424,9 +424,14 @@ project uses a provisional package identity until T17.1 sets the public one.
   unsupported type, and case-colliding destinations. Report missing files
   and blocked remote references in preview before Confirm. Revalidate
   staged paths and hashes before publishing; a source asset changed during
-  preview cannot silently change the imported result.
+  preview cannot silently change the imported result. For a selected entry
+  with `%` in its filename, map only its matching `_files` companion folder
+  to a safe managed directory. Retain each included asset's validated URL
+  request path separately from its managed-file path.
 - **T07.3** Serve only a per-guide manifest allowlist from WebView2's
-  `WebResourceRequested` handler at the unique synthetic origin. Deny all
+  `WebResourceRequested` handler at the unique synthetic origin. Validate
+  and decode request paths once, then map any allowed companion URL to its
+  staged managed path; never use a request path for disk access. Deny all
   other requests, navigation, new windows, permissions, and downloads;
   disable document scripts, host objects, and web messages. Internal
   fragments remain in the view. An external URL is canceled and shown in an

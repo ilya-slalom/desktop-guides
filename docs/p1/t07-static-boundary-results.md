@@ -38,3 +38,13 @@ source for revalidation. URL asset paths still reject encoded escapes.
 On the same Windows 11 x64 host, the focused boundary tests passed **10/10**,
 the full Infrastructure suite passed **84/84**, and the unsigned Release
 x64 production MSIX build passed with the same symbols-package warning.
+
+The follow-up PR review found that a `%`-named entry's matching `_files`
+directory could contain valid local images that were omitted as unsafe.
+The scanner now maps that known companion root to a safe managed directory
+and records its original request path alongside the managed path. Source
+opens, staged copies, and post-copy hash checks use the same mapping; other
+percent paths and encoded traversal remain blocked. A Windows 11 x64 run
+passed **89/89** Infrastructure tests, including literal and URL-escaped
+companion references, missing assets, source changes, a linked file, and
+an ambiguous encoded triplet that remains blocked.

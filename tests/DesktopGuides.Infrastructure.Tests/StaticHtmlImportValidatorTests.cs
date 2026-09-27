@@ -65,7 +65,7 @@ public sealed class StaticHtmlImportValidatorTests
             Assert.Single(preview.Warnings).Status);
         Assert.False(File.Exists(Path.Combine(files.SourceRoot, managedName)));
 
-        files.Stage(preview);
+        await files.StageAsync(preview);
         await validator.VerifyStagedAsync(preview, files.StageRoot);
         Assert.True(File.Exists(Path.Combine(files.StageRoot, managedName)));
 
@@ -92,6 +92,116 @@ public sealed class StaticHtmlImportValidatorTests
                 new StaticHtmlImportValidator().PreviewAsync(selected));
 
         Assert.Equal(StaticHtmlValidationIssue.UnsafePath, error.Issue);
+    }
+
+    [Theory]
+    [InlineData("100% Completion Guide_files")]
+    [InlineData("100%25 Completion Guide_files")]
+    [InlineData("100%25%20Completion%20Guide_files")]
+    public async Task PercentNamedCompanionAssetsAreIncludedAndRevalidated(
+        string referencedFolder)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using TestHtmlDirectory files = new();
+        const string sourceEntry = "100% Completion Guide.html";
+        const string companion = "100% Completion Guide_files";
+        string managedFolder = RootedStaticHtmlAssetSource.ManagedCompanionFolder;
+        files.WriteSource(sourceEntry, $"""
+            <link rel="stylesheet" href="{referencedFolder}/style.css">
+            <img src="{referencedFolder}/map.png">
+            <img src="{referencedFolder}/missing.png">
+            <img src="{referencedFolder}/%2e%2e/outside.png">
+            <img src="{managedFolder}/unrelated.png">
+            """);
+        files.WriteSource(companion + "/style.css",
+            "body { background: url(map.png) }");
+        files.WriteSource(companion + "/map.png", "image");
+        files.WriteSource(managedFolder + "/unrelated.png", "unrelated");
+        StaticHtmlImportValidator validator = new();
+
+        StaticHtmlImportPreview preview = await validator.PreviewAsync(
+            Path.Combine(files.SourceRoot, sourceEntry));
+
+        Assert.Equal("guide.html", preview.EntryRelativePath);
+        Assert.Equal(
+            [managedFolder + "/map.png", managedFolder + "/style.css",
+                "guide.html"],
+            preview.Manifest.Assets.Select(asset => asset.RelativePath));
+        Assert.Equal(
+            companion + "/map.png",
+            Assert.Single(preview.Manifest.Assets,
+                asset => asset.Kind == StaticAssetKind.Image)
+                .RequestRelativePath);
+        Assert.Equal(
+            companion + "/style.css",
+            Assert.Single(preview.Manifest.Assets,
+                asset => asset.Kind == StaticAssetKind.StyleSheet)
+                .RequestRelativePath);
+        Assert.Equal(
+            [StaticReferenceStatus.Missing, StaticReferenceStatus.Unsafe,
+                StaticReferenceStatus.Unsafe],
+            preview.Warnings.Select(warning => warning.Status));
+        Assert.Contains(preview.Manifest.References, reference =>
+            reference.RawTarget == referencedFolder + "/map.png" &&
+            reference.RelativePath == managedFolder + "/map.png" &&
+            reference.Status == StaticReferenceStatus.Included);
+
+        await files.StageAsync(preview);
+        await validator.VerifyStagedAsync(preview, files.StageRoot);
+        Assert.Equal(
+            "image",
+            files.ReadStage(managedFolder + "/map.png"));
+
+        files.WriteSource(companion + "/map.png", "changed");
+        StaticHtmlValidationException error = await Assert.ThrowsAsync<
+            StaticHtmlValidationException>(() =>
+                validator.VerifyStagedAsync(preview, files.StageRoot));
+        Assert.Equal(StaticHtmlValidationIssue.SourceChanged, error.Issue);
+    }
+
+    [Fact]
+    public async Task PercentNamedCompanionLinkFailsClosed()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using TestHtmlDirectory files = new();
+        const string companion = "100% Completion Guide_files";
+        files.WriteSource(
+            "100% Completion Guide.html",
+            $"""<img src="{companion}/linked.png">""");
+        string outside = Path.Combine(files.Root, "outside.png");
+        File.WriteAllText(outside, "private");
+        string link = Path.Combine(
+            files.SourceRoot, companion, "linked.png");
+        Directory.CreateDirectory(Path.GetDirectoryName(link)!);
+        File.CreateSymbolicLink(link, outside);
+
+        StaticHtmlValidationException error = await Assert.ThrowsAsync<
+            StaticHtmlValidationException>(() =>
+                new StaticHtmlImportValidator().PreviewAsync(
+                    Path.Combine(files.SourceRoot,
+                        "100% Completion Guide.html")));
+
+        Assert.Equal(StaticHtmlValidationIssue.UnsafePath, error.Issue);
+    }
+
+    [Fact]
+    public async Task EncodedTripletInLiteralCompanionNameStaysUnsafe()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using TestHtmlDirectory files = new();
+        files.WriteSource(
+            "Guide%2e.html",
+            """<img src="Guide%2e_files/map.png">""");
+        files.WriteSource("Guide%2e_files/map.png", "image");
+
+        StaticHtmlImportPreview preview = await new StaticHtmlImportValidator()
+            .PreviewAsync(Path.Combine(files.SourceRoot, "Guide%2e.html"));
+
+        Assert.Equal(
+            StaticReferenceStatus.Unsafe,
+            Assert.Single(preview.Warnings).Status);
+        Assert.DoesNotContain(preview.Manifest.Assets,
+            asset => asset.Kind == StaticAssetKind.Image);
     }
 
     [Fact]
@@ -187,7 +297,7 @@ public sealed class StaticHtmlImportValidatorTests
         StaticHtmlImportValidator validator = new();
         StaticHtmlImportPreview preview = await validator.PreviewAsync(
             files.EntryPath);
-        files.Stage(preview);
+        await files.StageAsync(preview);
 
         await validator.VerifyStagedAsync(preview, files.StageRoot);
 
@@ -215,7 +325,7 @@ public sealed class StaticHtmlImportValidatorTests
         StaticHtmlImportValidator validator = new();
         StaticHtmlImportPreview preview = await validator.PreviewAsync(
             files.EntryPath);
-        files.Stage(preview);
+        await files.StageAsync(preview);
         File.Delete(Path.Combine(files.StageRoot, "map.png"));
         File.CreateSymbolicLink(
             Path.Combine(files.StageRoot, "map.png"),
@@ -265,17 +375,22 @@ public sealed class StaticHtmlImportValidatorTests
         public void WriteStage(string relativePath, string text) =>
             Write(StageRoot, relativePath, text);
 
-        public void Stage(StaticHtmlImportPreview preview)
+        public string ReadStage(string relativePath) =>
+            File.ReadAllText(GetPath(StageRoot, relativePath));
+
+        public async Task StageAsync(StaticHtmlImportPreview preview)
         {
+            RootedStaticHtmlAssetSource source = preview.CreateSource();
             foreach (StaticAsset asset in preview.Manifest.Assets)
             {
-                string source = GetPath(SourceRoot,
-                    asset.RelativePath == preview.EntryRelativePath
-                        ? preview.SourceEntryFileName
-                        : asset.RelativePath);
                 string target = GetPath(StageRoot, asset.RelativePath);
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                File.Copy(source, target);
+                await using Stream input = await source.OpenReadAsync(
+                    asset.RelativePath) ??
+                    throw new FileNotFoundException(
+                        "Preview asset vanished before staging.");
+                await using FileStream output = File.Create(target);
+                await input.CopyToAsync(output);
             }
         }
 
