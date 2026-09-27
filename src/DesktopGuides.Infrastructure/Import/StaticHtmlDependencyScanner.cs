@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 using AngleSharp.Css.Dom;
 using AngleSharp.Css.Parser;
 using AngleSharp.Dom;
@@ -313,7 +312,7 @@ public sealed class StaticHtmlDependencyScanner
                 StaticReferenceStatus.Included));
             if (kind == StaticAssetKind.StyleSheet)
             {
-                await ScanCssAsync(path, Encoding.UTF8.GetString(bytes), depth);
+                await ScanCssAsync(path, CssTextDecoder.Decode(bytes), depth);
             }
         }
 

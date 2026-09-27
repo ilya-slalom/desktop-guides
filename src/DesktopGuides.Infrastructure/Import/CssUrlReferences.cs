@@ -1,9 +1,9 @@
 namespace DesktopGuides.Infrastructure.Import;
 
 /// <summary>
-/// Reads url() arguments from CSS declaration values in source text, including
-/// nested rules that the CSS parser may omit. It decodes escapes in the function
-/// name, but leaves targets unchanged for the scanner's path checks.
+/// Reads url() arguments and quoted image-set() sources from CSS declaration
+/// values, including nested rules that the CSS parser may omit. Function-name
+/// escapes are decoded; target text stays unchanged for path checks.
 /// </summary>
 internal static class CssUrlReferences
 {
@@ -12,8 +12,10 @@ internal static class CssUrlReferences
         bool inlineStyle = false)
     {
         int blockDepth = inlineStyle ? 1 : 0;
+        int parenthesisDepth = 0;
         bool inDeclarationValue = false;
         bool inAtRulePrelude = false;
+        Stack<ImageSetFrame> imageSets = new();
         for (int index = 0; index < css.Length;)
         {
             if (css[index] == '/' && index + 1 < css.Length &&
@@ -23,9 +25,25 @@ internal static class CssUrlReferences
                 index = end < 0 ? css.Length : end + 2;
                 continue;
             }
+            if (char.IsWhiteSpace(css[index]))
+            {
+                index++;
+                continue;
+            }
             if (css[index] is '\'' or '"')
             {
-                index = SkipString(css, index);
+                int after = SkipString(css, index);
+                if (inDeclarationValue &&
+                    imageSets.TryPeek(out ImageSetFrame? imageSet) &&
+                    imageSet.Depth == parenthesisDepth &&
+                    imageSet.ExpectsImage &&
+                    after > index + 1 &&
+                    css[after - 1] == css[index])
+                {
+                    imageSet.ExpectsImage = false;
+                    yield return css[(index + 1)..(after - 1)];
+                }
+                index = after;
                 continue;
             }
             switch (css[index])
@@ -38,21 +56,47 @@ internal static class CssUrlReferences
                     blockDepth++;
                     inDeclarationValue = false;
                     inAtRulePrelude = false;
+                    parenthesisDepth = 0;
+                    imageSets.Clear();
                     index++;
                     continue;
                 case '}':
                     blockDepth = Math.Max(0, blockDepth - 1);
                     inDeclarationValue = false;
                     inAtRulePrelude = false;
+                    parenthesisDepth = 0;
+                    imageSets.Clear();
                     index++;
                     continue;
-                case ';':
+                case ';' when parenthesisDepth == 0:
                     inDeclarationValue = false;
                     inAtRulePrelude = false;
                     index++;
                     continue;
                 case ':' when blockDepth > 0 && !inAtRulePrelude:
                     inDeclarationValue = true;
+                    index++;
+                    continue;
+                case '(':
+                    MarkImageSlot(imageSets, parenthesisDepth);
+                    parenthesisDepth++;
+                    index++;
+                    continue;
+                case ')':
+                    if (imageSets.TryPeek(out ImageSetFrame? closing) &&
+                        closing.Depth == parenthesisDepth)
+                    {
+                        imageSets.Pop();
+                    }
+                    parenthesisDepth = Math.Max(0, parenthesisDepth - 1);
+                    index++;
+                    continue;
+                case ',':
+                    if (imageSets.TryPeek(out ImageSetFrame? option) &&
+                        option.Depth == parenthesisDepth)
+                    {
+                        option.ExpectsImage = true;
+                    }
                     index++;
                     continue;
             }
@@ -64,41 +108,94 @@ internal static class CssUrlReferences
 
             int identifierLength = 0;
             bool isUrl = true;
+            bool isImageSet = true;
+            bool isWebkitImageSet = true;
             while (TryReadIdentifierCharacter(css, ref index,
                 out char character))
             {
-                isUrl &= identifierLength < 3 &&
-                    char.ToLowerInvariant(character) == "url"[identifierLength];
+                char lower = char.ToLowerInvariant(character);
+                isUrl &= Matches("url", identifierLength, lower);
+                isImageSet &= Matches("image-set", identifierLength, lower);
+                isWebkitImageSet &= Matches(
+                    "-webkit-image-set", identifierLength, lower);
                 identifierLength++;
             }
             if (identifierLength == 0)
             {
+                MarkImageSlot(imageSets, parenthesisDepth);
                 index++;
                 continue;
             }
-            if (!isUrl || identifierLength != 3)
+            MarkImageSlot(imageSets, parenthesisDepth);
+            if ((!isUrl || identifierLength != 3) &&
+                (!isImageSet || identifierLength != 9) &&
+                (!isWebkitImageSet || identifierLength != 17))
             {
                 continue;
             }
-            int cursor = index;
-            while (cursor < css.Length && char.IsWhiteSpace(css[cursor]))
-            {
-                cursor++;
-            }
+            int cursor = SkipTrivia(css, index);
             if (cursor >= css.Length || css[cursor] != '(')
             {
+                index = cursor;
                 continue;
             }
-            if (TryReadArgument(css, cursor + 1, out string? argument,
-                    out int after))
+            if (isUrl && identifierLength == 3)
             {
+                bool valid = TryReadArgument(
+                    css, cursor + 1, out string? argument, out int after);
                 index = after;
-                if (!string.IsNullOrWhiteSpace(argument))
+                if (valid && !string.IsNullOrWhiteSpace(argument))
                 {
                     yield return argument;
                 }
+                continue;
+            }
+            parenthesisDepth++;
+            imageSets.Push(new ImageSetFrame(parenthesisDepth));
+            index = cursor + 1;
+        }
+    }
+
+    private sealed class ImageSetFrame(int depth)
+    {
+        public int Depth { get; } = depth;
+        public bool ExpectsImage { get; set; } = true;
+    }
+
+    private static bool Matches(string expected, int index, char actual) =>
+        index < expected.Length && expected[index] == actual;
+
+    private static void MarkImageSlot(
+        Stack<ImageSetFrame> imageSets,
+        int parenthesisDepth)
+    {
+        if (imageSets.TryPeek(out ImageSetFrame? imageSet) &&
+            imageSet.Depth == parenthesisDepth)
+        {
+            imageSet.ExpectsImage = false;
+        }
+    }
+
+    private static int SkipTrivia(string css, int index)
+    {
+        while (index < css.Length)
+        {
+            if (char.IsWhiteSpace(css[index]))
+            {
+                index++;
+            }
+            else if (css[index] == '/' && index + 1 < css.Length &&
+                css[index + 1] == '*')
+            {
+                int end = css.IndexOf("*/", index + 2, StringComparison.Ordinal);
+                index = end < 0 ? css.Length : end + 2;
+            }
+            else
+            {
+                break;
             }
         }
+        return index;
     }
 
     private static bool TryReadIdentifierCharacter(
@@ -203,7 +300,7 @@ internal static class CssUrlReferences
         {
             if (css[cursor] is '\'' or '"')
             {
-                after = cursor + 1;
+                after = SkipString(css, cursor);
                 return false;
             }
             cursor++;

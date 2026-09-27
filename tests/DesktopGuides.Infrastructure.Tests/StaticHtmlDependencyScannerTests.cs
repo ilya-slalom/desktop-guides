@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using DesktopGuides.Infrastructure.Import;
@@ -137,6 +138,108 @@ public sealed class StaticHtmlDependencyScannerTests
     }
 
     [Fact]
+    public async Task ImageSetStringsAndUrlFunctionsAreIncluded()
+    {
+        MemorySource source = new(
+            ("guide.html", """
+                <style>
+                    .map {
+                        background: image-set("one.png" 1x type("image/png"),
+                            url(two.png) 2x, "three.webp" 3x);
+                        content: "image-set('ghost.png' 1x)";
+                    }
+                </style>
+                <div style="background: -webkit-image-set('inline.gif' 1x)"></div>
+                """),
+            ("one.png", "one"),
+            ("two.png", "two"),
+            ("three.webp", "three"),
+            ("inline.gif", "inline"),
+            ("ghost.png", "ghost"));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner()
+            .ScanAsync("guide.html", source);
+
+        Assert.Equal(
+            ["guide.html", "inline.gif", "one.png", "three.webp",
+                "two.png"],
+            manifest.Assets.Select(asset => asset.RelativePath));
+        Assert.All(manifest.References, reference =>
+            Assert.Equal(StaticReferenceStatus.Included, reference.Status));
+    }
+
+    [Fact]
+    public async Task DeclaredWindows1252CssResolvesNonAsciiImagePath()
+    {
+        MemorySource source = new(
+            ("guide.html", """<link rel="stylesheet" href="theme.css">"""),
+            ("café.png", "image"));
+        byte[] prefix = Encoding.ASCII.GetBytes(
+            "@charset \"windows-1252\"; .map { background: url(\"caf");
+        byte[] suffix = Encoding.ASCII.GetBytes(".png\") }");
+        source.PutBytes("theme.css", [.. prefix, 0xE9, .. suffix]);
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner()
+            .ScanAsync("guide.html", source);
+
+        Assert.Equal(
+            ["café.png", "guide.html", "theme.css"],
+            manifest.Assets.Select(asset => asset.RelativePath));
+        Assert.All(manifest.References, reference =>
+            Assert.Equal(StaticReferenceStatus.Included, reference.Status));
+    }
+
+    [Fact]
+    public async Task UnsupportedDeclaredCssEncodingFailsPreview()
+    {
+        MemorySource source = new(
+            ("guide.html", """<link rel="stylesheet" href="theme.css">"""),
+            ("theme.css", """@charset "not-a-real-encoding"; .map { background: url(map.png) }"""),
+            ("map.png", "image"));
+
+        InvalidDataException error = await Assert.ThrowsAsync<
+            InvalidDataException>(() =>
+                new StaticHtmlDependencyScanner().ScanAsync("guide.html", source));
+
+        Assert.Contains("CSS encoding", error.Message);
+    }
+
+    [Fact]
+    public async Task CssBomTakesPrecedenceOverCharset()
+    {
+        MemorySource source = new(
+            ("guide.html", """<link rel="stylesheet" href="theme.css">"""),
+            ("café.png", "image"));
+        source.PutBytes("theme.css",
+            [0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes(
+                "@charset \"windows-1252\"; .map { background: url(\"café.png\") }")]);
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner()
+            .ScanAsync("guide.html", source);
+
+        Assert.Equal(
+            ["café.png", "guide.html", "theme.css"],
+            manifest.Assets.Select(asset => asset.RelativePath));
+    }
+
+    [Fact]
+    public async Task MalformedUrlFunctionsHaveBoundedScanTime()
+    {
+        string html = "<div style=\"background:" +
+            string.Concat(Enumerable.Repeat("url(", 64_000)) + "x\"></div>";
+        MemorySource source = new(("guide.html", html));
+
+        Stopwatch timer = Stopwatch.StartNew();
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner()
+            .ScanAsync("guide.html", source);
+        timer.Stop();
+
+        Assert.Empty(manifest.References);
+        Assert.True(timer.Elapsed < TimeSpan.FromSeconds(2),
+            $"Malformed CSS took {timer.Elapsed} to scan.");
+    }
+
+    [Fact]
     public async Task NamespaceAndConditionUrlsAreNotImageResources()
     {
         MemorySource source = new(
@@ -264,6 +367,8 @@ public sealed class StaticHtmlDependencyScannerTests
             StringComparer.Ordinal);
 
         public List<string> Reads { get; } = [];
+
+        public void PutBytes(string path, byte[] bytes) => content[path] = bytes;
 
         public ValueTask<Stream?> OpenReadAsync(
             string safeRelativePath,

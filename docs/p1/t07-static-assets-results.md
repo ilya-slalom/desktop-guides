@@ -38,3 +38,16 @@ source passed **62/62 Infrastructure tests**, including all four permanent
 regression tests. The unsigned Release x64 production MSIX build passed
 with zero errors and the same `mspdbcmf.exe` symbols warning. This scanner
 is still disconnected from the installed import workflow.
+
+## PR #9 second review follow-up
+
+The Windows 11 x64 review probes reproduced a quadratic scan of malformed
+`url(` tokens, omission of quoted `image-set()` images, and a false missing
+image from Windows-1252 CSS with a leading `@charset`. The fixes advance
+past malformed URL arguments, collect quoted image choices, and decode
+linked CSS using a byte-order mark or leading declaration. Unknown
+declared encodings now fail preview explicitly. Permanent regression tests
+also cover multiple image choices and BOM precedence. The staged Windows
+source passed **67/67 Infrastructure tests**. The unsigned Release x64
+production MSIX build passed with zero errors and the existing
+`mspdbcmf.exe` symbols warning.
