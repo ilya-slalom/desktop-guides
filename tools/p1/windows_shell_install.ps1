@@ -748,6 +748,11 @@ function Measure-LibraryStrip($result) {
     $strip = Get-ScreenshotRegionStats $result.libraryScreenshot `
         $region.X $region.Y $region.Width $region.Height
     $result | Add-Member -NotePropertyName libraryStrip -NotePropertyValue $strip
+    # The dialog command area between the button row and the panel's bottom edge.
+    $dialog = $result.dialogBounds
+    $dialogStrip = Get-ScreenshotRegionStats $result.dialogScreenshot `
+        ([int]$dialog.buttonLeft) ([int]$dialog.buttonBottom + 8) 48 4
+    $result | Add-Member -NotePropertyName dialogStrip -NotePropertyValue $dialogStrip
     return $result
 }
 
@@ -781,6 +786,15 @@ function Run-MaterialScenarios {
             if ($difference -le $acrylicThreshold) {
                 throw "The $themeName Acrylic backdrop matched Solid " +
                     "(difference $difference); the backdrop is not visible."
+            }
+            $solidDialog = $report.materials["$themeName-Solid"].dialogStrip
+            $acrylicDialog = $report.materials["$themeName-Acrylic"].dialogStrip
+            $dialogDifference = [Math]::Max([Math]::Abs($acrylicDialog.meanR - $solidDialog.meanR),
+                [Math]::Max([Math]::Abs($acrylicDialog.meanG - $solidDialog.meanG),
+                    [Math]::Abs($acrylicDialog.meanB - $solidDialog.meanB)))
+            $report.materials["$themeName-dialogDifference"] = $dialogDifference
+            if ($dialogDifference -le 2) {
+                throw "The $themeName Acrylic dialog matched the Solid dialog."
             }
         }
 

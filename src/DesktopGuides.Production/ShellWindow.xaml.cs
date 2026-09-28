@@ -79,7 +79,7 @@ public sealed partial class ShellWindow : Window
         SolidCanvas.Visibility = EffectiveMaterial == WindowMaterial.Solid
             ? Visibility.Visible
             : Visibility.Collapsed;
-        // ReaderActions.DialogMaterial = EffectiveMaterial;
+        ReaderActions.DialogMaterial = EffectiveMaterial;
         applyingMaterialSelection = true;
         WindowMaterialSelector.SelectedIndex = (int)requested;
         applyingMaterialSelection = false;
@@ -497,6 +497,7 @@ public sealed partial class ShellWindow : Window
                 {
                     XamlRoot = Navigation.XamlRoot
                 };
+                DialogSurface.Apply(editor, EffectiveMaterial);
                 activeGameEditor = editor;
                 try
                 {
@@ -560,6 +561,7 @@ public sealed partial class ShellWindow : Window
                 {
                     XamlRoot = Navigation.XamlRoot
                 };
+                DialogSurface.Apply(editor, EffectiveMaterial);
                 activeGameEditor = editor;
                 try
                 {

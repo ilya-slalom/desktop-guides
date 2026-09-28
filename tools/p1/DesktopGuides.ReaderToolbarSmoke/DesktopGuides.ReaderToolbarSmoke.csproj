@@ -25,5 +25,9 @@
           Link="ReaderToolbar.xaml" />
     <Compile Include="../../../src/DesktopGuides.Production/ReaderToolbar.xaml.cs"
              Link="ReaderToolbar.xaml.cs" />
+    <Page Include="../../../src/DesktopGuides.Production/Styles/Dialogs.xaml"
+          Link="Styles/Dialogs.xaml" />
+    <Compile Include="../../../src/DesktopGuides.Production/Materials/DialogSurface.cs"
+             Link="Materials/DialogSurface.cs" />
   </ItemGroup>
 </Project>

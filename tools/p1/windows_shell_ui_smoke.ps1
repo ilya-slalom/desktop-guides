@@ -910,6 +910,13 @@ try {
         [void](Wait-VisibleById 'GameTitleInput')
         Assert-ShellForeground
         $report.dialogScreenshot = Save-WindowScreenshot "material-$selected-edit-game"
+        # The dialog's own peer spans the smoke layer, so anchor on the primary
+        # button inside the dialog panel's command area.
+        $primary = (Wait-VisibleById 'PrimaryButton').Current.BoundingRectangle
+        $report.dialogBounds = [ordered]@{
+            buttonLeft = $primary.Left - $window.Left
+            buttonBottom = $primary.Bottom - $window.Top
+        }
         [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
         Wait-EditorClosed
 
