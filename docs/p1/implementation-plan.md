@@ -4,7 +4,7 @@ Status: M0 merged; M1 in progress; M2 in progress; M3–M6 planned,
 27 September 2026.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
-This plan orders all **16 P1 stories and 49 tasks** in the
+This plan orders all **16 P1 stories and 50 tasks** in the
 [work breakdown](../work-breakdown.md). The [technical design](../p1-technical-design.md)
 defines the architecture, data contracts, failure protocols, and reader
 behavior. [Implementation results](results.md) and the
@@ -578,23 +578,26 @@ T07.1 was merged through PR #9 on 27 September 2026, merge commit
 [T07.2 boundary plan](t07-static-boundary-plan.md) follows its scanner
 contract. T07.2 was merged through PR #10 on 27 September 2026, merge
 commit `72f43785fad2b01b3f79b739017f0623d46b6665`. The
-[T04.1 game editor plan](t04-game-editor-plan.md) is the next M2 dependency
-for import UI.
+[T04.1 game editor plan](t04-game-editor-plan.md) supplies the manual/offline
+fallback. T04.4 is the next M2 dependency: select the external metadata
+provider and implement search-first game addition before catalog and import
+UI consume the enriched Game model.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
-| T04.1 | T03.2, T11.1 | Add/Edit game dialogs and validation. Unicode, duplicate-title, optional-field, cancel, and keyboard cases pass without unintended writes. | TR03.1 |
-| T04.2 | T04.1, T11.1 | ID-bound Game detail rename/remove actions. Rename preserves Guide IDs, state, and view selection after refresh or restart. | TR03.1 |
-| T05.1 | T03.2, T11.1 | Virtualized Library and Game guide rows with metadata-driven format, last-opened, estimate, and completion displays. Large synthetic lists keep bounded realized UI items. | TR05.2 |
+| T04.1 | T03.2, T11.1 | Manual/offline Add/Edit game dialogs and validation. Unicode, duplicate-title, optional-field, cancel, and keyboard cases pass without unintended writes. | TR03.1 |
+| T04.4 | T03.2, T03.3, T04.1, T11.1, T15.2 | Reviewed external-provider decision, schema-v3 migration, and search-first Add game flow. Selection publishes one stable local Game ID, unique provider link, bounded normalized snapshot, and validated managed artwork. Migration rollback, manual/offline fallback, refresh overrides, duplicate ID, timeout/rate-limit, malformed response, cancellation, crash recovery, and disconnected relaunch checks pass without embedded confidential credentials or partial rows/files. | TR04.3, TR04.4 |
+| T04.2 | T04.1, T04.4, T11.1 | ID-bound Game detail rename/remove actions. Rename preserves the provider association, Guide IDs, state, and view selection after refresh or restart. | TR03.1, TR04.3 |
+| T05.1 | T03.2, T04.4, T11.1 | Virtualized Library and Game guide rows with cached game artwork/source metadata and metadata-driven guide format, last-opened, estimate, and completion displays. Large synthetic lists keep bounded realized UI items and browsing needs no provider request. | TR04.3, TR05.2 |
 | T05.2 | T05.1 | Case-insensitive metadata title search with empty/loading/no-results states. Mixed-case and non-ASCII tests pass offline without reading guide bytes; unread rows say `Not started`. | TR05.1, TR05.2 |
-| T06.1 | T04.1, T11.1 | Window-owned file picker, game-scoped import preview, warnings, and cancelable progress UI. Cancel before Confirm creates neither a guide nor staged files. | TR06.1 |
+| T06.1 | T04.4, T11.1 | Window-owned file picker, game-scoped import preview, warnings, and cancelable progress UI. A newly provider-linked or manual game can continue directly to import; Cancel before Confirm creates neither a guide nor staged files. | TR06.1 |
 | T07.1 | T03.3 | Bounded HTML/CSS dependency parser and static-asset manifest with pinned, license-reviewed parser dependencies. Nested local CSS, `srcset`, cycles, and over-budget fixture tests pass. | TR07.1, TR07.3 |
 | T07.2 | T03.3, T07.1 | Preview warnings and path checks for missing, unsupported, remote, escaping, and changed assets. A percent-named entry's matching `_files` assets receive safe managed names and validated request-path mappings. NTFS junction/case-collision tests and post-copy revalidation pass. | TR07.1, TR07.3 |
 | T06.2 | T06.1, T07.1, T07.2, T10.0 | Typed import validation for TXT encoding, one static HTML entry, and readable PDF/password cases. Unsupported, encrypted-unreadable, and size-limit inputs produce distinct errors before publication. | TR06.1, TR06.2 |
 | T06.3 | T03.2, T03.3, T06.2, T15.2 | Staged streaming copy, fingerprints, prepared journal, same-volume rename, and transactional metadata publication. Original-removal, cancellation, crash-point, disk/copy, and failed-commit tests show no partial listed guide. | TR06.1–TR06.3 |
 | T06.4 | T06.3 | Duplicate fingerprint choice (`Open existing` / `Import another copy`) and typed errors. Repeated import never overwrites; a second copy has its own Guide ID and state. | TR06.3 |
 | T15.3 | T06.3, T15.2 | Confirmed guide deletion via trash journal. Cancel, move failure, commit failure, and startup recovery tests preserve or remove exactly the intended metadata and owned bytes. | TR15.1, TR15.2 |
-| T04.3 | T04.2, T15.3 | Count-confirmed multi-guide Game removal through the same trash protocol. Cancel and changed-count cases leave records/files intact; commit removes only that Game's guides and state. | TR04.1, TR04.2 |
+| T04.3 | T04.2, T04.4, T15.3 | Count-confirmed multi-guide Game removal through the same trash protocol. Cancel and changed-count cases leave records/files intact; commit removes only that Game's guides, state, provider snapshot, and artwork. | TR04.1, TR04.2 |
 | T05.3 | T04.2, T05.2, T06.3, T15.3 | Stable ID-based selection and Back behavior after rename/import/removal. Reader → Game retains guide selection and focus; Back to Library restores its query. Async refresh does not jump to stale rows. | TR05.1 |
 
 ## M3 — managed reader adapters
@@ -642,7 +645,7 @@ flows work by keyboard and with the recorded accessibility checks.
 | --- | --- | --- | --- |
 | T15.1 | T03.2, T06.3, T09.1, T10.1 | Stable service errors and actionable UI for corrupt DB, missing guide, invalid content, and missing runtime. An unaffected guide still opens; a corrupt DB is never replaced by an empty one. | TR15.1 |
 | T15.4 | T04.3, T06.3, T15.2, T15.3 | Headless fault-injection matrix across each import/delete protocol phase plus canceled operations. Assert exact DB rows and owned paths; Windows NTFS runs cover links and malformed names. | TR04.1, TR04.2, TR06.2, TR15.1, TR15.2 |
-| T20.1 | T03.2, T06.3, T15.2 | Versioned ZIP manifest and consistent SQLite/files snapshot under one write gate. Export is canceled cleanly, verified by checksums, and excludes source paths, credentials, and transient profiles. | TR20.2 |
+| T20.1 | T03.2, T04.4, T06.3, T15.2 | Versioned ZIP manifest and consistent SQLite/files snapshot under one write gate, including provider snapshots and managed game artwork. Export is canceled cleanly, verified by checksums, and excludes source paths, credentials, remote caches, and transient profiles. | TR20.2 |
 | T20.2 | T15.1, T15.4, T20.1 | Settings Export/Restore, out-of-app-data destination check, first-import export reminder, full staged archive validation, Cancel/Replace, and rollback marker. Clean and populated restore, corrupt/unsafe ZIP, cancel, and interrupted swap tests pass. | TR20.1, TR20.2 |
 | T16.1 | T05.2, T06.1, T08.3, T10.2, T11.3 | Visible menu/toolbar parity and documented shortcuts. Keyboard trace checks context, text-field handling, dialogs, page movement, and Escape behavior. | TR16.1, TR16.2 |
 | T16.2 | T07.3, T08.3, T09.3, T10.2, T13.1, T16.1, T20.2 | Real WinUI audit of tab/focus, touch, high contrast, DPI, AutomationProperties, and Narrator through Add game → Import → Read → Complete → Export. TXT/HTML document text is read, and overlays return focus. | TR16.1, TR16.2 |

@@ -4,7 +4,7 @@ Status: M0 merged into `main` through
 [PR #3](https://github.com/ilya-slalom/desktop-guides/pull/3) on
 26 September 2026, including the SQLite initialization review fix.
 The P1 first usable release remains in progress. The
-[dependency plan](implementation-plan.md) defines all 49 task exit gates;
+[dependency plan](implementation-plan.md) defines all 50 task exit gates;
 this file records checks actually run.
 
 The M2 T07.1 scanner verification is recorded in the
@@ -20,6 +20,11 @@ T07.2 was merged into `main` through PR #10 on 27 September 2026 at
 run passed 89/89 Infrastructure tests and an unsigned Release x64 MSIX build;
 all 18 CI checks passed. T04.1's Windows x64 checks passed in PR #11,
 pending merge.
+
+On 28 September 2026, requirements review added T04.4 for provider-backed,
+search-first game addition with a cached offline metadata/artwork snapshot and
+T04.1 as the manual fallback. T04.4 now precedes T04.2, T05.1, and T06.1.
+No provider has been selected and no T04.4 implementation result is claimed.
 
 ## M2 T04.1 game editor — implementation check, 27 September 2026
 

@@ -49,5 +49,7 @@ cannot bypass limits.
 | UI | Library Add and Game Edit open the same dialog. Primary is disabled until the trimmed title is valid. Length feedback, keyboard submission, accessible labels/focus, cancel, and retryable write errors work in a narrow WinUI window. |
 | Installed check | Signed x64 production shell UIA creates a Unicode game with optional fields, cancels a draft, creates a duplicate title, edits by ID, and verifies persisted rows after relaunch. Capture an actual Add/Edit dialog screenshot for the PR description. |
 
-T04.2 will add removal and the full rename/selection refresh gate after
-T04.1. This task proves the shared edit form and basic ID-based update.
+T04.4 will place provider search and edition selection ahead of this dialog,
+using it for `Create manually` and local overrides. T04.2 will add removal and
+the full rename/selection refresh gate after T04.4. This task proves the shared
+manual edit form and basic ID-based update.

@@ -41,7 +41,7 @@ or to match every feature.
 
 | ID | Requirement | Observable behavior |
 | --- | --- | --- |
-| R1 | Organize by game | Create, rename, and remove a game; attach multiple independently tracked guides to it. |
+| R1 | Organize by game | Search an external game-metadata provider and add a selected edition with a locally cached metadata/artwork snapshot, or create a game manually while offline or when no result fits. Rename and remove games; attach multiple independently tracked guides to each one. |
 | R2 | Import local guides | Pick TXT, HTML, or PDF files; copy content and supported local HTML assets into managed storage; show a clear error for unsupported, missing, or unreadable files. |
 | R3 | Browse the library | See games, their guides, format, last opened date, and reading state; find a game or guide by title. |
 | R4 | Read offline | Open any successfully imported guide after disconnecting from the network. No reader view should need a remote resource. |
@@ -149,7 +149,10 @@ page. Host-owned DOM queries use fixed scripts and validated results.
 
 Keep the initial schema small:
 
-- `Game`: stable ID, title, optional platform/notes, created and updated times.
+- `Game`: stable local ID, editable title/platform/notes, optional external
+  provider and game ID, normalized source metadata, managed local artwork,
+  metadata retrieval time, and created/updated times. Provider data enriches
+  the local record; it is never required to browse or read the offline library.
 - `Guide`: stable ID, game ID, title, format, managed relative path, content
   fingerprint, imported time, and optional original source label.
 - `ReadingState`: guide ID, format-specific locator with schema version,
