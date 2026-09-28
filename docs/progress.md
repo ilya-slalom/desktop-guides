@@ -14,7 +14,11 @@ the [work breakdown](work-breakdown.md).
 | P1 T11.4 design language | Implementation and available Windows 11 x64 verification complete on the feature branch; merge pending. | Shared semantic XAML resources, Toolkit `SettingsCard`, native `TitleBar`, Mica backdrop, full-width routes, and transient `InfoBar` feedback passed the full installed shell regression at 100% scale in system, light, dark, and high contrast. The [result](p1/evidence/t11-design-language/windows-11-x64-result.json) records Toolkit 8.2.251219, 73 Core and 90 Infrastructure passes, both package builds, screenshots, and exact host cleanup. The user deferred 200% display scaling to T16.2. |
 | P1 first usable release | M1 and M2 in progress; M3–M6 not started. | [P1 technical design](p1-technical-design.md) and [dependency plan](p1/implementation-plan.md) cover 16 stories and 53 tasks: S03–S17 plus S20. T11.4 now establishes the design language and starts stable Toolkit adoption with `SettingsCard`; mapped later tasks add `MetadataControl`, `HeaderedContentControl`, `Segmented`, `GridSplitter`, and conditional `RichSuggestBox` when their workflows exist. The [installed E2E procedure](p1/e2e-testing.md) uses an interactive scheduled task for the signed MSIX and UI workflows. S20 manual export/restore is in P1 because an uninstall removes package local data. |
 
-The remaining M1 task is package
-identity in the [P1 plan](p1/implementation-plan.md). Do not infer
+The remaining M1 task is T17.1 in the [P1 plan](p1/implementation-plan.md).
+[PR #8](https://github.com/ilya-slalom/desktop-guides/pull/8) merged its
+packaging groundwork: packed-manifest checks, a temporary-certificate signing
+check, and an interactive upgrade under a test identity. The package still
+uses the `DesktopGuides.Preview` identity. The final public Name, certificate
+Subject, protected signing, and a public candidate upgrade remain open. Do not infer
 production-app compatibility from the P0 fixture harness or the M0 PDF
 experiment.
