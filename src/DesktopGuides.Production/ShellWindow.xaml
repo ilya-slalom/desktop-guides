@@ -4,17 +4,41 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:toolkit="using:CommunityToolkit.WinUI.Controls"
     xmlns:local="using:DesktopGuides.Production">
-    <NavigationView x:Name="Navigation"
-                    PaneTitle="Desktop Guides"
+    <Window.SystemBackdrop>
+        <MicaBackdrop Kind="Base" />
+    </Window.SystemBackdrop>
+
+    <Grid Background="{ThemeResource DesktopGuidesWindowBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TitleBar x:Name="AppTitleBar"
+                  Title="Desktop Guides"
+                  Subtitle="Offline game guide library"
+                  IsBackButtonVisible="True"
+                  IsBackButtonEnabled="False"
+                  IsPaneToggleButtonVisible="True"
+                  BackRequested="TitleBarBackRequested"
+                  PaneToggleRequested="TitleBarPaneToggleRequested"
+                  AutomationProperties.AutomationId="AppTitleBar">
+            <TitleBar.IconSource>
+                <FontIconSource Glyph="&#xE82D;" />
+            </TitleBar.IconSource>
+        </TitleBar>
+
+        <NavigationView x:Name="Navigation"
+                    Grid.Row="1"
                     PaneDisplayMode="Auto"
                     CompactPaneLength="48"
                     OpenPaneLength="240"
-                    IsBackButtonVisible="Visible"
+                    IsBackButtonVisible="Collapsed"
+                    IsPaneToggleButtonVisible="False"
                     IsSettingsVisible="True"
-                    Background="{ThemeResource DesktopGuidesCanvasBrush}"
+                    Background="{ThemeResource DesktopGuidesWindowBackgroundBrush}"
                     AutomationProperties.AutomationId="Navigation"
-                    ItemInvoked="NavigationInvoked"
-                    BackRequested="NavigationBackRequested">
+                    ItemInvoked="NavigationInvoked">
         <NavigationView.MenuItems>
             <NavigationViewItem x:Name="LibraryItem"
                                 Content="Library"
@@ -23,17 +47,30 @@
         </NavigationView.MenuItems>
 
         <Grid x:Name="ShellContent"
-              MaxWidth="{StaticResource DesktopGuidesContentMaxWidth}"
               Padding="{StaticResource DesktopGuidesPagePadding}"
               HorizontalAlignment="Stretch"
-              Background="{ThemeResource DesktopGuidesCanvasBrush}"
+              Background="{ThemeResource DesktopGuidesWindowBackgroundBrush}"
+              AutomationProperties.AutomationId="ShellContent"
+              AutomationProperties.Name="Page content"
+              AutomationProperties.AccessibilityView="Raw"
               SizeChanged="ShellContentSizeChanged">
             <Grid.RowDefinitions>
-                <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
+            <InfoBar x:Name="ShellStatusInfoBar"
+                     Margin="0,0,0,16"
+                     IsOpen="True"
+                     IsClosable="False"
+                     Severity="Informational"
+                     Message="Opening library…"
+                     AutomationProperties.AutomationId="ShellStatus"
+                     AutomationProperties.Name="Opening library…"
+                     AutomationProperties.LiveSetting="Polite" />
+
             <Grid x:Name="LibraryPanel"
+                  Grid.Row="1"
                   RowSpacing="{StaticResource DesktopGuidesSpacing16}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -101,6 +138,7 @@
             </Grid>
 
             <Grid x:Name="GamePanel"
+                  Grid.Row="1"
                   RowSpacing="{StaticResource DesktopGuidesSpacing16}"
                   Visibility="Collapsed">
                 <Grid.RowDefinitions>
@@ -129,7 +167,8 @@
 
                 <Border x:Name="GameMetadataSurface"
                         Grid.Row="1"
-                        Style="{StaticResource DesktopGuidesSurfaceStyle}">
+                        Style="{StaticResource DesktopGuidesSurfaceStyle}"
+                        AutomationProperties.AutomationId="GameMetadataSurface">
                     <StackPanel Spacing="{StaticResource DesktopGuidesSpacing8}">
                         <TextBlock x:Name="GamePlatform"
                                    Style="{StaticResource DesktopGuidesBodyStyle}"
@@ -190,6 +229,7 @@
             </Grid>
 
             <Grid x:Name="ReaderPanel"
+                  Grid.Row="1"
                   RowSpacing="{StaticResource DesktopGuidesSpacing12}"
                   Visibility="Collapsed">
                 <Grid.RowDefinitions>
@@ -248,6 +288,7 @@
             </Grid>
 
             <Grid x:Name="SettingsPanel"
+                  Grid.Row="1"
                   RowSpacing="{StaticResource DesktopGuidesSpacing16}"
                   Visibility="Collapsed">
                 <Grid.RowDefinitions>
@@ -262,12 +303,14 @@
                            Text="Manage how Desktop Guides stores and presents your library."
                            Style="{StaticResource DesktopGuidesSecondaryBodyStyle}" />
                 <ScrollViewer Grid.Row="2"
-                              VerticalScrollBarVisibility="Auto">
+                              VerticalScrollBarVisibility="Auto"
+                              VerticalContentAlignment="Top">
                     <toolkit:SettingsCard
                         x:Name="LibraryStorageSettingsCard"
                         Header="Library storage"
                         Description="Your library is stored on this device."
                         HorizontalAlignment="Stretch"
+                        VerticalAlignment="Top"
                         IsClickEnabled="False"
                         AutomationProperties.AutomationId="LibraryStorageSettingsCard"
                         AutomationProperties.Name="Library storage. Your library is stored on this device.">
@@ -278,17 +321,7 @@
                     </toolkit:SettingsCard>
                 </ScrollViewer>
             </Grid>
-
-            <Border Grid.Row="1"
-                    Margin="0,16,0,0"
-                    Style="{StaticResource DesktopGuidesStatusBarStyle}">
-                <TextBlock x:Name="ShellStatus"
-                           Text="Opening library…"
-                           Style="{StaticResource DesktopGuidesStatusTextStyle}"
-                           AutomationProperties.AutomationId="ShellStatus"
-                           AutomationProperties.LiveSetting="Polite" />
-            </Border>
-
         </Grid>
-    </NavigationView>
+        </NavigationView>
+    </Grid>
 </Window>

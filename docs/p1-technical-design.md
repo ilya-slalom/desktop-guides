@@ -281,6 +281,29 @@ High contrast uses system brushes, never hard-coded HTML colors without a
 matching local style. A screen-reader announcement distinguishes approximate
 restore, missing managed content, and completion changes.
 
+Use the native WinUI `TitleBar` as the window drag region and host the Back and
+pane-toggle actions there. Continue using `AppWindow` for close coordination
+and window lifecycle. Apply a Mica system backdrop to the long-lived main
+window and keep route backgrounds transparent so the material is visible;
+high contrast replaces it with the system window color. Acrylic is reserved
+for transient flyouts or light-dismiss overlays rather than persistent reader
+or catalog surfaces.
+
+The shell and each route fill the available width after `NavigationView` and
+responsive page padding. Do not apply a global content maximum that creates
+unused vertical gutters on wide windows. A format adapter may constrain an
+individual prose column when line length requires it, while metadata surfaces,
+catalog rows, toolbars, and reader hosts still occupy the route width.
+
+Present loading states and actionable feedback with a native `InfoBar` above
+the active route. Loading remains visible until replaced. Routine ready
+messages close after three seconds; warning and error messages remain
+dismissible. Preserve the last status through the shell automation state so
+installed tests can synchronize without keeping diagnostics visible. Keep
+that retained marker in the raw UI Automation view, outside normal assistive
+technology views, and include a monotonically increasing sequence so a test
+cannot accept an older completion state.
+
 The design language is a quiet field guide for game reference material.
 Catalog views let cached game artwork carry the strongest color and visual
 identity. Guide lists use denser flat rows, restrained separators, and a clear
@@ -314,7 +337,7 @@ Adoption occurs with the feature that first needs the pattern:
 
 | Stage | Task | Gallery-informed UI work |
 | --- | --- | --- |
-| Foundation | T11.4 | Semantic resources, type/spacing scales, responsive shell layouts, control-state rules, and representative Library/Game/Reader/Settings screenshots. |
+| Foundation | T11.4 | Semantic resources, type/spacing scales, full-width responsive routes, native `TitleBar`, Mica window backdrop, transient `InfoBar`, control-state rules, and representative Library/Game/Reader/Settings screenshots. |
 | Provider addition | T04.4 | Search entry, cancelable progress, edition result rows, artwork fallback, `InfoBar`/validation feedback, manual fallback, and dialog focus restoration. |
 | Catalog and import | T05.4, then T05.1/T06.1 | Reusable artwork and metadata templates, virtualized rows, empty/loading/error states, import preview groups, progress, and confirmation. |
 | Reader and Settings | T14.4 | Theme-aware command presentation, appearance settings, teaching/status surfaces, and Settings groups after functional controls exist. |
@@ -336,8 +359,10 @@ packages are added only with the task that first uses them:
 | T22.2 | `RichSuggestBox` candidate | `CommunityToolkit.WinUI.Controls.RichSuggestBox` | Use only when a selected source supports cancellable incremental suggestions within its rate and credential model. T04.4 provider search remains explicit-submit. |
 
 Native WinUI remains the chosen implementation for `NavigationView`,
-`CommandBar`, `AutoSuggestBox`, `InfoBar`, `ContentDialog`, `TreeView`,
-`NumberBox`, progress, file pickers, and keyboard accelerators. Toolkit
+`TitleBar`, `CommandBar`, `AutoSuggestBox`, `InfoBar`, `ContentDialog`,
+`TreeView`, `NumberBox`, progress, file pickers, and keyboard accelerators.
+The main window uses Mica; default or explicit Acrylic remains limited to
+transient UI. Toolkit
 animation, converter, primitive, media, color, token, and tabbed-command
 packages have no current requirement and are not added speculatively.
 
@@ -352,7 +377,7 @@ The recorded UI tasks were reviewed as one set:
 | T07.3, T09.1–T09.3 | Keep WebView2 security, external-link actions, and host-owned appearance in the reader adapter; no Toolkit control changes the trust boundary. |
 | T08.2–T08.3 | Keep the virtualized TXT surface and reader commands native so long-guide realization and stable locators remain under app control. |
 | T10.2 | Keep PDF movement, `NumberBox` page entry, zoom, fit, and `CommandBar` overflow native. |
-| T11.1–T11.3 | Keep `NavigationView` and `CommandBar`; their shell, focus, and overflow behavior is already implemented and tested. |
+| T11.1–T11.4 | Keep `NavigationView` and `CommandBar`; move shell Back and pane-toggle actions into native `TitleBar`, use Mica behind transparent route backgrounds, fill the available width, and auto-hide routine native `InfoBar` messages. |
 | T11.4 | Use `SettingsCard` for the local-storage row and retain semantic app resources around it. |
 | T13.1 | Use `Segmented` for the two explicit completion states if UIA selection passes; keep a native radio fallback. |
 | T14.1–T14.4 | Use `Segmented` for System/Light/Dark and `SettingsCard`/`SettingsExpander` for Settings. Keep reader text-size commands native. |

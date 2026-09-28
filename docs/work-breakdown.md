@@ -340,8 +340,10 @@ Desktop Guides identity.
   roles, icon and copy rules, and representative responsive layouts. Record a
   version-compatible WinUI Gallery component inventory and adoption rules
   before new provider and catalog UI is built. Introduce the stable Toolkit
-  `SettingsCard` for the representative Settings surface and verify it in the
-  signed installed shell.
+  `SettingsCard` for the representative Settings surface. Use the native
+  WinUI `TitleBar`, `AppWindow` lifecycle integration, Mica backdrop, and
+  transient `InfoBar`; route panels fill the available content width without a
+  shell-level maximum. Verify these behaviors in the signed installed shell.
 - **TR11.1** The shell does not inspect format-specific controls to read or
   save position.
 - **TR11.2** Disabled or unsupported actions are absent or clearly unavailable,
@@ -349,7 +351,9 @@ Desktop Guides identity.
 - **TR11.3** Production UI uses shared semantic resources and native theme
   brushes rather than duplicated page-local values. Gallery-derived code is
   adapted to the locked Windows App SDK, retains keyboard/focus/UIA behavior,
-  and introduces no dependency on the Gallery sample application.
+  and introduces no dependency on the Gallery sample application. Routine
+  status surfaces clear automatically, while progress, warning, and error
+  states remain available for as long as the user needs them.
 
 ### S12 — Resume each guide independently
 

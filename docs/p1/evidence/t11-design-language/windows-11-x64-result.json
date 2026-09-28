@@ -1,6 +1,6 @@
 {
   "task": "T11.4",
-  "observedAt": "2026-09-28T05:14:12.2322609Z",
+  "observedAt": "2026-09-28T06:31:00.9720792Z",
   "status": "passed-with-deferred-scale-matrix",
   "environment": {
     "osBuild": "10.0.26200.0",
@@ -27,21 +27,21 @@
   "packages": {
     "x64": {
       "name": "DesktopGuides.Production_0.1.0.0_x64.msix",
-      "bytes": 66332506,
-      "sha256": "B9F10C00D15C777A9BAB645B97F10219529D2F44B4364BAA226432E69CB2C177",
+      "bytes": 66335160,
+      "sha256": "DCA67246134FF1BD305B6AFEA3B8B40B2C25D92AA8A0C09B0D5266EFD9811C14",
       "installedWorkflowPassed": true
     },
     "ARM64": {
       "name": "DesktopGuides.Production_0.1.0.0_arm64.msix",
-      "bytes": 64388309,
-      "sha256": "B255582D562D30A48A21B227504E2670ADF3A82B4C238A9B22667BCC55716471",
+      "bytes": 64390966,
+      "sha256": "6C3B7C01635552A8446B9B91A8BE63256C4C96F295A4C9EC23E6E2FF0B5DA8BE",
       "buildPassed": true,
       "runtimeTested": false
     }
   },
   "installedWorkflow": {
     "success": true,
-    "signedPackageSha256": "596E8D6C06DA9697B635E5D6B7EDC554C66A3FAE3B1C45AE367FD6C1113AEFF6",
+    "signedPackageSha256": "FCF81330358E93F24DB1CDEC69641DA1765EAF47B134EC463851D59603F247DD",
     "interactiveSessionId": 1,
     "fullExistingShellRegressionPassed": true,
     "designLanguage": {
@@ -53,7 +53,7 @@
           "library",
           "library-wide-focus-and-heading",
           "library-narrow",
-          "game-wide-metadata",
+          "game-wide-full-width-metadata",
           "game-narrow-long-title",
           "reader-wide",
           "reader-narrow",
@@ -69,7 +69,7 @@
           "library",
           "library-wide-focus-and-heading",
           "library-narrow",
-          "game-wide-metadata",
+          "game-wide-full-width-metadata",
           "game-narrow-long-title",
           "reader-wide",
           "reader-narrow",
@@ -85,7 +85,7 @@
           "library",
           "library-wide-focus-and-heading",
           "library-narrow",
-          "game-wide-metadata",
+          "game-wide-full-width-metadata",
           "game-narrow-long-title",
           "reader-wide",
           "reader-narrow",
@@ -101,7 +101,7 @@
           "library",
           "library-wide-focus-and-heading",
           "library-narrow",
-          "game-wide-metadata",
+          "game-wide-full-width-metadata",
           "game-narrow-long-title",
           "reader-wide",
           "reader-narrow",
@@ -111,8 +111,8 @@
       }
     },
     "themeLuminance": {
-      "light": 237.34,
-      "dark": 44.91
+      "light": 238.56,
+      "dark": 39.74
     },
     "readerToolbarRegression": {
       "success": true,
@@ -159,33 +159,49 @@
       "certificateStillTrusted": false,
       "profileStillExists": false,
       "testScheduledTasksStillRegistered": false
+    },
+    "windowChrome": {
+      "nativeTitleBarBackAndPaneActionsPassed": true,
+      "micaBackdropAndHighContrastFallbackPassed": true,
+      "fullWidthShellBoundsPassed": true,
+      "routineInfoBarAutoDismissSeconds": 3,
+      "routineInfoBarAutoDismissPassed": true,
+      "persistentAutomationStatusPassed": true,
+      "persistentAutomationStatusAccessibilityView": "Raw",
+      "persistentAutomationStatusSequenced": true,
+      "settingsCardTopAlignmentReviewed": true
     }
   },
   "screenshots": [
     {
       "file": "design-dark.reader-wide.png",
-      "bytes": 26597,
-      "sha256": "B53BECF4AB6D607156BDCE74D711CDD12F5EC6755F54D68F145D9743CAFDC5B3"
+      "bytes": 50020,
+      "sha256": "8CF0861CE29180D50B2D4090E0980D4F90C1C7AA3CBE63278DC71DBFC311A696"
     },
     {
       "file": "design-high-contrast.game-narrow.png",
-      "bytes": 21853,
-      "sha256": "DA34D76A7CE13C2ABF5F3F71064C4A2D337E34A8B7E75DD04A733912CCB62D51"
+      "bytes": 20987,
+      "sha256": "40111417DCB09E0F2830C8E292599DD881738D73F76593D3F761F86BC3866F50"
     },
     {
       "file": "design-light.game-narrow.png",
-      "bytes": 23894,
-      "sha256": "CAFEF884DD68ADE1B090DDA4974AB10B1AC5E1F64C9A4AC43D5F324DDEE497E7"
+      "bytes": 33948,
+      "sha256": "E589594F9816B390D12C625C3D5A579AB5D6FEC1F5B27F4AE06C25B18096E3F6"
+    },
+    {
+      "file": "design-light.game-wide.png",
+      "bytes": 55525,
+      "sha256": "5070E3BE53A06271182347C6DF9D33936FF161FB4CECC78D239967876789764F"
     },
     {
       "file": "design-light.library-wide.png",
-      "bytes": 20863,
-      "sha256": "5B7A778FB268350100CC925F8A06E14F366037D5BF7135E7E223D792A3FD4D7B"
+      "bytes": 49320,
+      "sha256": "6F6F8995B4ACC335F2B1FAA44607519B5E7D3399E25CCDAB1887ECC8455121AD"
     },
     {
       "file": "design-light.settings-narrow.png",
-      "bytes": 16819,
-      "sha256": "28C942F7E1B13F43D51F9B700590F9794DCA3EA241C4921E07F60EB70874F5A5"
+      "bytes": 26476,
+      "sha256": "951F4870536C4F664DDCF3504777AECCFCDE6A88EA8B1BE1D5118414764D4D98"
     }
   ],
   "deferred": {
@@ -201,7 +217,8 @@
     "installedUiaNameAndBoundsPassed": true
   },
   "verificationNotes": [
-    "A focused installed design-language run passed before the full regression.",
-    "The first full run reached the existing rapid Guide to Settings to Back scenario once before the selected guide route became visible. No product change was made; a controlled full rerun passed the complete workflow."
+    "The final exact-source installed run passed the complete existing shell regression and all four design-language appearance modes.",
+    "Routine ready notifications auto-dismiss visually while the shell retains a sequenced marker in the raw UI Automation view for deterministic installed checks.",
+    "Acrylic was not applied to the persistent main window; Mica is used for the long-lived backdrop and Acrylic remains reserved for transient UI."
   ]
 }

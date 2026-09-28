@@ -82,7 +82,12 @@ Use Segoe UI Variable with the system UI font fallback, system accent and theme
 resources, left-aligned hierarchy, and compact Windows-native controls. Use
 cards where artwork or a group boundary carries meaning; use flat rows and
 separators for dense guide lists instead of placing every item in an identical
-rounded container.
+rounded container. The shell uses the native WinUI `TitleBar`, `AppWindow`
+lifecycle APIs, and a Mica system backdrop. Route panels fill the available
+window width; individual readers may constrain text measure when that improves
+legibility. Routine status messages appear in a transient `InfoBar`, while
+warnings and actionable errors remain dismissible. Reserve Acrylic for
+transient flyouts and light-dismiss surfaces.
 
 Opening a guide shows a reader with a compact top bar (game and guide title,
 back, appearance controls, and `Mark complete`) and a collapsible navigation

@@ -53,7 +53,9 @@ high contrast remain native:
 
 High contrast overrides the app aliases with Windows system window, text,
 highlight, and hotlight colors. No page owns a fixed foreground/background
-pair.
+pair. The long-lived main window uses a Mica system backdrop behind transparent
+shell backgrounds. Acrylic remains limited to transient flyouts and
+light-dismiss surfaces.
 
 ### Type
 
@@ -67,12 +69,13 @@ heading levels. Monospace remains exclusive to the TXT reader.
 ### Layout and shape
 
 Use 4, 8, 12, 16, 24, 32, and 48-DIP spacing steps. Page content is
-left-aligned and capped at 1,120 DIPs on wide windows. Padding reduces from
-48/32 to 32/24. Narrow layouts use 16-DIP side and bottom padding plus a
-64-DIP top inset that keeps content clear of compact NavigationView controls.
-Eight-DIP corners mark meaningful surfaces; guide lists remain flat rather
-than turning every row into a card. Motion is limited to native control state
-and layout transitions.
+left-aligned and fills the route width after responsive padding. Do not apply a
+shell-level maximum that creates unused vertical gutters on wide windows.
+Padding reduces from 48/32 to 32/24 and then 16/24/16/16 at narrow widths. The
+native `TitleBar` owns Back and pane-toggle controls in a separate row, so
+route content does not need a compensating top inset. Eight-DIP corners mark
+meaningful surfaces; guide lists remain flat rather than turning every row
+into a card. Motion is limited to native control state and layout transitions.
 
 ```text
 Wide Library
@@ -103,14 +106,16 @@ gradients or repeated cards.
 Use sentence case and concrete actions: `Add game`, `Edit game`, `Back to
 game`, and `Open selected guide`. Empty states explain the next action.
 Status text reports state without fixture terminology. Error text names the
-failed operation and offers one recovery action when one exists.
+failed operation and offers one recovery action when one exists. Loading uses
+a top `InfoBar`; routine ready messages close after three seconds, while
+warnings and errors remain dismissible.
 
 ## Implementation sequence and exits
 
 | Step | Output | Verification |
 | --- | --- | --- |
-| Resource foundation | App-level dictionaries for semantic colors, spacing, typography, surfaces, buttons, lists, and status presentation | Production XAML compiles on Windows x64 and ARM64; every app resource resolves in light, dark, and high contrast |
-| Representative routes | Library, Game, Reader, Settings, game editor, and reader toolbar consume semantic styles; the Settings route uses Toolkit `SettingsCard`; adaptive page padding and narrow layouts are active | Existing route, editor, focus, Settings-card UIA, and toolbar checks remain passing |
+| Resource foundation | App-level dictionaries for semantic colors, spacing, typography, surfaces, buttons, lists, backdrop, title bar, and status presentation | Production XAML compiles on Windows x64 and ARM64; every app resource resolves in light, dark, and high contrast |
+| Representative routes | Library, Game, Reader, Settings, game editor, and reader toolbar consume semantic styles; the Settings route uses Toolkit `SettingsCard`; native `TitleBar`, Mica, full-width layout, transient `InfoBar`, adaptive page padding, and narrow layouts are active | Existing route, editor, title-bar navigation, focus, Settings-card UIA, status-timeout, and toolbar checks remain passing |
 | Gallery inventory | Built-in, adapted, deferred, and rejected component list tied to the locked SDK | No Gallery application dependency; stable Toolkit packages are centrally pinned when first used |
 | Installed visual check | Seeded realistic metadata is captured at wide and narrow sizes in system light, dark, and high contrast | Keyboard focus, heading names, long text, and screenshots are recorded on Windows 11 x64 at the host's current 100% display scale; 200% display scaling is explicitly deferred |
 
@@ -126,16 +131,15 @@ package passed the complete interactive signed-install shell regression plus
 the design-language scenarios in system, light, dark, and high-contrast
 themes. Each appearance run covered Library, Game, Reader, and Settings at
 wide and narrow window sizes, heading semantics, keyboard focus, UIA names,
-the Toolkit `SettingsCard` name and bounds, long metadata, and control
-overlap. The host reported 96 DPI / 100% scaling.
+the native title-bar controls, full-width shell bounds, automatic dismissal of
+routine status, the Toolkit `SettingsCard` name and bounds, long metadata, and
+control overlap. The host reported 96 DPI / 100% scaling.
 
 The same source passed 73 Core tests, 90 Infrastructure tests, seven
 PowerShell harness checks, x64 and ARM64 package builds, and the complete shell
 installed regression. The unchanged linked reader toolbar retains its prior
-installed pass. One initial full shell run reached the existing rapid
-Guide → Settings → Back scenario before the guide route became visible; a
-controlled rerun passed the entire workflow without a product or harness
-change. The sanitized
+installed pass. The final exact-source installed run passed the complete
+workflow and all four appearance modes. The sanitized
 [Windows result](evidence/t11-design-language/windows-11-x64-result.json) and
 selected installed screenshots are retained with the task evidence. Windows
 10, installed ARM64 behavior, and 200% display scaling remain unverified.

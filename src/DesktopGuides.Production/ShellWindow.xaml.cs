@@ -9,6 +9,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.Storage;
 using Windows.System;
+using DispatcherQueueTimer = Microsoft.UI.Dispatching.DispatcherQueueTimer;
 
 namespace DesktopGuides.Production;
 
@@ -17,6 +18,7 @@ public sealed partial class ShellWindow : Window
     private readonly ShellNavigator navigator = new();
     private readonly NavigationActionQueue navigationQueue = new();
     private readonly CancellationTokenSource leaseWait = new();
+    private readonly DispatcherQueueTimer statusDismissTimer;
     private Task initializationTask = Task.CompletedTask;
     private LibrarySessionLease? libraryLease;
     private SqliteLibraryRepository? repository;
@@ -25,6 +27,7 @@ public sealed partial class ShellWindow : Window
     private int guideFocusRenderGeneration = -1;
     private int renderGeneration;
     private long gameGuideIntentVersion;
+    private long statusSequence;
     private bool settingGuideSelection;
     private bool ready;
     private bool closeRequested;
@@ -36,6 +39,12 @@ public sealed partial class ShellWindow : Window
     {
         InitializeComponent();
         Title = "Desktop Guides Preview";
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+        statusDismissTimer = DispatcherQueue.CreateTimer();
+        statusDismissTimer.Interval = TimeSpan.FromSeconds(3);
+        statusDismissTimer.IsRepeating = false;
+        statusDismissTimer.Tick += (_, _) => ShellStatusInfoBar.IsOpen = false;
         Navigation.SelectedItem = LibraryItem;
         GameList.AddHandler(
             UIElement.TappedEvent, new TappedEventHandler(GameTapped), true);
@@ -49,7 +58,7 @@ public sealed partial class ShellWindow : Window
         Navigation.RegisterPropertyChangedCallback(
             NavigationView.IsPaneOpenProperty, (_, _) => UpdatePaneStatus());
         UpdatePaneStatus();
-        ReaderActions.CommandFailed += message => ShellStatus.Text = message;
+        ReaderActions.CommandFailed += ShowErrorStatus;
         AppWindow.Closing += WindowClosing;
     }
 
@@ -57,6 +66,38 @@ public sealed partial class ShellWindow : Window
         AutomationProperties.SetItemStatus(
             Navigation,
             Navigation.IsPaneOpen ? "Navigation pane open" : "Navigation pane closed");
+
+    private void ShowBusyStatus(string message) =>
+        ShowStatus(message, InfoBarSeverity.Informational, false, false);
+
+    private void ShowTransientStatus(string message) =>
+        ShowStatus(message, InfoBarSeverity.Informational, false, true);
+
+    private void ShowWarningStatus(string message) =>
+        ShowStatus(message, InfoBarSeverity.Warning, true, false);
+
+    private void ShowErrorStatus(string message) =>
+        ShowStatus(message, InfoBarSeverity.Error, true, false);
+
+    private void ShowStatus(
+        string message,
+        InfoBarSeverity severity,
+        bool isClosable,
+        bool autoDismiss)
+    {
+        statusDismissTimer.Stop();
+        ShellStatusInfoBar.Message = message;
+        AutomationProperties.SetName(ShellStatusInfoBar, message);
+        AutomationProperties.SetItemStatus(
+            ShellContent, $"{++statusSequence}|{message}");
+        ShellStatusInfoBar.Severity = severity;
+        ShellStatusInfoBar.IsClosable = isClosable;
+        ShellStatusInfoBar.IsOpen = true;
+        if (autoDismiss)
+        {
+            statusDismissTimer.Start();
+        }
+    }
 
     private void ShellContentSizeChanged(object sender, SizeChangedEventArgs args)
     {
@@ -86,10 +127,10 @@ public sealed partial class ShellWindow : Window
         try
         {
             string dataRoot = ApplicationData.Current.LocalFolder.Path;
-            ShellStatus.Text = "Waiting for previous window...";
+            ShowBusyStatus("Waiting for previous window...");
             libraryLease = await LibrarySessionLease.AcquireAsync(
                 dataRoot, leaseWait.Token);
-            ShellStatus.Text = "Loading library...";
+            ShowBusyStatus("Loading library...");
             repository = new SqliteLibraryRepository(new ManagedPathResolver(dataRoot));
             await repository.InitializeAsync();
             ready = true;
@@ -102,7 +143,7 @@ public sealed partial class ShellWindow : Window
         catch (Exception error)
         {
             ready = false;
-            ShellStatus.Text = $"Could not open the library: {error.Message}";
+            ShowErrorStatus($"Could not open the library: {error.Message}");
         }
     }
 
@@ -118,6 +159,7 @@ public sealed partial class ShellWindow : Window
             return;
         }
         closeRequested = true;
+        statusDismissTimer.Stop();
         activeGameEditor?.Hide();
         leaseWait.Cancel();
         Task pendingNavigation = navigationQueue.StopAndDrainAsync();
@@ -186,11 +228,13 @@ public sealed partial class ShellWindow : Window
         });
     }
 
-    private async void NavigationBackRequested(
-        NavigationView sender, NavigationViewBackRequestedEventArgs args)
+    private async void TitleBarBackRequested(TitleBar sender, object args)
     {
         await RunNavigationAsync(GoBackAsync);
     }
+
+    private void TitleBarPaneToggleRequested(TitleBar sender, object args) =>
+        Navigation.IsPaneOpen = !Navigation.IsPaneOpen;
 
     private async void ReaderBackClicked(object sender, RoutedEventArgs args)
     {
@@ -447,7 +491,7 @@ public sealed partial class ShellWindow : Window
                 }
                 if (game is null)
                 {
-                    ShellStatus.Text = "This game is no longer in your library.";
+                    ShowWarningStatus("This game is no longer in your library.");
                     return;
                 }
                 GameEditorDialog editor = new(game, async details =>
@@ -505,7 +549,7 @@ public sealed partial class ShellWindow : Window
         }
         catch (Exception error)
         {
-            ShellStatus.Text = $"Could not open the game: {error.Message}";
+            ShowErrorStatus($"Could not open the game: {error.Message}");
         }
     }
 
@@ -560,7 +604,7 @@ public sealed partial class ShellWindow : Window
         {
             return;
         }
-        ShellStatus.Text = "Opening guide...";
+        ShowBusyStatus("Opening guide...");
         try
         {
             SqliteLibraryRepository library = RequireRepository();
@@ -572,7 +616,7 @@ public sealed partial class ShellWindow : Window
             if (guide is null ||
                 (sourceGameId is Guid source && guide.GameId != source))
             {
-                ShellStatus.Text = "This guide is no longer in your library.";
+                ShowWarningStatus("This guide is no longer in your library.");
                 return;
             }
             Game? ownerGame = await library.GetGameAsync(guide.GameId);
@@ -582,7 +626,7 @@ public sealed partial class ShellWindow : Window
             }
             if (ownerGame is null)
             {
-                ShellStatus.Text = "This guide is no longer in your library.";
+                ShowWarningStatus("This guide is no longer in your library.");
                 return;
             }
             AppSettings settings = await library.GetSettingsAsync();
@@ -604,13 +648,13 @@ public sealed partial class ShellWindow : Window
                 }
                 catch (Exception error)
                 {
-                    ShellStatus.Text = $"Could not save Resume: {error.Message}";
+                    ShowErrorStatus($"Could not save Resume: {error.Message}");
                 }
             }
         }
         catch (Exception error)
         {
-            ShellStatus.Text = $"Could not open the guide: {error.Message}";
+            ShowErrorStatus($"Could not open the guide: {error.Message}");
         }
     }
 
@@ -627,7 +671,7 @@ public sealed partial class ShellWindow : Window
         ReaderPanel.Visibility = Visibility.Collapsed;
         SettingsPanel.Visibility = Visibility.Collapsed;
         OpenSelectedGuideButton.Visibility = Visibility.Collapsed;
-        Navigation.IsBackEnabled = navigator.CanGoBack;
+        AppTitleBar.IsBackButtonEnabled = navigator.CanGoBack;
         Navigation.SelectedItem = navigator.Current is SettingsRoute
             ? Navigation.SettingsItem
             : LibraryItem;
@@ -643,7 +687,7 @@ public sealed partial class ShellWindow : Window
             {
                 case LibraryRoute:
                     LibraryPanel.Visibility = Visibility.Visible;
-                    ShellStatus.Text = "Loading library…";
+                    ShowBusyStatus("Loading library…");
                     IReadOnlyList<Game> games = await library.ListGamesAsync();
                     AppSettings settings = await library.GetSettingsAsync();
                     Guide? resume = settings.LastActiveGuideId is Guid lastId
@@ -665,12 +709,12 @@ public sealed partial class ShellWindow : Window
                     {
                         ResumeButton.Content = $"Resume {resume.Title}";
                     }
-                    ShellStatus.Text = "Library ready.";
+                    ShowTransientStatus("Library ready.");
                     break;
 
                 case GameRoute gameRoute:
                     GamePanel.Visibility = Visibility.Visible;
-                    ShellStatus.Text = "Loading game…";
+                    ShowBusyStatus("Loading game…");
                     Guid? selectedGuideId = pendingGuideFocus ??
                         (GuideList.SelectedItem as Guide)?.Id;
                     GameHeading.Text = "Loading game…";
@@ -700,7 +744,7 @@ public sealed partial class ShellWindow : Window
                     {
                         navigator.ResetToLibrary();
                         await RenderCurrentAsync();
-                        ShellStatus.Text = "This game is no longer in your library.";
+                        ShowWarningStatus("This game is no longer in your library.");
                         return false;
                     }
                     IReadOnlyList<Guide> guides =
@@ -756,12 +800,12 @@ public sealed partial class ShellWindow : Window
                     {
                         pendingGuideFocus = null;
                     }
-                    ShellStatus.Text = "Game ready.";
+                    ShowTransientStatus("Game ready.");
                     break;
 
                 case ReaderRoute readerRoute:
                     ReaderPanel.Visibility = Visibility.Visible;
-                    ShellStatus.Text = "Loading guide…";
+                    ShowBusyStatus("Loading guide…");
                     await PauseReaderMetadataReadForTestAsync();
                     Guide? guide = await library.GetGuideAsync(readerRoute.GuideId);
                     if (generation != renderGeneration)
@@ -772,7 +816,7 @@ public sealed partial class ShellWindow : Window
                     {
                         navigator.ResetToLibrary();
                         await RenderCurrentAsync();
-                        ShellStatus.Text = "This guide is no longer in your library.";
+                        ShowWarningStatus("This guide is no longer in your library.");
                         return false;
                     }
                     Game? readerGame = await library.GetGameAsync(readerRoute.GameId);
@@ -784,18 +828,18 @@ public sealed partial class ShellWindow : Window
                     {
                         navigator.ResetToLibrary();
                         await RenderCurrentAsync();
-                        ShellStatus.Text = "This game is no longer in your library.";
+                        ShowWarningStatus("This game is no longer in your library.");
                         return false;
                     }
                     ReaderHeading.Text = guide.Title;
                     ReaderGameName.Text = readerGame.Title;
                     ReaderFormat.Text = guide.Format.ToString().ToUpperInvariant();
-                    ShellStatus.Text = "Guide details ready.";
+                    ShowTransientStatus("Guide details ready.");
                     break;
 
                 case SettingsRoute:
                     SettingsPanel.Visibility = Visibility.Visible;
-                    ShellStatus.Text = "Settings ready.";
+                    ShowTransientStatus("Settings ready.");
                     break;
             }
             return true;
@@ -804,7 +848,7 @@ public sealed partial class ShellWindow : Window
         {
             if (generation == renderGeneration)
             {
-                ShellStatus.Text = $"Could not load this view: {error.Message}";
+                ShowErrorStatus($"Could not load this view: {error.Message}");
             }
             return false;
         }
