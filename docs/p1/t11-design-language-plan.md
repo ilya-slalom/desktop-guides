@@ -19,15 +19,20 @@ Three practical approaches were considered:
 | Approach | Benefit | Cost or risk | Decision |
 | --- | --- | --- | --- |
 | Copy the WinUI Gallery shell and resource set | Fastest route to a visibly polished sample | Gallery main uses an experimental Windows App SDK build, Toolkit packages, sample-specific navigation, and controls Desktop Guides does not need | Reject |
-| Add Windows Community Toolkit settings and layout controls now | Provides polished settings cards and helper controls | Adds package, license, version, and installed-runtime surface before Settings behavior exists | Defer Toolkit-only controls to T14.4 |
-| Build semantic app resources over native WinUI controls | Matches the locked SDK, preserves native input/accessibility behavior, and lets each feature adopt only what it needs | Requires a small resource and layout foundation now | Choose |
+| Add every Windows Community Toolkit package now | Makes the catalog immediately available | Adds unused assemblies, package updates, and test surface without a user workflow | Reject |
+| Build semantic app resources and add a stable Toolkit package with its first suitable component | Preserves native behavior while allowing purpose-built controls where they improve a recorded workflow | Each introduced package needs an installed Windows regression check | Choose |
 
 The WinUI Gallery review uses Microsoft revision
 `7614c0083cc7fe33f5473603bb745a222abaef27`. Its app-level resource aliases,
 heading styles, adaptive item layouts, `NavigationView`, `InfoBar`, and native
-control samples are suitable references. Its Toolkit `SettingsCard`,
-`SettingsExpander`, animation helpers, and experimental-SDK-only controls are
-not T11.4 dependencies.
+control samples are suitable references. T11.4 pins
+`CommunityToolkit.WinUI.Controls.SettingsControls` `8.2.251219` and uses
+`SettingsCard` for the representative local-storage setting. Later tasks add
+`MetadataControl`, `HeaderedContentControl`, `Segmented`, `GridSplitter`, or
+`RichSuggestBox` only at the mapped workflow and after package-specific
+installed checks. Experimental SDK and Toolkit preview controls remain
+outside P1. The selected package is MIT licensed and its dependency floor is
+below the app's locked Windows App SDK `2.5.1`; no SDK change is required.
 
 ## Design language
 
@@ -105,8 +110,8 @@ failed operation and offers one recovery action when one exists.
 | Step | Output | Verification |
 | --- | --- | --- |
 | Resource foundation | App-level dictionaries for semantic colors, spacing, typography, surfaces, buttons, lists, and status presentation | Production XAML compiles on Windows x64 and ARM64; every app resource resolves in light, dark, and high contrast |
-| Representative routes | Library, Game, Reader, Settings, game editor, and reader toolbar consume semantic styles; adaptive page padding and narrow layouts are active | Existing route, editor, focus, and toolbar UIA checks remain passing |
-| Gallery inventory | Built-in, adapted, deferred, and rejected component list tied to the locked SDK | No Gallery application dependency; no Toolkit package added in T11.4 |
+| Representative routes | Library, Game, Reader, Settings, game editor, and reader toolbar consume semantic styles; the Settings route uses Toolkit `SettingsCard`; adaptive page padding and narrow layouts are active | Existing route, editor, focus, Settings-card UIA, and toolbar checks remain passing |
+| Gallery inventory | Built-in, adapted, deferred, and rejected component list tied to the locked SDK | No Gallery application dependency; stable Toolkit packages are centrally pinned when first used |
 | Installed visual check | Seeded realistic metadata is captured at wide and narrow sizes in system light, dark, and high contrast | Keyboard focus, heading names, long text, and screenshots are recorded on Windows 11 x64 at the host's current 100% display scale; 200% display scaling is explicitly deferred |
 
 The implementation PR targets **T11.4**. Prerequisites T11.1 and T11.3 are
@@ -121,11 +126,16 @@ package passed the complete interactive signed-install shell regression plus
 the design-language scenarios in system, light, dark, and high-contrast
 themes. Each appearance run covered Library, Game, Reader, and Settings at
 wide and narrow window sizes, heading semantics, keyboard focus, UIA names,
-long metadata, and control overlap. The host reported 96 DPI / 100% scaling.
+the Toolkit `SettingsCard` name and bounds, long metadata, and control
+overlap. The host reported 96 DPI / 100% scaling.
 
 The same source passed 73 Core tests, 90 Infrastructure tests, seven
-PowerShell harness checks, and the complete linked reader-toolbar installed
-regression. The sanitized
+PowerShell harness checks, x64 and ARM64 package builds, and the complete shell
+installed regression. The unchanged linked reader toolbar retains its prior
+installed pass. One initial full shell run reached the existing rapid
+Guide → Settings → Back scenario before the guide route became visible; a
+controlled rerun passed the entire workflow without a product or harness
+change. The sanitized
 [Windows result](evidence/t11-design-language/windows-11-x64-result.json) and
 selected installed screenshots are retained with the task evidence. Windows
 10, installed ARM64 behavior, and 200% display scaling remain unverified.

@@ -303,9 +303,11 @@ Use the [WinUI Gallery](https://github.com/microsoft/WinUI-Gallery) as an
 interactive catalog and source reference, not as an application dependency or
 a shell to copy. Review examples against the project's locked Windows App SDK
 version before adopting them. Prefer built-in WinUI controls and resource
-keys. A Windows Community Toolkit control requires a recorded need,
-license/version review, locked package update, and installed Windows check.
-Copy only the minimal pattern needed and adapt automation names, focus
+keys where they provide the required behavior. A stable Windows Community
+Toolkit control is appropriate when it supplies a complete accessible pattern
+that the app would otherwise rebuild. Each Toolkit package requires a recorded
+need, license/version review, central version lock, and installed Windows
+check. Copy only the minimal pattern needed and adapt automation names, focus
 behavior, theme resources, copy, and layout to Desktop Guides.
 
 Adoption occurs with the feature that first needs the pattern:
@@ -317,6 +319,51 @@ Adoption occurs with the feature that first needs the pattern:
 | Catalog and import | T05.4, then T05.1/T06.1 | Reusable artwork and metadata templates, virtualized rows, empty/loading/error states, import preview groups, progress, and confirmation. |
 | Reader and Settings | T14.4 | Theme-aware command presentation, appearance settings, teaching/status surfaces, and Settings groups after functional controls exist. |
 | Release audit | T16.2 | Keyboard, UIA, touch target, localization/overflow, theme, high contrast, DPI, and screenshot review of the complete flow. |
+
+The application remains on stable Windows App SDK `2.5.1`. Toolkit packages
+use stable `8.2.251219`; preview `8.3` and Gallery experimental-SDK controls
+are excluded from P1. T11.4 introduces
+`CommunityToolkit.WinUI.Controls.SettingsControls` for `SettingsCard`. Other
+packages are added only with the task that first uses them:
+
+| Task(s) | Toolkit component | Package | Use and boundary |
+| --- | --- | --- | --- |
+| T11.4, T14.4, T20.2 | `SettingsCard`, `SettingsExpander` | `CommunityToolkit.WinUI.Controls.SettingsControls` | Use cards for actionable or informative Settings rows and expanders for optional advanced groups. Do not turn catalog rows or reader content into settings cards. |
+| T04.4, T05.1, T05.4 | `MetadataControl` | `CommunityToolkit.WinUI.Controls.MetadataControl` | Flatten short platform, edition, provider, format, and reading-state facts into accessible text. Keep artwork, title, selection, and virtualization in the owning data template. |
+| T06.1 | `HeaderedContentControl` | `CommunityToolkit.WinUI.Controls.HeaderedControls` | Associate repeated import-preview groups with visible headings. Use native headings when only one group exists. |
+| T13.1, T14.2, T19.2 | `Segmented` | `CommunityToolkit.WinUI.Controls.Segmented` | Present two to five bounded, mutually exclusive states. Verify selected-state UIA and retain native radio-button behavior as the fallback. |
+| T18.2 | `GridSplitter` | `CommunityToolkit.WinUI.Controls.Sizers` | Make the optional table-of-contents pane resizable without changing its collapsed default. Do not place a splitter in the primary reading surface before the pane exists. |
+| T22.2 | `RichSuggestBox` candidate | `CommunityToolkit.WinUI.Controls.RichSuggestBox` | Use only when a selected source supports cancellable incremental suggestions within its rate and credential model. T04.4 provider search remains explicit-submit. |
+
+Native WinUI remains the chosen implementation for `NavigationView`,
+`CommandBar`, `AutoSuggestBox`, `InfoBar`, `ContentDialog`, `TreeView`,
+`NumberBox`, progress, file pickers, and keyboard accelerators. Toolkit
+animation, converter, primitive, media, color, token, and tabbed-command
+packages have no current requirement and are not added speculatively.
+
+The recorded UI tasks were reviewed as one set:
+
+| UI task(s) | Component decision |
+| --- | --- |
+| T04.1–T04.3 | Keep the native form controls, `MenuFlyout`, and `ContentDialog`; Toolkit settings controls would misrepresent editing and destructive actions. |
+| T04.4 | Add Toolkit `MetadataControl` for bounded edition/provider facts. Keep provider search as an explicit native search action so typing does not produce network requests. |
+| T05.1–T05.4 | Reuse `MetadataControl` inside virtualized data templates. Native list/grid, search, selection, and state surfaces remain responsible for browsing behavior. |
+| T06.1–T06.4, T07.2 | Add `HeaderedContentControl` only for repeated import-preview groups. Keep file picking, validation `InfoBar`, progress, encoding choice, duplicate choice, and confirmation native. |
+| T07.3, T09.1–T09.3 | Keep WebView2 security, external-link actions, and host-owned appearance in the reader adapter; no Toolkit control changes the trust boundary. |
+| T08.2–T08.3 | Keep the virtualized TXT surface and reader commands native so long-guide realization and stable locators remain under app control. |
+| T10.2 | Keep PDF movement, `NumberBox` page entry, zoom, fit, and `CommandBar` overflow native. |
+| T11.1–T11.3 | Keep `NavigationView` and `CommandBar`; their shell, focus, and overflow behavior is already implemented and tested. |
+| T11.4 | Use `SettingsCard` for the local-storage row and retain semantic app resources around it. |
+| T13.1 | Use `Segmented` for the two explicit completion states if UIA selection passes; keep a native radio fallback. |
+| T14.1–T14.4 | Use `Segmented` for System/Light/Dark and `SettingsCard`/`SettingsExpander` for Settings. Keep reader text-size commands native. |
+| T15.1, T15.3 | Keep actionable `InfoBar` and destructive `ContentDialog` behavior native. |
+| T16.1–T16.2 | Audit Toolkit controls together with native controls; keyboard accelerators and focus restoration stay app-owned. |
+| T20.2 | Put Export and Restore in `SettingsCard` rows, with optional details in `SettingsExpander` and native replacement confirmation. |
+| T18.1–T18.2 | Keep find UI and TOC `TreeView` native; add `GridSplitter` if the TOC pane becomes user-resizable. |
+| T19.1–T19.2 | Keep bookmark list/navigation native and use `Segmented` for Original/Reflow. |
+| T21.2 | Select a Toolkit media control only after a chosen format proves a need; no generic media package is preselected. |
+| T22.2 | Evaluate `RichSuggestBox` for a provider that supports safe incremental suggestions; otherwise reuse T04.4 explicit search. |
+| T23.2, T24.1–T24.2 | Keep conflict, window, controller, and annotation UI unassigned until those interaction models are designed. |
 
 `NavigationView` does not manage a back stack automatically. A shell
 navigation coordinator owns `Library`, `Game(gameId)`, `Reader(guideId)`, and
@@ -634,8 +681,10 @@ project uses a provisional package identity until T17.1 sets the public one.
   rules described in section 4. Build representative responsive states for
   Library, Game, Reader, and Settings with realistic guide metadata. Review
   WinUI Gallery patterns against Windows App SDK 2.5.1 and record built-in,
-  adapted, rejected, and Toolkit-dependent candidates. Verify theme resource
-  lookup, keyboard focus, UIA names, 200% display scaling, long text, narrow
+  adapted, rejected, and Toolkit-dependent candidates. Pin stable Toolkit
+  `SettingsControls` and use `SettingsCard` for the representative local
+  storage setting. Verify theme resource lookup, keyboard focus, the
+  Settings-card UIA name and bounds, 200% display scaling, long text, narrow
   width, and high contrast on installed Windows. Capture screenshots for the
   implementation PR. For the initial T11.4 implementation, the user deferred
   the 200% display-scaling run to T16.2; the other checks still run now and

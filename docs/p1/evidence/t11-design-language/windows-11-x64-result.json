@@ -1,6 +1,6 @@
 {
   "task": "T11.4",
-  "observedAt": "2026-09-28T04:37:09.5796219Z",
+  "observedAt": "2026-09-28T05:14:12.2322609Z",
   "status": "passed-with-deferred-scale-matrix",
   "environment": {
     "osBuild": "10.0.26200.0",
@@ -27,21 +27,21 @@
   "packages": {
     "x64": {
       "name": "DesktopGuides.Production_0.1.0.0_x64.msix",
-      "bytes": 66144548,
-      "sha256": "58D725F2AEF26AFEDF72B7223DD377C13F70DAF93C63DD4DA933ADC1B7763466",
+      "bytes": 66332506,
+      "sha256": "B9F10C00D15C777A9BAB645B97F10219529D2F44B4364BAA226432E69CB2C177",
       "installedWorkflowPassed": true
     },
     "ARM64": {
       "name": "DesktopGuides.Production_0.1.0.0_arm64.msix",
-      "bytes": 64200504,
-      "sha256": "56D7CD562F3E9FB1234E4D3DBC7F58D4964192319C2A74AB3734F672D0334EE9",
+      "bytes": 64388309,
+      "sha256": "B255582D562D30A48A21B227504E2670ADF3A82B4C238A9B22667BCC55716471",
       "buildPassed": true,
       "runtimeTested": false
     }
   },
   "installedWorkflow": {
     "success": true,
-    "signedPackageSha256": "69FCF633D11CCB16766D7BD1BA30AEB486CBE0B968F4CEC4C4B0CAE319791FA6",
+    "signedPackageSha256": "596E8D6C06DA9697B635E5D6B7EDC554C66A3FAE3B1C45AE367FD6C1113AEFF6",
     "interactiveSessionId": 1,
     "fullExistingShellRegressionPassed": true,
     "designLanguage": {
@@ -111,14 +111,16 @@
       }
     },
     "themeLuminance": {
-      "light": 237.8,
-      "dark": 45.37
+      "light": 237.34,
+      "dark": 44.91
     },
     "readerToolbarRegression": {
       "success": true,
       "packageSha256": "63A4306E6876C8E65C23DFD0988EED973A41B31D8931F50F819B9087DA26AEAF",
       "overlapAndTimeoutCleanup": "passed",
-      "delayedInstallAndReceipt": "passed"
+      "delayedInstallAndReceipt": "passed",
+      "rerunForToolkitChange": false,
+      "basis": "ReaderToolbar source and smoke package dependencies were unchanged; prior branch-head installed pass retained."
     },
     "highContrast": {
       "original": {
@@ -162,33 +164,44 @@
   "screenshots": [
     {
       "file": "design-dark.reader-wide.png",
-      "bytes": 30823,
-      "sha256": "BEFC52A3E9128D9129ABD6F451158845B87551EFA36504DA7E6674C83289D647"
+      "bytes": 26597,
+      "sha256": "B53BECF4AB6D607156BDCE74D711CDD12F5EC6755F54D68F145D9743CAFDC5B3"
     },
     {
       "file": "design-high-contrast.game-narrow.png",
-      "bytes": 21932,
-      "sha256": "419AFD7DC33443DA641CB2A956C736089F9E5BC8E867E1DDD99E88F418A63E55"
+      "bytes": 21853,
+      "sha256": "DA34D76A7CE13C2ABF5F3F71064C4A2D337E34A8B7E75DD04A733912CCB62D51"
     },
     {
       "file": "design-light.game-narrow.png",
-      "bytes": 27434,
-      "sha256": "69CA7F0ED29C1419053366763D6452573CC9932C1A72F5B206F0F3631EC90A82"
+      "bytes": 23894,
+      "sha256": "CAFEF884DD68ADE1B090DDA4974AB10B1AC5E1F64C9A4AC43D5F324DDEE497E7"
     },
     {
       "file": "design-light.library-wide.png",
-      "bytes": 26489,
-      "sha256": "A04658B5DDE6466306AD6D16DC30BD57D47DFFAD1AC1BCE32A72BB7A2CD4CE70"
+      "bytes": 20863,
+      "sha256": "5B7A778FB268350100CC925F8A06E14F366037D5BF7135E7E223D792A3FD4D7B"
     },
     {
       "file": "design-light.settings-narrow.png",
-      "bytes": 21255,
-      "sha256": "C5E606D9E25D322D7DA52C380F0553231F2E71665A7068E5629A8E66EC965173"
+      "bytes": 16819,
+      "sha256": "28C942F7E1B13F43D51F9B700590F9794DCA3EA241C4921E07F60EB70874F5A5"
     }
   ],
   "deferred": {
     "displayScaling": "200% testing deferred by the user; this run used 96 DPI / 100%.",
     "windows10Runtime": "Deferred.",
     "ARM64InstalledWorkflow": "Deferred; package build only in this local run."
-  }
+  },
+  "toolkit": {
+    "windowsAppSdk": "2.5.1",
+    "package": "CommunityToolkit.WinUI.Controls.SettingsControls",
+    "version": "8.2.251219",
+    "component": "SettingsCard",
+    "installedUiaNameAndBoundsPassed": true
+  },
+  "verificationNotes": [
+    "A focused installed design-language run passed before the full regression.",
+    "The first full run reached the existing rapid Guide to Settings to Back scenario once before the selected guide route became visible. No product change was made; a controlled full rerun passed the complete workflow."
+  ]
 }

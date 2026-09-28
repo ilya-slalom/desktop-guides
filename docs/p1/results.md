@@ -1066,27 +1066,37 @@ resources. The representative routes use responsive page padding, bounded
 metadata, native WinUI heading semantics, directed empty states, and compact
 navigation clearance. The
 [design plan](t11-design-language-plan.md) records the chosen quiet field-guide
-direction and the WinUI Gallery revision and component inventory.
+direction and the WinUI Gallery revision and component inventory. A follow-up
+pins MIT-licensed
+`CommunityToolkit.WinUI.Controls.SettingsControls` `8.2.251219` and replaces
+the representative local-storage surface with an adaptive Toolkit
+`SettingsCard`; Windows App SDK remains `2.5.1`.
 
 On the Windows 11 x64 host at `E:\work\desktop-guides`, 73/73 Core tests,
 90/90 Infrastructure tests, and all seven PowerShell harness checks passed.
 Fresh Release production packages built for x64 and ARM64. The x64 package
 SHA-256 was
-`58D725F2AEF26AFEDF72B7223DD377C13F70DAF93C63DD4DA933ADC1B7763466`;
+`B9F10C00D15C777A9BAB645B97F10219529D2F44B4364BAA226432E69CB2C177`;
 the ARM64 package SHA-256 was
-`56D7CD562F3E9FB1234E4D3DBC7F58D4964192319C2A74AB3734F672D0334EE9`.
+`B255582D562D30A48A21B227504E2670ADF3A82B4C238A9B22667BCC55716471`.
 The host's missing optional `mspdbcmf.exe` produced only the existing
 symbols-package warning.
 
 The final interactive signed-install run passed the complete existing shell
 regression and all four design-language modes. Each mode checked Library,
 Game, Reader, and Settings at wide and narrow widths, semantic headings,
-focus, UIA names, long metadata, and compact-navigation overlap. Light and
-dark screenshot luminance measured 237.8 and 45.37. High contrast changed
+focus, UIA names, the Toolkit Settings-card name and bounds, long metadata,
+and compact-navigation overlap. Light and dark screenshot luminance measured
+237.34 and 44.91. High contrast changed
 from disabled flags `126` to enabled flags `127` with `High Contrast Black`,
 then restored exactly. The original light-app preference was also restored.
 The package, package profile, temporary certificate trust, and scheduled
 tasks were absent after cleanup.
+
+The first complete rerun reached the timing-sensitive rapid
+Guide → Settings → Back scenario once before the guide route became visible.
+The focused Toolkit run had already passed, and a controlled complete rerun
+passed every shell and design phase without a code or harness change.
 
 The linked reader-toolbar package includes the shared design token dictionary
 and retains the native command label position so wide layouts keep `Zoom in`

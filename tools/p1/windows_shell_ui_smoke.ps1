@@ -694,10 +694,13 @@ try {
         Resize-ShellWindow $wideWidth $windowHeight
         Select-Element 'Settings'
         [void](Wait-Name 'SettingsHeading' 'Settings')
+        [void](Wait-Name 'LibraryStorageSettingsCard' (
+            'Library storage. Your library is stored on this device.'))
         [void](Wait-Name 'ShellStatus' 'Settings ready.')
         Assert-HeadingLevel 'SettingsHeading' 1
         Resize-ShellWindow $narrowWidth $windowHeight
         Assert-InsideWindow 'SettingsHeading'
+        Assert-InsideWindow 'LibraryStorageSettingsCard'
         Assert-NoOverlap 'TogglePaneButton' 'SettingsHeading'
         Assert-NoOverlap 'NavigationViewBackButton' 'SettingsHeading'
         $report.settingsNarrowScreenshot =
@@ -706,6 +709,7 @@ try {
 
         Resize-ShellWindow $wideWidth $windowHeight
         Assert-InsideWindow 'SettingsHeading'
+        Assert-InsideWindow 'LibraryStorageSettingsCard'
         $report.settingsWideScreenshot =
             Save-WindowScreenshot 'settings-wide'
         $report.phases += 'settings-wide'
