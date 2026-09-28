@@ -1135,24 +1135,29 @@ harness; the runs below kept every `Personalize` value. With real translucency,
 Thin Acrylic in light theme over a dark window measured 2.4:1 for secondary
 text and 3.0:1 for body text, so Acrylic now uses Base acrylic.
 
-From a snapshot of `fb3a393` on the same host, with transparency
+From a snapshot of `eec9782` on the same host, with transparency
 effects on: locked restores, 73/73 Core tests, 98/98 Infrastructure tests,
 and all nine PowerShell harness checks passed, and Release packages built for
 x64 and ARM64. The x64 package SHA-256 was
-`66F47172063DC409E7A46E069502288904935B3F0E369DAF2E5C0881C7DA0469`;
+`0E96D957ACE66139CB3F1FA960CED667E855D4A33BE6650E425C0E82C0E7100E`;
 the ARM64 package SHA-256 was
-`C54A32880EE1A568848AAD0B603F6C9C6BC32613F15F61C53607BD0275685451`.
+`510FEAA3E4F40B874D5E473D4E1D24E770365B5802781A4BCED937C115C54FCB`.
 The full signed-install regression passed. It ran the system, light, and dark
 design-language modes and six material passes: light and dark × Solid,
 Acrylic, and Mica, plus a switch-and-relaunch check. A strip across the
 pane/content boundary had a channel range of 0 for Solid, so no seam was
 visible. Mica showed the wallpaper tint (light 249/241/235 and dark 35/31/28,
-against Solid 243 and 32). With a dark console window behind the app, Acrylic
-measured 214 in light and 42 in dark, against Solid 243 and 32 (threshold 4).
+against Solid 243 and 32). Acrylic measured 214 in light and 42 in dark. These
+checks cover the app code only: Acrylic fails only if it repeats the Solid
+fill within one level on every channel, which is what one of our layers
+covering the backdrop would show. Mica is not checked this way, because with
+transparency off Windows draws it in the Solid fill color. How Windows tints
+either material is recorded, not asserted.
 Light Acrylic text measured 5.46:1 for secondary text and 12.34:1 for body
-text. The Acrylic edit-game command band showed the in-app acrylic noise
-(channel range 3, Solid 0); the check accepts that noise or the fallback
-color, because live in-app acrylic takes its tint from the content behind it.
+text. A 160×4 strip in the Acrylic edit-game command band showed the in-app
+acrylic noise (channel range 4, Solid 0); the check accepts that noise or the
+fallback color, because live in-app acrylic takes its tint from the content
+behind it. The report records the dialog difference for each theme.
 
 A second interactive run switched the Windows app theme while the app stayed
 open. Library luminance followed from 46 to 209 and back to 46, and with Edit
@@ -1161,8 +1166,9 @@ Mica matched Solid and Acrylic showed its fallback color (249 light, 44 dark);
 the run then restored the setting. After each run, the package, certificate
 trust, and scheduled tasks were gone, and the `Personalize` values, the
 high-contrast flags (`126`), and the active `Custom.theme` were unchanged.
-The reader-toolbar installed smoke passed all eight phases, including focus
-restoration after the page and find dialogs.
+On a snapshot of `fb3a393`, the reader-toolbar installed smoke passed all
+eight phases, including focus restoration after the page and find dialogs; its
+code and harness have not changed since.
 
 High contrast moves to T16.2: enabling it makes Windows rewrite the active
 theme to `Custom.theme`, which this harness cannot restore. Optional colorful

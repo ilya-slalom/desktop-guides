@@ -160,12 +160,12 @@ dark, plus a Mica-to-Acrylic switch that persisted across relaunch. An 80×8
 strip across the pane/content boundary had a channel range of 0 for Solid, so
 no seam shows. Mica showed the wallpaper tint. Thin Acrylic over a dark window
 left light-theme text at 2.4:1 to 3.0:1, so Acrylic now uses Base acrylic,
-which differed from Solid by 29 (light) and 10 (dark) channel levels against a
-threshold of 4 and kept light text at 5.46:1 or better. The Acrylic dialog's
+which kept light text at 5.46:1 or better. The harness checks only that
+Acrylic does not repeat the Solid fill, since Windows sets its tint. The Acrylic dialog's
 command area showed in-app acrylic noise that the Solid dialog lacks; its
 content area keeps WinUI's native overlay, so no template resource is
 overridden. A live Windows theme switch updated the open window and the Edit
 game dialog, and with transparency off Mica matched Solid and Acrylic showed
-its fallback color. The same source passed 73 Core tests, 98 Infrastructure
-tests, nine PowerShell harness checks, x64 and ARM64 package builds, and the
-linked reader toolbar installed smoke.
+its fallback color. The final source passed 73 Core tests, 98 Infrastructure
+tests, nine PowerShell harness checks, and x64 and ARM64 package builds; the
+unchanged linked reader toolbar passed its installed smoke on `fb3a393`.

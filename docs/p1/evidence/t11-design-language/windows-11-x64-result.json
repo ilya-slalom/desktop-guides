@@ -1,6 +1,6 @@
 {
   "task": "T11.4",
-  "observedAt": "2026-09-28T15:24:11.7523860Z",
+  "observedAt": "2026-09-28T16:41:58.7523582Z",
   "status": "passed-with-deferred-scale-and-high-contrast",
   "environment": {
     "osBuild": "10.0.26200.0",
@@ -13,7 +13,7 @@
       "2.5.1.0"
     ]
   },
-  "sourceCommit": "fb3a393",
+  "sourceCommit": "eec9782",
   "headlessChecks": {
     "coreTests": {
       "passed": 73,
@@ -29,21 +29,21 @@
   "packages": {
     "x64": {
       "name": "DesktopGuides.Production_0.1.0.0_x64.msix",
-      "bytes": 66337779,
-      "sha256": "66F47172063DC409E7A46E069502288904935B3F0E369DAF2E5C0881C7DA0469",
+      "bytes": 66337763,
+      "sha256": "0E96D957ACE66139CB3F1FA960CED667E855D4A33BE6650E425C0E82C0E7100E",
       "installedWorkflowPassed": true
     },
     "ARM64": {
       "name": "DesktopGuides.Production_0.1.0.0_arm64.msix",
-      "bytes": 64393570,
-      "sha256": "C54A32880EE1A568848AAD0B603F6C9C6BC32613F15F61C53607BD0275685451",
+      "bytes": 64393577,
+      "sha256": "510FEAA3E4F40B874D5E473D4E1D24E770365B5802781A4BCED937C115C54FCB",
       "buildPassed": true,
       "runtimeTested": false
     }
   },
   "installedWorkflow": {
     "success": true,
-    "signedPackageSha256": "271364F3EB48FBC957469E734C0EE453D6D036B5C99FE1CCE7C004C8F8F2A229",
+    "signedPackageSha256": "33B959D2EBE46CCC2A36E59A0D2E81D4CDEC2CDC185D183C35F8F3582113D0B6",
     "interactiveSessionId": 1,
     "fullExistingShellRegressionPassed": true,
     "designLanguage": {
@@ -97,13 +97,14 @@
       }
     },
     "themeLuminance": {
-      "light": 236.73,
-      "dark": 37.75
+      "light": 234.42,
+      "dark": 35.44
     },
     "windowMaterials": {
       "thresholds": {
         "solidStripMaxChannelRange": 2,
-        "acrylicDifferenceGreaterThan": 4,
+        "acrylicFailsWhen": "the library strip repeats the Solid fill within 1 level on every channel (an app layer covers the backdrop); Mica is recorded only, since its transparency-off fallback equals the Solid fill",
+        "dialogStrip": "160x4 px, 8 px below the primary button",
         "dialogAcrylicVisibleWhen": "mean difference from Solid > 2 (fallback color) or noise range at least 2 above Solid (live in-app acrylic)"
       },
       "passes": {
@@ -159,10 +160,10 @@
             "buttonBottom": 578
           },
           "dialogStrip": {
-            "meanR": 244.74,
-            "meanG": 244.74,
-            "meanB": 244.74,
-            "maxChannelRange": 3
+            "meanR": 244.87,
+            "meanG": 244.87,
+            "meanB": 244.87,
+            "maxChannelRange": 4
           }
         },
         "light-Mica": {
@@ -194,7 +195,10 @@
             "maxChannelRange": 0
           }
         },
-        "light-acrylicDifference": 29,
+        "light-dialogDifference": {
+          "meanDifference": 1.87,
+          "rangeDifference": 4
+        },
         "dark-Solid": {
           "success": true,
           "phases": [
@@ -247,10 +251,10 @@
             "buttonBottom": 578
           },
           "dialogStrip": {
-            "meanR": 45.58,
-            "meanG": 45.58,
-            "meanB": 45.58,
-            "maxChannelRange": 3
+            "meanR": 45.65,
+            "meanG": 45.65,
+            "meanB": 45.65,
+            "maxChannelRange": 4
           }
         },
         "dark-Mica": {
@@ -282,7 +286,10 @@
             "maxChannelRange": 0
           }
         },
-        "dark-acrylicDifference": 10
+        "dark-dialogDifference": {
+          "meanDifference": 13.65,
+          "rangeDifference": 4
+        }
       },
       "switchAndRelaunch": {
         "switched": {
@@ -306,9 +313,10 @@
       "storedMaterialRestoredTo": "Mica",
       "notes": [
         "Captured with Windows transparency effects on. Mica shows the wallpaper tint (light 249/241/235, dark 35/31/28 against Solid 243 and 32).",
-        "Acrylic is Base desktop acrylic. With a dark console behind the window it measured 214 in light and 42 in dark; its transparency-off fallback is 249 and 44.",
-        "Light Acrylic text contrast over that dark window: secondary text 5.46:1, body text 12.34:1 (Thin acrylic measured 2.4:1 and 3.0:1 before the switch to Base)."
-      ]
+        "Acrylic is Base desktop acrylic. Its tint depends on what Windows finds behind the window, so it is recorded, not asserted: in this run it measured 214 in light and 42 in dark (transparency-off fallback 249 and 44). The Acrylic edit-game command band showed in-app acrylic noise (range 4, Solid 0).",
+        "Light Acrylic text contrast over a dark window: secondary text 5.46:1, body text 12.34:1 (Thin acrylic measured 2.4:1 and 3.0:1 before the switch to Base)."
+      ],
+      "scope": "Checks cover app code only: reported effective material, our layers (seam, no Solid cover), the Acrylic dialog style, and persistence. Windows and WinUI rendering of Mica and Acrylic is not asserted."
     },
     "readerToolbarRegression": {
       "success": true,
@@ -388,118 +396,118 @@
   "screenshots": [
     {
       "file": "design-dark.library-narrow.png",
-      "bytes": 49138,
-      "sha256": "0D2835A0C26BB2396BCFD924A000A5CFC45635C131FBD9E0A091D32569D7A065"
+      "bytes": 72883,
+      "sha256": "86324CE6394824B38231B2CC090CAE9EE41CBEE7BC0C80C6E0EB5EBF03F84BE1"
     },
     {
       "file": "design-dark.library-wide.png",
-      "bytes": 93225,
-      "sha256": "DF6412704BB1D55FC4A421731173962C570A3007831D18BC0F7FE5F9485C4043"
+      "bytes": 129552,
+      "sha256": "34DD1F6BDC37CABF42C07FFDA2A2E215603326164D1DB3932624A134E7BDFFED"
     },
     {
       "file": "design-light.library-narrow.png",
-      "bytes": 56939,
-      "sha256": "711EDDDBF18E36393022C22162C32A21F28C2A62974FED8355FB66BDA3F2A620"
+      "bytes": 80705,
+      "sha256": "5D22A75A683BAA9AD9992621AF062B9879E4F850A7851C037F44E398979E3DFD"
     },
     {
       "file": "design-light.library-wide.png",
-      "bytes": 98385,
-      "sha256": "E67DB6E4732079BDEBF50E0899A778556E09C23EB1D19BAC5CEE2ED45DF94EE0"
+      "bytes": 134955,
+      "sha256": "43CE2402DAB8E85D72A9A275B08607D34FEE0F0E7AEB230EA728FD6F6E087C02"
     },
     {
       "file": "material-dark-acrylic.edit-game.png",
-      "bytes": 180016,
-      "sha256": "60D673E7D0715BC52D48015305035331A953954D5EB56EA13FC38FF22C184620"
+      "bytes": 217301,
+      "sha256": "8D9777E137589D80D5C2A7374F88751661F834914DCC2281AA13F9DC34B6119A"
     },
     {
       "file": "material-dark-acrylic.library.png",
-      "bytes": 26208,
-      "sha256": "CD114A92039F59F1E84AC5A87CEBD9098251996D3FB1DEAAB8733F250875B626"
+      "bytes": 61122,
+      "sha256": "1F89041ADCB2F3A4356F2DCF3C16AEBB1E1B771966FD12F0469020CE266DE64D"
     },
     {
       "file": "material-dark-acrylic.reader.png",
-      "bytes": 26927,
-      "sha256": "D0034E24C765E3B6EFDD2BC55DD427D47D438CC032FE9141FBA4B17BE5EAD31C"
+      "bytes": 62292,
+      "sha256": "D4093DAA7E57FA1AE69E34DE56BC65C19A94D160A16C58F408CC5F682B5B2F72"
     },
     {
       "file": "material-dark-mica.edit-game.png",
-      "bytes": 100215,
-      "sha256": "745B204446F7EE15583768A9D8020F6329E4BAB211196481D26A156ADDAC9007"
+      "bytes": 135799,
+      "sha256": "D2D69E6E1EF1D20E719C949AF0500E0F5B4D7E9B6785F1F80E53ADDCC5457C1E"
     },
     {
       "file": "material-dark-mica.library.png",
-      "bytes": 94231,
-      "sha256": "12EDC77346090FC91FEEED6D216E7C5C640BACC9D9B00BACBF8000F4BB243898"
+      "bytes": 130558,
+      "sha256": "A114B4B3CA1504420D7655D452C20803852F1B283BFA0919A5D7E3F3B4A3D63C"
     },
     {
       "file": "material-dark-mica.reader.png",
-      "bytes": 51072,
-      "sha256": "92F30FE79934ED2D158782BC7AFD184331E6C7D89781FA17233C16BFACF7157D"
+      "bytes": 87867,
+      "sha256": "C5A73D2E24E6387C29603E5EF1EE67D096402149CB477DD7C1A4AC3DC26BF18B"
     },
     {
       "file": "material-dark-solid.edit-game.png",
-      "bytes": 68879,
-      "sha256": "1D803EBDFB2149EC291215844C26E77432CF77AD070F2DD502D53341D7E58DDD"
+      "bytes": 104355,
+      "sha256": "ABAB0390587ABA8EDDE047DEAB580F643730F38C02B77548812325471EBFB849"
     },
     {
       "file": "material-dark-solid.library.png",
-      "bytes": 26207,
-      "sha256": "09FE023C09D4006A4EE2A4689C64BC320F4A5EEAA6B7EB5E028D050A5A65CB99"
+      "bytes": 61491,
+      "sha256": "D9E05CBB712E2EA399161D6A691C3E8C9291965584F9B7754B7C832BA485F5CB"
     },
     {
       "file": "material-dark-solid.reader.png",
-      "bytes": 26965,
-      "sha256": "5C68F9B725E25896CC36FD000787CFDCABE27E8FCBF2707739E91D9EC9E1FC69"
+      "bytes": 62303,
+      "sha256": "9949588B94DDF02B40D60B340765FD608EDA2FB34AEB579698C4DA463111CBDB"
     },
     {
       "file": "material-light-acrylic.edit-game.png",
-      "bytes": 87131,
-      "sha256": "418FC6E8E391A21721FEC56EB82289FBC1269EF8EE1C5A22D1566A9455FFDFC8"
+      "bytes": 121557,
+      "sha256": "1179AFCE6223EBFD06443ABC471DAC6FC10DE5AE3D8251DCA90BBEFC4B25CD22"
     },
     {
       "file": "material-light-acrylic.library.png",
-      "bytes": 26231,
-      "sha256": "3F21156EDD832C90D1A4C777D80CCEFE4275E045B6A7340A5589D9CF85B61B0D"
+      "bytes": 61593,
+      "sha256": "DB331CB0FE2F15DE75A532B14E1479FFC2B23C193532726230199619C57A7E4C"
     },
     {
       "file": "material-light-acrylic.reader.png",
-      "bytes": 28667,
-      "sha256": "34EF42FB3490169F19915D8AFDA70A743EB97AFB080004A2C53E023F2A32C579"
+      "bytes": 64362,
+      "sha256": "DD5925061A2BC31CB85B3AF7252B4C9AF8EE626A784D4C0EE484FDF2D949B9CF"
     },
     {
       "file": "material-light-mica.edit-game.png",
-      "bytes": 113157,
-      "sha256": "FF47E933349E23E47477808287E11689427F00CC65BA9082630A1D3316973C96"
+      "bytes": 149749,
+      "sha256": "423808BA1C5DDB17955EF4F129875D740FA0FBC260B3E2045E710E66C85BC577"
     },
     {
       "file": "material-light-mica.library.png",
-      "bytes": 97785,
-      "sha256": "DE64DAA67E49DEC67B1E1BB65720E9B63CAEC54B4FD9D521DE7B7F36C53FA6E9"
+      "bytes": 134468,
+      "sha256": "97445C73D350D31019D545A8E97883DA29342920AF09D94C8642FC85D5F8E001"
     },
     {
       "file": "material-light-mica.reader.png",
-      "bytes": 60471,
-      "sha256": "C8E09CAA9A999CF143B91823C9D7F6CF8951B7314172DD3E30BD8A4F6FB95FF5"
+      "bytes": 97094,
+      "sha256": "81A55230BC4D0BF97B9F35992C91E7BA39DF82D9531A47B3693C4BC877A031A0"
     },
     {
       "file": "material-light-mica.settings.png",
-      "bytes": 94645,
-      "sha256": "CF920C705DE56077DE6FFBC7EBBD59D2E9F5A5AC9D4CB0F9985F482C3DAD0B18"
+      "bytes": 130925,
+      "sha256": "4AE9E4E254592C2CFE1D78E5128A352E6E0E73BC3181A031C284F32DA057D674"
     },
     {
       "file": "material-light-solid.edit-game.png",
-      "bytes": 74601,
-      "sha256": "5AAEC729E4F73FD5AFFA6FDF9149AD18BD0ABF356C18778877DB68E258DE5CF5"
+      "bytes": 110113,
+      "sha256": "27F22BE7800CDA4C5B4143F682A979F8AE241BBEA8D451966EC05CF668EB1A45"
     },
     {
       "file": "material-light-solid.library.png",
-      "bytes": 25863,
-      "sha256": "83FA1AF44547BF8BB2246DD97B6FCD77B17FFDCEC3ED066CA2F5B2640EABC14E"
+      "bytes": 61583,
+      "sha256": "ACAF7DA7F643C095C324A1A9E940DCB5F1A1CAAAE378CB10F82659D92985D837"
     },
     {
       "file": "material-light-solid.reader.png",
-      "bytes": 28651,
-      "sha256": "626466861EE1646C33F61D3949667F70E33BDD2DE3B2D45C6D76F407D3B91606"
+      "bytes": 64323,
+      "sha256": "869E5AB461452FB3C55AFA4CD3BF56D179CD047496AFB3ECD629708DB40B5D4E"
     }
   ],
   "deferred": {
