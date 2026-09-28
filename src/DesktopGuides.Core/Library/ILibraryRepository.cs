@@ -25,4 +25,7 @@ public interface ILibraryRepository : IAsyncDisposable
         Guid guideId, double? textScale, CancellationToken token = default);
     Task<AppSettings> GetSettingsAsync(CancellationToken token = default);
     Task SaveSettingsAsync(AppSettings settings, CancellationToken token = default);
+    Task<AppSettings> UpdateSettingsAsync(
+        Func<AppSettings, AppSettings> update,
+        CancellationToken token = default);
 }

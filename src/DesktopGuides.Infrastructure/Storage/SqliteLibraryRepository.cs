@@ -279,73 +279,129 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         ReadAsync(() =>
         {
             using SqliteConnection connection = OpenConnection();
-            using SqliteCommand command = connection.CreateCommand();
-            command.CommandText = "SELECT Key, Value FROM Settings";
-            using SqliteDataReader reader = command.ExecuteReader();
-            ThemePreference theme = ThemePreference.System;
-            Guid? lastGuide = null;
-            while (reader.Read())
-            {
-                string key = reader.GetString(0);
-                string value = reader.GetString(1);
-                if (key == "Theme")
-                {
-                    if (!Enum.TryParse(value, out theme) ||
-                        !Enum.IsDefined(theme) ||
-                        theme.ToString() != value)
-                    {
-                        throw new InvalidDataException("Stored theme is invalid.");
-                    }
-                }
-                else if (key == "LastActiveGuideId")
-                {
-                    if (!Guid.TryParseExact(value, "N", out Guid parsed))
-                    {
-                        throw new InvalidDataException("Stored last-guide ID is invalid.");
-                    }
-                    lastGuide = parsed;
-                }
-            }
-            return new AppSettings(theme, lastGuide);
+            return ReadSettings(connection, null);
         }, token);
 
     public Task SaveSettingsAsync(AppSettings settings, CancellationToken token = default)
     {
-        if (!Enum.IsDefined(settings.Theme))
-        {
-            throw new ArgumentOutOfRangeException(nameof(settings));
-        }
+        ValidateSettings(settings);
         return WriteAsync(() =>
         {
             using SqliteConnection connection = OpenConnection();
             using SqliteTransaction transaction = connection.BeginTransaction();
-            using (SqliteCommand theme = connection.CreateCommand())
-            {
-                theme.Transaction = transaction;
-                theme.CommandText = """
-                    INSERT INTO Settings (Key, Value) VALUES ('Theme', $value)
-                    ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value
-                    """;
-                theme.Parameters.AddWithValue("$value", settings.Theme.ToString());
-                theme.ExecuteNonQuery();
-            }
-            using (SqliteCommand lastGuide = connection.CreateCommand())
-            {
-                lastGuide.Transaction = transaction;
-                lastGuide.CommandText = settings.LastActiveGuideId.HasValue
-                    ? """
-                      INSERT INTO Settings (Key, Value) VALUES ('LastActiveGuideId', $value)
-                      ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value
-                      """
-                    : "DELETE FROM Settings WHERE Key = 'LastActiveGuideId'";
-                if (settings.LastActiveGuideId is Guid id)
-                {
-                    lastGuide.Parameters.AddWithValue("$value", id.ToString("N"));
-                }
-                lastGuide.ExecuteNonQuery();
-            }
+            WriteSettings(connection, transaction, settings);
             transaction.Commit();
         }, token);
+    }
+
+    public Task<AppSettings> UpdateSettingsAsync(
+        Func<AppSettings, AppSettings> update,
+        CancellationToken token = default)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        return WriteAsync(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            AppSettings updated = update(ReadSettings(connection, transaction));
+            ValidateSettings(updated);
+            WriteSettings(connection, transaction, updated);
+            transaction.Commit();
+            return updated;
+        }, token);
+    }
+
+    private static void ValidateSettings(AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (!Enum.IsDefined(settings.Theme) || !Enum.IsDefined(settings.WindowMaterial))
+        {
+            throw new ArgumentOutOfRangeException(nameof(settings));
+        }
+    }
+
+    private static AppSettings ReadSettings(
+        SqliteConnection connection, SqliteTransaction? transaction)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT Key, Value FROM Settings";
+        using SqliteDataReader reader = command.ExecuteReader();
+        ThemePreference theme = ThemePreference.System;
+        Guid? lastGuide = null;
+        WindowMaterial material = WindowMaterial.Mica;
+        while (reader.Read())
+        {
+            string key = reader.GetString(0);
+            string value = reader.GetString(1);
+            if (key == "Theme")
+            {
+                if (!Enum.TryParse(value, out theme) ||
+                    !Enum.IsDefined(theme) ||
+                    theme.ToString() != value)
+                {
+                    throw new InvalidDataException("Stored theme is invalid.");
+                }
+            }
+            else if (key == "LastActiveGuideId")
+            {
+                if (!Guid.TryParseExact(value, "N", out Guid parsed))
+                {
+                    throw new InvalidDataException("Stored last-guide ID is invalid.");
+                }
+                lastGuide = parsed;
+            }
+            else if (key == "WindowMaterial")
+            {
+                if (!Enum.TryParse(value, out material) ||
+                    !Enum.IsDefined(material) ||
+                    material.ToString() != value)
+                {
+                    throw new InvalidDataException("Stored window material is invalid.");
+                }
+            }
+        }
+        return new AppSettings(theme, lastGuide, material);
+    }
+
+    private static void WriteSettings(
+        SqliteConnection connection, SqliteTransaction transaction, AppSettings settings)
+    {
+        using (SqliteCommand theme = connection.CreateCommand())
+        {
+            theme.Transaction = transaction;
+            theme.CommandText = """
+                INSERT INTO Settings (Key, Value) VALUES ('Theme', $value)
+                ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value
+                """;
+            theme.Parameters.AddWithValue("$value", settings.Theme.ToString());
+            theme.ExecuteNonQuery();
+        }
+        using (SqliteCommand lastGuide = connection.CreateCommand())
+        {
+            lastGuide.Transaction = transaction;
+            lastGuide.CommandText = settings.LastActiveGuideId.HasValue
+                ? """
+                  INSERT INTO Settings (Key, Value) VALUES ('LastActiveGuideId', $value)
+                  ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value
+                  """
+                : "DELETE FROM Settings WHERE Key = 'LastActiveGuideId'";
+            if (settings.LastActiveGuideId is Guid id)
+            {
+                lastGuide.Parameters.AddWithValue("$value", id.ToString("N"));
+            }
+            lastGuide.ExecuteNonQuery();
+        }
+        using (SqliteCommand material = connection.CreateCommand())
+        {
+            material.Transaction = transaction;
+            material.CommandText = """
+                INSERT INTO Settings (Key, Value) VALUES ('WindowMaterial', $value)
+                ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value
+                """;
+            material.Parameters.AddWithValue("$value", settings.WindowMaterial.ToString());
+            material.ExecuteNonQuery();
+        }
     }
 
     public ValueTask DisposeAsync()

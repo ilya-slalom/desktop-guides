@@ -45,7 +45,17 @@ public sealed record ReadingState(
 
 public sealed record ReaderPreferences(Guid GuideId, double? TextScale);
 
-public sealed record AppSettings(ThemePreference Theme, Guid? LastActiveGuideId);
+public enum WindowMaterial
+{
+    Mica,
+    Acrylic,
+    Solid
+}
+
+public sealed record AppSettings(
+    ThemePreference Theme,
+    Guid? LastActiveGuideId,
+    WindowMaterial WindowMaterial = WindowMaterial.Mica);
 
 public sealed record StartupReconciliationReport(
     int ResolvedOperationCount,
