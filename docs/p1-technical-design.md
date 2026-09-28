@@ -637,7 +637,9 @@ project uses a provisional package identity until T17.1 sets the public one.
   adapted, rejected, and Toolkit-dependent candidates. Verify theme resource
   lookup, keyboard focus, UIA names, 200% display scaling, long text, narrow
   width, and high contrast on installed Windows. Capture screenshots for the
-  implementation PR.
+  implementation PR. For the initial T11.4 implementation, the user deferred
+  the 200% display-scaling run to T16.2; the other checks still run now and
+  the deferred gate must remain explicit.
 
 ## 8. Task design: tracking, preferences, and recovery
 

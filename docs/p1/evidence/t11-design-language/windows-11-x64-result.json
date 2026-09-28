@@ -1,0 +1,207 @@
+{
+  "task": "T11.4",
+  "observedAt": "2026-09-28T04:13:45.7172267Z",
+  "status": "passed-with-deferred-scale-matrix",
+  "environment": {
+    "osBuild": "10.0.26200.0",
+    "cpuArchitecture": "AMD64",
+    "dotnetSdk": "10.0.401",
+    "windowsAppRuntime": [
+      "2.2.0.0",
+      "2.3.1.0",
+      "2.4.0.0",
+      "2.5.1.0"
+    ]
+  },
+  "headlessChecks": {
+    "coreTests": {
+      "passed": 73,
+      "failed": 0
+    },
+    "infrastructureTests": {
+      "passed": 90,
+      "failed": 0
+    },
+    "powershellHarnessChecksPassed": 7
+  },
+  "packages": {
+    "x64": {
+      "name": "DesktopGuides.Production_0.1.0.0_x64.msix",
+      "bytes": 66144550,
+      "sha256": "63ADC52C678B6C907E3629424199F162733E7499BB2A2A92E97A70FD9EC434D4",
+      "installedWorkflowPassed": true
+    },
+    "ARM64": {
+      "name": "DesktopGuides.Production_0.1.0.0_arm64.msix",
+      "bytes": 64200509,
+      "sha256": "C2C929F85A138075A370D3324D20838E911F85972314C693F3E2EA8835FF4940",
+      "buildPassed": true,
+      "runtimeTested": false
+    }
+  },
+  "installedWorkflow": {
+    "success": true,
+    "signedPackageSha256": "ABA22BBB87FAC5B63007F9839963E3390AFF83F666395EAB3F06DD138D97C161",
+    "interactiveSessionId": 1,
+    "fullExistingShellRegressionPassed": true,
+    "designLanguage": {
+      "system": {
+        "success": true,
+        "windowDpi": 96,
+        "scalePercent": 100,
+        "phases": [
+          "library",
+          "library-wide-focus-and-heading",
+          "library-narrow",
+          "game-wide-metadata",
+          "game-narrow-long-title",
+          "reader-wide",
+          "reader-narrow",
+          "settings-narrow",
+          "settings-wide"
+        ]
+      },
+      "light": {
+        "success": true,
+        "windowDpi": 96,
+        "scalePercent": 100,
+        "phases": [
+          "library",
+          "library-wide-focus-and-heading",
+          "library-narrow",
+          "game-wide-metadata",
+          "game-narrow-long-title",
+          "reader-wide",
+          "reader-narrow",
+          "settings-narrow",
+          "settings-wide"
+        ]
+      },
+      "dark": {
+        "success": true,
+        "windowDpi": 96,
+        "scalePercent": 100,
+        "phases": [
+          "library",
+          "library-wide-focus-and-heading",
+          "library-narrow",
+          "game-wide-metadata",
+          "game-narrow-long-title",
+          "reader-wide",
+          "reader-narrow",
+          "settings-narrow",
+          "settings-wide"
+        ]
+      },
+      "highContrast": {
+        "success": true,
+        "windowDpi": 96,
+        "scalePercent": 100,
+        "phases": [
+          "library",
+          "library-wide-focus-and-heading",
+          "library-narrow",
+          "game-wide-metadata",
+          "game-narrow-long-title",
+          "reader-wide",
+          "reader-narrow",
+          "settings-narrow",
+          "settings-wide"
+        ]
+      }
+    },
+    "themeLuminance": {
+      "light": 234.55,
+      "dark": 42.13
+    },
+    "highContrast": {
+      "original": {
+        "path": "HKCU:\\Control Panel\\Accessibility\\HighContrast",
+        "flags": 126,
+        "scheme": "",
+        "enabled": false
+      },
+      "enabled": {
+        "path": "HKCU:\\Control Panel\\Accessibility\\HighContrast",
+        "flags": 127,
+        "scheme": "High Contrast Black",
+        "enabled": true
+      },
+      "restored": {
+        "path": "HKCU:\\Control Panel\\Accessibility\\HighContrast",
+        "flags": 126,
+        "scheme": "",
+        "enabled": false
+      }
+    },
+    "appTheme": {
+      "original": {
+        "path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+        "hasValue": true,
+        "value": 1
+      },
+      "restored": {
+        "path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+        "hasValue": true,
+        "value": 1
+      }
+    },
+    "cleanup": {
+      "packageStillInstalled": false,
+      "certificateStillTrusted": false,
+      "profileStillExists": false,
+      "testScheduledTasksStillRegistered": false
+    },
+    "focusedAppearanceRerunAfterRestoreGuard": {
+      "observedAt": "2026-09-28T04:20:46.2796616Z",
+      "success": true,
+      "sourcePackageSha256": "63ADC52C678B6C907E3629424199F162733E7499BB2A2A92E97A70FD9EC434D4",
+      "scalePercent": 100,
+      "restoredHighContrast": {
+        "path": "HKCU:\\Control Panel\\Accessibility\\HighContrast",
+        "flags": 126,
+        "scheme": "",
+        "enabled": false
+      },
+      "restoredAppTheme": {
+        "path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+        "hasValue": true,
+        "value": 1
+      },
+      "packageStillInstalled": false,
+      "certificateStillTrusted": false
+    }
+  },
+  "screenshots": [
+    {
+      "file": "design-dark.reader-wide.png",
+      "bytes": 37798,
+      "sha256": "5FA6502C5FE9140C596967D200C4C9E06B94166DB1F3116F3320BFB1C8843E72"
+    },
+    {
+      "file": "design-high-contrast.game-narrow.png",
+      "bytes": 21908,
+      "sha256": "47EB0AA734E6645A574C498C5BAF7E199EF8C688463D77DECF43F4371A6445BF"
+    },
+    {
+      "file": "design-light.game-narrow.png",
+      "bytes": 29374,
+      "sha256": "3CA3CE16858FAD006BE17CE5B4074B5970A755E49AB6C53D2CB30F147A9FF123"
+    },
+    {
+      "file": "design-light.library-wide.png",
+      "bytes": 33684,
+      "sha256": "1D493660B543B769DC49DE2A8BD0863EC31DAF7C6678AFA3BA8C17F72A47A12C"
+    },
+    {
+      "file": "design-light.settings-narrow.png",
+      "bytes": 22711,
+      "sha256": "3F900D767A6252DFF3B12B3C4A5B499F512FDF40FAE2C0683842FBDDA2A50584"
+    }
+  ],
+  "deferred": {
+    "displayScaling": "200% testing deferred by the user; this run used 96 DPI / 100%.",
+    "windows10Runtime": "Deferred.",
+    "ARM64InstalledWorkflow": "Deferred; package build only in this local run."
+  }
+}

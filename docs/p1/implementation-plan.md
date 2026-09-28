@@ -584,9 +584,9 @@ contract. T07.2 was merged through PR #10 on 27 September 2026, merge
 commit `72f43785fad2b01b3f79b739017f0623d46b6665`. The
 [T04.1 game editor plan](t04-game-editor-plan.md) supplies the manual/offline
 fallback; T04.1 was merged through PR #11 on 28 September 2026, merge commit
-`e18964f1d253746a3e6cdc0d51c659a71a531bc3`. T11.4 is the next UI dependency:
-establish the shared design language before provider, catalog, and import
-surfaces expand. T04.4 then
+`e18964f1d253746a3e6cdc0d51c659a71a531bc3`. T11.4 implementation and available
+Windows 11 x64 verification are complete on its feature branch. The user
+deferred 200% display-scaling verification to T16.2. After T11.4 merges, T04.4
 selects the external metadata provider and implements search-first game
 addition before catalog and import UI consume the enriched Game model.
 
@@ -601,7 +601,7 @@ rather than created speculatively.
 
 | Stage | Dependency | Output and check |
 | --- | --- | --- |
-| T11.4 foundation | T11.1, T11.3 | Design-language note plus semantic XAML resources for type, spacing, surfaces, state, icons, and copy. Representative Library/Game/Reader/Settings layouts pass narrow-width, 200% scale, keyboard-focus, theme, high-contrast, and long-text checks; the PR includes installed screenshots. |
+| T11.4 foundation | T11.1, T11.3 | Design-language note plus semantic XAML resources for type, spacing, surfaces, state, icons, and copy. Representative Library/Game/Reader/Settings layouts pass narrow-width, keyboard-focus, theme, high-contrast, and long-text checks at the host's 100% scale; the PR includes installed screenshots. The deferred 200% scale check moves to T16.2. |
 | T04.4 provider flow | T11.4 and provider decision | Use reviewed search, progress, validation/status, result-row, artwork-fallback, and dialog patterns. Cancellation and manual fallback stay visible and keyboard accessible. |
 | T05.4 catalog/workflow components | T04.4 | Extract only the proven reusable patterns for Library, Game, and import. Virtualization and offline rendering checks prevent a visual component from adding provider calls or an item-permanent control tree. |
 | T14.4 reader/Settings adoption | T05.4, production readers, T14.2 | Apply the same language to reader commands, appearance controls, Settings groups, and teaching/status surfaces without crowding guide content. Theme and focus checks cover TXT, HTML, PDF, and Settings. |
@@ -610,7 +610,7 @@ rather than created speculatively.
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
 | T04.1 | T03.2, T11.1 | Manual/offline Add/Edit game dialogs and validation. Unicode, duplicate-title, optional-field, cancel, and keyboard cases pass without unintended writes. | TR03.1 |
-| T11.4 | T11.1, T11.3 | Reviewed Desktop Guides design language, app-level semantic XAML resources, version-matched Gallery component inventory, and representative responsive route layouts. Installed Windows checks cover system/light/dark/high contrast, keyboard focus, UIA names, 200% scale, long text, and narrow width; the PR includes screenshots. | TR11.3 |
+| T11.4 | T11.1, T11.3 | Reviewed Desktop Guides design language, app-level semantic XAML resources, version-matched Gallery component inventory, and representative responsive route layouts. Installed Windows checks cover system/light/dark/high contrast, keyboard focus, UIA names, long text, and narrow width at 100% scale; the PR includes screenshots. The user-deferred 200% scale check remains in T16.2. | TR11.3 |
 | T04.4 | T03.2, T03.3, T04.1, T11.1, T11.4, T15.2 | Reviewed external-provider decision, schema-v3 migration, and search-first Add game flow using the shared design resources and reviewed Gallery search/result/status patterns. Selection publishes one stable local Game ID, unique provider link, bounded normalized snapshot, and validated managed artwork. Migration rollback, manual/offline fallback, refresh overrides, duplicate ID, timeout/rate-limit, malformed response, cancellation, crash recovery, and disconnected relaunch checks pass without embedded confidential credentials or partial rows/files. | TR04.3, TR04.4, TR11.3 |
 | T05.4 | T04.4, T11.4 | Shared catalog/workflow styles and data templates extracted from proven provider UI for artwork, metadata, progress/status, and empty/loading/error states. Long/localized text, missing artwork, keyboard/UIA, virtualization, narrow-width, and disconnected rendering checks pass without provider requests. | TR05.3, TR11.3 |
 | T04.2 | T04.1, T04.4, T05.4, T11.1 | ID-bound Game detail rename/remove actions. Rename preserves the provider association, Guide IDs, state, and view selection after refresh or restart. | TR03.1, TR04.3 |

@@ -58,6 +58,21 @@ public sealed partial class ShellWindow : Window
             Navigation,
             Navigation.IsPaneOpen ? "Navigation pane open" : "Navigation pane closed");
 
+    private void ShellContentSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        ResourceDictionary resources = Application.Current.Resources;
+        double narrowBreakpoint =
+            (double)resources["DesktopGuidesNarrowBreakpoint"];
+        double wideBreakpoint =
+            (double)resources["DesktopGuidesWideBreakpoint"];
+        string paddingKey = args.NewSize.Width <= narrowBreakpoint
+            ? "DesktopGuidesPagePaddingNarrow"
+            : args.NewSize.Width >= wideBreakpoint
+                ? "DesktopGuidesPagePaddingWide"
+                : "DesktopGuidesPagePadding";
+        ShellContent.Padding = (Thickness)resources[paddingKey];
+    }
+
     public Task InitializeAsync()
     {
         initializationTask = InitializeCoreAsync();
@@ -639,8 +654,10 @@ public sealed partial class ShellWindow : Window
                         return false;
                     }
                     GameList.ItemsSource = games;
-                    LibraryEmpty.Visibility =
+                    LibraryEmptyState.Visibility =
                         games.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+                    GameList.Visibility =
+                        games.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
                     resumeGuideId = resume?.Id;
                     ResumeButton.Visibility =
                         resume is null ? Visibility.Collapsed : Visibility.Visible;
@@ -659,8 +676,10 @@ public sealed partial class ShellWindow : Window
                     GameHeading.Text = "Loading game…";
                     GamePlatform.Text = string.Empty;
                     GameNotes.Text = string.Empty;
+                    GameMetadataSurface.Visibility = Visibility.Collapsed;
                     EditGameButton.IsEnabled = false;
-                    GameEmpty.Visibility = Visibility.Collapsed;
+                    GameEmptyState.Visibility = Visibility.Collapsed;
+                    GuideList.Visibility = Visibility.Collapsed;
                     GuideList.IsEnabled = false;
                     settingGuideSelection = true;
                     try
@@ -693,6 +712,10 @@ public sealed partial class ShellWindow : Window
                     GameHeading.Text = game.Title;
                     GamePlatform.Text = game.Platform ?? string.Empty;
                     GameNotes.Text = game.Notes ?? string.Empty;
+                    GameMetadataSurface.Visibility =
+                        game.Platform is null && game.Notes is null
+                            ? Visibility.Collapsed
+                            : Visibility.Visible;
                     EditGameButton.IsEnabled = true;
                     Guide? selectedGuide = selectedGuideId is Guid id
                         ? guides.FirstOrDefault(item => item.Id == id)
@@ -708,8 +731,10 @@ public sealed partial class ShellWindow : Window
                         settingGuideSelection = false;
                     }
                     GuideList.IsEnabled = true;
-                    GameEmpty.Visibility =
+                    GameEmptyState.Visibility =
                         guides.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+                    GuideList.Visibility =
+                        guides.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
                     UpdateOpenSelectedGuideAction();
                     if (pendingGuideFocus is not null && selectedGuide is not null)
                     {

@@ -1056,3 +1056,51 @@ the passing rerun checked the actual `LocalState\library\library.sqlite`.
 T17.1 still requires the final public Name and certificate Subject, protected
 public signing integration, and an upgrade of public candidate versions.
 The user-deferred runtime-free VM and Windows 10 checks remain T17.3 gates.
+
+## M2 T11.4 design language — implementation check, 28 September 2026
+
+T11.4 adds app-level semantic resources for theme colors, spacing, shape,
+typography, surfaces, lists, buttons, and status presentation. Library, Game,
+Reader, Settings, the game editor, and the reader toolbar consume those
+resources. The representative routes use responsive page padding, bounded
+metadata, native WinUI heading semantics, directed empty states, and compact
+navigation clearance. The
+[design plan](t11-design-language-plan.md) records the chosen quiet field-guide
+direction and the WinUI Gallery revision and component inventory.
+
+On the Windows 11 x64 host at `E:\work\desktop-guides`, 73/73 Core tests,
+90/90 Infrastructure tests, and all seven PowerShell harness checks passed.
+Fresh Release production packages built for x64 and ARM64. The x64 package
+SHA-256 was
+`63ADC52C678B6C907E3629424199F162733E7499BB2A2A92E97A70FD9EC434D4`;
+the ARM64 package SHA-256 was
+`C2C929F85A138075A370D3324D20838E911F85972314C693F3E2EA8835FF4940`.
+The host's missing optional `mspdbcmf.exe` produced only the existing
+symbols-package warning.
+
+The final interactive signed-install run passed the complete existing shell
+regression and all four design-language modes. Each mode checked Library,
+Game, Reader, and Settings at wide and narrow widths, semantic headings,
+focus, UIA names, long metadata, and compact-navigation overlap. Light and
+dark screenshot luminance measured 234.55 and 42.13. High contrast changed
+from disabled flags `126` to enabled flags `127` with `High Contrast Black`,
+then restored exactly. The original light-app preference was also restored.
+The package, package profile, temporary certificate trust, and scheduled
+tasks were absent after cleanup. A subsequent focused appearance rerun passed
+after the restore guard was tightened to avoid a redundant Windows
+high-contrast API call; it restored the same settings and cleanup state.
+
+Selected installed evidence includes the
+[light Library](evidence/t11-design-language/design-light.library-wide.png),
+[narrow Game](evidence/t11-design-language/design-light.game-narrow.png),
+[dark Reader](evidence/t11-design-language/design-dark.reader-wide.png),
+[narrow Settings](evidence/t11-design-language/design-light.settings-narrow.png),
+and [high-contrast Game](evidence/t11-design-language/design-high-contrast.game-narrow.png).
+The sanitized
+[result record](evidence/t11-design-language/windows-11-x64-result.json)
+contains package and screenshot hashes.
+
+The run used the host's current 96 DPI / 100% display scale. The user deferred
+200% display-scaling verification to T16.2. Windows 10 and installed ARM64
+behavior also remain unverified; the local ARM64 result is a package build
+only.

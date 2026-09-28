@@ -3,7 +3,9 @@ param(
     [string] $PackagePath,
 
     [Parameter(Mandatory = $true)]
-    [string] $ResultDirectory
+    [string] $ResultDirectory,
+
+    [switch] $DesignOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -25,6 +27,7 @@ if (Get-AppxPackage -Name DesktopGuides.Preview) {
 Assert-FreshPreviewProfile $env:LOCALAPPDATA
 . (Join-Path $PSScriptRoot 'windows_shell_smoke_result.ps1')
 . (Join-Path $PSScriptRoot 'windows_shell_task_cleanup.ps1')
+Add-Type -Path (Join-Path $PSScriptRoot 'windows_shell_appearance_probe.cs')
 
 New-Item -ItemType Directory -Force $ResultDirectory | Out-Null
 $ResultDirectory = (Resolve-Path $ResultDirectory).Path
@@ -612,8 +615,10 @@ function Assert-AcceptedThenClose {
 function Run-ShellSmoke(
     [string] $mode,
     [string] $expectedResumeGuide = 'Route Test Guide',
-    [int] $ExitDelayMilliseconds = 0) {
-    $resultPath = Join-Path $ResultDirectory "$mode.json"
+    [int] $ExitDelayMilliseconds = 0,
+    [string] $ResultName = $mode,
+    [int] $ExpectedScalePercent = 0) {
+    $resultPath = Join-Path $ResultDirectory "$ResultName.json"
     Clear-ShellSmokeResult $resultPath
     $invocationId = [Guid]::NewGuid().ToString('N')
     $script = Join-Path $PSScriptRoot 'windows_shell_ui_smoke.ps1'
@@ -625,7 +630,8 @@ function Run-ShellSmoke(
         ' -SessionId ' + $targetSessionId +
         ' -ExecutablePath "' + $expectedExecutablePath + '"' +
         ' -ExpectedResumeGuide "' + $expectedResumeGuide + '"' +
-        ' -ExitDelayMilliseconds ' + $ExitDelayMilliseconds
+        ' -ExitDelayMilliseconds ' + $ExitDelayMilliseconds +
+        ' -ExpectedScalePercent ' + $ExpectedScalePercent
     $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
         -Argument $arguments -WorkingDirectory $PSScriptRoot
     Register-ScheduledTask -TaskName $smokeTask -Action $action `
@@ -647,6 +653,176 @@ function Run-ShellSmoke(
         throw "Installed $mode shell smoke failed: $($result.error)"
     }
     return $result
+}
+
+function Get-AppThemePreference {
+    $path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+    $item = Get-ItemProperty -Path $path -ErrorAction SilentlyContinue
+    $hasValue = $item -and
+        $item.PSObject.Properties.Name -contains 'AppsUseLightTheme'
+    return [ordered]@{
+        path = $path
+        hasValue = [bool]$hasValue
+        value = if ($hasValue) { [int]$item.AppsUseLightTheme } else { $null }
+    }
+}
+
+function Set-AppThemePreference([bool] $UseLightTheme) {
+    $path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+    New-Item -Path $path -Force | Out-Null
+    New-ItemProperty -Path $path -Name AppsUseLightTheme `
+        -PropertyType DWord -Value ([int]$UseLightTheme) -Force | Out-Null
+}
+
+function Restore-AppThemePreference($Original) {
+    if ($Original.hasValue) {
+        New-ItemProperty -Path $Original.path -Name AppsUseLightTheme `
+            -PropertyType DWord -Value $Original.value -Force | Out-Null
+    }
+    else {
+        Remove-ItemProperty -Path $Original.path -Name AppsUseLightTheme `
+            -ErrorAction SilentlyContinue
+    }
+}
+
+function Get-HighContrastPreference {
+    $path = 'HKCU:\Control Panel\Accessibility\HighContrast'
+    $item = Get-ItemProperty -Path $path
+    [uint32]$flags = $item.Flags
+    return [ordered]@{
+        path = $path
+        flags = $flags
+        scheme = [string]$item.'High Contrast Scheme'
+        enabled = ($flags -band 1) -ne 0
+    }
+}
+
+function Set-HighContrastPreference($Original, [bool] $Enabled) {
+    [uint32]$flags = $Original.flags
+    if ($Enabled) {
+        $flags = $flags -bor 1
+    }
+    else {
+        $flags = $flags -band ([uint32]::MaxValue - 1)
+    }
+    $scheme = if ($Enabled -and
+        [string]::IsNullOrWhiteSpace($Original.scheme)) {
+        'High Contrast Black'
+    }
+    else {
+        $Original.scheme
+    }
+    [DesktopGuidesAppearanceProbe]::SetHighContrast($flags, $scheme)
+}
+
+function Restore-HighContrastPreference($Original) {
+    $current = Get-HighContrastPreference
+    if ($current.flags -ne $Original.flags -or
+        $current.scheme -ne $Original.scheme -or
+        $current.enabled -ne $Original.enabled) {
+        [DesktopGuidesAppearanceProbe]::SetHighContrast(
+            [uint32]$Original.flags, [string]$Original.scheme)
+    }
+    New-ItemProperty -Path $Original.path -Name Flags `
+        -PropertyType String -Value ([string]$Original.flags) `
+        -Force | Out-Null
+    New-ItemProperty -Path $Original.path -Name 'High Contrast Scheme' `
+        -PropertyType String -Value $Original.scheme -Force | Out-Null
+}
+
+function Get-ScreenshotLuminance([string] $Path) {
+    Add-Type -AssemblyName System.Drawing
+    $bitmap = [System.Drawing.Bitmap]::new($Path)
+    try {
+        $stepX = [Math]::Max(1, [int][Math]::Floor($bitmap.Width / 80))
+        $stepY = [Math]::Max(1, [int][Math]::Floor($bitmap.Height / 60))
+        [double]$total = 0
+        [int]$count = 0
+        for ($y = 0; $y -lt $bitmap.Height; $y += $stepY) {
+            for ($x = 0; $x -lt $bitmap.Width; $x += $stepX) {
+                $color = $bitmap.GetPixel($x, $y)
+                $total += (0.2126 * $color.R) +
+                    (0.7152 * $color.G) +
+                    (0.0722 * $color.B)
+                $count++
+            }
+        }
+        if ($count -eq 0) { throw "Screenshot $Path has no pixels." }
+        return [Math]::Round($total / $count, 2)
+    }
+    finally {
+        $bitmap.Dispose()
+    }
+}
+
+function Run-DesignLanguageScenarios {
+    $originalTheme = Get-AppThemePreference
+    $originalHighContrast = Get-HighContrastPreference
+    $report.originalAppTheme = $originalTheme
+    $report.originalHighContrast = $originalHighContrast
+    if ($originalHighContrast.enabled) {
+        throw 'Design appearance checks require high contrast to be disabled initially.'
+    }
+    try {
+        Start-InstalledShell
+        $report.designLanguageSystem = Run-ShellSmoke `
+            'design-language' -ResultName 'design-system'
+        Close-InstalledShell
+
+        Set-AppThemePreference $true
+        Start-InstalledShell
+        $report.designLanguageLight = Run-ShellSmoke `
+            'design-language' -ResultName 'design-light'
+        Close-InstalledShell
+
+        Set-AppThemePreference $false
+        Start-InstalledShell
+        $report.designLanguageDark = Run-ShellSmoke `
+            'design-language' -ResultName 'design-dark'
+        Close-InstalledShell
+
+        Set-HighContrastPreference $originalHighContrast $true
+        $enabledHighContrast = Get-HighContrastPreference
+        if (-not $enabledHighContrast.enabled) {
+            throw 'Windows did not enable high contrast for the installed check.'
+        }
+        $report.enabledHighContrast = $enabledHighContrast
+        Start-InstalledShell
+        $report.designLanguageHighContrast = Run-ShellSmoke `
+            'design-language' -ResultName 'design-high-contrast'
+        Close-InstalledShell
+
+        $lightLuminance = Get-ScreenshotLuminance `
+            $report.designLanguageLight.libraryWideScreenshot
+        $darkLuminance = Get-ScreenshotLuminance `
+            $report.designLanguageDark.libraryWideScreenshot
+        if ($lightLuminance -le ($darkLuminance + 40)) {
+            throw "Light and dark screenshots did not differ enough: " +
+                "$lightLuminance versus $darkLuminance."
+        }
+        $report.themeLuminance = [ordered]@{
+            light = $lightLuminance
+            dark = $darkLuminance
+        }
+    }
+    finally {
+        try {
+            Restore-HighContrastPreference $originalHighContrast
+            $report.restoredHighContrast = Get-HighContrastPreference
+            if ($report.restoredHighContrast.flags -ne
+                    $originalHighContrast.flags -or
+                $report.restoredHighContrast.scheme -ne
+                    $originalHighContrast.scheme -or
+                $report.restoredHighContrast.enabled -ne
+                    $originalHighContrast.enabled) {
+                throw 'High contrast was not restored to its original state.'
+            }
+        }
+        finally {
+            Restore-AppThemePreference $originalTheme
+            $report.restoredAppTheme = Get-AppThemePreference
+        }
+    }
 }
 
 try {
@@ -711,6 +887,17 @@ try {
     Register-ScheduledTask -TaskName $launchTask -Action $launchAction `
         -Principal $principal -Force | Out-Null
 
+    if ($DesignOnly) {
+        dotnet run --project $seedProject -c Release --no-restore -- `
+            seed-design $dataRoot
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Could not seed the design-language metadata.'
+        }
+        Run-DesignLanguageScenarios
+        $report.success = $true
+        return
+    }
+
     Start-InstalledShell
     $report.empty = Run-ShellSmoke 'empty' -ExitDelayMilliseconds 2000
     $report.emptyAfterDelayedTask = Run-ShellSmoke 'empty'
@@ -756,6 +943,15 @@ try {
     Start-InstalledShell
     Assert-GameSwitchClearsWhileLoading
     Close-InstalledShell
+
+    Get-ChildItem -LiteralPath $dataRoot -Force |
+        Remove-Item -Recurse -Force
+    dotnet run --project $seedProject -c Release --no-restore -- `
+        seed-design $dataRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not seed the design-language metadata.'
+    }
+    Run-DesignLanguageScenarios
     $report.success = $true
 }
 catch {
