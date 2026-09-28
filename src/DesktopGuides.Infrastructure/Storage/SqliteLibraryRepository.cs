@@ -353,11 +353,12 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             }
             else if (key == "WindowMaterial")
             {
+                // An unknown material, such as one from a newer build, falls back to Mica.
                 if (!Enum.TryParse(value, out material) ||
                     !Enum.IsDefined(material) ||
                     material.ToString() != value)
                 {
-                    throw new InvalidDataException("Stored window material is invalid.");
+                    material = WindowMaterial.Mica;
                 }
             }
         }

@@ -631,6 +631,13 @@ try {
         return $selection[0].Current.Name
     }
 
+    function Assert-EffectiveMaterial([string] $material) {
+        $status = (Wait-VisibleById 'WindowMaterialSelector').Current.ItemStatus
+        if ($status -ne $material) {
+            throw "Expected the $material window background to be applied, found '$status'."
+        }
+    }
+
     function Select-ComboItem([string] $id, [string] $name) {
         $combo = Wait-VisibleById $id
         $expand = $combo.GetCurrentPattern(
@@ -879,12 +886,14 @@ try {
         if ($selected -ne $ExpectedMaterial) {
             throw "Expected $ExpectedMaterial window background, found $selected."
         }
+        Assert-EffectiveMaterial $selected
         $report.phases += "material-$selected-restored"
 
         if ($SwitchToMaterial) {
             Select-ComboItem 'WindowMaterialSelector' $SwitchToMaterial
             [void](Wait-Status "Window background set to $SwitchToMaterial.")
             $selected = $SwitchToMaterial
+            Assert-EffectiveMaterial $selected
             $report.phases += "material-switched-$selected"
         }
         [void](Wait-HiddenById 'ShellStatus')

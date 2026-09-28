@@ -597,7 +597,7 @@ public sealed class SqliteLibraryRepositoryTests
     [InlineData("Glass")]
     [InlineData("acrylic")]
     [InlineData("1")]
-    public async Task RejectsInvalidStoredWindowMaterial(string value)
+    public async Task ReadsUnknownStoredWindowMaterialAsMica(string value)
     {
         using TestLibrary directory = new();
         await using SqliteLibraryRepository repository = new(directory.Paths);
@@ -610,9 +610,10 @@ public sealed class SqliteLibraryRepositoryTests
             command.ExecuteNonQuery();
         }
 
-        InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(
-            () => repository.GetSettingsAsync());
-        Assert.Equal("Stored window material is invalid.", error.Message);
+        // A newer build may store a material this one does not know; the next save replaces it.
+        Assert.Equal(WindowMaterial.Mica, (await repository.GetSettingsAsync()).WindowMaterial);
+        await repository.UpdateSettingsAsync(s => s with { WindowMaterial = WindowMaterial.Solid });
+        Assert.Equal(WindowMaterial.Solid, (await repository.GetSettingsAsync()).WindowMaterial);
     }
 
     [Fact]

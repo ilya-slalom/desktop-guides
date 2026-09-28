@@ -45,11 +45,11 @@ public sealed partial class ShellWindow : Window
         Title = "Desktop Guides Preview";
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
-        ApplyWindowMaterial(WindowMaterial.Mica);
         statusDismissTimer = DispatcherQueue.CreateTimer();
         statusDismissTimer.Interval = TimeSpan.FromSeconds(3);
         statusDismissTimer.IsRepeating = false;
         statusDismissTimer.Tick += (_, _) => ShellStatusInfoBar.IsOpen = false;
+        ApplyWindowMaterial(WindowMaterial.Mica);
         Navigation.SelectedItem = LibraryItem;
         GameList.AddHandler(
             UIElement.TappedEvent, new TappedEventHandler(GameTapped), true);
@@ -72,6 +72,9 @@ public sealed partial class ShellWindow : Window
             Navigation,
             Navigation.IsPaneOpen ? "Navigation pane open" : "Navigation pane closed");
 
+    private static string MaterialFallbackMessage(WindowMaterial requested) =>
+        $"{requested} isn't available on this device. Using Solid.";
+
     private void ApplyWindowMaterial(WindowMaterial requested)
     {
         EffectiveMaterial = WindowMaterials.Resolve(requested);
@@ -83,10 +86,15 @@ public sealed partial class ShellWindow : Window
         applyingMaterialSelection = true;
         WindowMaterialSelector.SelectedIndex = (int)requested;
         applyingMaterialSelection = false;
-        if (EffectiveMaterial != requested)
-        {
-            ShowWarningStatus($"{requested} isn't available on this device. Using Solid.");
-        }
+        AutomationProperties.SetItemStatus(
+            WindowMaterialSelector, EffectiveMaterial.ToString());
+        // The card keeps the fallback visible after the transient status is replaced.
+        string description = EffectiveMaterial == requested
+            ? "Choose how much of your desktop shows behind the app."
+            : MaterialFallbackMessage(requested);
+        WindowMaterialSettingsCard.Description = description;
+        AutomationProperties.SetName(
+            WindowMaterialSettingsCard, $"Window background. {description}");
     }
 
     private async void WindowMaterialSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -107,6 +115,10 @@ public sealed partial class ShellWindow : Window
             if (EffectiveMaterial == requested)
             {
                 ShowTransientStatus($"Window background set to {requested}.");
+            }
+            else
+            {
+                ShowWarningStatus(MaterialFallbackMessage(requested));
             }
         }
         catch (Exception error)
@@ -182,17 +194,23 @@ public sealed partial class ShellWindow : Window
             ShowBusyStatus("Loading library...");
             repository = new SqliteLibraryRepository(new ManagedPathResolver(dataRoot));
             await repository.InitializeAsync();
+            WindowMaterial requestedMaterial = WindowMaterial.Mica;
             try
             {
-                ApplyWindowMaterial((await repository.GetSettingsAsync()).WindowMaterial);
+                requestedMaterial = (await repository.GetSettingsAsync()).WindowMaterial;
             }
             catch (InvalidDataException)
             {
-                ShowWarningStatus("Could not read the window background setting. Using Mica.");
+                // Another invalid setting; RenderCurrentAsync reports it.
             }
+            ApplyWindowMaterial(requestedMaterial);
             WindowMaterialSelector.IsEnabled = true;
             ready = true;
             await RenderCurrentAsync();
+            if (EffectiveMaterial != requestedMaterial)
+            {
+                ShowWarningStatus(MaterialFallbackMessage(requestedMaterial));
+            }
         }
         catch (OperationCanceledException) when (closeRequested)
         {
