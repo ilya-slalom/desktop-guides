@@ -36,6 +36,20 @@ try {
         $region.Width -ne 80 -or $region.Height -ne 8) {
         throw "Boundary strip region was wrong: $($region | ConvertTo-Json -Compress)"
     }
+    $solidDialog = [ordered]@{ meanR = 243; meanG = 243; meanB = 243; maxChannelRange = 0 }
+    $fallbackDialog = [ordered]@{ meanR = 249; meanG = 249; meanB = 249; maxChannelRange = 0 }
+    # Real in-app acrylic over gray content: close to Solid, but with noise.
+    $liveDialog = [ordered]@{ meanR = 244.74; meanG = 244.74; meanB = 244.74; maxChannelRange = 3 }
+    $matchedDialog = [ordered]@{ meanR = 244; meanG = 244; meanB = 244; maxChannelRange = 1 }
+    if (-not (Test-AcrylicSurfaceVisible $fallbackDialog $solidDialog)) {
+        throw 'The Acrylic fallback color was not told apart from Solid.'
+    }
+    if (-not (Test-AcrylicSurfaceVisible $liveDialog $solidDialog)) {
+        throw 'The live Acrylic noise was not told apart from Solid.'
+    }
+    if (Test-AcrylicSurfaceVisible $matchedDialog $solidDialog) {
+        throw 'A surface that matched Solid was reported as Acrylic.'
+    }
     if ((Get-ScreenshotLuminance $path) -lt 243) {
         throw 'Luminance of a light image was too low.'
     }

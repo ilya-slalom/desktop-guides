@@ -65,3 +65,13 @@ function Get-BoundaryStripRegion(
         X = $boundary - 40; Y = [int]($WindowHeight - 24); Width = 80; Height = 8
     }
 }
+
+# Acrylic shows as either its fallback color (transparency off) or its noise
+# texture (transparency on); the live tint depends on what is behind it.
+function Test-AcrylicSurfaceVisible($Acrylic, $Solid) {
+    $difference = [Math]::Max([Math]::Abs($Acrylic.meanR - $Solid.meanR),
+        [Math]::Max([Math]::Abs($Acrylic.meanG - $Solid.meanG),
+            [Math]::Abs($Acrylic.meanB - $Solid.meanB)))
+    return $difference -gt 2 -or
+        ($Acrylic.maxChannelRange - $Solid.maxChannelRange) -ge 2
+}

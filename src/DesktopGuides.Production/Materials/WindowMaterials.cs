@@ -17,7 +17,7 @@ internal static class WindowMaterials
     public static SystemBackdrop? CreateBackdrop(WindowMaterial effective) => effective switch
     {
         WindowMaterial.Mica => new MicaBackdrop { Kind = MicaKind.Base },
-        WindowMaterial.Acrylic => new ThinAcrylicBackdrop(),
+        WindowMaterial.Acrylic => new DesktopAcrylicBackdrop(),
         _ => null
     };
 }

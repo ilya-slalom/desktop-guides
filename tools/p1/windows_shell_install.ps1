@@ -760,11 +760,7 @@ function Run-MaterialScenarios {
             }
             $solidDialog = $report.materials["$themeName-Solid"].dialogStrip
             $acrylicDialog = $report.materials["$themeName-Acrylic"].dialogStrip
-            $dialogDifference = [Math]::Max([Math]::Abs($acrylicDialog.meanR - $solidDialog.meanR),
-                [Math]::Max([Math]::Abs($acrylicDialog.meanG - $solidDialog.meanG),
-                    [Math]::Abs($acrylicDialog.meanB - $solidDialog.meanB)))
-            $report.materials["$themeName-dialogDifference"] = $dialogDifference
-            if ($dialogDifference -le 2) {
+            if (-not (Test-AcrylicSurfaceVisible $acrylicDialog $solidDialog)) {
                 throw "The $themeName Acrylic dialog matched the Solid dialog."
             }
         }
