@@ -11,6 +11,8 @@
                             ResourceKey="LayerFillColorDefaultBrush" />
             <StaticResource x:Key="DesktopGuidesElevatedSurfaceBrush"
                             ResourceKey="CardBackgroundFillColorDefaultBrush" />
+            <StaticResource x:Key="DesktopGuidesReadingSurfaceBrush"
+                            ResourceKey="SolidBackgroundFillColorQuarternaryBrush" />
             <StaticResource x:Key="DesktopGuidesBorderBrush"
                             ResourceKey="CardStrokeColorDefaultBrush" />
             <StaticResource x:Key="DesktopGuidesPrimaryTextBrush"
@@ -37,6 +39,8 @@
                             ResourceKey="LayerFillColorDefaultBrush" />
             <StaticResource x:Key="DesktopGuidesElevatedSurfaceBrush"
                             ResourceKey="CardBackgroundFillColorDefaultBrush" />
+            <StaticResource x:Key="DesktopGuidesReadingSurfaceBrush"
+                            ResourceKey="SolidBackgroundFillColorQuarternaryBrush" />
             <StaticResource x:Key="DesktopGuidesBorderBrush"
                             ResourceKey="CardStrokeColorDefaultBrush" />
             <StaticResource x:Key="DesktopGuidesPrimaryTextBrush"
@@ -62,6 +66,8 @@
             <SolidColorBrush x:Key="DesktopGuidesSurfaceBrush"
                              Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="DesktopGuidesElevatedSurfaceBrush"
+                             Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="DesktopGuidesReadingSurfaceBrush"
                              Color="{ThemeResource SystemColorWindowColor}" />
             <SolidColorBrush x:Key="DesktopGuidesBorderBrush"
                              Color="{ThemeResource SystemColorWindowTextColor}" />

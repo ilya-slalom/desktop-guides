@@ -1,6 +1,7 @@
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Navigation;
 using DesktopGuides.Infrastructure.Storage;
+using DesktopGuides.Production.Materials;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -33,7 +34,10 @@ public sealed partial class ShellWindow : Window
     private bool closeRequested;
     private bool allowClose;
     private bool gameEditorRequested;
+    private bool applyingMaterialSelection;
     private GameEditorDialog? activeGameEditor;
+
+    internal WindowMaterial EffectiveMaterial { get; private set; } = WindowMaterial.Solid;
 
     public ShellWindow()
     {
@@ -41,6 +45,7 @@ public sealed partial class ShellWindow : Window
         Title = "Desktop Guides Preview";
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
+        ApplyWindowMaterial(WindowMaterial.Mica);
         statusDismissTimer = DispatcherQueue.CreateTimer();
         statusDismissTimer.Interval = TimeSpan.FromSeconds(3);
         statusDismissTimer.IsRepeating = false;
@@ -66,6 +71,50 @@ public sealed partial class ShellWindow : Window
         AutomationProperties.SetItemStatus(
             Navigation,
             Navigation.IsPaneOpen ? "Navigation pane open" : "Navigation pane closed");
+
+    private void ApplyWindowMaterial(WindowMaterial requested)
+    {
+        EffectiveMaterial = WindowMaterials.Resolve(requested);
+        SystemBackdrop = WindowMaterials.CreateBackdrop(EffectiveMaterial);
+        SolidCanvas.Visibility = EffectiveMaterial == WindowMaterial.Solid
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        // ReaderActions.DialogMaterial = EffectiveMaterial;
+        applyingMaterialSelection = true;
+        WindowMaterialSelector.SelectedIndex = (int)requested;
+        applyingMaterialSelection = false;
+        if (EffectiveMaterial != requested)
+        {
+            ShowWarningStatus($"{requested} isn't available on this device. Using Solid.");
+        }
+    }
+
+    private async void WindowMaterialSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (applyingMaterialSelection ||
+            repository is null ||
+            WindowMaterialSelector.SelectedItem is not ComboBoxItem { Tag: string tag } ||
+            !Enum.TryParse(tag, out WindowMaterial requested))
+        {
+            return;
+        }
+        WindowMaterial previous = e.RemovedItems.FirstOrDefault() is ComboBoxItem { Tag: string old } &&
+            Enum.TryParse(old, out WindowMaterial parsed) ? parsed : WindowMaterial.Mica;
+        ApplyWindowMaterial(requested);
+        try
+        {
+            await repository.UpdateSettingsAsync(s => s with { WindowMaterial = requested });
+            if (EffectiveMaterial == requested)
+            {
+                ShowTransientStatus($"Window background set to {requested}.");
+            }
+        }
+        catch (Exception error)
+        {
+            ApplyWindowMaterial(previous);
+            ShowErrorStatus($"Could not save the window background: {error.Message}");
+        }
+    }
 
     private void ShowBusyStatus(string message) =>
         ShowStatus(message, InfoBarSeverity.Informational, false, false);
@@ -133,6 +182,15 @@ public sealed partial class ShellWindow : Window
             ShowBusyStatus("Loading library...");
             repository = new SqliteLibraryRepository(new ManagedPathResolver(dataRoot));
             await repository.InitializeAsync();
+            try
+            {
+                ApplyWindowMaterial((await repository.GetSettingsAsync()).WindowMaterial);
+            }
+            catch (InvalidDataException)
+            {
+                ShowWarningStatus("Could not read the window background setting. Using Mica.");
+            }
+            WindowMaterialSelector.IsEnabled = true;
             ready = true;
             await RenderCurrentAsync();
         }
@@ -629,7 +687,7 @@ public sealed partial class ShellWindow : Window
                 ShowWarningStatus("This guide is no longer in your library.");
                 return;
             }
-            AppSettings settings = await library.GetSettingsAsync();
+            await library.GetSettingsAsync();
             if (IsSupersededGameGuideIntent(intentVersion))
             {
                 return;
@@ -643,8 +701,8 @@ public sealed partial class ShellWindow : Window
             {
                 try
                 {
-                    await library.SaveSettingsAsync(
-                        settings with { LastActiveGuideId = guide.Id });
+                    await library.UpdateSettingsAsync(
+                        s => s with { LastActiveGuideId = guide.Id });
                 }
                 catch (Exception error)
                 {

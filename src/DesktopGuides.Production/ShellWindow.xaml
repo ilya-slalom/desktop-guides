@@ -4,15 +4,18 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:toolkit="using:CommunityToolkit.WinUI.Controls"
     xmlns:local="using:DesktopGuides.Production">
-    <Window.SystemBackdrop>
-        <MicaBackdrop Kind="Base" />
-    </Window.SystemBackdrop>
-
-    <Grid Background="{ThemeResource DesktopGuidesWindowBackgroundBrush}">
+    <Grid x:Name="ShellRoot"
+          Background="{ThemeResource DesktopGuidesWindowBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
+
+        <Border x:Name="SolidCanvas"
+                Grid.RowSpan="2"
+                Background="{ThemeResource DesktopGuidesCanvasBrush}"
+                Visibility="Collapsed"
+                AutomationProperties.AccessibilityView="Raw" />
 
         <TitleBar x:Name="AppTitleBar"
                   Title="Desktop Guides"
@@ -39,6 +42,20 @@
                     Background="{ThemeResource DesktopGuidesWindowBackgroundBrush}"
                     AutomationProperties.AutomationId="Navigation"
                     ItemInvoked="NavigationInvoked">
+        <NavigationView.Resources>
+            <ResourceDictionary>
+                <ResourceDictionary.ThemeDictionaries>
+                    <ResourceDictionary x:Key="Default">
+                        <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+                        <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="Transparent" />
+                    </ResourceDictionary>
+                    <ResourceDictionary x:Key="HighContrast">
+                        <StaticResource x:Key="NavigationViewContentBackground" ResourceKey="SystemColorWindowColorBrush" />
+                        <StaticResource x:Key="NavigationViewContentGridBorderBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+                    </ResourceDictionary>
+                </ResourceDictionary.ThemeDictionaries>
+            </ResourceDictionary>
+        </NavigationView.Resources>
         <NavigationView.MenuItems>
             <NavigationViewItem x:Name="LibraryItem"
                                 Content="Library"
@@ -277,7 +294,8 @@
                                      Grid.Row="2" />
 
                 <Border Grid.Row="3"
-                        Style="{StaticResource DesktopGuidesElevatedSurfaceStyle}">
+                        Style="{StaticResource DesktopGuidesElevatedSurfaceStyle}"
+                        Background="{ThemeResource DesktopGuidesReadingSurfaceBrush}">
                     <ContentControl x:Name="ReaderSurface">
                         <TextBlock x:Name="ReaderPlaceholder"
                                    Text="Reading this guide is unavailable in this preview."
@@ -305,20 +323,44 @@
                 <ScrollViewer Grid.Row="2"
                               VerticalScrollBarVisibility="Auto"
                               VerticalContentAlignment="Top">
-                    <toolkit:SettingsCard
-                        x:Name="LibraryStorageSettingsCard"
-                        Header="Library storage"
-                        Description="Your library is stored on this device."
-                        HorizontalAlignment="Stretch"
-                        VerticalAlignment="Top"
-                        IsClickEnabled="False"
-                        AutomationProperties.AutomationId="LibraryStorageSettingsCard"
-                        AutomationProperties.Name="Library storage. Your library is stored on this device.">
-                        <toolkit:SettingsCard.HeaderIcon>
-                            <FontIcon Glyph="&#xE8F1;"
-                                      AutomationProperties.AccessibilityView="Raw" />
-                        </toolkit:SettingsCard.HeaderIcon>
-                    </toolkit:SettingsCard>
+                    <StackPanel Spacing="{StaticResource DesktopGuidesSpacing4}">
+                        <toolkit:SettingsCard
+                            x:Name="LibraryStorageSettingsCard"
+                            Header="Library storage"
+                            Description="Your library is stored on this device."
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Top"
+                            IsClickEnabled="False"
+                            AutomationProperties.AutomationId="LibraryStorageSettingsCard"
+                            AutomationProperties.Name="Library storage. Your library is stored on this device.">
+                            <toolkit:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE8F1;"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                            </toolkit:SettingsCard.HeaderIcon>
+                        </toolkit:SettingsCard>
+                        <toolkit:SettingsCard
+                            x:Name="WindowMaterialSettingsCard"
+                            Header="Window background"
+                            Description="Choose how much of your desktop shows behind the app."
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="WindowMaterialSettingsCard"
+                            AutomationProperties.Name="Window background. Choose how much of your desktop shows behind the app.">
+                            <toolkit:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE790;"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                            </toolkit:SettingsCard.HeaderIcon>
+                            <ComboBox x:Name="WindowMaterialSelector"
+                                      MinWidth="160"
+                                      IsEnabled="False"
+                                      SelectionChanged="WindowMaterialSelectionChanged"
+                                      AutomationProperties.AutomationId="WindowMaterialSelector"
+                                      AutomationProperties.Name="Window background">
+                                <ComboBoxItem Content="Mica" Tag="Mica" />
+                                <ComboBoxItem Content="Acrylic" Tag="Acrylic" />
+                                <ComboBoxItem Content="Solid" Tag="Solid" />
+                            </ComboBox>
+                        </toolkit:SettingsCard>
+                    </StackPanel>
                 </ScrollViewer>
             </Grid>
         </Grid>
