@@ -66,12 +66,36 @@ function Get-BoundaryStripRegion(
     }
 }
 
+# A 160x4 strip in a dialog's command area, 8 px below the primary button,
+# in window-relative pixels.
+function Get-DialogStripRegion([double] $ButtonLeft, [double] $ButtonBottom) {
+    return [ordered]@{
+        X = [int]$ButtonLeft; Y = [int]$ButtonBottom + 8; Width = 160; Height = 4
+    }
+}
+
+# True when a strip repeats Solid's fill within one level on every channel,
+# as it does when a layer of ours covers the backdrop. How Windows tints
+# Mica or Acrylic is not checked.
+function Test-MatchesSolidFill($Strip, $Solid) {
+    return [Math]::Abs($Strip.meanR - $Solid.meanR) -le 1 -and
+        [Math]::Abs($Strip.meanG - $Solid.meanG) -le 1 -and
+        [Math]::Abs($Strip.meanB - $Solid.meanB) -le 1
+}
+
+function Get-AcrylicSurfaceDifference($Acrylic, $Solid) {
+    $mean = [Math]::Max([Math]::Abs($Acrylic.meanR - $Solid.meanR),
+        [Math]::Max([Math]::Abs($Acrylic.meanG - $Solid.meanG),
+            [Math]::Abs($Acrylic.meanB - $Solid.meanB)))
+    return [ordered]@{
+        meanDifference = [Math]::Round($mean, 2)
+        rangeDifference = $Acrylic.maxChannelRange - $Solid.maxChannelRange
+    }
+}
+
 # Acrylic shows as either its fallback color (transparency off) or its noise
 # texture (transparency on); the live tint depends on what is behind it.
 function Test-AcrylicSurfaceVisible($Acrylic, $Solid) {
-    $difference = [Math]::Max([Math]::Abs($Acrylic.meanR - $Solid.meanR),
-        [Math]::Max([Math]::Abs($Acrylic.meanG - $Solid.meanG),
-            [Math]::Abs($Acrylic.meanB - $Solid.meanB)))
-    return $difference -gt 2 -or
-        ($Acrylic.maxChannelRange - $Solid.maxChannelRange) -ge 2
+    $difference = Get-AcrylicSurfaceDifference $Acrylic $Solid
+    return $difference.meanDifference -gt 2 -or $difference.rangeDifference -ge 2
 }

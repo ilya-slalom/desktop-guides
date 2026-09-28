@@ -720,16 +720,18 @@ function Measure-LibraryStrip($result) {
         $region.X $region.Y $region.Width $region.Height
     $result | Add-Member -NotePropertyName libraryStrip -NotePropertyValue $strip
     # The dialog command area between the button row and the panel's bottom edge.
-    $dialog = $result.dialogBounds
+    $dialog = Get-DialogStripRegion $result.dialogBounds.buttonLeft `
+        $result.dialogBounds.buttonBottom
     $dialogStrip = Get-ScreenshotRegionStats $result.dialogScreenshot `
-        ([int]$dialog.buttonLeft) ([int]$dialog.buttonBottom + 8) 48 4
+        $dialog.X $dialog.Y $dialog.Width $dialog.Height
     $result | Add-Member -NotePropertyName dialogStrip -NotePropertyValue $dialogStrip
     return $result
 }
 
+# These passes check what the app controls: the material it reports, its own
+# layers, the dialog style, and the stored choice. How Windows renders Mica
+# and Acrylic is not tested.
 function Run-MaterialScenarios {
-    # Calibrated on the Windows 11 x64 host; see t11-materials-plan.md.
-    $acrylicThreshold = 4
     $originalTheme = Get-AppThemePreference
     $report.materials = [ordered]@{}
     try {
@@ -749,17 +751,17 @@ function Run-MaterialScenarios {
                 throw "The $themeName Solid window shows a pane/content seam: " +
                     "range $($solid.maxChannelRange)."
             }
+            # Mica is not checked: with transparency off, Windows draws it in
+            # the same color as our Solid fill.
             $acrylic = $report.materials["$themeName-Acrylic"].libraryStrip
-            $difference = [Math]::Max([Math]::Abs($acrylic.meanR - $solid.meanR),
-                [Math]::Max([Math]::Abs($acrylic.meanG - $solid.meanG),
-                    [Math]::Abs($acrylic.meanB - $solid.meanB)))
-            $report.materials["$themeName-acrylicDifference"] = $difference
-            if ($difference -le $acrylicThreshold) {
-                throw "The $themeName Acrylic backdrop matched Solid " +
-                    "(difference $difference); the backdrop is not visible."
+            if (Test-MatchesSolidFill $acrylic $solid) {
+                throw "The $themeName Acrylic window shows the Solid fill; " +
+                    'an app layer covers the backdrop.'
             }
             $solidDialog = $report.materials["$themeName-Solid"].dialogStrip
             $acrylicDialog = $report.materials["$themeName-Acrylic"].dialogStrip
+            $report.materials["$themeName-dialogDifference"] =
+                Get-AcrylicSurfaceDifference $acrylicDialog $solidDialog
             if (-not (Test-AcrylicSurfaceVisible $acrylicDialog $solidDialog)) {
                 throw "The $themeName Acrylic dialog matched the Solid dialog."
             }

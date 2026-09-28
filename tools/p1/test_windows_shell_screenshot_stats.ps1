@@ -50,6 +50,33 @@ try {
     if (Test-AcrylicSurfaceVisible $matchedDialog $solidDialog) {
         throw 'A surface that matched Solid was reported as Acrylic.'
     }
+    $faintNoiseDialog = [ordered]@{ meanR = 244; meanG = 244; meanB = 244; maxChannelRange = 2 }
+    if (-not (Test-AcrylicSurfaceVisible $faintNoiseDialog $solidDialog)) {
+        throw 'Noise two levels above Solid was not told apart from Solid.'
+    }
+    $difference = Get-AcrylicSurfaceDifference $liveDialog $solidDialog
+    if ($difference.meanDifference -ne 1.74 -or $difference.rangeDifference -ne 3) {
+        throw "Acrylic difference was wrong: $($difference | ConvertTo-Json -Compress)"
+    }
+    # A layer of ours covering the backdrop repeats Solid's fill exactly.
+    $solidStrip = [ordered]@{ meanR = 243; meanG = 243; meanB = 243; maxChannelRange = 0 }
+    $coveredStrip = [ordered]@{ meanR = 243.6; meanG = 242.4; meanB = 244; maxChannelRange = 0 }
+    $micaStrip = [ordered]@{ meanR = 249; meanG = 241; meanB = 234.91; maxChannelRange = 1 }
+    $nearStrip = [ordered]@{ meanR = 243; meanG = 243; meanB = 241.5; maxChannelRange = 0 }
+    if (-not (Test-MatchesSolidFill $coveredStrip $solidStrip)) {
+        throw 'A strip within one level of Solid was not reported as Solid.'
+    }
+    if (Test-MatchesSolidFill $micaStrip $solidStrip) {
+        throw 'A tinted Mica strip was reported as Solid.'
+    }
+    if (Test-MatchesSolidFill $nearStrip $solidStrip) {
+        throw 'A strip 1.5 levels from Solid on one channel was reported as Solid.'
+    }
+    $dialogRegion = Get-DialogStripRegion 530 578
+    if ($dialogRegion.X -ne 530 -or $dialogRegion.Y -ne 586 -or
+        $dialogRegion.Width -ne 160 -or $dialogRegion.Height -ne 4) {
+        throw "Dialog strip region was wrong: $($dialogRegion | ConvertTo-Json -Compress)"
+    }
     if ((Get-ScreenshotLuminance $path) -lt 243) {
         throw 'Luminance of a light image was too low.'
     }
