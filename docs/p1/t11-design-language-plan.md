@@ -123,8 +123,9 @@ themes. Each appearance run covered Library, Game, Reader, and Settings at
 wide and narrow window sizes, heading semantics, keyboard focus, UIA names,
 long metadata, and control overlap. The host reported 96 DPI / 100% scaling.
 
-The same source passed 73 Core tests, 90 Infrastructure tests, and seven
-PowerShell harness checks. The sanitized
+The same source passed 73 Core tests, 90 Infrastructure tests, seven
+PowerShell harness checks, and the complete linked reader-toolbar installed
+regression. The sanitized
 [Windows result](evidence/t11-design-language/windows-11-x64-result.json) and
 selected installed screenshots are retained with the task evidence. Windows
 10, installed ARM64 behavior, and 200% display scaling remain unverified.

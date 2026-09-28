@@ -1072,9 +1072,9 @@ On the Windows 11 x64 host at `E:\work\desktop-guides`, 73/73 Core tests,
 90/90 Infrastructure tests, and all seven PowerShell harness checks passed.
 Fresh Release production packages built for x64 and ARM64. The x64 package
 SHA-256 was
-`63ADC52C678B6C907E3629424199F162733E7499BB2A2A92E97A70FD9EC434D4`;
+`58D725F2AEF26AFEDF72B7223DD377C13F70DAF93C63DD4DA933ADC1B7763466`;
 the ARM64 package SHA-256 was
-`C2C929F85A138075A370D3324D20838E911F85972314C693F3E2EA8835FF4940`.
+`56D7CD562F3E9FB1234E4D3DBC7F58D4964192319C2A74AB3734F672D0334EE9`.
 The host's missing optional `mspdbcmf.exe` produced only the existing
 symbols-package warning.
 
@@ -1082,13 +1082,16 @@ The final interactive signed-install run passed the complete existing shell
 regression and all four design-language modes. Each mode checked Library,
 Game, Reader, and Settings at wide and narrow widths, semantic headings,
 focus, UIA names, long metadata, and compact-navigation overlap. Light and
-dark screenshot luminance measured 234.55 and 42.13. High contrast changed
+dark screenshot luminance measured 237.8 and 45.37. High contrast changed
 from disabled flags `126` to enabled flags `127` with `High Contrast Black`,
 then restored exactly. The original light-app preference was also restored.
 The package, package profile, temporary certificate trust, and scheduled
-tasks were absent after cleanup. A subsequent focused appearance rerun passed
-after the restore guard was tightened to avoid a redundant Windows
-high-contrast API call; it restored the same settings and cleanup state.
+tasks were absent after cleanup.
+
+The linked reader-toolbar package includes the shared design token dictionary
+and retains the native command label position so wide layouts keep `Zoom in`
+visible. Its installed Windows run passed overlap ownership, simulated timeout
+cleanup, all toolbar commands, and the 31-second delayed install/receipt path.
 
 Selected installed evidence includes the
 [light Library](evidence/t11-design-language/design-light.library-wide.png),

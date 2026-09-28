@@ -1,6 +1,6 @@
 {
   "task": "T11.4",
-  "observedAt": "2026-09-28T04:13:45.7172267Z",
+  "observedAt": "2026-09-28T04:37:09.5796219Z",
   "status": "passed-with-deferred-scale-matrix",
   "environment": {
     "osBuild": "10.0.26200.0",
@@ -27,21 +27,21 @@
   "packages": {
     "x64": {
       "name": "DesktopGuides.Production_0.1.0.0_x64.msix",
-      "bytes": 66144550,
-      "sha256": "63ADC52C678B6C907E3629424199F162733E7499BB2A2A92E97A70FD9EC434D4",
+      "bytes": 66144548,
+      "sha256": "58D725F2AEF26AFEDF72B7223DD377C13F70DAF93C63DD4DA933ADC1B7763466",
       "installedWorkflowPassed": true
     },
     "ARM64": {
       "name": "DesktopGuides.Production_0.1.0.0_arm64.msix",
-      "bytes": 64200509,
-      "sha256": "C2C929F85A138075A370D3324D20838E911F85972314C693F3E2EA8835FF4940",
+      "bytes": 64200504,
+      "sha256": "56D7CD562F3E9FB1234E4D3DBC7F58D4964192319C2A74AB3734F672D0334EE9",
       "buildPassed": true,
       "runtimeTested": false
     }
   },
   "installedWorkflow": {
     "success": true,
-    "signedPackageSha256": "ABA22BBB87FAC5B63007F9839963E3390AFF83F666395EAB3F06DD138D97C161",
+    "signedPackageSha256": "69FCF633D11CCB16766D7BD1BA30AEB486CBE0B968F4CEC4C4B0CAE319791FA6",
     "interactiveSessionId": 1,
     "fullExistingShellRegressionPassed": true,
     "designLanguage": {
@@ -111,8 +111,14 @@
       }
     },
     "themeLuminance": {
-      "light": 234.55,
-      "dark": 42.13
+      "light": 237.8,
+      "dark": 45.37
+    },
+    "readerToolbarRegression": {
+      "success": true,
+      "packageSha256": "63A4306E6876C8E65C23DFD0988EED973A41B31D8931F50F819B9087DA26AEAF",
+      "overlapAndTimeoutCleanup": "passed",
+      "delayedInstallAndReceipt": "passed"
     },
     "highContrast": {
       "original": {
@@ -151,52 +157,33 @@
       "certificateStillTrusted": false,
       "profileStillExists": false,
       "testScheduledTasksStillRegistered": false
-    },
-    "focusedAppearanceRerunAfterRestoreGuard": {
-      "observedAt": "2026-09-28T04:20:46.2796616Z",
-      "success": true,
-      "sourcePackageSha256": "63ADC52C678B6C907E3629424199F162733E7499BB2A2A92E97A70FD9EC434D4",
-      "scalePercent": 100,
-      "restoredHighContrast": {
-        "path": "HKCU:\\Control Panel\\Accessibility\\HighContrast",
-        "flags": 126,
-        "scheme": "",
-        "enabled": false
-      },
-      "restoredAppTheme": {
-        "path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
-        "hasValue": true,
-        "value": 1
-      },
-      "packageStillInstalled": false,
-      "certificateStillTrusted": false
     }
   },
   "screenshots": [
     {
       "file": "design-dark.reader-wide.png",
-      "bytes": 37798,
-      "sha256": "5FA6502C5FE9140C596967D200C4C9E06B94166DB1F3116F3320BFB1C8843E72"
+      "bytes": 30823,
+      "sha256": "BEFC52A3E9128D9129ABD6F451158845B87551EFA36504DA7E6674C83289D647"
     },
     {
       "file": "design-high-contrast.game-narrow.png",
-      "bytes": 21908,
-      "sha256": "47EB0AA734E6645A574C498C5BAF7E199EF8C688463D77DECF43F4371A6445BF"
+      "bytes": 21932,
+      "sha256": "419AFD7DC33443DA641CB2A956C736089F9E5BC8E867E1DDD99E88F418A63E55"
     },
     {
       "file": "design-light.game-narrow.png",
-      "bytes": 29374,
-      "sha256": "3CA3CE16858FAD006BE17CE5B4074B5970A755E49AB6C53D2CB30F147A9FF123"
+      "bytes": 27434,
+      "sha256": "69CA7F0ED29C1419053366763D6452573CC9932C1A72F5B206F0F3631EC90A82"
     },
     {
       "file": "design-light.library-wide.png",
-      "bytes": 33684,
-      "sha256": "1D493660B543B769DC49DE2A8BD0863EC31DAF7C6678AFA3BA8C17F72A47A12C"
+      "bytes": 26489,
+      "sha256": "A04658B5DDE6466306AD6D16DC30BD57D47DFFAD1AC1BCE32A72BB7A2CD4CE70"
     },
     {
       "file": "design-light.settings-narrow.png",
-      "bytes": 22711,
-      "sha256": "3F900D767A6252DFF3B12B3C4A5B499F512FDF40FAE2C0683842FBDDA2A50584"
+      "bytes": 21255,
+      "sha256": "C5E606D9E25D322D7DA52C380F0553231F2E71665A7068E5629A8E66EC965173"
     }
   ],
   "deferred": {
