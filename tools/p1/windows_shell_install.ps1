@@ -28,6 +28,7 @@ Assert-FreshPreviewProfile $env:LOCALAPPDATA
 . (Join-Path $PSScriptRoot 'windows_shell_smoke_result.ps1')
 . (Join-Path $PSScriptRoot 'windows_shell_task_cleanup.ps1')
 . (Join-Path $PSScriptRoot 'windows_shell_screenshot_stats.ps1')
+. (Join-Path $PSScriptRoot 'windows_shell_theme_preference.ps1')
 
 New-Item -ItemType Directory -Force $ResultDirectory | Out-Null
 $ResultDirectory = (Resolve-Path $ResultDirectory).Path
@@ -661,36 +662,6 @@ function Run-ShellSmoke(
         throw "Installed $mode shell smoke failed: $($result.error)"
     }
     return $result
-}
-
-function Get-AppThemePreference {
-    $path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
-    $item = Get-ItemProperty -Path $path -ErrorAction SilentlyContinue
-    $hasValue = $item -and
-        $item.PSObject.Properties.Name -contains 'AppsUseLightTheme'
-    return [ordered]@{
-        path = $path
-        hasValue = [bool]$hasValue
-        value = if ($hasValue) { [int]$item.AppsUseLightTheme } else { $null }
-    }
-}
-
-function Set-AppThemePreference([bool] $UseLightTheme) {
-    $path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
-    New-Item -Path $path -Force | Out-Null
-    New-ItemProperty -Path $path -Name AppsUseLightTheme `
-        -PropertyType DWord -Value ([int]$UseLightTheme) -Force | Out-Null
-}
-
-function Restore-AppThemePreference($Original) {
-    if ($Original.hasValue) {
-        New-ItemProperty -Path $Original.path -Name AppsUseLightTheme `
-            -PropertyType DWord -Value $Original.value -Force | Out-Null
-    }
-    else {
-        Remove-ItemProperty -Path $Original.path -Name AppsUseLightTheme `
-            -ErrorAction SilentlyContinue
-    }
 }
 
 function Run-DesignLanguageScenarios {

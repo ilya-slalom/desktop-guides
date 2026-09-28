@@ -87,6 +87,9 @@ jobs:
       - name: Check screenshot statistics
         shell: pwsh
         run: ./tools/p1/test_windows_shell_screenshot_stats.ps1
+      - name: Check app theme preference restore
+        shell: pwsh
+        run: ./tools/p1/test_windows_shell_theme_preference.ps1
       - name: Check toolbar smoke result identity
         shell: pwsh
         run: ./tools/p1/test_windows_reader_toolbar_smoke_result.ps1
