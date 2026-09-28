@@ -1118,34 +1118,51 @@ User review asked for a seamless backdrop, a working dark Acrylic, and dialogs
 that match the window. The window backdrop now runs unbroken behind the title
 bar, navigation pane, and route background, because the `NavigationView`
 content layer and its border are transparent. A Settings `Window background`
-card stores Mica (default), Thin Acrylic, or Solid in SQLite `AppSettings`
-through an atomic read-modify-write; unsupported materials fall back to Solid
-with a warning. The Thin Acrylic controller keeps the default system backdrop
-configuration, so it follows the app theme and turns solid while the window is
-inactive. The reader page uses the opaque
+card stores Mica (default), Acrylic, or Solid in SQLite `AppSettings` through
+an atomic read-modify-write; unsupported materials fall back to Solid with a
+warning. Acrylic uses the Base `DesktopAcrylicBackdrop` with the default
+system backdrop configuration, so it follows the app theme and turns solid
+while the window is inactive. The reader page uses the opaque
 `SolidBackgroundFillColorQuarternaryBrush`. In Acrylic mode, `ContentDialog`
 uses in-app acrylic; in Mica and Solid it keeps the default dialog.
 
-From a fresh snapshot of commit `4255907` on the same host: locked restores,
-73/73 Core tests, 98/98 Infrastructure tests, and all eight PowerShell harness
-checks passed, and Release packages built for x64 and ARM64. The x64 package
-SHA-256 was
-`F4AF1A8B1EC646A6FD7E909C46554853B6033F3634C15AE4551EE17D2448B34D`;
+Earlier material evidence was captured without translucency. From `279dfe1`
+to `8bc7e5d`, the harness recreated the `Personalize` registry key when it
+switched the app theme, which deleted the host's transparency setting and its
+other values. Those screenshots showed backdrop fallback colors, so they did
+not prove that Mica or Acrylic let the desktop through. `8bc7e5d` fixed the
+harness; the runs below kept every `Personalize` value. With real translucency,
+Thin Acrylic in light theme over a dark window measured 2.4:1 for secondary
+text and 3.0:1 for body text, so Acrylic now uses Base acrylic.
+
+From a snapshot of `fb3a393` on the same host, with transparency
+effects on: locked restores, 73/73 Core tests, 98/98 Infrastructure tests,
+and all nine PowerShell harness checks passed, and Release packages built for
+x64 and ARM64. The x64 package SHA-256 was
+`66F47172063DC409E7A46E069502288904935B3F0E369DAF2E5C0881C7DA0469`;
 the ARM64 package SHA-256 was
-`9C568AEB38510E112E5FCA29F21BE6FCAE636115554F4D570600742F05F326D5`.
-The interactive design-only run and then the full signed-install regression
-passed. Both ran the system, light, and dark design-language modes and six
-material passes: light and dark × Solid, Acrylic, and Mica, plus a
-switch-and-relaunch check. A strip across the pane/content boundary had a
-channel range of 0 in every pass, so no seam was visible. Acrylic differed from
-Solid by 32 in light and 52 in dark (threshold 4), and the Acrylic edit-game
-command band differed from Solid by 6 and 12 (threshold 2). Mica matched Solid
-on this host's wallpaper and is not asserted. The harness restored the stored
-material to Mica and the light-app preference. Afterward, the package,
-certificate trust, and scheduled tasks were gone, and the high-contrast flags
-(`126`) and active `Custom.theme` were unchanged. The reader-toolbar installed
-smoke passed all eight phases, including focus restoration after the page and
-find dialogs.
+`C54A32880EE1A568848AAD0B603F6C9C6BC32613F15F61C53607BD0275685451`.
+The full signed-install regression passed. It ran the system, light, and dark
+design-language modes and six material passes: light and dark × Solid,
+Acrylic, and Mica, plus a switch-and-relaunch check. A strip across the
+pane/content boundary had a channel range of 0 for Solid, so no seam was
+visible. Mica showed the wallpaper tint (light 249/241/235 and dark 35/31/28,
+against Solid 243 and 32). With a dark console window behind the app, Acrylic
+measured 214 in light and 42 in dark, against Solid 243 and 32 (threshold 4).
+Light Acrylic text measured 5.46:1 for secondary text and 12.34:1 for body
+text. The Acrylic edit-game command band showed the in-app acrylic noise
+(channel range 3, Solid 0); the check accepts that noise or the fallback
+color, because live in-app acrylic takes its tint from the content behind it.
+
+A second interactive run switched the Windows app theme while the app stayed
+open. Library luminance followed from 46 to 209 and back to 46, and with Edit
+game open from 41 to 168 and back to 41. With transparency effects turned off,
+Mica matched Solid and Acrylic showed its fallback color (249 light, 44 dark);
+the run then restored the setting. After each run, the package, certificate
+trust, and scheduled tasks were gone, and the `Personalize` values, the
+high-contrast flags (`126`), and the active `Custom.theme` were unchanged.
+The reader-toolbar installed smoke passed all eight phases, including focus
+restoration after the page and find dialogs.
 
 High contrast moves to T16.2: enabling it makes Windows rewrite the active
 theme to `Custom.theme`, which this harness cannot restore. Optional colorful
@@ -1155,7 +1172,7 @@ Gallery has no colored icon set.
 Selected installed evidence includes the
 [wide](evidence/t11-design-language/design-light.library-wide.png) and
 [narrow](evidence/t11-design-language/design-light.library-narrow.png) light
-Library, the [dark Acrylic Library](evidence/t11-design-language/material-dark-acrylic.library.png),
+Library, the [light Acrylic Library](evidence/t11-design-language/material-light-acrylic.library.png), [dark Acrylic Library](evidence/t11-design-language/material-dark-acrylic.library.png),
 [dark Acrylic Reader](evidence/t11-design-language/material-dark-acrylic.reader.png),
 [dark Acrylic Edit game](evidence/t11-design-language/material-dark-acrylic.edit-game.png),
 [light Solid Library](evidence/t11-design-language/material-light-solid.library.png),

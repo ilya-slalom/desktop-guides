@@ -56,7 +56,7 @@ High contrast overrides the app aliases with Windows system window, text,
 highlight, and hotlight colors. No page owns a fixed foreground/background
 pair. The window backdrop runs unbroken behind the title bar, navigation pane,
 and route background; the `NavigationView` content layer and its border are
-transparent. A Settings choice selects Mica (default), Thin Acrylic, or Solid.
+transparent. A Settings choice selects Mica (default), Acrylic, or Solid.
 Unsupported materials fall back to Solid with a warning. The backdrop follows
 the app theme and turns solid while the window is inactive. Reading surfaces,
 cards, and dialogs stay opaque or card-filled so text never sits directly on
@@ -152,15 +152,20 @@ selected installed screenshots are retained with the task evidence. Windows
 
 The window-material follow-up replaced the high-contrast pass, which rewrote
 the host's active Windows theme, with material passes; high contrast moves to
-T16.2. The design-only installed run covered system, light, and dark, then
-Solid, Acrylic, and Mica in light and dark, plus a Mica-to-Acrylic switch that
-persisted across relaunch. An 80×8 strip across the pane/content boundary had
-a channel range of 0 in every material, so no seam shows. Acrylic differed from
-Solid by 32 (light) and 52 (dark) channel levels against a threshold of 4,
-which also confirms that dark-theme acrylic now renders. The Acrylic dialog's
-command area differed from the Solid dialog by 6 (light) and 12 (dark) against
-a threshold of 2; its content area keeps WinUI's native overlay, so no template
-resource is overridden. Mica matched Solid on this host's neutral wallpaper,
-which the harness does not assert. The same source passed 73 Core tests, 98
-Infrastructure tests, eight PowerShell harness checks, x64 and ARM64 package
-builds, and the linked reader toolbar installed smoke.
+T16.2. Earlier material runs deleted the host's transparency setting when they
+switched the app theme, so their screenshots showed backdrop fallback colors;
+`8bc7e5d` fixed the harness. With transparency effects on, the installed run
+covered system, light, and dark, then Solid, Acrylic, and Mica in light and
+dark, plus a Mica-to-Acrylic switch that persisted across relaunch. An 80×8
+strip across the pane/content boundary had a channel range of 0 for Solid, so
+no seam shows. Mica showed the wallpaper tint. Thin Acrylic over a dark window
+left light-theme text at 2.4:1 to 3.0:1, so Acrylic now uses Base acrylic,
+which differed from Solid by 29 (light) and 10 (dark) channel levels against a
+threshold of 4 and kept light text at 5.46:1 or better. The Acrylic dialog's
+command area showed in-app acrylic noise that the Solid dialog lacks; its
+content area keeps WinUI's native overlay, so no template resource is
+overridden. A live Windows theme switch updated the open window and the Edit
+game dialog, and with transparency off Mica matched Solid and Acrylic showed
+its fallback color. The same source passed 73 Core tests, 98 Infrastructure
+tests, nine PowerShell harness checks, x64 and ARM64 package builds, and the
+linked reader toolbar installed smoke.

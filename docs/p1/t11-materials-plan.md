@@ -18,6 +18,14 @@ when the window is inactive. The setting is stored as a new key in the existing
 key/value `Settings` table and written through a new atomic
 `UpdateSettingsAsync`.
 
+> **Amendment (29 September 2026):** Verification with Windows transparency
+> effects on showed that Thin acrylic in light theme over a dark window leaves
+> text at 2.4:1 to 3.0:1 contrast. Acrylic now uses the Base
+> `DesktopAcrylicBackdrop`, and `ThinAcrylicBackdrop` was removed. The
+> Acrylic dialog check also accepts in-app acrylic noise, because live in-app
+> acrylic takes its tint from the content behind it. See
+> [results](results.md#window-materials-follow-up).
+
 **Tech Stack:** .NET 10, WinUI 3 / Windows App SDK 2.5.1, Community Toolkit
 `SettingsControls` 8.2.251219, SQLite (Microsoft.Data.Sqlite), xUnit, and
 PowerShell UI Automation harnesses run on the Windows 11 x64 host.

@@ -1,6 +1,6 @@
 {
   "task": "T11.4",
-  "observedAt": "2026-09-28T13:11:22.7125473Z",
+  "observedAt": "2026-09-28T15:24:11.7523860Z",
   "status": "passed-with-deferred-scale-and-high-contrast",
   "environment": {
     "osBuild": "10.0.26200.0",
@@ -13,7 +13,7 @@
       "2.5.1.0"
     ]
   },
-  "sourceCommit": "4255907",
+  "sourceCommit": "fb3a393",
   "headlessChecks": {
     "coreTests": {
       "passed": 73,
@@ -23,27 +23,27 @@
       "passed": 98,
       "failed": 0
     },
-    "powershellHarnessChecksPassed": 8,
+    "powershellHarnessChecksPassed": 9,
     "lockedRestoresPassed": true
   },
   "packages": {
     "x64": {
       "name": "DesktopGuides.Production_0.1.0.0_x64.msix",
-      "bytes": 66337896,
-      "sha256": "F4AF1A8B1EC646A6FD7E909C46554853B6033F3634C15AE4551EE17D2448B34D",
+      "bytes": 66337779,
+      "sha256": "66F47172063DC409E7A46E069502288904935B3F0E369DAF2E5C0881C7DA0469",
       "installedWorkflowPassed": true
     },
     "ARM64": {
       "name": "DesktopGuides.Production_0.1.0.0_arm64.msix",
-      "bytes": 64393702,
-      "sha256": "9C568AEB38510E112E5FCA29F21BE6FCAE636115554F4D570600742F05F326D5",
+      "bytes": 64393570,
+      "sha256": "C54A32880EE1A568848AAD0B603F6C9C6BC32613F15F61C53607BD0275685451",
       "buildPassed": true,
       "runtimeTested": false
     }
   },
   "installedWorkflow": {
     "success": true,
-    "signedPackageSha256": "9FFD2BF1A522407A3A1B995708BAC6260DCE8F1B59EA153F4BD6E019F73F3D27",
+    "signedPackageSha256": "271364F3EB48FBC957469E734C0EE453D6D036B5C99FE1CCE7C004C8F8F2A229",
     "interactiveSessionId": 1,
     "fullExistingShellRegressionPassed": true,
     "designLanguage": {
@@ -97,14 +97,14 @@
       }
     },
     "themeLuminance": {
-      "light": 236.93,
-      "dark": 37.81
+      "light": 236.73,
+      "dark": 37.75
     },
     "windowMaterials": {
       "thresholds": {
         "solidStripMaxChannelRange": 2,
         "acrylicDifferenceGreaterThan": 4,
-        "dialogDifferenceGreaterThan": 2
+        "dialogAcrylicVisibleWhen": "mean difference from Solid > 2 (fallback color) or noise range at least 2 above Solid (live in-app acrylic)"
       },
       "passes": {
         "light-Solid": {
@@ -149,9 +149,9 @@
             "contentLeft": 779
           },
           "libraryStrip": {
-            "meanR": 211,
-            "meanG": 211,
-            "meanB": 211,
+            "meanR": 214,
+            "meanG": 214,
+            "meanB": 214,
             "maxChannelRange": 0
           },
           "dialogBounds": {
@@ -159,10 +159,10 @@
             "buttonBottom": 578
           },
           "dialogStrip": {
-            "meanR": 249,
-            "meanG": 249,
-            "meanB": 249,
-            "maxChannelRange": 0
+            "meanR": 244.74,
+            "meanG": 244.74,
+            "meanB": 244.74,
+            "maxChannelRange": 3
           }
         },
         "light-Mica": {
@@ -178,10 +178,10 @@
             "contentLeft": 779
           },
           "libraryStrip": {
-            "meanR": 243,
-            "meanG": 243,
-            "meanB": 243,
-            "maxChannelRange": 0
+            "meanR": 249,
+            "meanG": 241,
+            "meanB": 234.91,
+            "maxChannelRange": 1
           },
           "dialogBounds": {
             "buttonLeft": 530,
@@ -194,8 +194,7 @@
             "maxChannelRange": 0
           }
         },
-        "light-acrylicDifference": 32,
-        "light-dialogDifference": 6,
+        "light-acrylicDifference": 29,
         "dark-Solid": {
           "success": true,
           "phases": [
@@ -238,9 +237,9 @@
             "contentLeft": 779
           },
           "libraryStrip": {
-            "meanR": 84,
-            "meanG": 84,
-            "meanB": 84,
+            "meanR": 42,
+            "meanG": 42,
+            "meanB": 42,
             "maxChannelRange": 0
           },
           "dialogBounds": {
@@ -248,10 +247,10 @@
             "buttonBottom": 578
           },
           "dialogStrip": {
-            "meanR": 44,
-            "meanG": 44,
-            "meanB": 44,
-            "maxChannelRange": 0
+            "meanR": 45.58,
+            "meanG": 45.58,
+            "meanB": 45.58,
+            "maxChannelRange": 3
           }
         },
         "dark-Mica": {
@@ -267,10 +266,10 @@
             "contentLeft": 779
           },
           "libraryStrip": {
-            "meanR": 32,
-            "meanG": 32,
-            "meanB": 32,
-            "maxChannelRange": 0
+            "meanR": 35,
+            "meanG": 31,
+            "meanB": 27.67,
+            "maxChannelRange": 1
           },
           "dialogBounds": {
             "buttonLeft": 530,
@@ -283,8 +282,7 @@
             "maxChannelRange": 0
           }
         },
-        "dark-acrylicDifference": 52,
-        "dark-dialogDifference": 12
+        "dark-acrylicDifference": 10
       },
       "switchAndRelaunch": {
         "switched": {
@@ -307,12 +305,14 @@
       },
       "storedMaterialRestoredTo": "Mica",
       "notes": [
-        "Mica matched Solid in both themes on this host wallpaper; the harness asserts Acrylic and dialog differences only."
+        "Captured with Windows transparency effects on. Mica shows the wallpaper tint (light 249/241/235, dark 35/31/28 against Solid 243 and 32).",
+        "Acrylic is Base desktop acrylic. With a dark console behind the window it measured 214 in light and 42 in dark; its transparency-off fallback is 249 and 44.",
+        "Light Acrylic text contrast over that dark window: secondary text 5.46:1, body text 12.34:1 (Thin acrylic measured 2.4:1 and 3.0:1 before the switch to Base)."
       ]
     },
     "readerToolbarRegression": {
       "success": true,
-      "packageSha256": "A59B678514266308BE6935F8DE66897BBD383740B6E4962058D9F40CBB32CDD4",
+      "packageSha256": "2877A33D4BA452CA533D3A0268AFFEFF4190647994C64943E7866DFA4A58921F",
       "phases": [
         "initial-no-session-capabilities",
         "worker-capability-change-text-dispatch",
@@ -330,12 +330,12 @@
       "original": {
         "path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
         "hasValue": true,
-        "value": 1
+        "value": 0
       },
       "restored": {
         "path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
         "hasValue": true,
-        "value": 1
+        "value": 0
       }
     },
     "cleanup": {
@@ -343,7 +343,12 @@
       "certificateStillTrusted": false,
       "testScheduledTasksStillRegistered": false,
       "hostHighContrastFlagsUnchanged": 126,
-      "hostActiveThemeUnchanged": "Custom.theme"
+      "hostActiveThemeUnchanged": "Custom.theme",
+      "hostPersonalizeValuesPreserved": {
+        "AppsUseLightTheme": 0,
+        "EnableTransparency": 1,
+        "ColorPrevalence": 0
+      }
     },
     "windowChrome": {
       "nativeTitleBarBackAndPaneActionsPassed": true,
@@ -355,123 +360,146 @@
       "persistentAutomationStatusSequenced": true,
       "settingsCardTopAlignmentReviewed": true,
       "seamlessBackdropPassed": true
+    },
+    "transparencyChecks": {
+      "liveThemeSwitchLuminance": {
+        "library": [
+          46.32,
+          208.99,
+          46.47
+        ],
+        "editGameDialog": [
+          41.06,
+          168.11,
+          41.04
+        ]
+      },
+      "transparencyOffLibraryStrip": {
+        "light-Solid": 243,
+        "light-Mica": 243,
+        "light-Acrylic": 249,
+        "dark-Solid": 32,
+        "dark-Mica": 32,
+        "dark-Acrylic": 44
+      },
+      "hostTransparencyRestored": true
     }
   },
   "screenshots": [
     {
       "file": "design-dark.library-narrow.png",
-      "bytes": 18087,
-      "sha256": "8D2F26B68D7C9565F3C6064415CD9A0B8A843010F74D538F4D5BF217800DC4B1"
+      "bytes": 49138,
+      "sha256": "0D2835A0C26BB2396BCFD924A000A5CFC45635C131FBD9E0A091D32569D7A065"
     },
     {
       "file": "design-dark.library-wide.png",
-      "bytes": 23736,
-      "sha256": "10D26648953DF6F2923D62A9E8A6A6A1FB1290D2B5BF510538E40AA1D747321E"
+      "bytes": 93225,
+      "sha256": "DF6412704BB1D55FC4A421731173962C570A3007831D18BC0F7FE5F9485C4043"
     },
     {
       "file": "design-light.library-narrow.png",
-      "bytes": 18015,
-      "sha256": "924035CFB87DB39CFE6FE3366686DA03A0EDCF7AE8EE0848DF5650F420DC3EF4"
+      "bytes": 56939,
+      "sha256": "711EDDDBF18E36393022C22162C32A21F28C2A62974FED8355FB66BDA3F2A620"
     },
     {
       "file": "design-light.library-wide.png",
-      "bytes": 23682,
-      "sha256": "A5FDDD3697FD16ECD7CE7743F222BCCDDC7A99A8816A2EA7ADC5980480B17990"
+      "bytes": 98385,
+      "sha256": "E67DB6E4732079BDEBF50E0899A778556E09C23EB1D19BAC5CEE2ED45DF94EE0"
     },
     {
       "file": "material-dark-acrylic.edit-game.png",
-      "bytes": 69511,
-      "sha256": "01EACA38AEDFA8F729FF79A234CEE052F7430CBFD84882688F4C0A5A3B5EB7D9"
+      "bytes": 180016,
+      "sha256": "60D673E7D0715BC52D48015305035331A953954D5EB56EA13FC38FF22C184620"
     },
     {
       "file": "material-dark-acrylic.library.png",
-      "bytes": 24693,
-      "sha256": "C980727C09A823C25463B58B06C5781CBBAF7B29E78C9FF08346949BE2120385"
+      "bytes": 26208,
+      "sha256": "CD114A92039F59F1E84AC5A87CEBD9098251996D3FB1DEAAB8733F250875B626"
     },
     {
       "file": "material-dark-acrylic.reader.png",
-      "bytes": 25538,
-      "sha256": "57E98FBA84B4CD05DFB48590A2A12BF9979C743CB9C7BB97E3E2C338B45A83B3"
+      "bytes": 26927,
+      "sha256": "D0034E24C765E3B6EFDD2BC55DD427D47D438CC032FE9141FBA4B17BE5EAD31C"
     },
     {
       "file": "material-dark-mica.edit-game.png",
-      "bytes": 66975,
-      "sha256": "2FC52E3554C29E0C444793C8C410BE5370933F7946C9EA7BA42A401A74B64777"
+      "bytes": 100215,
+      "sha256": "745B204446F7EE15583768A9D8020F6329E4BAB211196481D26A156ADDAC9007"
     },
     {
       "file": "material-dark-mica.library.png",
-      "bytes": 24702,
-      "sha256": "A8FFE5AF5F218F9A3F6C2BB8B5B40B3C48813B14AE887F77217E5B19DEE69723"
+      "bytes": 94231,
+      "sha256": "12EDC77346090FC91FEEED6D216E7C5C640BACC9D9B00BACBF8000F4BB243898"
     },
     {
       "file": "material-dark-mica.reader.png",
-      "bytes": 25431,
-      "sha256": "0DB0833C93B889BD5C6426B64C9D4C09853C752C6826BA1887DBCD48E3987C16"
+      "bytes": 51072,
+      "sha256": "92F30FE79934ED2D158782BC7AFD184331E6C7D89781FA17233C16BFACF7157D"
     },
     {
       "file": "material-dark-solid.edit-game.png",
-      "bytes": 68162,
-      "sha256": "5985A4B00039BD945003FA77EBE086085954FEBC31458A8CFDBB75A717B7D7FC"
+      "bytes": 68879,
+      "sha256": "1D803EBDFB2149EC291215844C26E77432CF77AD070F2DD502D53341D7E58DDD"
     },
     {
       "file": "material-dark-solid.library.png",
-      "bytes": 24697,
-      "sha256": "C067FE82F7FED723E9118D2E1420E8777C6C454741CDF276FBE359C273CB76CC"
+      "bytes": 26207,
+      "sha256": "09FE023C09D4006A4EE2A4689C64BC320F4A5EEAA6B7EB5E028D050A5A65CB99"
     },
     {
       "file": "material-dark-solid.reader.png",
-      "bytes": 26681,
-      "sha256": "9CFE9ACDC36761FD4A47F054E014438F6B7DEC3191E9BAEAC4BEEEB45BDBE35D"
+      "bytes": 26965,
+      "sha256": "5C68F9B725E25896CC36FD000787CFDCABE27E8FCBF2707739E91D9EC9E1FC69"
     },
     {
       "file": "material-light-acrylic.edit-game.png",
-      "bytes": 71724,
-      "sha256": "C1F6C7ABB4A47BD9ED0B7CABD04E51ED0BDAF6C6094A1974677597E49956D915"
+      "bytes": 87131,
+      "sha256": "418FC6E8E391A21721FEC56EB82289FBC1269EF8EE1C5A22D1566A9455FFDFC8"
     },
     {
       "file": "material-light-acrylic.library.png",
-      "bytes": 24671,
-      "sha256": "6258A2516174599630579AB954057F738B42662231BC2CA4F38E87F54771B74C"
+      "bytes": 26231,
+      "sha256": "3F21156EDD832C90D1A4C777D80CCEFE4275E045B6A7340A5589D9CF85B61B0D"
     },
     {
       "file": "material-light-acrylic.reader.png",
-      "bytes": 27051,
-      "sha256": "B52B6B4B6B93F159715D05DD85B439ED4E79FDA9F6022A6E2237D170E96260FA"
+      "bytes": 28667,
+      "sha256": "34EF42FB3490169F19915D8AFDA70A743EB97AFB080004A2C53E023F2A32C579"
     },
     {
       "file": "material-light-mica.edit-game.png",
-      "bytes": 72789,
-      "sha256": "C3182DE4F62EEF00F64433A9047FA0982CB6D3EE0FEF5757F95C86B0C624878E"
+      "bytes": 113157,
+      "sha256": "FF47E933349E23E47477808287E11689427F00CC65BA9082630A1D3316973C96"
     },
     {
       "file": "material-light-mica.library.png",
-      "bytes": 24680,
-      "sha256": "2C9DB44B41672FF0BB629EAA4695255C244CD65D5B7895C64D750245FEE3CB58"
+      "bytes": 97785,
+      "sha256": "DE64DAA67E49DEC67B1E1BB65720E9B63CAEC54B4FD9D521DE7B7F36C53FA6E9"
     },
     {
       "file": "material-light-mica.reader.png",
-      "bytes": 27065,
-      "sha256": "FD3A8491CB6BC5911C1BF690FA3D5E0D282EF7A532D35F952424FF4CF9F002BB"
+      "bytes": 60471,
+      "sha256": "C8E09CAA9A999CF143B91823C9D7F6CF8951B7314172DD3E30BD8A4F6FB95FF5"
     },
     {
       "file": "material-light-mica.settings.png",
-      "bytes": 26506,
-      "sha256": "93C4C15766F0480959F3131BCD570EC6268EEF44FEF7AE232F6686CB674A22FA"
+      "bytes": 94645,
+      "sha256": "CF920C705DE56077DE6FFBC7EBBD59D2E9F5A5AC9D4CB0F9985F482C3DAD0B18"
     },
     {
       "file": "material-light-solid.edit-game.png",
-      "bytes": 73012,
-      "sha256": "52A8103E42787A2F8AF911DE771EB754D924812EAB78830ABB4001082F5C555C"
+      "bytes": 74601,
+      "sha256": "5AAEC729E4F73FD5AFFA6FDF9149AD18BD0ABF356C18778877DB68E258DE5CF5"
     },
     {
       "file": "material-light-solid.library.png",
-      "bytes": 24335,
-      "sha256": "F1222BE34119982966FDFBC1167FEC8688F893DCFAB90410225A5EB5529B42A1"
+      "bytes": 25863,
+      "sha256": "83FA1AF44547BF8BB2246DD97B6FCD77B17FFDCEC3ED066CA2F5B2640EABC14E"
     },
     {
       "file": "material-light-solid.reader.png",
-      "bytes": 27049,
-      "sha256": "EF0C66A4B53AC8645BE4FA5D778E5F6FBDC8A04D2FA397C9000F22F9B801EDA8"
+      "bytes": 28651,
+      "sha256": "626466861EE1646C33F61D3949667F70E33BDD2DE3B2D45C6D76F407D3B91606"
     }
   ],
   "deferred": {
@@ -489,8 +517,9 @@
     "installedUiaNameAndBoundsPassed": true
   },
   "verificationNotes": [
-    "The exact-source installed run passed the complete existing shell regression, the system/light/dark design-language modes, and all six window-material passes plus switch-and-relaunch.",
+    "The exact-source installed run passed the complete existing shell regression, the system/light/dark design-language modes, and all six window-material passes plus switch-and-relaunch, with Windows transparency effects on.",
     "Routine ready notifications auto-dismiss visually while the shell retains a sequenced marker in the raw UI Automation view for deterministic installed checks.",
-    "The window backdrop runs unbroken behind the title bar, pane, and route background. Mica is the default; Settings offers Mica, Thin Acrylic, or Solid. In Acrylic mode, ContentDialog uses in-app acrylic; transient flyouts keep their default acrylic."
+    "The window backdrop runs unbroken behind the title bar, pane, and route background. Mica is the default; Settings offers Mica, Acrylic, or Solid. In Acrylic mode, ContentDialog uses in-app acrylic; transient flyouts keep their default acrylic.",
+    "Earlier runs (from 279dfe1 to 8bc7e5d) recreated the Personalize registry key when switching the app theme, which deleted the host transparency setting; their screenshots showed backdrop fallback colors. 8bc7e5d fixed the harness, and this run kept every Personalize value."
   ]
 }
