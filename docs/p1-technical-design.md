@@ -285,9 +285,10 @@ Use the native WinUI `TitleBar` as the window drag region and host the Back and
 pane-toggle actions there. Continue using `AppWindow` for close coordination
 and window lifecycle. Apply a Mica system backdrop to the long-lived main
 window and keep route backgrounds transparent so the material is visible;
-high contrast replaces it with the system window color. Acrylic is reserved
-for transient flyouts or light-dismiss overlays rather than persistent reader
-or catalog surfaces.
+high contrast replaces it with the system window color. Acrylic is also an
+optional full-window material chosen in Settings, alongside Mica (default) and
+Solid; transient flyouts keep their default acrylic, and reader and catalog
+content surfaces stay opaque.
 
 The shell and each route fill the available width after `NavigationView` and
 responsive page padding. Do not apply a global content maximum that creates
@@ -361,8 +362,9 @@ packages are added only with the task that first uses them:
 Native WinUI remains the chosen implementation for `NavigationView`,
 `TitleBar`, `CommandBar`, `AutoSuggestBox`, `InfoBar`, `ContentDialog`,
 `TreeView`, `NumberBox`, progress, file pickers, and keyboard accelerators.
-The main window uses Mica; default or explicit Acrylic remains limited to
-transient UI. Toolkit
+The main window uses Mica by default; Acrylic is also an optional full-window
+material chosen in Settings, and transient flyouts keep their default acrylic.
+Toolkit
 animation, converter, primitive, media, color, token, and tabbed-command
 packages have no current requirement and are not added speculatively.
 
@@ -892,7 +894,7 @@ project uses a provisional package identity until T17.1 sets the public one.
 
 Every P1 task closes with a code or documentation artifact, a named test or
 manual trace, and a reviewable result. The [implementation plan](p1/implementation-plan.md)
-lists dependencies and specific exits for all 53 tasks. Core/Infrastructure
+lists dependencies and specific exits for all 54 tasks. Core/Infrastructure
 tests run on the locked Windows CI toolchain; critical file-boundary and
 symlink tests also run on Windows NTFS. UI Automation, Narrator, high
 contrast, DPI, installed-package, and offline checks run on target Windows

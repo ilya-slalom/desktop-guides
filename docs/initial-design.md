@@ -86,8 +86,9 @@ rounded container. The shell uses the native WinUI `TitleBar`, `AppWindow`
 lifecycle APIs, and a Mica system backdrop. Route panels fill the available
 window width; individual readers may constrain text measure when that improves
 legibility. Routine status messages appear in a transient `InfoBar`, while
-warnings and actionable errors remain dismissible. Reserve Acrylic for
-transient flyouts and light-dismiss surfaces.
+warnings and actionable errors remain dismissible. Acrylic is also an
+optional full-window material chosen in Settings; transient flyouts keep their
+default acrylic, and reading surfaces stay opaque.
 
 Opening a guide shows a reader with a compact top bar (game and guide title,
 back, appearance controls, and `Mark complete`) and a collapsible navigation

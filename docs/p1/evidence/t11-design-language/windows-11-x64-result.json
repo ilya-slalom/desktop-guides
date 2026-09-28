@@ -1,7 +1,7 @@
 {
   "task": "T11.4",
-  "observedAt": "2026-09-28T06:31:00.9720792Z",
-  "status": "passed-with-deferred-scale-matrix",
+  "observedAt": "2026-09-28T13:11:22.7125473Z",
+  "status": "passed-with-deferred-scale-and-high-contrast",
   "environment": {
     "osBuild": "10.0.26200.0",
     "cpuArchitecture": "AMD64",
@@ -13,35 +13,37 @@
       "2.5.1.0"
     ]
   },
+  "sourceCommit": "4255907",
   "headlessChecks": {
     "coreTests": {
       "passed": 73,
       "failed": 0
     },
     "infrastructureTests": {
-      "passed": 90,
+      "passed": 98,
       "failed": 0
     },
-    "powershellHarnessChecksPassed": 7
+    "powershellHarnessChecksPassed": 8,
+    "lockedRestoresPassed": true
   },
   "packages": {
     "x64": {
       "name": "DesktopGuides.Production_0.1.0.0_x64.msix",
-      "bytes": 66335160,
-      "sha256": "DCA67246134FF1BD305B6AFEA3B8B40B2C25D92AA8A0C09B0D5266EFD9811C14",
+      "bytes": 66337896,
+      "sha256": "F4AF1A8B1EC646A6FD7E909C46554853B6033F3634C15AE4551EE17D2448B34D",
       "installedWorkflowPassed": true
     },
     "ARM64": {
       "name": "DesktopGuides.Production_0.1.0.0_arm64.msix",
-      "bytes": 64390966,
-      "sha256": "6C3B7C01635552A8446B9B91A8BE63256C4C96F295A4C9EC23E6E2FF0B5DA8BE",
+      "bytes": 64393702,
+      "sha256": "9C568AEB38510E112E5FCA29F21BE6FCAE636115554F4D570600742F05F326D5",
       "buildPassed": true,
       "runtimeTested": false
     }
   },
   "installedWorkflow": {
     "success": true,
-    "signedPackageSha256": "FCF81330358E93F24DB1CDEC69641DA1765EAF47B134EC463851D59603F247DD",
+    "signedPackageSha256": "9FFD2BF1A522407A3A1B995708BAC6260DCE8F1B59EA153F4BD6E019F73F3D27",
     "interactiveSessionId": 1,
     "fullExistingShellRegressionPassed": true,
     "designLanguage": {
@@ -92,56 +94,238 @@
           "settings-narrow",
           "settings-wide"
         ]
-      },
-      "highContrast": {
-        "success": true,
-        "windowDpi": 96,
-        "scalePercent": 100,
-        "phases": [
-          "library",
-          "library-wide-focus-and-heading",
-          "library-narrow",
-          "game-wide-full-width-metadata",
-          "game-narrow-long-title",
-          "reader-wide",
-          "reader-narrow",
-          "settings-narrow",
-          "settings-wide"
-        ]
       }
     },
     "themeLuminance": {
-      "light": 238.56,
-      "dark": 39.74
+      "light": 236.93,
+      "dark": 37.81
+    },
+    "windowMaterials": {
+      "thresholds": {
+        "solidStripMaxChannelRange": 2,
+        "acrylicDifferenceGreaterThan": 4,
+        "dialogDifferenceGreaterThan": 2
+      },
+      "passes": {
+        "light-Solid": {
+          "success": true,
+          "phases": [
+            "library",
+            "material-Solid-restored",
+            "material-Solid-captured"
+          ],
+          "libraryBounds": {
+            "windowLeft": 530,
+            "windowHeight": 720,
+            "contentLeft": 779
+          },
+          "libraryStrip": {
+            "meanR": 243,
+            "meanG": 243,
+            "meanB": 243,
+            "maxChannelRange": 0
+          },
+          "dialogBounds": {
+            "buttonLeft": 530,
+            "buttonBottom": 578
+          },
+          "dialogStrip": {
+            "meanR": 243,
+            "meanG": 243,
+            "meanB": 243,
+            "maxChannelRange": 0
+          }
+        },
+        "light-Acrylic": {
+          "success": true,
+          "phases": [
+            "library",
+            "material-Acrylic-restored",
+            "material-Acrylic-captured"
+          ],
+          "libraryBounds": {
+            "windowLeft": 530,
+            "windowHeight": 720,
+            "contentLeft": 779
+          },
+          "libraryStrip": {
+            "meanR": 211,
+            "meanG": 211,
+            "meanB": 211,
+            "maxChannelRange": 0
+          },
+          "dialogBounds": {
+            "buttonLeft": 530,
+            "buttonBottom": 578
+          },
+          "dialogStrip": {
+            "meanR": 249,
+            "meanG": 249,
+            "meanB": 249,
+            "maxChannelRange": 0
+          }
+        },
+        "light-Mica": {
+          "success": true,
+          "phases": [
+            "library",
+            "material-Mica-restored",
+            "material-Mica-captured"
+          ],
+          "libraryBounds": {
+            "windowLeft": 530,
+            "windowHeight": 720,
+            "contentLeft": 779
+          },
+          "libraryStrip": {
+            "meanR": 243,
+            "meanG": 243,
+            "meanB": 243,
+            "maxChannelRange": 0
+          },
+          "dialogBounds": {
+            "buttonLeft": 530,
+            "buttonBottom": 578
+          },
+          "dialogStrip": {
+            "meanR": 243,
+            "meanG": 243,
+            "meanB": 243,
+            "maxChannelRange": 0
+          }
+        },
+        "light-acrylicDifference": 32,
+        "light-dialogDifference": 6,
+        "dark-Solid": {
+          "success": true,
+          "phases": [
+            "library",
+            "material-Solid-restored",
+            "material-Solid-captured"
+          ],
+          "libraryBounds": {
+            "windowLeft": 530,
+            "windowHeight": 720,
+            "contentLeft": 779
+          },
+          "libraryStrip": {
+            "meanR": 32,
+            "meanG": 32,
+            "meanB": 32,
+            "maxChannelRange": 0
+          },
+          "dialogBounds": {
+            "buttonLeft": 530,
+            "buttonBottom": 578
+          },
+          "dialogStrip": {
+            "meanR": 32,
+            "meanG": 32,
+            "meanB": 32,
+            "maxChannelRange": 0
+          }
+        },
+        "dark-Acrylic": {
+          "success": true,
+          "phases": [
+            "library",
+            "material-Acrylic-restored",
+            "material-Acrylic-captured"
+          ],
+          "libraryBounds": {
+            "windowLeft": 530,
+            "windowHeight": 720,
+            "contentLeft": 779
+          },
+          "libraryStrip": {
+            "meanR": 84,
+            "meanG": 84,
+            "meanB": 84,
+            "maxChannelRange": 0
+          },
+          "dialogBounds": {
+            "buttonLeft": 530,
+            "buttonBottom": 578
+          },
+          "dialogStrip": {
+            "meanR": 44,
+            "meanG": 44,
+            "meanB": 44,
+            "maxChannelRange": 0
+          }
+        },
+        "dark-Mica": {
+          "success": true,
+          "phases": [
+            "library",
+            "material-Mica-restored",
+            "material-Mica-captured"
+          ],
+          "libraryBounds": {
+            "windowLeft": 530,
+            "windowHeight": 720,
+            "contentLeft": 779
+          },
+          "libraryStrip": {
+            "meanR": 32,
+            "meanG": 32,
+            "meanB": 32,
+            "maxChannelRange": 0
+          },
+          "dialogBounds": {
+            "buttonLeft": 530,
+            "buttonBottom": 578
+          },
+          "dialogStrip": {
+            "meanR": 32,
+            "meanG": 32,
+            "meanB": 32,
+            "maxChannelRange": 0
+          }
+        },
+        "dark-acrylicDifference": 52,
+        "dark-dialogDifference": 12
+      },
+      "switchAndRelaunch": {
+        "switched": {
+          "success": true,
+          "phases": [
+            "library",
+            "material-Mica-restored",
+            "material-switched-Acrylic",
+            "material-Acrylic-captured"
+          ]
+        },
+        "persisted": {
+          "success": true,
+          "phases": [
+            "library",
+            "material-Acrylic-restored",
+            "material-Acrylic-captured"
+          ]
+        }
+      },
+      "storedMaterialRestoredTo": "Mica",
+      "notes": [
+        "Mica matched Solid in both themes on this host wallpaper; the harness asserts Acrylic and dialog differences only."
+      ]
     },
     "readerToolbarRegression": {
       "success": true,
-      "packageSha256": "63A4306E6876C8E65C23DFD0988EED973A41B31D8931F50F819B9087DA26AEAF",
-      "overlapAndTimeoutCleanup": "passed",
-      "delayedInstallAndReceipt": "passed",
-      "rerunForToolkitChange": false,
-      "basis": "ReaderToolbar source and smoke package dependencies were unchanged; prior branch-head installed pass retained."
+      "packageSha256": "A59B678514266308BE6935F8DE66897BBD383740B6E4962058D9F40CBB32CDD4",
+      "phases": [
+        "initial-no-session-capabilities",
+        "worker-capability-change-text-dispatch",
+        "page-dialog-restores-overflow-focus",
+        "find-dialog-restores-overflow-focus",
+        "all-capabilities-dispatch",
+        "narrow-primary-command-overflow",
+        "worker-capability-removal",
+        "detached-session-event-ignored"
+      ],
+      "installReceiptVerified": true
     },
-    "highContrast": {
-      "original": {
-        "path": "HKCU:\\Control Panel\\Accessibility\\HighContrast",
-        "flags": 126,
-        "scheme": "",
-        "enabled": false
-      },
-      "enabled": {
-        "path": "HKCU:\\Control Panel\\Accessibility\\HighContrast",
-        "flags": 127,
-        "scheme": "High Contrast Black",
-        "enabled": true
-      },
-      "restored": {
-        "path": "HKCU:\\Control Panel\\Accessibility\\HighContrast",
-        "flags": 126,
-        "scheme": "",
-        "enabled": false
-      }
-    },
+    "highContrast": "deferred-to-T16.2",
     "appTheme": {
       "original": {
         "path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
@@ -157,55 +341,143 @@
     "cleanup": {
       "packageStillInstalled": false,
       "certificateStillTrusted": false,
-      "profileStillExists": false,
-      "testScheduledTasksStillRegistered": false
+      "testScheduledTasksStillRegistered": false,
+      "hostHighContrastFlagsUnchanged": 126,
+      "hostActiveThemeUnchanged": "Custom.theme"
     },
     "windowChrome": {
       "nativeTitleBarBackAndPaneActionsPassed": true,
-      "micaBackdropAndHighContrastFallbackPassed": true,
       "fullWidthShellBoundsPassed": true,
       "routineInfoBarAutoDismissSeconds": 3,
       "routineInfoBarAutoDismissPassed": true,
       "persistentAutomationStatusPassed": true,
       "persistentAutomationStatusAccessibilityView": "Raw",
       "persistentAutomationStatusSequenced": true,
-      "settingsCardTopAlignmentReviewed": true
+      "settingsCardTopAlignmentReviewed": true,
+      "seamlessBackdropPassed": true
     }
   },
   "screenshots": [
     {
-      "file": "design-dark.reader-wide.png",
-      "bytes": 50020,
-      "sha256": "8CF0861CE29180D50B2D4090E0980D4F90C1C7AA3CBE63278DC71DBFC311A696"
+      "file": "design-dark.library-narrow.png",
+      "bytes": 18087,
+      "sha256": "8D2F26B68D7C9565F3C6064415CD9A0B8A843010F74D538F4D5BF217800DC4B1"
     },
     {
-      "file": "design-high-contrast.game-narrow.png",
-      "bytes": 20987,
-      "sha256": "40111417DCB09E0F2830C8E292599DD881738D73F76593D3F761F86BC3866F50"
+      "file": "design-dark.library-wide.png",
+      "bytes": 23736,
+      "sha256": "10D26648953DF6F2923D62A9E8A6A6A1FB1290D2B5BF510538E40AA1D747321E"
     },
     {
-      "file": "design-light.game-narrow.png",
-      "bytes": 33948,
-      "sha256": "E589594F9816B390D12C625C3D5A579AB5D6FEC1F5B27F4AE06C25B18096E3F6"
-    },
-    {
-      "file": "design-light.game-wide.png",
-      "bytes": 55525,
-      "sha256": "5070E3BE53A06271182347C6DF9D33936FF161FB4CECC78D239967876789764F"
+      "file": "design-light.library-narrow.png",
+      "bytes": 18015,
+      "sha256": "924035CFB87DB39CFE6FE3366686DA03A0EDCF7AE8EE0848DF5650F420DC3EF4"
     },
     {
       "file": "design-light.library-wide.png",
-      "bytes": 49320,
-      "sha256": "6F6F8995B4ACC335F2B1FAA44607519B5E7D3399E25CCDAB1887ECC8455121AD"
+      "bytes": 23682,
+      "sha256": "A5FDDD3697FD16ECD7CE7743F222BCCDDC7A99A8816A2EA7ADC5980480B17990"
     },
     {
-      "file": "design-light.settings-narrow.png",
-      "bytes": 26476,
-      "sha256": "951F4870536C4F664DDCF3504777AECCFCDE6A88EA8B1BE1D5118414764D4D98"
+      "file": "material-dark-acrylic.edit-game.png",
+      "bytes": 69511,
+      "sha256": "01EACA38AEDFA8F729FF79A234CEE052F7430CBFD84882688F4C0A5A3B5EB7D9"
+    },
+    {
+      "file": "material-dark-acrylic.library.png",
+      "bytes": 24693,
+      "sha256": "C980727C09A823C25463B58B06C5781CBBAF7B29E78C9FF08346949BE2120385"
+    },
+    {
+      "file": "material-dark-acrylic.reader.png",
+      "bytes": 25538,
+      "sha256": "57E98FBA84B4CD05DFB48590A2A12BF9979C743CB9C7BB97E3E2C338B45A83B3"
+    },
+    {
+      "file": "material-dark-mica.edit-game.png",
+      "bytes": 66975,
+      "sha256": "2FC52E3554C29E0C444793C8C410BE5370933F7946C9EA7BA42A401A74B64777"
+    },
+    {
+      "file": "material-dark-mica.library.png",
+      "bytes": 24702,
+      "sha256": "A8FFE5AF5F218F9A3F6C2BB8B5B40B3C48813B14AE887F77217E5B19DEE69723"
+    },
+    {
+      "file": "material-dark-mica.reader.png",
+      "bytes": 25431,
+      "sha256": "0DB0833C93B889BD5C6426B64C9D4C09853C752C6826BA1887DBCD48E3987C16"
+    },
+    {
+      "file": "material-dark-solid.edit-game.png",
+      "bytes": 68162,
+      "sha256": "5985A4B00039BD945003FA77EBE086085954FEBC31458A8CFDBB75A717B7D7FC"
+    },
+    {
+      "file": "material-dark-solid.library.png",
+      "bytes": 24697,
+      "sha256": "C067FE82F7FED723E9118D2E1420E8777C6C454741CDF276FBE359C273CB76CC"
+    },
+    {
+      "file": "material-dark-solid.reader.png",
+      "bytes": 26681,
+      "sha256": "9CFE9ACDC36761FD4A47F054E014438F6B7DEC3191E9BAEAC4BEEEB45BDBE35D"
+    },
+    {
+      "file": "material-light-acrylic.edit-game.png",
+      "bytes": 71724,
+      "sha256": "C1F6C7ABB4A47BD9ED0B7CABD04E51ED0BDAF6C6094A1974677597E49956D915"
+    },
+    {
+      "file": "material-light-acrylic.library.png",
+      "bytes": 24671,
+      "sha256": "6258A2516174599630579AB954057F738B42662231BC2CA4F38E87F54771B74C"
+    },
+    {
+      "file": "material-light-acrylic.reader.png",
+      "bytes": 27051,
+      "sha256": "B52B6B4B6B93F159715D05DD85B439ED4E79FDA9F6022A6E2237D170E96260FA"
+    },
+    {
+      "file": "material-light-mica.edit-game.png",
+      "bytes": 72789,
+      "sha256": "C3182DE4F62EEF00F64433A9047FA0982CB6D3EE0FEF5757F95C86B0C624878E"
+    },
+    {
+      "file": "material-light-mica.library.png",
+      "bytes": 24680,
+      "sha256": "2C9DB44B41672FF0BB629EAA4695255C244CD65D5B7895C64D750245FEE3CB58"
+    },
+    {
+      "file": "material-light-mica.reader.png",
+      "bytes": 27065,
+      "sha256": "FD3A8491CB6BC5911C1BF690FA3D5E0D282EF7A532D35F952424FF4CF9F002BB"
+    },
+    {
+      "file": "material-light-mica.settings.png",
+      "bytes": 26506,
+      "sha256": "93C4C15766F0480959F3131BCD570EC6268EEF44FEF7AE232F6686CB674A22FA"
+    },
+    {
+      "file": "material-light-solid.edit-game.png",
+      "bytes": 73012,
+      "sha256": "52A8103E42787A2F8AF911DE771EB754D924812EAB78830ABB4001082F5C555C"
+    },
+    {
+      "file": "material-light-solid.library.png",
+      "bytes": 24335,
+      "sha256": "F1222BE34119982966FDFBC1167FEC8688F893DCFAB90410225A5EB5529B42A1"
+    },
+    {
+      "file": "material-light-solid.reader.png",
+      "bytes": 27049,
+      "sha256": "EF0C66A4B53AC8645BE4FA5D778E5F6FBDC8A04D2FA397C9000F22F9B801EDA8"
     }
   ],
   "deferred": {
     "displayScaling": "200% testing deferred by the user; this run used 96 DPI / 100%.",
+    "highContrast": "Deferred to T16.2: enabling it makes Windows rewrite the active theme to Custom.theme, which the harness cannot restore.",
+    "colorfulIcons": "T11.5.",
     "windows10Runtime": "Deferred.",
     "ARM64InstalledWorkflow": "Deferred; package build only in this local run."
   },
@@ -217,8 +489,8 @@
     "installedUiaNameAndBoundsPassed": true
   },
   "verificationNotes": [
-    "The final exact-source installed run passed the complete existing shell regression and all four design-language appearance modes.",
+    "The exact-source installed run passed the complete existing shell regression, the system/light/dark design-language modes, and all six window-material passes plus switch-and-relaunch.",
     "Routine ready notifications auto-dismiss visually while the shell retains a sequenced marker in the raw UI Automation view for deterministic installed checks.",
-    "Acrylic was not applied to the persistent main window; Mica is used for the long-lived backdrop and Acrylic remains reserved for transient UI."
+    "The window backdrop runs unbroken behind the title bar, pane, and route background. Mica is the default; Settings offers Mica, Thin Acrylic, or Solid. In Acrylic mode, ContentDialog uses in-app acrylic; transient flyouts keep their default acrylic."
   ]
 }

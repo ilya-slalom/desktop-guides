@@ -1090,9 +1090,10 @@ Game, Reader, and Settings at wide and narrow widths, semantic headings,
 focus, UIA names, title-bar Back and pane actions, full-width bounds, automatic
 routine-status dismissal, the Toolkit Settings-card name and bounds, long
 metadata, and control overlap. Light and dark screenshot luminance measured
-238.56 and 39.74. High contrast changed
-from disabled flags `126` to enabled flags `127` with `High Contrast Black`,
-then restored exactly. The original light-app preference was also restored.
+238.56 and 39.74. That run also passed a high-contrast mode, which changed
+flags `126` to `127` with `High Contrast Black` and restored them; the window
+materials follow-up below moves high contrast to T16.2. The original
+light-app preference was also restored.
 The package, package profile, temporary certificate trust, and scheduled
 tasks were absent after cleanup.
 
@@ -1106,18 +1107,59 @@ and retains the native command label position so wide layouts keep `Zoom in`
 visible. Its installed Windows run passed overlap ownership, simulated timeout
 cleanup, all toolbar commands, and the 31-second delayed install/receipt path.
 
-Selected installed evidence includes the
-[light Library](evidence/t11-design-language/design-light.library-wide.png),
-[wide Game](evidence/t11-design-language/design-light.game-wide.png),
-[narrow Game](evidence/t11-design-language/design-light.game-narrow.png),
-[dark Reader](evidence/t11-design-language/design-dark.reader-wide.png),
-[narrow Settings](evidence/t11-design-language/design-light.settings-narrow.png),
-and [high-contrast Game](evidence/t11-design-language/design-high-contrast.game-narrow.png).
-The sanitized
-[result record](evidence/t11-design-language/windows-11-x64-result.json)
-contains package and screenshot hashes.
-
 The run used the host's current 96 DPI / 100% display scale. The user deferred
 200% display-scaling verification to T16.2. Windows 10 and installed ARM64
 behavior also remain unverified; the local ARM64 result is a package build
 only.
+
+### Window materials follow-up
+
+User review asked for a seamless backdrop, a working dark Acrylic, and dialogs
+that match the window. The window backdrop now runs unbroken behind the title
+bar, navigation pane, and route background, because the `NavigationView`
+content layer and its border are transparent. A Settings `Window background`
+card stores Mica (default), Thin Acrylic, or Solid in SQLite `AppSettings`
+through an atomic read-modify-write; unsupported materials fall back to Solid
+with a warning. The Thin Acrylic controller keeps the default system backdrop
+configuration, so it follows the app theme and turns solid while the window is
+inactive. The reader page uses the opaque
+`SolidBackgroundFillColorQuarternaryBrush`. In Acrylic mode, `ContentDialog`
+uses in-app acrylic; in Mica and Solid it keeps the default dialog.
+
+From a fresh snapshot of commit `4255907` on the same host: locked restores,
+73/73 Core tests, 98/98 Infrastructure tests, and all eight PowerShell harness
+checks passed, and Release packages built for x64 and ARM64. The x64 package
+SHA-256 was
+`F4AF1A8B1EC646A6FD7E909C46554853B6033F3634C15AE4551EE17D2448B34D`;
+the ARM64 package SHA-256 was
+`9C568AEB38510E112E5FCA29F21BE6FCAE636115554F4D570600742F05F326D5`.
+The interactive design-only run and then the full signed-install regression
+passed. Both ran the system, light, and dark design-language modes and six
+material passes: light and dark × Solid, Acrylic, and Mica, plus a
+switch-and-relaunch check. A strip across the pane/content boundary had a
+channel range of 0 in every pass, so no seam was visible. Acrylic differed from
+Solid by 32 in light and 52 in dark (threshold 4), and the Acrylic edit-game
+command band differed from Solid by 6 and 12 (threshold 2). Mica matched Solid
+on this host's wallpaper and is not asserted. The harness restored the stored
+material to Mica and the light-app preference. Afterward, the package,
+certificate trust, and scheduled tasks were gone, and the high-contrast flags
+(`126`) and active `Custom.theme` were unchanged. The reader-toolbar installed
+smoke passed all eight phases, including focus restoration after the page and
+find dialogs.
+
+High contrast moves to T16.2: enabling it makes Windows rewrite the active
+theme to `Custom.theme`, which this harness cannot restore. Optional colorful
+icons from the MIT Fluent UI System Icons `*_color` set are T11.5; WinUI
+Gallery has no colored icon set.
+
+Selected installed evidence includes the
+[wide](evidence/t11-design-language/design-light.library-wide.png) and
+[narrow](evidence/t11-design-language/design-light.library-narrow.png) light
+Library, the [dark Acrylic Library](evidence/t11-design-language/material-dark-acrylic.library.png),
+[dark Acrylic Reader](evidence/t11-design-language/material-dark-acrylic.reader.png),
+[dark Acrylic Edit game](evidence/t11-design-language/material-dark-acrylic.edit-game.png),
+[light Solid Library](evidence/t11-design-language/material-light-solid.library.png),
+and the [Window background card](evidence/t11-design-language/material-light-mica.settings.png).
+The sanitized
+[result record](evidence/t11-design-language/windows-11-x64-result.json)
+lists every material pass and the package and screenshot hashes.

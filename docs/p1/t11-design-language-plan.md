@@ -46,6 +46,7 @@ high contrast remain native:
 | Canvas | `SolidBackgroundFillColorBaseBrush` |
 | Surface | `LayerFillColorDefaultBrush` |
 | Elevated surface | `CardBackgroundFillColorDefaultBrush` |
+| Reading surface | `SolidBackgroundFillColorQuarternaryBrush` |
 | Border | `CardStrokeColorDefaultBrush` |
 | Primary and secondary text | `TextFillColorPrimaryBrush`, `TextFillColorSecondaryBrush` |
 | Accent and text on accent | `AccentFillColorDefaultBrush`, `TextOnAccentFillColorPrimaryBrush` |
@@ -53,9 +54,14 @@ high contrast remain native:
 
 High contrast overrides the app aliases with Windows system window, text,
 highlight, and hotlight colors. No page owns a fixed foreground/background
-pair. The long-lived main window uses a Mica system backdrop behind transparent
-shell backgrounds. Acrylic remains limited to transient flyouts and
-light-dismiss surfaces.
+pair. The window backdrop runs unbroken behind the title bar, navigation pane,
+and route background; the `NavigationView` content layer and its border are
+transparent. A Settings choice selects Mica (default), Thin Acrylic, or Solid.
+Unsupported materials fall back to Solid with a warning. The backdrop follows
+the app theme and turns solid while the window is inactive. Reading surfaces,
+cards, and dialogs stay opaque or card-filled so text never sits directly on
+the wallpaper. In Acrylic mode, `ContentDialog` uses in-app acrylic; in Mica
+and Solid it keeps the default solid dialog.
 
 ### Type
 
@@ -117,7 +123,7 @@ warnings and errors remain dismissible.
 | Resource foundation | App-level dictionaries for semantic colors, spacing, typography, surfaces, buttons, lists, backdrop, title bar, and status presentation | Production XAML compiles on Windows x64 and ARM64; every app resource resolves in light, dark, and high contrast |
 | Representative routes | Library, Game, Reader, Settings, game editor, and reader toolbar consume semantic styles; the Settings route uses Toolkit `SettingsCard`; native `TitleBar`, Mica, full-width layout, transient `InfoBar`, adaptive page padding, and narrow layouts are active | Existing route, editor, title-bar navigation, focus, Settings-card UIA, status-timeout, and toolbar checks remain passing |
 | Gallery inventory | Built-in, adapted, deferred, and rejected component list tied to the locked SDK | No Gallery application dependency; stable Toolkit packages are centrally pinned when first used |
-| Installed visual check | Seeded realistic metadata is captured at wide and narrow sizes in system light, dark, and high contrast | Keyboard focus, heading names, long text, and screenshots are recorded on Windows 11 x64 at the host's current 100% display scale; 200% display scaling is explicitly deferred |
+| Installed visual check | Seeded realistic metadata is captured at wide and narrow sizes in system, light, and dark, and in each window material; high contrast moves to T16.2 | Keyboard focus, heading names, long text, and screenshots are recorded on Windows 11 x64 at the host's current 100% display scale; 200% display scaling is explicitly deferred |
 
 The implementation PR targets **T11.4**. Prerequisites T11.1 and T11.3 are
 merged. Its outcome is a reviewed visual and resource foundation that unblocks
@@ -143,3 +149,18 @@ workflow and all four appearance modes. The sanitized
 [Windows result](evidence/t11-design-language/windows-11-x64-result.json) and
 selected installed screenshots are retained with the task evidence. Windows
 10, installed ARM64 behavior, and 200% display scaling remain unverified.
+
+The window-material follow-up replaced the high-contrast pass, which rewrote
+the host's active Windows theme, with material passes; high contrast moves to
+T16.2. The design-only installed run covered system, light, and dark, then
+Solid, Acrylic, and Mica in light and dark, plus a Mica-to-Acrylic switch that
+persisted across relaunch. An 80×8 strip across the pane/content boundary had
+a channel range of 0 in every material, so no seam shows. Acrylic differed from
+Solid by 32 (light) and 52 (dark) channel levels against a threshold of 4,
+which also confirms that dark-theme acrylic now renders. The Acrylic dialog's
+command area differed from the Solid dialog by 6 (light) and 12 (dark) against
+a threshold of 2; its content area keeps WinUI's native overlay, so no template
+resource is overridden. Mica matched Solid on this host's neutral wallpaper,
+which the harness does not assert. The same source passed 73 Core tests, 98
+Infrastructure tests, eight PowerShell harness checks, x64 and ARM64 package
+builds, and the linked reader toolbar installed smoke.

@@ -341,9 +341,18 @@ Desktop Guides identity.
   version-compatible WinUI Gallery component inventory and adoption rules
   before new provider and catalog UI is built. Introduce the stable Toolkit
   `SettingsCard` for the representative Settings surface. Use the native
-  WinUI `TitleBar`, `AppWindow` lifecycle integration, Mica backdrop, and
-  transient `InfoBar`; route panels fill the available content width without a
-  shell-level maximum. Verify these behaviors in the signed installed shell.
+  WinUI `TitleBar`, `AppWindow` lifecycle integration, a seamless window
+  backdrop with a Mica (default), Acrylic, or Solid setting and matching
+  dialogs, and transient `InfoBar`; route panels fill the available content
+  width without a shell-level maximum. Verify these behaviors in the signed
+  installed shell. High contrast moves to T16.2.
+- **T11.5** Add an optional Settings "Colorful icons" toggle that swaps
+  navigation and route icons for Fluent UI System Icons `*_color` SVGs (MIT),
+  packaged as assets and shown through `ImageIcon`. Monochrome Segoe Fluent
+  icons stay the default and are always used in high contrast. Verify the icon
+  set, license notice, asset size, theme and high-contrast screenshots, and UIA
+  names. WinUI Gallery has no colored icon set, so this uses the external
+  library.
 - **TR11.1** The shell does not inspect format-specific controls to read or
   save position.
 - **TR11.2** Disabled or unsupported actions are absent or clearly unavailable,
@@ -461,7 +470,10 @@ reader, and the UI remains usable with Windows scaling and high contrast.
 - **T16.1** Map and document `Ctrl+O`, library `Ctrl+F`, `Esc`, and page
   navigation; keep every shortcut action in the visible UI.
 - **T16.2** Audit keyboard order, focus restoration, AutomationProperties,
-  touch target size, DPI scaling, and high contrast.
+  touch target size, DPI scaling, and high contrast, after T11.5. Run the
+  high-contrast pass deferred from T11.4: before enabling high contrast, save
+  the active `.theme` path and wallpaper, and restore them exactly afterward,
+  or run in a disposable Windows profile or VM.
 - **T16.3** Record PDF document-text access behavior from the chosen engine
   and provide an accurate user-facing limitation if needed.
 - **TR16.1** No essential flow depends on hover or a keyboard-only gesture.
