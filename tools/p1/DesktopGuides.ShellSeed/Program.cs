@@ -56,6 +56,22 @@ if (args.Length == 4 &&
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "set-material")
+{
+    if (!Enum.TryParse(args[2], false, out WindowMaterial material) ||
+        !Enum.IsDefined(material) || material.ToString() != args[2])
+    {
+        Console.Error.WriteLine("Material must be Mica, Acrylic, or Solid.");
+        return 2;
+    }
+    await using SqliteLibraryRepository materialRepository =
+        new(new ManagedPathResolver(args[1]));
+    await materialRepository.InitializeAsync();
+    await materialRepository.UpdateSettingsAsync(
+        settings => settings with { WindowMaterial = material });
+    return 0;
+}
+
 if (args.Length == 2 && args[0] == "invalidate-blocked-guide")
 {
     ManagedPathResolver fixturePaths = new(args[1]);

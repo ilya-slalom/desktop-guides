@@ -27,7 +27,7 @@ if (Get-AppxPackage -Name DesktopGuides.Preview) {
 Assert-FreshPreviewProfile $env:LOCALAPPDATA
 . (Join-Path $PSScriptRoot 'windows_shell_smoke_result.ps1')
 . (Join-Path $PSScriptRoot 'windows_shell_task_cleanup.ps1')
-Add-Type -Path (Join-Path $PSScriptRoot 'windows_shell_appearance_probe.cs')
+. (Join-Path $PSScriptRoot 'windows_shell_screenshot_stats.ps1')
 
 New-Item -ItemType Directory -Force $ResultDirectory | Out-Null
 $ResultDirectory = (Resolve-Path $ResultDirectory).Path
@@ -617,7 +617,9 @@ function Run-ShellSmoke(
     [string] $expectedResumeGuide = 'Route Test Guide',
     [int] $ExitDelayMilliseconds = 0,
     [string] $ResultName = $mode,
-    [int] $ExpectedScalePercent = 0) {
+    [int] $ExpectedScalePercent = 0,
+    [string] $ExpectedMaterial = '',
+    [string] $SwitchToMaterial = '') {
     $resultPath = Join-Path $ResultDirectory "$ResultName.json"
     Clear-ShellSmokeResult $resultPath
     $invocationId = [Guid]::NewGuid().ToString('N')
@@ -632,6 +634,12 @@ function Run-ShellSmoke(
         ' -ExpectedResumeGuide "' + $expectedResumeGuide + '"' +
         ' -ExitDelayMilliseconds ' + $ExitDelayMilliseconds +
         ' -ExpectedScalePercent ' + $ExpectedScalePercent
+    if ($ExpectedMaterial) {
+        $arguments += ' -ExpectedMaterial ' + $ExpectedMaterial
+    }
+    if ($SwitchToMaterial) {
+        $arguments += ' -SwitchToMaterial ' + $SwitchToMaterial
+    }
     $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
         -Argument $arguments -WorkingDirectory $PSScriptRoot
     Register-ScheduledTask -TaskName $smokeTask -Action $action `
@@ -685,84 +693,11 @@ function Restore-AppThemePreference($Original) {
     }
 }
 
-function Get-HighContrastPreference {
-    $path = 'HKCU:\Control Panel\Accessibility\HighContrast'
-    $item = Get-ItemProperty -Path $path
-    [uint32]$flags = $item.Flags
-    return [ordered]@{
-        path = $path
-        flags = $flags
-        scheme = [string]$item.'High Contrast Scheme'
-        enabled = ($flags -band 1) -ne 0
-    }
-}
-
-function Set-HighContrastPreference($Original, [bool] $Enabled) {
-    [uint32]$flags = $Original.flags
-    if ($Enabled) {
-        $flags = $flags -bor 1
-    }
-    else {
-        $flags = $flags -band ([uint32]::MaxValue - 1)
-    }
-    $scheme = if ($Enabled -and
-        [string]::IsNullOrWhiteSpace($Original.scheme)) {
-        'High Contrast Black'
-    }
-    else {
-        $Original.scheme
-    }
-    [DesktopGuidesAppearanceProbe]::SetHighContrast($flags, $scheme)
-}
-
-function Restore-HighContrastPreference($Original) {
-    $current = Get-HighContrastPreference
-    if ($current.flags -ne $Original.flags -or
-        $current.scheme -ne $Original.scheme -or
-        $current.enabled -ne $Original.enabled) {
-        [DesktopGuidesAppearanceProbe]::SetHighContrast(
-            [uint32]$Original.flags, [string]$Original.scheme)
-    }
-    New-ItemProperty -Path $Original.path -Name Flags `
-        -PropertyType String -Value ([string]$Original.flags) `
-        -Force | Out-Null
-    New-ItemProperty -Path $Original.path -Name 'High Contrast Scheme' `
-        -PropertyType String -Value $Original.scheme -Force | Out-Null
-}
-
-function Get-ScreenshotLuminance([string] $Path) {
-    Add-Type -AssemblyName System.Drawing
-    $bitmap = [System.Drawing.Bitmap]::new($Path)
-    try {
-        $stepX = [Math]::Max(1, [int][Math]::Floor($bitmap.Width / 80))
-        $stepY = [Math]::Max(1, [int][Math]::Floor($bitmap.Height / 60))
-        [double]$total = 0
-        [int]$count = 0
-        for ($y = 0; $y -lt $bitmap.Height; $y += $stepY) {
-            for ($x = 0; $x -lt $bitmap.Width; $x += $stepX) {
-                $color = $bitmap.GetPixel($x, $y)
-                $total += (0.2126 * $color.R) +
-                    (0.7152 * $color.G) +
-                    (0.0722 * $color.B)
-                $count++
-            }
-        }
-        if ($count -eq 0) { throw "Screenshot $Path has no pixels." }
-        return [Math]::Round($total / $count, 2)
-    }
-    finally {
-        $bitmap.Dispose()
-    }
-}
-
 function Run-DesignLanguageScenarios {
     $originalTheme = Get-AppThemePreference
-    $originalHighContrast = Get-HighContrastPreference
     $report.originalAppTheme = $originalTheme
-    $report.originalHighContrast = $originalHighContrast
-    if ($originalHighContrast.enabled) {
-        throw 'Design appearance checks require high contrast to be disabled initially.'
-    }
+    # High contrast rewrites the active Windows theme, so T16.2 owns that pass.
+    $report.highContrast = 'deferred-to-T16.2'
     try {
         Start-InstalledShell
         $report.designLanguageSystem = Run-ShellSmoke `
@@ -781,17 +716,6 @@ function Run-DesignLanguageScenarios {
             'design-language' -ResultName 'design-dark'
         Close-InstalledShell
 
-        Set-HighContrastPreference $originalHighContrast $true
-        $enabledHighContrast = Get-HighContrastPreference
-        if (-not $enabledHighContrast.enabled) {
-            throw 'Windows did not enable high contrast for the installed check.'
-        }
-        $report.enabledHighContrast = $enabledHighContrast
-        Start-InstalledShell
-        $report.designLanguageHighContrast = Run-ShellSmoke `
-            'design-language' -ResultName 'design-high-contrast'
-        Close-InstalledShell
-
         $lightLuminance = Get-ScreenshotLuminance `
             $report.designLanguageLight.libraryWideScreenshot
         $darkLuminance = Get-ScreenshotLuminance `
@@ -806,22 +730,76 @@ function Run-DesignLanguageScenarios {
         }
     }
     finally {
-        try {
-            Restore-HighContrastPreference $originalHighContrast
-            $report.restoredHighContrast = Get-HighContrastPreference
-            if ($report.restoredHighContrast.flags -ne
-                    $originalHighContrast.flags -or
-                $report.restoredHighContrast.scheme -ne
-                    $originalHighContrast.scheme -or
-                $report.restoredHighContrast.enabled -ne
-                    $originalHighContrast.enabled) {
-                throw 'High contrast was not restored to its original state.'
+        Restore-AppThemePreference $originalTheme
+        $report.restoredAppTheme = Get-AppThemePreference
+    }
+}
+
+function Set-StoredMaterial([string] $material) {
+    dotnet run --project $seedProject -c Release --no-restore -- `
+        set-material $dataRoot $material
+    if ($LASTEXITCODE -ne 0) { throw "Could not store the $material window background." }
+}
+
+function Measure-LibraryStrip($result) {
+    $bounds = $result.libraryBounds
+    $region = Get-BoundaryStripRegion $bounds.windowLeft $bounds.windowHeight `
+        $bounds.contentLeft
+    $strip = Get-ScreenshotRegionStats $result.libraryScreenshot `
+        $region.X $region.Y $region.Width $region.Height
+    $result | Add-Member -NotePropertyName libraryStrip -NotePropertyValue $strip
+    return $result
+}
+
+function Run-MaterialScenarios {
+    # Calibrated on the Windows 11 x64 host; see t11-materials-plan.md.
+    $acrylicThreshold = 4
+    $originalTheme = Get-AppThemePreference
+    $report.materials = [ordered]@{}
+    try {
+        foreach ($light in @($true, $false)) {
+            $themeName = if ($light) { 'light' } else { 'dark' }
+            Set-AppThemePreference $light
+            foreach ($material in @('Solid', 'Acrylic', 'Mica')) {
+                Set-StoredMaterial $material
+                Start-InstalledShell
+                $report.materials["$themeName-$material"] = Measure-LibraryStrip (
+                    Run-ShellSmoke 'material' -ResultName "material-$themeName-$material" `
+                        -ExpectedMaterial $material)
+                Close-InstalledShell
+            }
+            $solid = $report.materials["$themeName-Solid"].libraryStrip
+            if ($solid.maxChannelRange -gt 2) {
+                throw "The $themeName Solid window shows a pane/content seam: " +
+                    "range $($solid.maxChannelRange)."
+            }
+            $acrylic = $report.materials["$themeName-Acrylic"].libraryStrip
+            $difference = [Math]::Max([Math]::Abs($acrylic.meanR - $solid.meanR),
+                [Math]::Max([Math]::Abs($acrylic.meanG - $solid.meanG),
+                    [Math]::Abs($acrylic.meanB - $solid.meanB)))
+            $report.materials["$themeName-acrylicDifference"] = $difference
+            if ($difference -le $acrylicThreshold) {
+                throw "The $themeName Acrylic backdrop matched Solid " +
+                    "(difference $difference); the backdrop is not visible."
             }
         }
-        finally {
-            Restore-AppThemePreference $originalTheme
-            $report.restoredAppTheme = Get-AppThemePreference
-        }
+
+        Set-AppThemePreference $true
+        Set-StoredMaterial 'Mica'
+        Start-InstalledShell
+        $report.materialSwitch = Run-ShellSmoke 'material' `
+            -ResultName 'material-switch' -ExpectedMaterial 'Mica' `
+            -SwitchToMaterial 'Acrylic'
+        Close-InstalledShell
+        Start-InstalledShell
+        $report.materialPersisted = Run-ShellSmoke 'material' `
+            -ResultName 'material-persisted' -ExpectedMaterial 'Acrylic'
+        Close-InstalledShell
+    }
+    finally {
+        Set-StoredMaterial 'Mica'
+        Restore-AppThemePreference $originalTheme
+        $report.restoredAppTheme = Get-AppThemePreference
     }
 }
 
@@ -894,6 +872,7 @@ try {
             throw 'Could not seed the design-language metadata.'
         }
         Run-DesignLanguageScenarios
+        Run-MaterialScenarios
         $report.success = $true
         return
     }
@@ -952,6 +931,7 @@ try {
         throw 'Could not seed the design-language metadata.'
     }
     Run-DesignLanguageScenarios
+    Run-MaterialScenarios
     $report.success = $true
 }
 catch {

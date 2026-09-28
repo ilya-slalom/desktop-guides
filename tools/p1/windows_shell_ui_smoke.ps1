@@ -7,7 +7,7 @@ param(
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
         'reader-render-error-observed', 'reader-render-error-result',
-        'late-guide-after-close', 'waiting-handoff')]
+        'late-guide-after-close', 'waiting-handoff', 'material')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -33,7 +33,13 @@ param(
     [int] $ExitDelayMilliseconds = 0,
 
     [ValidateRange(0, 400)]
-    [int] $ExpectedScalePercent = 0
+    [int] $ExpectedScalePercent = 0,
+
+    [ValidateSet('Mica', 'Acrylic', 'Solid')]
+    [string] $ExpectedMaterial = 'Mica',
+
+    [ValidateSet('', 'Mica', 'Acrylic', 'Solid')]
+    [string] $SwitchToMaterial = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -617,6 +623,49 @@ try {
         }
     }
 
+    function Get-ComboSelection([string] $id) {
+        $combo = Wait-VisibleById $id
+        $selection = $combo.GetCurrentPattern(
+            [System.Windows.Automation.SelectionPattern]::Pattern).Current.GetSelection()
+        if ($selection.Length -ne 1) { throw "$id has $($selection.Length) selected items." }
+        return $selection[0].Current.Name
+    }
+
+    function Select-ComboItem([string] $id, [string] $name) {
+        $combo = Wait-VisibleById $id
+        $expand = $combo.GetCurrentPattern(
+            [System.Windows.Automation.ExpandCollapsePattern]::Pattern)
+        $expand.Expand()
+        $item = $null
+        $deadline = (Get-Date).AddSeconds(5)
+        do {
+            $itemCondition = [System.Windows.Automation.AndCondition]::new(
+                [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::NameProperty, $name),
+                [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                    [System.Windows.Automation.ControlType]::ListItem))
+            # WinUI hosts the open drop-down in a popup outside the ComboBox subtree.
+            $item = $combo.FindFirst($scope, $itemCondition)
+            if (-not $item) { $item = $root.FindFirst($scope, $itemCondition) }
+            if (-not $item) { Start-Sleep -Milliseconds 100 }
+        } while (-not $item -and (Get-Date) -lt $deadline)
+        if (-not $item) { throw "$id has no item named $name." }
+        $item.GetCurrentPattern(
+            [System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+        if ($expand.Current.ExpandCollapseState -ne
+                [System.Windows.Automation.ExpandCollapseState]::Collapsed) {
+            $expand.Collapse()
+        }
+    }
+
+    function Assert-ShellForeground {
+        if ([DesktopGuidesForegroundProbe]::GetForegroundWindow() -ne
+                $process.MainWindowHandle) {
+            throw 'The shell was not the foreground window; its backdrop would be inactive.'
+        }
+    }
+
     if ($Mode -eq 'waiting-handoff') {
         [void](Wait-Status 'Waiting for previous window...')
         $report.phases += 'waiting-for-library-lease'
@@ -818,6 +867,60 @@ try {
         $report.settingsWideScreenshot =
             Save-WindowScreenshot 'settings-wide'
         $report.phases += 'settings-wide'
+    }
+    elseif ($Mode -eq 'material') {
+        $designGame = 'The Legend of Zelda: Tears of the Kingdom'
+        $designGuide = 'Complete Story Walkthrough'
+        Resize-ShellWindow 1500 720
+        Select-Element 'Settings'
+        [void](Wait-Name 'WindowMaterialSettingsCard' (
+            'Window background. Choose how much of your desktop shows behind the app.'))
+        $selected = Get-ComboSelection 'WindowMaterialSelector'
+        if ($selected -ne $ExpectedMaterial) {
+            throw "Expected $ExpectedMaterial window background, found $selected."
+        }
+        $report.phases += "material-$selected-restored"
+
+        if ($SwitchToMaterial) {
+            Select-ComboItem 'WindowMaterialSelector' $SwitchToMaterial
+            [void](Wait-Status "Window background set to $SwitchToMaterial.")
+            $selected = $SwitchToMaterial
+            $report.phases += "material-switched-$selected"
+        }
+        [void](Wait-HiddenById 'ShellStatus')
+        Assert-ShellForeground
+        $report.settingsScreenshot = Save-WindowScreenshot "material-$selected-settings"
+
+        Select-Element 'Library'
+        [void](Wait-GameRow $designGame)
+        Start-Sleep -Milliseconds 400
+        Assert-ShellForeground
+        $report.libraryScreenshot = Save-WindowScreenshot "material-$selected-library"
+        # windows_shell_install.ps1 measures the pane/content strip from these bounds.
+        $window = $root.Current.BoundingRectangle
+        $report.libraryBounds = [ordered]@{
+            windowLeft = $window.Left
+            windowHeight = $window.Height
+            contentLeft = (Find-RawById 'ShellContent').Current.BoundingRectangle.Left
+        }
+
+        Press-Enter (Wait-GameRow $designGame)
+        [void](Wait-Name 'GameHeading' $designGame)
+        Invoke-Element (Wait-EnabledById 'EditGameButton')
+        [void](Wait-VisibleById 'GameTitleInput')
+        Assert-ShellForeground
+        $report.dialogScreenshot = Save-WindowScreenshot "material-$selected-edit-game"
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+        Wait-EditorClosed
+
+        Press-Enter (Wait-GuideRow $designGuide)
+        [void](Wait-Name 'ReaderHeading' $designGuide)
+        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-HiddenById 'ShellStatus')
+        Assert-ShellForeground
+        $report.readerScreenshot = Save-WindowScreenshot "material-$selected-reader"
+        $report.material = $selected
+        $report.phases += "material-$selected-captured"
     }
     elseif ($Mode -eq 'prepare-game-editor-close') {
         Select-Element 'Route Test Game'
