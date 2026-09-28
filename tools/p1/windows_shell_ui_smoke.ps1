@@ -3,7 +3,8 @@ param(
     [ValidateSet('empty', 'game-editor', 'game-editor-persisted',
         'normal', 'stale', 'long-list', 'switch-game',
         'switch-game-prepare', 'switch-game-loading', 'queue-guide',
-        'queue-guide-write', 'queue-later-guide', 'later-guide-result',
+        'queue-guide-write', 'prepare-game-editor-close',
+        'queue-game-editor', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
         'reader-render-error-observed', 'reader-render-error-result',
         'late-guide-after-close', 'waiting-handoff')]
@@ -108,6 +109,19 @@ try {
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
         throw "Expected visible '$id'."
+    }
+
+    function Wait-EnabledById([string] $id) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $element = Find-ById $id
+            if ($element -and -not $element.Current.IsOffscreen -and
+                $element.Current.IsEnabled) {
+                return $element
+            }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected enabled '$id'."
     }
 
     function Set-Text([string] $id, [string] $value) {
@@ -446,6 +460,23 @@ try {
         [void](Wait-Name 'ShellStatus' 'Guide details ready.')
         $report.phases += 'guide-reader-open-while-save-blocked'
     }
+    elseif ($Mode -eq 'queue-game-editor') {
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        $edit = Wait-Name 'EditGameButton' 'Edit game'
+        Invoke-Element $edit
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $edit = Find-ById 'EditGameButton'
+            if ($edit -and -not $edit.Current.IsEnabled) {
+                break
+            }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+        if (-not $edit -or $edit.Current.IsEnabled) {
+            throw 'Edit game did not enter its queued repository read.'
+        }
+        $report.phases += 'game-editor-read-started'
+    }
     elseif ($Mode -eq 'queue-later-guide') {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Name 'ShellStatus' 'Game ready.')
@@ -501,34 +532,49 @@ try {
         }
         $report.phases += 'empty-library'
     }
+    elseif ($Mode -eq 'prepare-game-editor-close') {
+        Select-Element 'Route Test Game'
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        $report.phases += 'game-ready-for-editor-close'
+    }
     elseif ($Mode -eq 'game-editor') {
         $title = "Pok$([char]0x00E9)mon Mystery Dungeon"
         $renamed = "$title DX"
-        Invoke-Element (Wait-Name 'AddGameButton' 'Add game')
+        Invoke-Element (Wait-EnabledById 'AddGameButton')
         [void](Wait-Name 'GameTitleFeedback' 'Enter a title to continue.')
         $report.addGameScreenshot = Save-WindowScreenshot 'add-game'
         Set-Text 'GameTitleInput' '   '
         [void](Wait-Name 'GameTitleFeedback' 'Enter a title to continue.')
         Press-Enter (Wait-VisibleById 'GameTitleInput')
         [void](Wait-VisibleById 'GameTitleInput')
+        $boundaryTitle = ' ' + ('T' * 160) + ' '
+        Set-Text 'GameTitleInput' $boundaryTitle
+        [void](Wait-Name 'GameTitleFeedback' '160 / 160 characters')
+        $boundaryInput = Wait-VisibleById 'GameTitleInput'
+        $boundaryValue = $boundaryInput.GetCurrentPattern(
+            [System.Windows.Automation.ValuePattern]::Pattern)
+        if ($boundaryValue.Current.Value.Length -ne 162) {
+            throw 'The title input truncated a valid trimmed boundary value.'
+        }
         Set-Text 'GameTitleInput' 'Discarded game'
         [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
         Wait-EditorClosed
         [void](Wait-Name 'LibraryEmpty' 'No games in your library.')
         $report.phases += 'cancel-and-invalid-title-leave-empty-library'
 
-        Invoke-Element (Wait-Name 'AddGameButton' 'Add game')
+        Invoke-Element (Wait-EnabledById 'AddGameButton')
         Set-Text 'GameTitleInput' " $title "
         Set-Text 'GamePlatformInput' ' Windows '
         Set-Text 'GameNotesInput' '  Explore the postgame.  '
-        [void](Wait-Name 'GameTitleFeedback' "$($title.Length + 2) / 160 characters")
+        [void](Wait-Name 'GameTitleFeedback' "$($title.Length) / 160 characters")
         Press-Enter (Wait-VisibleById 'GameTitleInput')
         [void](Wait-Name 'GameHeading' $title)
         [void](Wait-Name 'GamePlatform' 'Windows')
         [void](Wait-Name 'GameNotes' 'Explore the postgame.')
         $report.phases += 'keyboard-add-unicode-and-optional-fields'
 
-        Invoke-Element (Wait-Name 'EditGameButton' 'Edit game')
+        Invoke-Element (Wait-EnabledById 'EditGameButton')
         $input = Wait-VisibleById 'GameTitleInput'
         $value = $input.GetCurrentPattern(
             [System.Windows.Automation.ValuePattern]::Pattern)
@@ -542,11 +588,35 @@ try {
         [void](Wait-Name 'GameHeading' $title)
         $report.phases += 'cancel-edit-preserves-game'
 
-        Invoke-Element (Wait-Name 'EditGameButton' 'Edit game')
+        Invoke-Element (Wait-EnabledById 'EditGameButton')
         Set-Text 'GameTitleInput' $renamed
         Set-Text 'GamePlatformInput' ''
-        Set-Text 'GameNotesInput' ''
+        $longNotes = ('Note ' * 399) + 'Notes'
+        Set-Text 'GameNotesInput' $longNotes
         [void](Wait-Name 'GameTitleFeedback' "$($renamed.Length) / 160 characters")
+        Press-Enter (Wait-VisibleById 'GameTitleInput')
+        [void](Wait-Name 'GameHeading' $renamed)
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        $notes = Wait-VisibleById 'GameNotes'
+        if ($notes.Current.Name.Length -ne 2000) {
+            throw 'The saved 2,000-character game note was not rendered in full.'
+        }
+        $notesScroll = Wait-VisibleById 'GameNotesScroll'
+        if ($notesScroll.Current.BoundingRectangle.Height -ge
+            ($root.Current.BoundingRectangle.Height / 3)) {
+            throw 'Long game notes exceeded their bounded metadata region.'
+        }
+        $guideList = Wait-VisibleById 'GuideList'
+        if ($guideList.Current.BoundingRectangle.Height -lt
+            ($root.Current.BoundingRectangle.Height / 5)) {
+            throw 'Long game notes left no usable guide-list area.'
+        }
+        Start-Sleep -Milliseconds 500
+        $report.longNotesScreenshot = Save-WindowScreenshot 'long-notes'
+        $report.phases += 'long-notes-preserve-guide-area'
+
+        Invoke-Element (Wait-EnabledById 'EditGameButton')
+        Set-Text 'GameNotesInput' ''
         Press-Enter (Wait-VisibleById 'GameTitleInput')
         [void](Wait-Name 'GameHeading' $renamed)
         [void](Wait-Name 'ShellStatus' 'Game ready.')
@@ -555,13 +625,14 @@ try {
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
         [void](Wait-Name 'ShellStatus' 'Library ready.')
-        Invoke-Element (Wait-Name 'AddGameButton' 'Add game')
+        Invoke-Element (Wait-EnabledById 'AddGameButton')
         Set-Text 'GameTitleInput' $renamed
         [void](Wait-Name 'GameTitleFeedback' "$($renamed.Length) / 160 characters")
         Press-Enter (Wait-VisibleById 'GameTitleInput')
         [void](Wait-Name 'GameHeading' $renamed)
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Name 'ShellStatus' 'Library ready.')
         $count = Count-GameRows $renamed
         if ($count -ne 2) {
             throw "Library showed $count selectable duplicate-title games, expected two."

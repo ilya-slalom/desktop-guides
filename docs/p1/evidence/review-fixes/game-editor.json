@@ -1,0 +1,21 @@
+﻿{
+    "mode":  "game-editor",
+    "invocationId":  "041b5a567c9948b8aed83c91b49f0446",
+    "observedAt":  "2026-09-28T01:59:19.1148079Z",
+    "processId":  48928,
+    "sessionId":  1,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "cancel-and-invalid-title-leave-empty-library",
+                   "keyboard-add-unicode-and-optional-fields",
+                   "cancel-edit-preserves-game",
+                   "long-notes-preserve-guide-area",
+                   "edit-by-id-and-clear-optional-fields",
+                   "duplicate-title-games-are-distinct"
+               ],
+    "addGameScreenshot":  "E:\\work\\desktop-guides\\review-fixes-20260928\\artifacts\\installed-review\\game-editor.add-game.png",
+    "editGameScreenshot":  "E:\\work\\desktop-guides\\review-fixes-20260928\\artifacts\\installed-review\\game-editor.edit-game.png",
+    "longNotesScreenshot":  "E:\\work\\desktop-guides\\review-fixes-20260928\\artifacts\\installed-review\\game-editor.long-notes.png"
+}

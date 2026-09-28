@@ -701,9 +701,10 @@ project uses a provisional package identity until T17.1 sets the public one.
   removes that temporary output.
 - **T20.2** Validate archive version, supported schema version, entry count,
   expanded size, duplicate and escaping names, hashes, database integrity,
-  foreign keys, and all managed-guide references in a staging root before
-  touching the live library. Canonical export destinations must be outside
-  the package's app-data parent;
+  foreign keys, all managed-guide references, and every
+  `GameMetadataLinks` artwork reference and manifest entry in a staging root
+  before touching the live library. Canonical export destinations must be
+  outside the package's app-data parent;
   the Settings flow and first-import reminder explain why. P1 choices are
   Cancel or Replace after a count summary; merging two libraries is deferred.
   For Replace, close database/readers, write a restore marker outside the

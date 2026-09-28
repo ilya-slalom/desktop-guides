@@ -51,8 +51,40 @@ duplicate-title games appeared. The
 games again. The signed test package and temporary trust were removed after
 the run. The [Add game screenshot](evidence/ci/game-editor/add-game.png) and
 [Edit game screenshot](evidence/ci/game-editor/edit-game.png) show the installed
-WinUI form. T04.1's listed Windows x64 exit checks passed; the complete P1
-workflow and Windows 10/ARM64 runtime checks remain later gates.
+WinUI form. T04.1's exercised Windows x64 checks passed. The retryable
+repository-write failure still needs installed fault injection; the complete
+P1 workflow and Windows 10/ARM64 runtime checks remain later gates.
+
+### T04.1 review fixes — Windows 11 x64 check, 28 September 2026
+
+PR #11 review fixes reject queued Add/Edit work after shutdown begins and
+recheck closing state after the Edit metadata read. The dialog disables its
+originating action until the request finishes. Normalized field lengths now
+control validation without truncating a valid boundary value surrounded by
+whitespace. Game notes render in a selectable, vertically scrollable
+96-DIP region so the guide area retains the remaining height. T20.2 restore
+design now validates managed game-artwork references as well as guide files.
+
+On the Windows 11 x64 host, both changed PowerShell scripts passed parser
+checks, Core passed 73/73, Infrastructure passed 90/90, and the unsigned
+Release x64 production MSIX built with only the existing missing-symbols-tool
+warning. The installed [game-editor trace](evidence/review-fixes/game-editor.json)
+passed the trimmed 160-character input, 2,000-character note, duplicate-title,
+cancel, and update checks. The
+[long-note screenshot](evidence/review-fixes/long-notes.png) shows the bounded
+metadata area with the guide region still available.
+
+The installed shutdown fixture prepared Game view and blocked Edit's metadata
+read in process 58520, as recorded by the
+[prepare trace](evidence/review-fixes/prepare-game-editor-close.json) and
+[queued-edit trace](evidence/review-fixes/queue-game-editor.json). Close
+drained that process and the controller launched process 11748 for the next
+scenario, proving the editor did not reopen and hold shutdown. The later
+[normal trace](evidence/review-fixes/normal.json) stopped at an unchanged
+background-window pointer click on the local host. The
+[install report](evidence/review-fixes/signed-install.json) records the
+limitation and confirms no package or temporary certificate remained. Full
+installed regression remains a PR CI gate.
 
 ## M0 task results
 

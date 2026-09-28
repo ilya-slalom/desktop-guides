@@ -1,0 +1,13 @@
+﻿{
+    "mode":  "prepare-game-editor-close",
+    "invocationId":  "cffa0f08819f4c7a825fbd435d27321d",
+    "observedAt":  "2026-09-28T01:59:33.7927156Z",
+    "processId":  58520,
+    "sessionId":  1,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "game-ready-for-editor-close"
+               ]
+}

@@ -36,18 +36,19 @@ Notes                           0 / 2000
 ```
 
 Normalize whitespace at save, allow duplicate titles, and identify edits by
-stable Game ID. Match the existing schema limits: title 1–160, platform
-0–80, and notes 0–2,000 characters. An empty optional field becomes `null`.
-Use the same validator in UI and repository so a direct repository caller
-cannot bypass limits.
+stable Game ID. Match the existing schema limits after trimming: title 1–160,
+platform 0–80, and notes 0–2,000 characters. An empty optional field becomes
+`null`. The input fields do not truncate a valid normalized value because of
+surrounding whitespace. Use the same validator in UI and repository so a
+direct repository caller cannot bypass limits.
 
 ## Sequence and exit
 
 | Step | Output and check |
 | --- | --- |
 | Contract | Shared normalized metadata input and `UpdateGameAsync` preserve ID and CreatedUtc, update UpdatedUtc, and leave guides and state untouched. Repository tests cover Unicode, duplicate titles, optional fields, limits, and missing IDs. |
-| UI | Library Add and Game Edit open the same dialog. Primary is disabled until the trimmed title is valid. Length feedback, keyboard submission, accessible labels/focus, cancel, and retryable write errors work in a narrow WinUI window. |
-| Installed check | Signed x64 production shell UIA creates a Unicode game with optional fields, cancels a draft, creates a duplicate title, edits by ID, and verifies persisted rows after relaunch. Capture an actual Add/Edit dialog screenshot for the PR description. |
+| UI | Library Add and Game Edit open the same dialog. Primary is disabled until all normalized fields fit their limits. Length feedback, keyboard submission, accessible labels/focus, cancel, and retryable write errors work in a narrow WinUI window. Long notes stay in a bounded, scrollable region so the guide list remains usable. |
+| Installed check | Signed x64 production shell UIA creates a Unicode game with optional fields, accepts a trimmed 160-character boundary value without truncation, bounds a 2,000-character note, cancels a draft, creates a duplicate title, edits by ID, closes during a blocked edit read without reopening the dialog, and verifies persisted rows after relaunch. Capture the affected UI for the PR description. |
 
 T04.4 will place provider search and edition selection ahead of this dialog,
 using it for `Create manually` and local overrides. T04.2 will add removal and

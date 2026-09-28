@@ -308,6 +308,7 @@ jobs:
             artifacts/production-shell/installed/normal.game.png
             artifacts/production-shell/installed/game-editor.add-game.png
             artifacts/production-shell/installed/game-editor.edit-game.png
+            artifacts/production-shell/installed/game-editor.long-notes.png
             artifacts/production-shell/installed/game-editor.failure.png
           if-no-files-found: warn
 

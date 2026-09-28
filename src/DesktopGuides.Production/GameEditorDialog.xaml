@@ -10,7 +10,6 @@
         <StackPanel Spacing="4">
             <TextBox x:Name="GameTitleInput"
                      Header="Title"
-                     MaxLength="160"
                      TextChanged="InputChanged"
                      AutomationProperties.AutomationId="GameTitleInput" />
             <TextBlock x:Name="TitleFeedback"
@@ -20,7 +19,6 @@
         <StackPanel Spacing="4">
             <TextBox x:Name="GamePlatformInput"
                      Header="Platform (optional)"
-                     MaxLength="80"
                      TextChanged="InputChanged"
                      AutomationProperties.AutomationId="GamePlatformInput" />
             <TextBlock x:Name="PlatformFeedback"
@@ -29,7 +27,6 @@
         <StackPanel Spacing="4">
             <TextBox x:Name="GameNotesInput"
                      Header="Notes (optional)"
-                     MaxLength="2000"
                      AcceptsReturn="True"
                      TextWrapping="Wrap"
                      Height="96"

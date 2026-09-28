@@ -444,18 +444,19 @@ machine. Missing WebView2 Runtime produces an actionable setup message.
 machine loss, or an unsuccessful upgrade does not leave my only guide copies
 unrecoverable. **Traces:** R8. **Depends on:** S03, S15.
 
-**Acceptance:** An archive saved outside app data restores games, guides,
-preferences, and reading state into a clean installation. Restore validates
-its integrity before replacing an existing library. Export and restore are
-user initiated. After the first import, the app explains that uninstall
-removes its live library and points to Export in Settings.
+**Acceptance:** An archive saved outside app data restores games, provider
+metadata and artwork, guides, preferences, and reading state into a clean
+installation. Restore validates its integrity and every managed reference
+before replacing an existing library. Export and restore are user initiated.
+After the first import, the app explains that uninstall removes its live
+library and points to Export in Settings.
 
 - **T20.1** Define a versioned manifest and archive of a consistent SQLite
   snapshot and managed guide files.
 - **T20.2** Build export, validation, and restore flows with cancel/replace
   conflict handling.
-- **TR20.1** Restore validates checksums and paths in staging before modifying
-  the active library.
+- **TR20.1** Restore validates checksums, paths, guide references, and provider
+  artwork references in staging before modifying the active library.
 - **TR20.2** The export includes no credentials, transient WebView2 data, or
   unrelated user files.
 

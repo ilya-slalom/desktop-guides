@@ -369,6 +369,23 @@ function Assert-RelaunchDuringClose {
     $report.normalAfterCloseRelaunch = Run-ShellSmoke 'normal' 'Blocked Write Guide'
 }
 
+function Assert-GameEditorDoesNotOpenDuringClose {
+    $closingProcessId = $report.launchedProcessId
+    $lockReady = Join-Path $ResultDirectory "editor-close-lock-ready-$runId"
+    $lockRelease = Join-Path $ResultDirectory "editor-close-lock-release-$runId"
+    $lockProcess = Start-ShellDatabaseLock `
+        'hold-read-lock' $lockReady $lockRelease
+    try {
+        $report.gameEditorQueuedBeforeClose = Run-ShellSmoke 'queue-game-editor'
+        Request-InstalledShellClose $closingProcessId
+    }
+    finally {
+        Release-ShellDatabaseLock $lockProcess $lockRelease
+    }
+    Wait-InstalledShellExit $closingProcessId
+    Start-InstalledShell
+}
+
 function Assert-LaterGuideWins {
     $lockReady = Join-Path $ResultDirectory "later-guide-lock-ready-$runId"
     $lockRelease = Join-Path $ResultDirectory "later-guide-lock-release-$runId"
@@ -708,6 +725,9 @@ try {
     dotnet run --project $seedProject -c Release --no-restore -- seed $dataRoot
     if ($LASTEXITCODE -ne 0) { throw 'Could not seed shell route metadata.' }
     Start-InstalledShell
+    $report.gameEditorClosePrepared =
+        Run-ShellSmoke 'prepare-game-editor-close'
+    Assert-GameEditorDoesNotOpenDuringClose
     $report.normal = Run-ShellSmoke 'normal'
     Assert-RelaunchDuringClose
     Assert-ClosingTargetRedirect

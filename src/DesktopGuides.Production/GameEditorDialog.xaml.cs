@@ -44,14 +44,20 @@ public sealed partial class GameEditorDialog : ContentDialog
             return;
         }
         string title = GameTitleInput.Text.Trim();
+        string platform = GamePlatformInput.Text.Trim();
+        string notes = GameNotesInput.Text.Trim();
         TitleFeedback.Text = title.Length == 0
             ? "Enter a title to continue."
-            : $"{GameTitleInput.Text.Length} / {GameDetails.TitleLimit} characters";
+            : $"{title.Length} / {GameDetails.TitleLimit} characters";
         PlatformFeedback.Text =
-            $"{GamePlatformInput.Text.Length} / {GameDetails.PlatformLimit} characters";
+            $"{platform.Length} / {GameDetails.PlatformLimit} characters";
         NotesFeedback.Text =
-            $"{GameNotesInput.Text.Length} / {GameDetails.NotesLimit} characters";
-        IsPrimaryButtonEnabled = !saving && title.Length is > 0 and <= GameDetails.TitleLimit;
+            $"{notes.Length} / {GameDetails.NotesLimit} characters";
+        IsPrimaryButtonEnabled =
+            !saving &&
+            title.Length is > 0 and <= GameDetails.TitleLimit &&
+            platform.Length <= GameDetails.PlatformLimit &&
+            notes.Length <= GameDetails.NotesLimit;
     }
 
     private async void SaveClicked(

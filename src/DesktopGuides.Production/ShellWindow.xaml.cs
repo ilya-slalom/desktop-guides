@@ -362,11 +362,12 @@ public sealed partial class ShellWindow : Window
             return;
         }
         gameEditorRequested = true;
+        AddGameButton.IsEnabled = false;
         try
         {
             await RunNavigationAsync(async () =>
             {
-                if (navigator.Current is not LibraryRoute)
+                if (closeRequested || navigator.Current is not LibraryRoute)
                 {
                     return;
                 }
@@ -398,6 +399,10 @@ public sealed partial class ShellWindow : Window
         finally
         {
             gameEditorRequested = false;
+            if (!closeRequested)
+            {
+                AddGameButton.IsEnabled = true;
+            }
         }
     }
 
@@ -409,16 +414,22 @@ public sealed partial class ShellWindow : Window
             return;
         }
         gameEditorRequested = true;
+        EditGameButton.IsEnabled = false;
         try
         {
             await RunNavigationAsync(async () =>
             {
-                if (navigator.Current is not GameRoute current ||
+                if (closeRequested ||
+                    navigator.Current is not GameRoute current ||
                     current.GameId != route.GameId)
                 {
                     return;
                 }
                 Game? game = await RequireRepository().GetGameAsync(route.GameId);
+                if (closeRequested)
+                {
+                    return;
+                }
                 if (game is null)
                 {
                     ShellStatus.Text = "This game is no longer in your library.";
@@ -450,13 +461,17 @@ public sealed partial class ShellWindow : Window
         finally
         {
             gameEditorRequested = false;
+            if (!closeRequested && navigator.Current is GameRoute)
+            {
+                EditGameButton.IsEnabled = true;
+            }
         }
     }
 
     private Task RunNavigationAsync(Func<Task> action) =>
         navigationQueue.RunAsync(async () =>
         {
-            if (ready)
+            if (ready && !closeRequested)
             {
                 await action();
             }

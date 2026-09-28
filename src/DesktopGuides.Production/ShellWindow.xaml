@@ -92,9 +92,17 @@
                     <TextBlock x:Name="GamePlatform"
                                TextWrapping="Wrap"
                                AutomationProperties.AutomationId="GamePlatform" />
-                    <TextBlock x:Name="GameNotes"
-                               TextWrapping="Wrap"
-                               AutomationProperties.AutomationId="GameNotes" />
+                    <ScrollViewer x:Name="GameNotesScroll"
+                                  MaxHeight="96"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto"
+                                  AutomationProperties.AutomationId="GameNotesScroll"
+                                  AutomationProperties.Name="Game notes">
+                        <TextBlock x:Name="GameNotes"
+                                   TextWrapping="Wrap"
+                                   IsTextSelectionEnabled="True"
+                                   AutomationProperties.AutomationId="GameNotes" />
+                    </ScrollViewer>
                 </StackPanel>
                 <Grid Grid.Row="2">
                     <TextBlock x:Name="GameEmpty"
