@@ -1,0 +1,16 @@
+﻿{
+    "mode":  "normal",
+    "invocationId":  "77e049a9331d49edaeff98e4f39b5f37",
+    "observedAt":  "2026-09-28T01:59:39.9626988Z",
+    "processId":  11748,
+    "sessionId":  1,
+    "exitDelayMilliseconds":  0,
+    "success":  false,
+    "phases":  [
+                   "library",
+                   "resume-reader",
+                   "reader-pane-toggle"
+               ],
+    "readerScreenshot":  "E:\\work\\desktop-guides\\review-fixes-20260928\\artifacts\\installed-review\\normal.reader.png",
+    "error":  "Expected visible \u0027GameHeading\u0027 named \u0027Route Test Game\u0027.\r\nAt E:\\work\\desktop-guides\\review-fixes-20260928\\tools\\p1\\windows_shell_ui_smoke.ps1:99 char:9\r\n+         throw \"Expected visible \u0027$id\u0027 named \u0027$expected\u0027.\"\r\n+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : OperationStopped: (Expected visibl...ute Test Game\u0027.:String) [], RuntimeException\r\n    + FullyQualifiedErrorId : Expected visible \u0027GameHeading\u0027 named \u0027Route Test Game\u0027.\r\n \r\n"
+}

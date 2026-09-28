@@ -69,7 +69,7 @@ flowchart LR
 For the packaged app, use
 `ApplicationData.Current.LocalFolder.Path/DesktopGuides/` as an app-data
 parent. Its live `library/` child contains `library.sqlite`,
-`content/<guide-id>/`, `.staging/<operation-id>/`, and
+`games/<game-id>/`, `content/<guide-id>/`, `.staging/<operation-id>/`, and
 `.trash/<operation-id>/`. Sibling `.restore/`, `.recovery/`, and
 `restore-state.json` support whole-library replacement without renaming a
 directory into itself. Put transient WebView2 profiles under
@@ -90,31 +90,36 @@ renames is outside P1. Never recurse into unknown directories during cleanup.
 
 ### Initial schema and invariants
 
-Schema v1 establishes the tables below; schema v2 adds the last-opened-time
-index. New databases apply both versions in order and finish with
-`PRAGMA user_version=2`. Use `Guid` text IDs, UTC Unix-millisecond integers,
-parameterized SQL, `CHECK` constraints for bounded strings and fractions,
-and `PRAGMA foreign_keys=ON` on **every** connection. `ON DELETE CASCADE`
-handles dependent rows inside the database; only application services may
-invoke deletes because files need separate coordination.
+Schema v1 establishes the original tables below; schema v2 adds the
+last-opened-time index. T04.4 adds schema v3 with `GameMetadataLinks` and the
+`AddGameMetadata` journal kind. New databases apply all available versions in
+order and, after T04.4 lands, finish with `PRAGMA user_version=3`. Use `Guid`
+text IDs, UTC Unix-millisecond integers, parameterized SQL, `CHECK`
+constraints for bounded strings and fractions, and
+`PRAGMA foreign_keys=ON` on **every** connection. `ON DELETE CASCADE` handles
+dependent rows inside the database; only application services may invoke
+deletes because files need separate coordination.
 
 | Table | Required fields and constraints |
 | --- | --- |
-| `Games` | `Id` primary key, trimmed `Title` (1–160), optional `Platform` (up to 80) and `Notes` (up to 2,000), `CreatedUtcMs`, `UpdatedUtcMs`. |
+| `Games` | `Id` primary key, trimmed editable `Title` (1–160), optional editable `Platform` (up to 80) and `Notes` (up to 2,000), `CreatedUtcMs`, `UpdatedUtcMs`. |
+| `GameMetadataLinks` | `GameId` primary/foreign key, bounded `Provider` and `ExternalGameId` with a unique pair, normalized canonical title/platform/release/developer/publisher snapshot, optional managed artwork relative path, and `FetchedUtcMs`. Provider-specific payloads are not persisted without a separately bounded, versioned contract. |
 | `Guides` | `Id` primary key, `GameId` foreign key to Games, title (1–200), format enum, unique `ManagedRelativeRoot`, `PrimaryRelativePath`, `ContentSha256`, `ContentBytes`, optional source label, nullable TXT-only `TextCodePage` (437 or 1252), `ImportedUtcMs`, `UpdatedUtcMs`. |
 | `ReadingStates` | `GuideId` primary/foreign key, nullable versioned locator JSON, nullable estimated fraction in `[0,1]`, nullable `LastOpenedUtcMs`, nullable `CompletedUtcMs`. A new guide has no estimated fraction. |
 | `ReaderPreferences` | `GuideId` primary/foreign key, nullable TXT/HTML font scale within the permitted range. |
 | `Settings` | Key/value rows for system/light/dark theme and last active guide ID; a stale guide ID is ignored at launch. |
-| `FileOperations` | Operation ID, `Import`/`DeleteGuide`/`DeleteGame`, `Prepared`/`Committed` phase, validated JSON manifest of generated guide IDs and app-owned paths, creation time. Stable for startup recovery. |
+| `FileOperations` | Operation ID, `Import`/`AddGameMetadata`/`DeleteGuide`/`DeleteGame`, `Prepared`/`Committed` phase, validated JSON manifest of generated game or guide IDs and app-owned paths, creation time. Stable for startup recovery. |
 
-Create `Guides(GameId)` in v1 and `ReadingStates(LastOpenedUtcMs)` in v2. Do
-not duplicate a global reading position on Game or filename. Invariant/culture-independent
-title comparison is performed on metadata in Core so non-ASCII case behavior
-does not depend on SQLite's built-in `NOCASE`; paginate **after** filtering.
-Reassess query strategy only if measured libraries make this too slow.
-For TXT/PDF, `ContentSha256` is the copied file hash. For HTML, it is SHA-256
-of a canonical sorted list of managed relative paths and each file's SHA-256,
-so an asset change also changes the guide fingerprint.
+Create `Guides(GameId)` in v1, `ReadingStates(LastOpenedUtcMs)` in v2, and the
+provider/external-ID unique constraint with `GameMetadataLinks` in v3. Do not
+duplicate a global reading position on Game or filename.
+Invariant/culture-independent title comparison is performed on metadata in
+Core so non-ASCII case behavior does not depend on SQLite's built-in
+`NOCASE`; paginate **after** filtering. Reassess query strategy only if
+measured libraries make this too slow. For TXT/PDF, `ContentSha256` is the
+copied file hash. For HTML, it is SHA-256 of a canonical sorted list of
+managed relative paths and each file's SHA-256, so an asset change also
+changes the guide fingerprint.
 
 ### Cross-boundary protocol
 
@@ -127,9 +132,21 @@ At startup, a prepared import with no Guide row removes only its named staged
 or newly moved directory; a committed Guide row is never removed by a janitor.
 The UI lists only committed Guide rows.
 
+A provider-backed game addition uses the same publication boundary. It writes
+a prepared `AddGameMetadata` operation for one generated Game ID, downloads
+optional artwork only into its named staging root, validates and decodes the
+bounded image, and renames the generated game root into `games/<game-id>` on
+the same volume. One SQLite transaction then inserts `Games` and
+`GameMetadataLinks` and removes the operation row. If there is no artwork,
+the manifest has no owned path and publication is database-only. At startup,
+a prepared operation with no Game row removes only its exact staging or final
+game root; a committed Game row is retained. Cancellation cleans up the
+prepared row and its exact owned paths before returning control to the dialog.
+
 A **guide or game deletion** first writes a `Prepared` operation naming all
-owned guide IDs, moves their directories to `.trash/<operation-id>`, then
-deletes metadata and marks the operation `Committed` in one transaction.
+owned guide IDs and, for a game, its exact generated `games/<game-id>` root,
+moves their directories to `.trash/<operation-id>`, then deletes metadata and
+marks the operation `Committed` in one transaction.
 If move or commit fails, restore any moved directories and keep metadata.
 At startup, `Prepared` deletion with remaining database rows restores files;
 `Committed` deletion removes its exact trash paths and then its operation
@@ -141,33 +158,43 @@ For T15.2, `ManifestJson` v1 contains `schemaVersion`, canonical `"N"` guide
 IDs, and the expected library-relative `ownedPaths`. An import names one
 `.staging/<operation-id>/<guide-id>` and `content/<guide-id>` pair. A
 `DeleteGuide` names one `content/<guide-id>` and
-`.trash/<operation-id>/<guide-id>` pair; `DeleteGame` names one or more such
-pairs. Recovery derives paths from IDs and requires the manifest paths to
-match exactly. It rejects unknown versions, duplicate IDs or claims, unsafe
-paths, incompatible row phases, and conflicting directory states before
-changing files. A nested filesystem link blocks that operation without being
-followed.
+`.trash/<operation-id>/<guide-id>` pair; a v1 `DeleteGame` names one or more
+guide pairs.
 
-Recovery compares committed `Guides.Id` values as parsed GUIDs, since the
-SQLite schema permits uppercase spelling of a generated ID. An unparseable
-or duplicate logical Guide ID stops cleanup before any owned tree changes.
-The orphan count uses the same GUID identity for content directory names.
+T04.4 adds manifest v2 without reinterpreting v1. V2 retains `guideIds` and
+adds canonical `"N"` `gameIds`. `AddGameMetadata` requires exactly one Game
+ID, no Guide IDs, and, when artwork is present, one
+`.staging/<operation-id>/<game-id>` and `games/<game-id>` pair. A v2
+`DeleteGame` requires exactly one Game ID, its current Guide IDs, their guide
+pairs, and the generated game root when present. The parser continues to
+accept pending v1 operations after migration. Recovery derives paths from IDs
+and requires the manifest paths to match exactly. It rejects unknown versions,
+duplicate IDs or claims, unsafe paths, incompatible row phases, and
+conflicting directory states before changing files. A nested filesystem link
+blocks that operation without being followed.
+
+Recovery compares committed `Guides.Id` and `Games.Id` values as parsed GUIDs,
+since the SQLite schema permits uppercase spelling of a generated ID. An
+unparseable or duplicate logical ID stops cleanup before any owned tree
+changes. Orphan counts use the same GUID identity for content and game
+directory names.
 
 The startup reconciler preflights every journal row, then resolves rows in
 creation order. It removes only the named roots for a prepared import with
-no committed Guide; restores named trash roots for a prepared deletion whose
-Guides still exist; and removes named trash roots for a committed deletion
-whose Guides are absent. It clears each row after its filesystem work, so
-a crash can be retried. It leaves untracked entries under `content`,
-`.staging`, and `.trash` untouched and reports their count for a later
-`Review orphan` UI. A collision or malformed row stops startup recovery
-while preserving the journal and files for repair.
+no committed Guide; removes only the named roots for a prepared metadata add
+with no committed Game; restores named trash roots for a prepared deletion
+whose Games or Guides still exist; and removes named trash roots for a
+committed deletion whose target rows are absent. It clears each row after its
+filesystem work, so a crash can be retried. It leaves untracked entries under
+`games`, `content`, `.staging`, and `.trash` untouched and reports their count
+for a later `Review orphan` UI. A collision or malformed row stops startup
+recovery while preserving the journal and files for repair.
 
 On startup, run schema validation/migration, reconcile known operations,
-then detect untracked directories under `content` without deleting them.
-Surface missing/corrupt managed guides as repairable rows. If the database is
-corrupt, stop publication and offer the recovery copy; never initialize an
-empty replacement over the existing file.
+then detect untracked directories under `games` and `content` without
+deleting them. Surface missing/corrupt managed artwork and guides as
+repairable rows. If the database is corrupt, stop publication and offer the
+recovery copy; never initialize an empty replacement over the existing file.
 
 ### Migrations and backup
 
@@ -176,7 +203,10 @@ Before a schema upgrade, create a consistent recovery database with
 insufficient. Apply each forward migration and `user_version` change in one
 transaction, then run both `integrity_check` and `foreign_key_check`. Failure
 rolls back and leaves the old file/copy for recovery. A populated v1 fixture
-must upgrade to v2 with the last-opened index and all rows intact.
+must upgrade to v2 with the last-opened index and all rows intact. T04.4 adds
+a populated v2-to-v3 fixture that proves existing games and guides survive,
+the metadata-link table and unique provider key are present, and a failed v3
+migration preserves the v2 database or recovery copy.
 Reject filesystem links at `library.sqlite`, its `-wal`, `-shm`, and
 `-journal` sidecars, and their parent paths before each database open. On
 Windows, also reject any of these files with multiple hard links, using a
@@ -346,7 +376,8 @@ project uses a provisional package identity until T17.1 sets the public one.
   optional platform/notes, length feedback, and Save disabled until valid.
   Duplicate titles are allowed because distinct editions/platforms can share
   a name; stable IDs disambiguate them. Cancel closes without a repository
-  call. Test keyboard submission, errors, and Unicode names.
+  write. Test keyboard submission, errors, and Unicode names. Use this dialog
+  as T04.4's manual/offline fallback and local-override editor.
 - **T04.2** Show game details and rename/remove actions bound to the game ID.
   A rename updates `UpdatedUtcMs`, keeps guide IDs and reading state intact,
   refreshes Library/Game breadcrumbs, and preserves list selection. An
@@ -357,7 +388,26 @@ project uses a provisional package identity until T17.1 sets the public one.
   service; if the count changed, refresh the dialog rather than deleting an
   unexpected set. Use the multi-guide trash protocol in section 2. Verify
   confirmed, canceled, failed-move, failed-commit, and startup-recovery
-  cases; no unrelated game directory is touched.
+  cases; remove the exact provider snapshot and managed artwork root, and
+  touch no unrelated game directory.
+- **T04.4** Record a provider decision covering catalog/edition coverage,
+  public-client authentication, licensing, attribution, rate limits,
+  availability, and artwork terms. A provider requiring a confidential
+  credential must use an approved service boundary or be rejected; never
+  ship that secret in the desktop package. Add the schema-v3 migration,
+  preserve pending manifest-v1 operations, and introduce manifest v2 with
+  explicit Game IDs. Add a provider-neutral Core contract with bounded,
+  cancellation-aware search and detail/artwork retrieval. The Add game dialog searches online,
+  distinguishes editions by platform/release data, and offers
+  `Create manually` at all times. Selecting a result allocates a local Game
+  ID, stages and validates bounded artwork, then publishes the Game, unique
+  provider link, normalized snapshot, and managed artwork through the
+  recovery journal. Store no remote URL as an offline display dependency.
+  Explicit refresh updates the source snapshot while preserving editable
+  local title/platform/notes. Test v2 migration and rollback, duplicate
+  provider IDs, cancellation, timeout, rate limiting, malformed/oversized
+  metadata and images, provider outage, offline fallback, crash recovery,
+  refresh overrides, and relaunch without networking.
 
 ### S05 — Browse and find library entries
 
@@ -651,9 +701,10 @@ project uses a provisional package identity until T17.1 sets the public one.
   removes that temporary output.
 - **T20.2** Validate archive version, supported schema version, entry count,
   expanded size, duplicate and escaping names, hashes, database integrity,
-  foreign keys, and all managed-guide references in a staging root before
-  touching the live library. Canonical export destinations must be outside
-  the package's app-data parent;
+  foreign keys, all managed-guide references, and every
+  `GameMetadataLinks` artwork reference and manifest entry in a staging root
+  before touching the live library. Canonical export destinations must be
+  outside the package's app-data parent;
   the Settings flow and first-import reminder explain why. P1 choices are
   Cancel or Replace after a count summary; merging two libraries is deferred.
   For Replace, close database/readers, write a restore marker outside the
@@ -703,7 +754,7 @@ project uses a provisional package identity until T17.1 sets the public one.
 
 Every P1 task closes with a code or documentation artifact, a named test or
 manual trace, and a reviewable result. The [implementation plan](p1/implementation-plan.md)
-lists dependencies and specific exits for all 49 tasks. Core/Infrastructure
+lists dependencies and specific exits for all 50 tasks. Core/Infrastructure
 tests run on the locked Windows CI toolchain; critical file-boundary and
 symlink tests also run on Windows NTFS. UI Automation, Narrator, high
 contrast, DPI, installed-package, and offline checks run on target Windows

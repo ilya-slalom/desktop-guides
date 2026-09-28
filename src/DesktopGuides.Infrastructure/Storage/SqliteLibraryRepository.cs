@@ -39,9 +39,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
     public Task<Game> AddGameAsync(
         string title, string? platform, string? notes, CancellationToken token = default)
     {
-        title = RequiredText(title, 160, nameof(title));
-        platform = OptionalText(platform, 80, nameof(platform));
-        notes = OptionalText(notes, 2000, nameof(notes));
+        GameDetails details = GameDetails.Create(title, platform, notes);
         return WriteAsync(() =>
         {
             Guid id = Guid.NewGuid();
@@ -54,12 +52,66 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                 ) VALUES ($id, $title, $platform, $notes, $now, $now)
                 """;
             command.Parameters.AddWithValue("$id", id.ToString("N"));
-            command.Parameters.AddWithValue("$title", title);
-            command.Parameters.AddWithValue("$platform", (object?)platform ?? DBNull.Value);
-            command.Parameters.AddWithValue("$notes", (object?)notes ?? DBNull.Value);
+            command.Parameters.AddWithValue("$title", details.Title);
+            command.Parameters.AddWithValue(
+                "$platform", (object?)details.Platform ?? DBNull.Value);
+            command.Parameters.AddWithValue("$notes", (object?)details.Notes ?? DBNull.Value);
             command.Parameters.AddWithValue("$now", now.ToUnixTimeMilliseconds());
             command.ExecuteNonQuery();
-            return new Game(id, title, platform, notes, now, now);
+            return new Game(id, details.Title, details.Platform, details.Notes, now, now);
+        }, token);
+    }
+
+    public Task<Game> UpdateGameAsync(
+        Guid gameId, string title, string? platform, string? notes,
+        CancellationToken token = default)
+    {
+        if (gameId == Guid.Empty)
+        {
+            throw new ArgumentException("A game ID is required.", nameof(gameId));
+        }
+        GameDetails details = GameDetails.Create(title, platform, notes);
+        return WriteAsync(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteCommand existing = connection.CreateCommand();
+            existing.CommandText = """
+                SELECT Id, Title, Platform, Notes, CreatedUtcMs, UpdatedUtcMs
+                FROM Games WHERE Id = $id
+                """;
+            existing.Parameters.AddWithValue("$id", gameId.ToString("N"));
+            Game game;
+            using (SqliteDataReader reader = existing.ExecuteReader())
+            {
+                if (!reader.Read())
+                {
+                    throw new InvalidOperationException("This game is no longer in the library.");
+                }
+                game = ReadGame(reader);
+            }
+
+            DateTimeOffset now = clock.GetUtcNow();
+            using SqliteCommand update = connection.CreateCommand();
+            update.CommandText = """
+                UPDATE Games
+                SET Title = $title, Platform = $platform, Notes = $notes,
+                    UpdatedUtcMs = $updated
+                WHERE Id = $id
+                """;
+            update.Parameters.AddWithValue("$id", gameId.ToString("N"));
+            update.Parameters.AddWithValue("$title", details.Title);
+            update.Parameters.AddWithValue(
+                "$platform", (object?)details.Platform ?? DBNull.Value);
+            update.Parameters.AddWithValue("$notes", (object?)details.Notes ?? DBNull.Value);
+            update.Parameters.AddWithValue("$updated", now.ToUnixTimeMilliseconds());
+            RequireUpdated(update.ExecuteNonQuery(), "game");
+            return game with
+            {
+                Title = details.Title,
+                Platform = details.Platform,
+                Notes = details.Notes,
+                UpdatedUtc = now
+            };
         }, token);
     }
 
@@ -559,26 +611,6 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         {
             throw new InvalidOperationException($"Cannot update missing {kind}.");
         }
-    }
-
-    private static string RequiredText(string value, int limit, string name)
-    {
-        string trimmed = value?.Trim() ?? "";
-        if (trimmed.Length is < 1 || trimmed.Length > limit)
-        {
-            throw new ArgumentException($"A {name} of 1–{limit} characters is required.", name);
-        }
-        return trimmed;
-    }
-
-    private static string? OptionalText(string? value, int limit, string name)
-    {
-        string? trimmed = value?.Trim();
-        if (trimmed?.Length > limit)
-        {
-            throw new ArgumentException($"{name} exceeds {limit} characters.", name);
-        }
-        return trimmed is { Length: 0 } ? null : trimmed;
     }
 
     private static string? NullableString(SqliteDataReader reader, int ordinal) =>

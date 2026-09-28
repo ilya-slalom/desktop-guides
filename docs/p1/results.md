@@ -4,7 +4,7 @@ Status: M0 merged into `main` through
 [PR #3](https://github.com/ilya-slalom/desktop-guides/pull/3) on
 26 September 2026, including the SQLite initialization review fix.
 The P1 first usable release remains in progress. The
-[dependency plan](implementation-plan.md) defines all 49 task exit gates;
+[dependency plan](implementation-plan.md) defines all 50 task exit gates;
 this file records checks actually run.
 
 The M2 T07.1 scanner verification is recorded in the
@@ -12,9 +12,79 @@ The M2 T07.1 scanner verification is recorded in the
 T07.1 was merged into `main` through PR #9 on 27 September 2026 at
 `7039aef8127f4fcf45f1547344b4e88dad849b59`. Its last Windows 11 x64
 run passed 74/74 Infrastructure tests and an unsigned Release x64 MSIX
-build; all 18 CI checks passed. T07.2 is now in progress.
+build; all 18 CI checks passed.
 The T07.2 Windows implementation check is recorded in the
 [static-boundary result](t07-static-boundary-results.md).
+T07.2 was merged into `main` through PR #10 on 27 September 2026 at
+`72f43785fad2b01b3f79b739017f0623d46b6665`. Its final Windows 11 x64
+run passed 89/89 Infrastructure tests and an unsigned Release x64 MSIX build;
+all 18 CI checks passed. T04.1's Windows x64 checks passed in PR #11,
+pending merge.
+
+On 28 September 2026, requirements review added T04.4 for provider-backed,
+search-first game addition with a cached offline metadata/artwork snapshot and
+T04.1 as the manual fallback. T04.4 now precedes T04.2, T05.1, and T06.1.
+No provider has been selected and no T04.4 implementation result is claimed.
+
+## M2 T04.1 game editor — implementation check, 27 September 2026
+
+The [game editor plan](t04-game-editor-plan.md) defines the shared Add/Edit
+dialog and repository contract. On the Windows 11 x64 host (build
+`10.0.26200.0`, .NET SDK `10.0.401`), the branch was staged under
+`E:\work\desktop-guides\t04-game-editor-20260927`. Locked Core,
+Infrastructure, and Production restores passed; Release Core tests passed
+**73/73**, Infrastructure tests **90/90**, and an unsigned Release x64
+Production MSIX build passed. The host's existing `mspdbcmf.exe`
+symbols-package warning remains. Both changed PowerShell UI/installer
+scripts passed a Windows PowerShell parser check.
+
+The signed installed `production-shell-ui` job passed on the Windows CI
+runner (Windows build `10.0.26100.0`, x64, .NET SDK `10.0.401`) for source
+`76a762724b260d3b028a94691ae259f673894455`, in
+[push run 36331946181](https://github.com/ilya-slalom/desktop-guides/actions/runs/36331946181).
+The [game editor UI trace](evidence/ci/game-editor/game-editor.json) shows
+invalid-title and canceled drafts left an empty library, keyboard submission
+created a trimmed Unicode title and optional fields, canceled Edit preserved
+the game, an ID-bound edit cleared optional fields, and two selectable
+duplicate-title games appeared. The
+[relaunch trace](evidence/ci/game-editor/game-editor-persisted.json) found both
+games again. The signed test package and temporary trust were removed after
+the run. The [Add game screenshot](evidence/ci/game-editor/add-game.png) and
+[Edit game screenshot](evidence/ci/game-editor/edit-game.png) show the installed
+WinUI form. T04.1's exercised Windows x64 checks passed. The retryable
+repository-write failure still needs installed fault injection; the complete
+P1 workflow and Windows 10/ARM64 runtime checks remain later gates.
+
+### T04.1 review fixes — Windows 11 x64 check, 28 September 2026
+
+PR #11 review fixes reject queued Add/Edit work after shutdown begins and
+recheck closing state after the Edit metadata read. The dialog disables its
+originating action until the request finishes. Normalized field lengths now
+control validation without truncating a valid boundary value surrounded by
+whitespace. Game notes render in a selectable, vertically scrollable
+96-DIP region so the guide area retains the remaining height. T20.2 restore
+design now validates managed game-artwork references as well as guide files.
+
+On the Windows 11 x64 host, both changed PowerShell scripts passed parser
+checks, Core passed 73/73, Infrastructure passed 90/90, and the unsigned
+Release x64 production MSIX built with only the existing missing-symbols-tool
+warning. The installed [game-editor trace](evidence/review-fixes/game-editor.json)
+passed the trimmed 160-character input, 2,000-character note, duplicate-title,
+cancel, and update checks. The
+[long-note screenshot](evidence/review-fixes/long-notes.png) shows the bounded
+metadata area with the guide region still available.
+
+The installed shutdown fixture prepared Game view and blocked Edit's metadata
+read in process 58520, as recorded by the
+[prepare trace](evidence/review-fixes/prepare-game-editor-close.json) and
+[queued-edit trace](evidence/review-fixes/queue-game-editor.json). Close
+drained that process and the controller launched process 11748 for the next
+scenario, proving the editor did not reopen and hold shutdown. The later
+[normal trace](evidence/review-fixes/normal.json) stopped at an unchanged
+background-window pointer click on the local host. The
+[install report](evidence/review-fixes/signed-install.json) records the
+limitation and confirms no package or temporary certificate remained. Full
+installed regression remains a PR CI gate.
 
 ## M0 task results
 

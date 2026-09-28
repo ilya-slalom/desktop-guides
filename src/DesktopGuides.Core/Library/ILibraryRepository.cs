@@ -6,6 +6,9 @@ public interface ILibraryRepository : IAsyncDisposable
     Task InitializeAsync(CancellationToken token = default);
     Task<Game> AddGameAsync(
         string title, string? platform, string? notes, CancellationToken token = default);
+    Task<Game> UpdateGameAsync(
+        Guid gameId, string title, string? platform, string? notes,
+        CancellationToken token = default);
     Task<IReadOnlyList<Game>> ListGamesAsync(CancellationToken token = default);
     Task<Game?> GetGameAsync(Guid gameId, CancellationToken token = default);
     Task<IReadOnlyList<Guide>> ListGuidesAsync(

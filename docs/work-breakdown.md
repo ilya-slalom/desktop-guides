@@ -129,17 +129,37 @@ upgrade preserves a populated test library.
 guides under each game so my library matches what I am playing. **Traces:** R1,
 R8. **Depends on:** S03, S11.
 
-**Acceptance:** Two guides can belong to one game and retain independent
-reading state. Removing a game containing guides shows the number of affected
-guides and requires confirmation.
+**Acceptance:** When online, Add game can search the selected external
+metadata provider and create a local game from a chosen edition. The provider
+snapshot and artwork remain available offline. A visible manual option works
+without a provider or connection. Two guides can belong to one game and retain
+independent reading state. Removing a game containing guides shows the number
+of affected guides and requires confirmation.
 
 - **T04.1** Build add/edit game dialogs and validate titles; support optional
-  platform and notes without making either mandatory.
+  platform and notes without making either mandatory. This is the manual and
+  offline fallback for provider-based addition.
 - **T04.2** Build game detail actions for renaming and removal.
 - **T04.3** Implement confirmed cascade removal through the library service.
+- **T04.4** Select and document an externally backed game-metadata provider,
+  then implement a search-first Add game flow. Normalize bounded game/edition
+  results, persist provider provenance and a local metadata snapshot, cache
+  validated artwork in managed storage, preserve local overrides on refresh,
+  prevent an accidental duplicate provider ID, and retain T04.1 as the manual
+  fallback. Provider cancellation, timeout, unavailable service, malformed
+  data, and artwork failure leave no partial game or files. Do not embed a
+  confidential provider secret in the Windows client.
 - **TR04.1** Game removal deletes its guide metadata, reading state, reader
-  preferences, and managed content as one recoverable operation.
+  preferences, provider link/snapshot, cached artwork, and managed guide
+  content as one recoverable operation.
 - **TR04.2** Canceling removal changes neither database records nor files.
+- **TR04.3** A provider-linked game keeps a generated local Game ID and a
+  unique `(provider, external game ID)` association. The cached snapshot and
+  artwork work offline; refresh preserves local title, platform, and notes.
+- **TR04.4** Add game remains usable manually while offline. A canceled or
+  failed provider operation publishes neither a game row nor managed artwork,
+  and provider credentials, rate limits, attribution, and terms are handled by
+  the recorded provider decision.
 
 ### S05 — Browse and find library entries
 
@@ -424,18 +444,19 @@ machine. Missing WebView2 Runtime produces an actionable setup message.
 machine loss, or an unsuccessful upgrade does not leave my only guide copies
 unrecoverable. **Traces:** R8. **Depends on:** S03, S15.
 
-**Acceptance:** An archive saved outside app data restores games, guides,
-preferences, and reading state into a clean installation. Restore validates
-its integrity before replacing an existing library. Export and restore are
-user initiated. After the first import, the app explains that uninstall
-removes its live library and points to Export in Settings.
+**Acceptance:** An archive saved outside app data restores games, provider
+metadata and artwork, guides, preferences, and reading state into a clean
+installation. Restore validates its integrity and every managed reference
+before replacing an existing library. Export and restore are user initiated.
+After the first import, the app explains that uninstall removes its live
+library and points to Export in Settings.
 
 - **T20.1** Define a versioned manifest and archive of a consistent SQLite
   snapshot and managed guide files.
 - **T20.2** Build export, validation, and restore flows with cancel/replace
   conflict handling.
-- **TR20.1** Restore validates checksums and paths in staging before modifying
-  the active library.
+- **TR20.1** Restore validates checksums, paths, guide references, and provider
+  artwork references in staging before modifying the active library.
 - **TR20.2** The export includes no credentials, transient WebView2 data, or
   unrelated user files.
 

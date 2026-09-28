@@ -85,6 +85,58 @@ public sealed class SqliteLibraryRepositoryTests
     }
 
     [Fact]
+    public async Task EditingOneDuplicateNamedGameKeepsItsIdAndGuideState()
+    {
+        using TestLibrary directory = new();
+        DateTimeOffset later = Now.AddMinutes(12);
+        AdjustableTimeProvider clock = new(Now);
+        Guid editedId;
+        Guid otherId;
+        Guid guideId = Guid.NewGuid();
+        await using (SqliteLibraryRepository repository = new(directory.Paths, clock))
+        {
+            await repository.InitializeAsync();
+            Game first = await repository.AddGameAsync(
+                " 大航海時代 ", " PC ", " First note ");
+            Game other = await repository.AddGameAsync("大航海時代", null, null);
+            editedId = first.Id;
+            otherId = other.Id;
+            InsertGuide(directory.Paths.DatabasePath, guideId, editedId);
+            await repository.SaveReadingLocationAsync(
+                guideId, "{\"line\":12}", 0.2);
+            clock.Now = later;
+
+            Game changed = await repository.UpdateGameAsync(
+                editedId, " 大航海時代 II ", " Windows ", " ");
+            Assert.Equal(editedId, changed.Id);
+            Assert.Equal("大航海時代 II", changed.Title);
+            Assert.Equal("Windows", changed.Platform);
+            Assert.Null(changed.Notes);
+            Assert.Equal(Now, changed.CreatedUtc);
+            Assert.Equal(later, changed.UpdatedUtc);
+            Assert.Equal("大航海時代", (await repository.GetGameAsync(otherId))?.Title);
+            Assert.Equal(guideId, Assert.Single(
+                await repository.ListGuidesAsync(editedId)).Id);
+            Assert.Equal("{\"line\":12}",
+                (await repository.GetReadingStateAsync(guideId))?.LocatorJson);
+
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                repository.UpdateGameAsync(editedId, " ", null, null));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                repository.UpdateGameAsync(Guid.NewGuid(), "Missing", null, null));
+            Assert.Equal("大航海時代 II",
+                (await repository.GetGameAsync(editedId))?.Title);
+        }
+
+        await using SqliteLibraryRepository reopened = new(directory.Paths);
+        await reopened.InitializeAsync();
+        Assert.Equal("大航海時代 II", (await reopened.GetGameAsync(editedId))?.Title);
+        Assert.Equal(later, (await reopened.GetGameAsync(editedId))?.UpdatedUtc);
+        Assert.Equal("{\"line\":12}",
+            (await reopened.GetReadingStateAsync(guideId))?.LocatorJson);
+    }
+
+    [Fact]
     public async Task RejectsGuideRootThatIsNotBoundToItsId()
     {
         using TestLibrary directory = new();
@@ -615,6 +667,12 @@ public sealed class SqliteLibraryRepositoryTests
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    private sealed class AdjustableTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = now;
+        public override DateTimeOffset GetUtcNow() => Now;
     }
 
     private sealed class TestLibrary : IDisposable

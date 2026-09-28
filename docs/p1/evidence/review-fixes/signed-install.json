@@ -1,0 +1,149 @@
+﻿{
+    "runId":  "bd069f9b39a84355b5bcb510d62ef2a7",
+    "observedAt":  "2026-09-28T01:59:00.6109347Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "AMD64",
+    "success":  false,
+    "windowsAppRuntime":  [
+                              "2.2.0.0",
+                              "2.3.1.0",
+                              "2.4.0.0",
+                              "2.5.1.0"
+                          ],
+    "dotnetSdk":  "10.0.401",
+    "sourcePackageSha256":  "3CBBF693871865254975E5B11C508A18279B742C67DED212F36E93A3F6053E0C",
+    "certificateThumbprint":  "BCDD236797CABB9F2BD04D96F571D5E6539AE5C2",
+    "signedPackageSha256":  "81452F516FA6D8C2AB1B51367001F38BF3B21DC9D9B8C0968DE0024E2A15D571",
+    "packageFullName":  "DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+    "packageFamilyName":  "DesktopGuides.Preview_en8r599z3n35j",
+    "installLocation":  "C:\\Program Files\\WindowsApps\\DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+    "launchedProcessId":  11748,
+    "launchedSessionId":  1,
+    "empty":  {
+                  "mode":  "empty",
+                  "invocationId":  "437be595d7fe48ca8a4721eeda55bec9",
+                  "observedAt":  "2026-09-28T01:59:08.3197767Z",
+                  "processId":  48928,
+                  "sessionId":  1,
+                  "exitDelayMilliseconds":  2000,
+                  "success":  true,
+                  "phases":  [
+                                 "library",
+                                 "empty-library"
+                             ]
+              },
+    "emptyAfterDelayedTask":  {
+                                  "mode":  "empty",
+                                  "invocationId":  "7ba77f09844b45c68988fb145c9e718d",
+                                  "observedAt":  "2026-09-28T01:59:12.6918454Z",
+                                  "processId":  48928,
+                                  "sessionId":  1,
+                                  "exitDelayMilliseconds":  0,
+                                  "success":  true,
+                                  "phases":  [
+                                                 "library",
+                                                 "empty-library"
+                                             ]
+                              },
+    "secondLaunchProcessId":  58080,
+    "backgroundActivation":  {
+                                 "handoffToken":  "6d1d4d1469cb4d9c89d560ceb7612357",
+                                 "foregroundTargetProcessId":  48928,
+                                 "probeWindowHandle":  454170096,
+                                 "foregroundWindowBefore":  454170096,
+                                 "targetWindowHandle":  260182058,
+                                 "foregroundWindowHandle":  260182058,
+                                 "childExited":  true,
+                                 "success":  true
+                             },
+    "redirectedActivationObserved":  true,
+    "secondLaunchProcessIds":  [
+                                   48928
+                               ],
+    "singleInstanceProcessId":  48928,
+    "emptyAfterSecondLaunch":  {
+                                   "mode":  "empty",
+                                   "invocationId":  "63e1945b70ec453a8883531e7587f78a",
+                                   "observedAt":  "2026-09-28T01:59:17.5505320Z",
+                                   "processId":  48928,
+                                   "sessionId":  1,
+                                   "exitDelayMilliseconds":  0,
+                                   "success":  true,
+                                   "phases":  [
+                                                  "library",
+                                                  "empty-library"
+                                              ]
+                               },
+    "gameEditor":  {
+                       "mode":  "game-editor",
+                       "invocationId":  "041b5a567c9948b8aed83c91b49f0446",
+                       "observedAt":  "2026-09-28T01:59:19.1148079Z",
+                       "processId":  48928,
+                       "sessionId":  1,
+                       "exitDelayMilliseconds":  0,
+                       "success":  true,
+                       "phases":  [
+                                      "library",
+                                      "cancel-and-invalid-title-leave-empty-library",
+                                      "keyboard-add-unicode-and-optional-fields",
+                                      "cancel-edit-preserves-game",
+                                      "long-notes-preserve-guide-area",
+                                      "edit-by-id-and-clear-optional-fields",
+                                      "duplicate-title-games-are-distinct"
+                                  ],
+                       "addGameScreenshot":  "E:\\work\\desktop-guides\\review-fixes-20260928\\artifacts\\installed-review\\game-editor.add-game.png",
+                       "editGameScreenshot":  "E:\\work\\desktop-guides\\review-fixes-20260928\\artifacts\\installed-review\\game-editor.edit-game.png",
+                       "longNotesScreenshot":  "E:\\work\\desktop-guides\\review-fixes-20260928\\artifacts\\installed-review\\game-editor.long-notes.png"
+                   },
+    "closedGracefully":  true,
+    "gameEditorPersisted":  {
+                                "mode":  "game-editor-persisted",
+                                "invocationId":  "bbd273bbae674fc194d9ad6be32524a3",
+                                "observedAt":  "2026-09-28T01:59:27.2615788Z",
+                                "processId":  45864,
+                                "sessionId":  1,
+                                "exitDelayMilliseconds":  0,
+                                "success":  true,
+                                "phases":  [
+                                               "library",
+                                               "edited-and-duplicate-games-survive-relaunch"
+                                           ]
+                            },
+    "gameEditorClosePrepared":  {
+                                    "mode":  "prepare-game-editor-close",
+                                    "invocationId":  "cffa0f08819f4c7a825fbd435d27321d",
+                                    "observedAt":  "2026-09-28T01:59:33.7927156Z",
+                                    "processId":  58520,
+                                    "sessionId":  1,
+                                    "exitDelayMilliseconds":  0,
+                                    "success":  true,
+                                    "phases":  [
+                                                   "library",
+                                                   "game-ready-for-editor-close"
+                                               ]
+                                },
+    "gameEditorQueuedBeforeClose":  {
+                                        "mode":  "queue-game-editor",
+                                        "invocationId":  "c953286443b447ad9e30b055947d37a5",
+                                        "observedAt":  "2026-09-28T01:59:35.9369770Z",
+                                        "processId":  58520,
+                                        "sessionId":  1,
+                                        "exitDelayMilliseconds":  0,
+                                        "success":  true,
+                                        "phases":  [
+                                                       "game-editor-read-started"
+                                                   ]
+                                    },
+    "error":  "Installed normal shell smoke failed: Expected visible \u0027GameHeading\u0027 named \u0027Route Test Game\u0027.\r\nAt E:\\work\\desktop-guides\\review-fixes-20260928\\tools\\p1\\windows_shell_ui_smoke.ps1:99 char:9\r\n+         throw \"Expected visible \u0027$id\u0027 named \u0027$expected\u0027.\"\r\n+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : OperationStopped: (Expected visibl...ute Test Game\u0027.:String) [], RuntimeException\r\n    + FullyQualifiedErrorId : Expected visible \u0027GameHeading\u0027 named \u0027Route Test Game\u0027.\r\n \r\n\r\nAt E:\\work\\desktop-guides\\review-fixes-20260928\\tools\\p1\\windows_shell_install.ps1:647 char:9\r\n+         throw \"Installed $mode shell smoke failed: $($result.error)\"\r\n+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : OperationStopped: (Installed norma...est Game\u0027.\r\n \r\n:String) [], RuntimeException\r\n    + FullyQualifiedErrorId : Installed normal shell smoke failed: Expected visible \u0027GameHeading\u0027 named \u0027Route Test Ga \r\n   me\u0027.\r\nAt E:\\work\\desktop-guides\\review-fixes-20260928\\tools\\p1\\windows_shell_ui_smoke.ps1:99 char:9\r\n+         throw \"Expected visible \u0027$id\u0027 named \u0027$expected\u0027.\"\r\n+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : OperationStopped: (Expected visibl...ute Test Game\u0027.:String) [], RuntimeException\r\n    + FullyQualifiedErrorId : Expected visible \u0027GameHeading\u0027 named \u0027Route Test Game\u0027.\r\n \r\n\r\n \r\n",
+    "processesAtFailure":  [
+                               {
+                                   "processId":  11748,
+                                   "sessionId":  1,
+                                   "created":  "2026-09-28T10:59:37.9246320+09:00",
+                                   "testOwned":  true
+                               }
+                           ],
+    "applicationEventsError":  "Get-WinEvent : No events were found that match the specified selection criteria.\r\nAt E:\\work\\desktop-guides\\review-fixes-20260928\\tools\\p1\\windows_shell_install.ps1:781 char:13\r\n+             Get-WinEvent -FilterHashtable @{\r\n+             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : ObjectNotFound: (:) [Get-WinEvent], Exception\r\n    + FullyQualifiedErrorId : NoMatchingEventsFound,Microsoft.PowerShell.Commands.GetWinEventCommand\r\n \r\n",
+    "packageStillInstalled":  false,
+    "certificateStillTrusted":  false
+}

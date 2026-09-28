@@ -1,8 +1,10 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('empty', 'normal', 'stale', 'long-list', 'switch-game',
+    [ValidateSet('empty', 'game-editor', 'game-editor-persisted',
+        'normal', 'stale', 'long-list', 'switch-game',
         'switch-game-prepare', 'switch-game-loading', 'queue-guide',
-        'queue-guide-write', 'queue-later-guide', 'later-guide-result',
+        'queue-guide-write', 'prepare-game-editor-close',
+        'queue-game-editor', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
         'reader-render-error-observed', 'reader-render-error-result',
         'late-guide-after-close', 'waiting-handoff')]
@@ -95,6 +97,50 @@ try {
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
         throw "Expected visible '$id' named '$expected'."
+    }
+
+    function Wait-VisibleById([string] $id) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $element = Find-ById $id
+            if ($element -and -not $element.Current.IsOffscreen) {
+                return $element
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected visible '$id'."
+    }
+
+    function Wait-EnabledById([string] $id) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $element = Find-ById $id
+            if ($element -and -not $element.Current.IsOffscreen -and
+                $element.Current.IsEnabled) {
+                return $element
+            }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected enabled '$id'."
+    }
+
+    function Set-Text([string] $id, [string] $value) {
+        $element = Wait-VisibleById $id
+        $pattern = $element.GetCurrentPattern(
+            [System.Windows.Automation.ValuePattern]::Pattern)
+        $pattern.SetValue($value)
+    }
+
+    function Wait-EditorClosed {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $element = Find-ById 'GameTitleInput'
+            if (-not $element -or $element.Current.IsOffscreen) {
+                return
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw 'Game editor stayed open after Cancel.'
     }
 
     function Invoke-Element($element) {
@@ -255,6 +301,22 @@ try {
         throw "Expected visible game row '$expected'."
     }
 
+    function Count-GameRows([string] $name) {
+        $list = Wait-VisibleById 'GameList'
+        $condition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::NameProperty, $name)
+        $count = 0
+        foreach ($item in $list.FindAll($scope, $condition)) {
+            $pattern = $null
+            if ($item.TryGetCurrentPattern(
+                [System.Windows.Automation.SelectionItemPattern]::Pattern,
+                [ref]$pattern)) {
+                $count++
+            }
+        }
+        return $count
+    }
+
     function Wait-GuideRow([string] $expected) {
         $condition = [System.Windows.Automation.PropertyCondition]::new(
             [System.Windows.Automation.AutomationElement]::NameProperty, $expected)
@@ -398,6 +460,23 @@ try {
         [void](Wait-Name 'ShellStatus' 'Guide details ready.')
         $report.phases += 'guide-reader-open-while-save-blocked'
     }
+    elseif ($Mode -eq 'queue-game-editor') {
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        $edit = Wait-Name 'EditGameButton' 'Edit game'
+        Invoke-Element $edit
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $edit = Find-ById 'EditGameButton'
+            if ($edit -and -not $edit.Current.IsEnabled) {
+                break
+            }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+        if (-not $edit -or $edit.Current.IsEnabled) {
+            throw 'Edit game did not enter its queued repository read.'
+        }
+        $report.phases += 'game-editor-read-started'
+    }
     elseif ($Mode -eq 'queue-later-guide') {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Name 'ShellStatus' 'Game ready.')
@@ -452,6 +531,121 @@ try {
             throw 'An empty library exposed Resume.'
         }
         $report.phases += 'empty-library'
+    }
+    elseif ($Mode -eq 'prepare-game-editor-close') {
+        Select-Element 'Route Test Game'
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        $report.phases += 'game-ready-for-editor-close'
+    }
+    elseif ($Mode -eq 'game-editor') {
+        $title = "Pok$([char]0x00E9)mon Mystery Dungeon"
+        $renamed = "$title DX"
+        Invoke-Element (Wait-EnabledById 'AddGameButton')
+        [void](Wait-Name 'GameTitleFeedback' 'Enter a title to continue.')
+        $report.addGameScreenshot = Save-WindowScreenshot 'add-game'
+        Set-Text 'GameTitleInput' '   '
+        [void](Wait-Name 'GameTitleFeedback' 'Enter a title to continue.')
+        Press-Enter (Wait-VisibleById 'GameTitleInput')
+        [void](Wait-VisibleById 'GameTitleInput')
+        $boundaryTitle = ' ' + ('T' * 160) + ' '
+        Set-Text 'GameTitleInput' $boundaryTitle
+        [void](Wait-Name 'GameTitleFeedback' '160 / 160 characters')
+        $boundaryInput = Wait-VisibleById 'GameTitleInput'
+        $boundaryValue = $boundaryInput.GetCurrentPattern(
+            [System.Windows.Automation.ValuePattern]::Pattern)
+        if ($boundaryValue.Current.Value.Length -ne 162) {
+            throw 'The title input truncated a valid trimmed boundary value.'
+        }
+        Set-Text 'GameTitleInput' 'Discarded game'
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+        Wait-EditorClosed
+        [void](Wait-Name 'LibraryEmpty' 'No games in your library.')
+        $report.phases += 'cancel-and-invalid-title-leave-empty-library'
+
+        Invoke-Element (Wait-EnabledById 'AddGameButton')
+        Set-Text 'GameTitleInput' " $title "
+        Set-Text 'GamePlatformInput' ' Windows '
+        Set-Text 'GameNotesInput' '  Explore the postgame.  '
+        [void](Wait-Name 'GameTitleFeedback' "$($title.Length) / 160 characters")
+        Press-Enter (Wait-VisibleById 'GameTitleInput')
+        [void](Wait-Name 'GameHeading' $title)
+        [void](Wait-Name 'GamePlatform' 'Windows')
+        [void](Wait-Name 'GameNotes' 'Explore the postgame.')
+        $report.phases += 'keyboard-add-unicode-and-optional-fields'
+
+        Invoke-Element (Wait-EnabledById 'EditGameButton')
+        $input = Wait-VisibleById 'GameTitleInput'
+        $value = $input.GetCurrentPattern(
+            [System.Windows.Automation.ValuePattern]::Pattern)
+        if ($value.Current.Value -ne $title) {
+            throw 'Edit game did not load the existing title.'
+        }
+        $report.editGameScreenshot = Save-WindowScreenshot 'edit-game'
+        Set-Text 'GameTitleInput' 'Discarded edit'
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+        Wait-EditorClosed
+        [void](Wait-Name 'GameHeading' $title)
+        $report.phases += 'cancel-edit-preserves-game'
+
+        Invoke-Element (Wait-EnabledById 'EditGameButton')
+        Set-Text 'GameTitleInput' $renamed
+        Set-Text 'GamePlatformInput' ''
+        $longNotes = ('Note ' * 399) + 'Notes'
+        Set-Text 'GameNotesInput' $longNotes
+        [void](Wait-Name 'GameTitleFeedback' "$($renamed.Length) / 160 characters")
+        Press-Enter (Wait-VisibleById 'GameTitleInput')
+        [void](Wait-Name 'GameHeading' $renamed)
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        $notes = Wait-VisibleById 'GameNotes'
+        if ($notes.Current.Name.Length -ne 2000) {
+            throw 'The saved 2,000-character game note was not rendered in full.'
+        }
+        $notesScroll = Wait-VisibleById 'GameNotesScroll'
+        if ($notesScroll.Current.BoundingRectangle.Height -ge
+            ($root.Current.BoundingRectangle.Height / 3)) {
+            throw 'Long game notes exceeded their bounded metadata region.'
+        }
+        $guideList = Wait-VisibleById 'GuideList'
+        if ($guideList.Current.BoundingRectangle.Height -lt
+            ($root.Current.BoundingRectangle.Height / 5)) {
+            throw 'Long game notes left no usable guide-list area.'
+        }
+        Start-Sleep -Milliseconds 500
+        $report.longNotesScreenshot = Save-WindowScreenshot 'long-notes'
+        $report.phases += 'long-notes-preserve-guide-area'
+
+        Invoke-Element (Wait-EnabledById 'EditGameButton')
+        Set-Text 'GameNotesInput' ''
+        Press-Enter (Wait-VisibleById 'GameTitleInput')
+        [void](Wait-Name 'GameHeading' $renamed)
+        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        $report.phases += 'edit-by-id-and-clear-optional-fields'
+
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        Invoke-Element (Wait-EnabledById 'AddGameButton')
+        Set-Text 'GameTitleInput' $renamed
+        [void](Wait-Name 'GameTitleFeedback' "$($renamed.Length) / 160 characters")
+        Press-Enter (Wait-VisibleById 'GameTitleInput')
+        [void](Wait-Name 'GameHeading' $renamed)
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        $count = Count-GameRows $renamed
+        if ($count -ne 2) {
+            throw "Library showed $count selectable duplicate-title games, expected two."
+        }
+        $report.phases += 'duplicate-title-games-are-distinct'
+    }
+    elseif ($Mode -eq 'game-editor-persisted') {
+        $renamed = "Pok$([char]0x00E9)mon Mystery Dungeon DX"
+        $count = Count-GameRows $renamed
+        if ($count -ne 2) {
+            throw "Relaunched library showed $count duplicate-title games, expected two."
+        }
+        $report.phases += 'edited-and-duplicate-games-survive-relaunch'
     }
     elseif ($Mode -eq 'stale') {
         $resume = Find-ById 'ResumeGuide'
@@ -763,6 +957,24 @@ try {
 }
 catch {
     $report.error = $_ | Out-String
+    if ($Mode -eq 'game-editor' -and $root) {
+        try {
+            foreach ($id in @('ShellStatus', 'GameHeading',
+                'GameTitleFeedback', 'GameSaveError')) {
+                $element = Find-ById $id
+                if ($element) {
+                    $report["failure$id"] = [ordered]@{
+                        name = $element.Current.Name
+                        visible = -not $element.Current.IsOffscreen
+                    }
+                }
+            }
+            $report.failureScreenshot = Save-WindowScreenshot 'failure'
+        }
+        catch {
+            $report.failureInspectionError = $_ | Out-String
+        }
+    }
 }
 finally {
     $report | ConvertTo-Json -Depth 6 |

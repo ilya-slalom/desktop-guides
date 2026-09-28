@@ -1,0 +1,19 @@
+﻿{
+    "mode":  "game-editor",
+    "invocationId":  "a1618776c6de48fbab61bc7c61ec1b59",
+    "observedAt":  "2026-09-27T16:10:16.8012414Z",
+    "processId":  3860,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "cancel-and-invalid-title-leave-empty-library",
+                   "keyboard-add-unicode-and-optional-fields",
+                   "cancel-edit-preserves-game",
+                   "edit-by-id-and-clear-optional-fields",
+                   "duplicate-title-games-are-distinct"
+               ],
+    "addGameScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\game-editor.add-game.png",
+    "editGameScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\game-editor.edit-game.png"
+}
