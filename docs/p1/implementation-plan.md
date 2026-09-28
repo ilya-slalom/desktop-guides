@@ -1,10 +1,10 @@
 # P1 implementation plan and exit gates
 
 Status: M0 merged; M1 in progress; M2 in progress; M3–M6 planned,
-27 September 2026.
+28 September 2026.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
-This plan orders all **16 P1 stories and 50 tasks** in the
+This plan orders all **16 P1 stories and 53 tasks** in the
 [work breakdown](../work-breakdown.md). The [technical design](../p1-technical-design.md)
 defines the architecture, data contracts, failure protocols, and reader
 behavior. [Implementation results](results.md) and the
@@ -31,6 +31,10 @@ behavior. [Implementation results](results.md) and the
 4. Maintain the P0 diagnostic reader lane while building the production
    shell. Original guide files remain untouched, and the production package
    contains no P0 fixture picker or corpus.
+5. For UI work, apply the shared design language and review the matching
+   WinUI Gallery patterns before writing a custom control. UI PRs include
+   installed-app screenshots and record keyboard, theme, high-contrast, and
+   responsive checks relevant to the changed surface.
 
 Task prerequisites below are **task IDs** unless marked P0. Tasks in the same
 milestone may run in parallel once their prerequisites close. `TR` IDs are the
@@ -579,18 +583,40 @@ T07.1 was merged through PR #9 on 27 September 2026, merge commit
 contract. T07.2 was merged through PR #10 on 27 September 2026, merge
 commit `72f43785fad2b01b3f79b739017f0623d46b6665`. The
 [T04.1 game editor plan](t04-game-editor-plan.md) supplies the manual/offline
-fallback. T04.4 is the next M2 dependency: select the external metadata
-provider and implement search-first game addition before catalog and import
-UI consume the enriched Game model.
+fallback; T04.1 was merged through PR #11 on 28 September 2026, merge commit
+`e18964f1d253746a3e6cdc0d51c659a71a531bc3`. T11.4 is the next UI dependency:
+establish the shared design language before provider, catalog, and import
+surfaces expand. T04.4 then
+selects the external metadata provider and implements search-first game
+addition before catalog and import UI consume the enriched Game model.
+
+### UI design-language and Gallery adoption sequence
+
+The WinUI Gallery is a reference catalog, not a package or shell dependency.
+Review examples against the locked Windows App SDK 2.5.1 API surface. Prefer a
+built-in control, style, or data template; add a Windows Community Toolkit
+package only after its component, version, license, and installed-app behavior
+are recorded. Shared components are extracted from proven feature content
+rather than created speculatively.
+
+| Stage | Dependency | Output and check |
+| --- | --- | --- |
+| T11.4 foundation | T11.1, T11.3 | Design-language note plus semantic XAML resources for type, spacing, surfaces, state, icons, and copy. Representative Library/Game/Reader/Settings layouts pass narrow-width, 200% scale, keyboard-focus, theme, high-contrast, and long-text checks; the PR includes installed screenshots. |
+| T04.4 provider flow | T11.4 and provider decision | Use reviewed search, progress, validation/status, result-row, artwork-fallback, and dialog patterns. Cancellation and manual fallback stay visible and keyboard accessible. |
+| T05.4 catalog/workflow components | T04.4 | Extract only the proven reusable patterns for Library, Game, and import. Virtualization and offline rendering checks prevent a visual component from adding provider calls or an item-permanent control tree. |
+| T14.4 reader/Settings adoption | T05.4, production readers, T14.2 | Apply the same language to reader commands, appearance controls, Settings groups, and teaching/status surfaces without crowding guide content. Theme and focus checks cover TXT, HTML, PDF, and Settings. |
+| T16.2 final audit | Completed production UI | Review the complete Add → Import → Read → Complete → Export flow for hierarchy, copy, keyboard, UIA, touch, overflow/localization, themes, high contrast, DPI, and screenshot consistency. |
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
 | T04.1 | T03.2, T11.1 | Manual/offline Add/Edit game dialogs and validation. Unicode, duplicate-title, optional-field, cancel, and keyboard cases pass without unintended writes. | TR03.1 |
-| T04.4 | T03.2, T03.3, T04.1, T11.1, T15.2 | Reviewed external-provider decision, schema-v3 migration, and search-first Add game flow. Selection publishes one stable local Game ID, unique provider link, bounded normalized snapshot, and validated managed artwork. Migration rollback, manual/offline fallback, refresh overrides, duplicate ID, timeout/rate-limit, malformed response, cancellation, crash recovery, and disconnected relaunch checks pass without embedded confidential credentials or partial rows/files. | TR04.3, TR04.4 |
-| T04.2 | T04.1, T04.4, T11.1 | ID-bound Game detail rename/remove actions. Rename preserves the provider association, Guide IDs, state, and view selection after refresh or restart. | TR03.1, TR04.3 |
-| T05.1 | T03.2, T04.4, T11.1 | Virtualized Library and Game guide rows with cached game artwork/source metadata and metadata-driven guide format, last-opened, estimate, and completion displays. Large synthetic lists keep bounded realized UI items and browsing needs no provider request. | TR04.3, TR05.2 |
+| T11.4 | T11.1, T11.3 | Reviewed Desktop Guides design language, app-level semantic XAML resources, version-matched Gallery component inventory, and representative responsive route layouts. Installed Windows checks cover system/light/dark/high contrast, keyboard focus, UIA names, 200% scale, long text, and narrow width; the PR includes screenshots. | TR11.3 |
+| T04.4 | T03.2, T03.3, T04.1, T11.1, T11.4, T15.2 | Reviewed external-provider decision, schema-v3 migration, and search-first Add game flow using the shared design resources and reviewed Gallery search/result/status patterns. Selection publishes one stable local Game ID, unique provider link, bounded normalized snapshot, and validated managed artwork. Migration rollback, manual/offline fallback, refresh overrides, duplicate ID, timeout/rate-limit, malformed response, cancellation, crash recovery, and disconnected relaunch checks pass without embedded confidential credentials or partial rows/files. | TR04.3, TR04.4, TR11.3 |
+| T05.4 | T04.4, T11.4 | Shared catalog/workflow styles and data templates extracted from proven provider UI for artwork, metadata, progress/status, and empty/loading/error states. Long/localized text, missing artwork, keyboard/UIA, virtualization, narrow-width, and disconnected rendering checks pass without provider requests. | TR05.3, TR11.3 |
+| T04.2 | T04.1, T04.4, T05.4, T11.1 | ID-bound Game detail rename/remove actions. Rename preserves the provider association, Guide IDs, state, and view selection after refresh or restart. | TR03.1, TR04.3 |
+| T05.1 | T03.2, T04.4, T05.4, T11.1 | Virtualized Library and Game guide rows with cached game artwork/source metadata and metadata-driven guide format, last-opened, estimate, and completion displays. Large synthetic lists keep bounded realized UI items and browsing needs no provider request. | TR04.3, TR05.2, TR05.3 |
 | T05.2 | T05.1 | Case-insensitive metadata title search with empty/loading/no-results states. Mixed-case and non-ASCII tests pass offline without reading guide bytes; unread rows say `Not started`. | TR05.1, TR05.2 |
-| T06.1 | T04.4, T11.1 | Window-owned file picker, game-scoped import preview, warnings, and cancelable progress UI. A newly provider-linked or manual game can continue directly to import; Cancel before Confirm creates neither a guide nor staged files. | TR06.1 |
+| T06.1 | T04.4, T05.4, T11.1 | Window-owned file picker, game-scoped import preview, warnings, and cancelable progress UI using shared metadata/status patterns. A newly provider-linked or manual game can continue directly to import; Cancel before Confirm creates neither a guide nor staged files. | TR06.1, TR11.3 |
 | T07.1 | T03.3 | Bounded HTML/CSS dependency parser and static-asset manifest with pinned, license-reviewed parser dependencies. Nested local CSS, `srcset`, cycles, and over-budget fixture tests pass. | TR07.1, TR07.3 |
 | T07.2 | T03.3, T07.1 | Preview warnings and path checks for missing, unsupported, remote, escaping, and changed assets. A percent-named entry's matching `_files` assets receive safe managed names and validated request-path mappings. NTFS junction/case-collision tests and post-copy revalidation pass. | TR07.1, TR07.3 |
 | T06.2 | T06.1, T07.1, T07.2, T10.0 | Typed import validation for TXT encoding, one static HTML entry, and readable PDF/password cases. Unsupported, encrypted-unreadable, and size-limit inputs produce distinct errors before publication. | TR06.1, TR06.2 |
@@ -634,6 +660,7 @@ restart. Theme/font changes preserve or visibly approximate the location.
 | T13.1 | T05.1, T11.3, T13.2 | Guide and Reader completion actions bound to one service. UIA and keyboard checks show immediate committed state and announce changes; final-page reading leaves state unchanged. | TR13.1, TR13.2 |
 | T14.1 | T03.2, T08.2, T09.1, T11.3 | Bounded per-guide TXT/HTML text-size controls and persisted preferences. Two-guide restart test preserves separate sizes and TXT fixed-width layout. | TR14.1 |
 | T14.3 | T08.3, T09.3, T10.3, T14.1, T14.2 | Pre-change capture and post-layout restore across text/theme changes. TXT returns within one line, HTML to matching context where present, PDF to page/fraction; fallback is announced. | TR14.1, TR14.2 |
+| T14.4 | T05.4, T08.3, T09.2, T10.2, T11.3, T14.2 | Shared design language applied to production Reader and Settings commands, appearance controls, groups, and teaching/status surfaces. Installed TXT/HTML/PDF/Settings screenshots and keyboard, theme, high-contrast, text-scale, display-scale, and narrow-width checks pass; any Toolkit dependency is reviewed and locked. | TR11.3, TR14.3 |
 
 ## M5 — errors, accessibility, and portable backup
 
@@ -646,9 +673,9 @@ flows work by keyboard and with the recorded accessibility checks.
 | T15.1 | T03.2, T06.3, T09.1, T10.1 | Stable service errors and actionable UI for corrupt DB, missing guide, invalid content, and missing runtime. An unaffected guide still opens; a corrupt DB is never replaced by an empty one. | TR15.1 |
 | T15.4 | T04.3, T06.3, T15.2, T15.3 | Headless fault-injection matrix across each import/delete protocol phase plus canceled operations. Assert exact DB rows and owned paths; Windows NTFS runs cover links and malformed names. | TR04.1, TR04.2, TR06.2, TR15.1, TR15.2 |
 | T20.1 | T03.2, T04.4, T06.3, T15.2 | Versioned ZIP manifest and consistent SQLite/files snapshot under one write gate, including provider snapshots and managed game artwork. Export is canceled cleanly, verified by checksums, and excludes source paths, credentials, remote caches, and transient profiles. | TR20.2 |
-| T20.2 | T15.1, T15.4, T20.1 | Settings Export/Restore, out-of-app-data destination check, first-import export reminder, full staged archive validation of guide and provider-artwork references, Cancel/Replace, and rollback marker. Clean and populated restore, missing artwork, corrupt/unsafe ZIP, cancel, and interrupted swap tests pass. | TR20.1, TR20.2 |
+| T20.2 | T14.4, T15.1, T15.4, T20.1 | Settings Export/Restore, out-of-app-data destination check, first-import export reminder, full staged archive validation of guide and provider-artwork references, Cancel/Replace, and rollback marker. Clean and populated restore, missing artwork, corrupt/unsafe ZIP, cancel, and interrupted swap tests pass. | TR20.1, TR20.2 |
 | T16.1 | T05.2, T06.1, T08.3, T10.2, T11.3 | Visible menu/toolbar parity and documented shortcuts. Keyboard trace checks context, text-field handling, dialogs, page movement, and Escape behavior. | TR16.1, TR16.2 |
-| T16.2 | T07.3, T08.3, T09.3, T10.2, T13.1, T16.1, T20.2 | Real WinUI audit of tab/focus, touch, high contrast, DPI, AutomationProperties, and Narrator through Add game → Import → Read → Complete → Export. TXT/HTML document text is read, and overlays return focus. | TR16.1, TR16.2 |
+| T16.2 | T07.3, T08.3, T09.3, T10.2, T13.1, T14.4, T16.1, T20.2 | Real WinUI and design-language audit of hierarchy, copy, tab/focus, touch, overflow/localization, high contrast, DPI, AutomationProperties, and Narrator through Add game → Import → Read → Complete → Export. TXT/HTML document text is read, overlays return focus, and final screenshots are reviewed together. | TR11.3, TR14.3, TR16.1, TR16.2 |
 | T16.3 | T10.0, T10.2, T10.3 | Tagged/scanned/locked PDF UIA, selection, keyboard, and Narrator record for the selected production engine. Tagged document text passes; scanned image-only limitation is stated accurately. | TR10.3, TR16.1 |
 
 ## M6 — release evidence and tested support matrix

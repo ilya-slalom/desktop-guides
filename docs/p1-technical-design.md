@@ -1,7 +1,8 @@
 # P1 technical design: local library and first usable reader
 
-Status: design for S03–S17 and S20, 25 September 2026. The M0 contracts and
-PDF decision are implemented for review; see [P1 results](p1/results.md).
+Status: design for S03–S17 and S20, updated 28 September 2026. The M0
+contracts and PDF decision are implemented for review; see
+[P1 results](p1/results.md).
 The [high-level design](initial-design.md) defines R1–R9;
 the [work breakdown](work-breakdown.md) owns story, task, and TR IDs; the
 [implementation plan](p1/implementation-plan.md) orders the work. P0 was
@@ -280,6 +281,43 @@ High contrast uses system brushes, never hard-coded HTML colors without a
 matching local style. A screen-reader announcement distinguishes approximate
 restore, missing managed content, and completion changes.
 
+The design language is a quiet field guide for game reference material.
+Catalog views let cached game artwork carry the strongest color and visual
+identity. Guide lists use denser flat rows, restrained separators, and a clear
+reading-state marker. Reader chrome stays visually subordinate to the guide.
+Use Segoe UI Variable with the system UI font fallback for shell text and the
+selected fixed-width system font only for preformatted TXT. Headings, labels,
+and actions remain left aligned.
+
+Implement semantic XAML resources for canvas, surface, elevated surface,
+primary/secondary text, accent, selection, success, warning, and destructive
+states; spacing and corner-radius steps; and title, subtitle, body, caption,
+and reader-command styles. Light references start with canvas `#F8F9FB`,
+surface `#FFFFFF`, primary text `#1C1C1C`, secondary text `#616161`, and the
+system accent with `#0067C0` as a design reference. Runtime values bind to
+WinUI theme and high-contrast resources rather than fixing those light values
+in page XAML. Cards identify artwork or meaningful groups; dense guide data
+uses rows rather than a uniform card treatment.
+
+Use the [WinUI Gallery](https://github.com/microsoft/WinUI-Gallery) as an
+interactive catalog and source reference, not as an application dependency or
+a shell to copy. Review examples against the project's locked Windows App SDK
+version before adopting them. Prefer built-in WinUI controls and resource
+keys. A Windows Community Toolkit control requires a recorded need,
+license/version review, locked package update, and installed Windows check.
+Copy only the minimal pattern needed and adapt automation names, focus
+behavior, theme resources, copy, and layout to Desktop Guides.
+
+Adoption occurs with the feature that first needs the pattern:
+
+| Stage | Task | Gallery-informed UI work |
+| --- | --- | --- |
+| Foundation | T11.4 | Semantic resources, type/spacing scales, responsive shell layouts, control-state rules, and representative Library/Game/Reader/Settings screenshots. |
+| Provider addition | T04.4 | Search entry, cancelable progress, edition result rows, artwork fallback, `InfoBar`/validation feedback, manual fallback, and dialog focus restoration. |
+| Catalog and import | T05.4, then T05.1/T06.1 | Reusable artwork and metadata templates, virtualized rows, empty/loading/error states, import preview groups, progress, and confirmation. |
+| Reader and Settings | T14.4 | Theme-aware command presentation, appearance settings, teaching/status surfaces, and Settings groups after functional controls exist. |
+| Release audit | T16.2 | Keyboard, UIA, touch target, localization/overflow, theme, high contrast, DPI, and screenshot review of the complete flow. |
+
 `NavigationView` does not manage a back stack automatically. A shell
 navigation coordinator owns `Library`, `Game(gameId)`, `Reader(guideId)`, and
 `Settings`, keeps selected IDs stable across edits, and returns Reader to its
@@ -427,6 +465,13 @@ project uses a provisional package identity until T17.1 sets the public one.
   move focus to the nearest safe list row or heading. Restore the prior
   Library query on Back and prevent a stale async refresh from replacing a
   newer selection.
+- **T05.4** Extract the provider result's artwork, metadata, progress, status,
+  and error presentations into shared styles and data templates after T04.4
+  proves their real content. Reuse them in Library, Game, and import surfaces.
+  Keep item containers virtualizable, provide a deterministic missing-artwork
+  state, and test long titles, missing metadata, localization expansion, and
+  disconnected rendering. Do not create custom control wrappers for a style
+  or template that standard WinUI controls already support.
 
 ### S06 — Import without partial records
 
@@ -584,6 +629,15 @@ project uses a provisional package identity until T17.1 sets the public one.
   Library → Game → Reader → Game by keyboard and pointer without losing
   selection or guide state. T05.3 verifies the Library query survives the
   Library → Game → Reader → Game → Library route after T05.2 adds search.
+- **T11.4** Add app-level design resource dictionaries and document the
+  semantic color, typography, spacing, shape, icon, motion, layout, and copy
+  rules described in section 4. Build representative responsive states for
+  Library, Game, Reader, and Settings with realistic guide metadata. Review
+  WinUI Gallery patterns against Windows App SDK 2.5.1 and record built-in,
+  adapted, rejected, and Toolkit-dependent candidates. Verify theme resource
+  lookup, keyboard focus, UIA names, 200% display scaling, long text, narrow
+  width, and high contrast on installed Windows. Capture screenshots for the
+  implementation PR.
 
 ## 8. Task design: tracking, preferences, and recovery
 
@@ -641,6 +695,14 @@ project uses a provisional package identity until T17.1 sets the public one.
   TXT should remain within one logical line; HTML should return to the
   same context when it exists; PDF page/fraction behavior is unaffected.
   Record an approximate notice when a stable anchor cannot be found.
+- **T14.4** Apply the design resources and reviewed Gallery patterns to the
+  production Reader and Settings controls after T08–T10 and T14.2 establish
+  their behavior. Keep content dominant, retain capability-based command
+  overflow, and use settings/status/teaching patterns only where they clarify
+  an action. Verify all reader formats plus Settings under system, light,
+  dark, and high-contrast themes; test keyboard focus and supported text and
+  display scales. Record any Toolkit dependency decision and capture
+  installed-app screenshots.
 
 ### S15 — Recover from library and import errors
 
@@ -754,7 +816,7 @@ project uses a provisional package identity until T17.1 sets the public one.
 
 Every P1 task closes with a code or documentation artifact, a named test or
 manual trace, and a reviewable result. The [implementation plan](p1/implementation-plan.md)
-lists dependencies and specific exits for all 50 tasks. Core/Infrastructure
+lists dependencies and specific exits for all 53 tasks. Core/Infrastructure
 tests run on the locked Windows CI toolchain; critical file-boundary and
 symlink tests also run on Windows NTFS. UI Automation, Narrator, high
 contrast, DPI, installed-package, and offline checks run on target Windows

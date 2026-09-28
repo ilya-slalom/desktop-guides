@@ -31,9 +31,11 @@ This design assumes:
 | --- | --- | --- |
 | [Pocket Codex](https://www.pocketcodex.app/) | Focused offline TXT, HTML, and PDF reading; several guides per game; automatic per-guide resume; optional sync | Use the reading and library model for the first release. Revisit sync after local storage and conflict rules are proven. |
 | [Pixel Guide](https://github.com/rexmont/Pixel-Guide-Android) ([feature summary](https://pixelguide.app/)) | TXT reflow, tables of contents, in-guide search, reader themes, PDF fit-to-width, local HTML, controller use, maps/manuals, and online sources | Include fit-to-width PDF and core reader controls first. Add richer navigation and formats in stages. Do not copy Android-specific UI or integrations. |
+| [WinUI Gallery](https://github.com/microsoft/WinUI-Gallery) | First-party WinUI 3 controls, Fluent styles, interaction guidance, and XAML examples | Use a version-compatible Gallery release as a design and component reference. Prefer built-in WinUI controls and theme resources; adapt examples to Desktop Guides rather than copying the Gallery shell or taking a runtime dependency on the sample app. |
 
-The references describe product behavior, not a requirement to reuse their code
-or to match every feature.
+Pocket Codex and Pixel Guide describe product behavior; WinUI Gallery is an
+implementation reference. None requires reusing its application code or
+matching every feature.
 
 ## 2. Requirements
 
@@ -72,6 +74,15 @@ settings entry. The library offers a game list/grid, title search, and an
 percentage, completion state, and `Import guide`.
 Settings offers manual library export and restore. After the first import, the
 app explains that uninstall removes its live library and points to Export.
+
+The visual language is a quiet field guide for game reference material.
+Artwork and game identity provide the strongest color and imagery in catalog
+views, while guide rows and the reader stay restrained and content-focused.
+Use Segoe UI Variable with the system UI font fallback, system accent and theme
+resources, left-aligned hierarchy, and compact Windows-native controls. Use
+cards where artwork or a group boundary carries meaning; use flat rows and
+separators for dense guide lists instead of placing every item in an identical
+rounded container.
 
 Opening a guide shows a reader with a compact top bar (game and guide title,
 back, appearance controls, and `Mark complete`) and a collapsible navigation

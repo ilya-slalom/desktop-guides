@@ -32,6 +32,7 @@ passes its accessibility and installed-offline gates.
 | Build all three readers directly in the MVP, or prove them with Windows samples first | A spike adds work up front; skipping it risks rewriting position handling, HTML isolation, or the PDF engine after UI integration. | Complete S01–S02 first and use their evidence to settle reader choices. |
 | One flat implementation checklist, or stories with acceptance and dependency links | Linked stories take more planning to maintain but make scope and release readiness visible. | Use R → S → T → TR IDs and review the links when requirements change. |
 | Treat reading percentage as completion, or track completion explicitly | A separate action adds one UI control and state field but avoids marking a partially used guide complete by accident. | Keep per-guide location, estimated percentage, and user-set completion separate. |
+| Add visual styling after feature completion, or establish it before catalog UI expands | An early design language adds a small foundation task; a late pass creates duplicated XAML and costly UI rework. | Complete T11.4 before provider and catalog UI. Use the WinUI Gallery as a version-matched reference and adopt suitable patterns in the feature task that first needs them. |
 
 ### Traceability to the high-level requirements
 
@@ -164,20 +165,31 @@ of affected guides and requires confirmation.
 ### S05 — Browse and find library entries
 
 **Story:** As a reader, I want to find a game or guide quickly and see my
-reading state before opening it. **Traces:** R3. **Depends on:** S03, S11.
+reading state before opening it. **Traces:** R3. **Depends on:** S03, S04,
+S11.
 
-**Acceptance:** Library and game detail views show title, format, last opened
-time, approximate percentage, and completion state. A title query finds
-matching games and guides without requiring network access.
+**Acceptance:** Library and game detail views show artwork when available,
+title, platform/source context, guide format, last opened time, approximate
+percentage, and completion state. A title query finds matching games and
+guides without requiring network access. Empty, loading, unavailable-artwork,
+and no-result states use the same interaction language as Add game and import.
 
 - **T05.1** Implement sorted game list/grid and guide cards or rows in WinUI 3.
 - **T05.2** Add library title search and empty, loading, and no-result states.
 - **T05.3** Keep query, selection, and navigation stable on Back and when a
   game or guide is edited.
+- **T05.4** Build reusable catalog and workflow presentation components from
+  the T04.4 provider flow using reviewed, version-compatible WinUI Gallery
+  patterns. Cover artwork/result items, metadata groups, progress and status
+  surfaces, and empty/loading/error states without wrapping standard controls
+  when a style or data template is sufficient.
 - **TR05.1** Search compares titles case-insensitively and does not open or
   parse guide content.
 - **TR05.2** An unread guide has an explicit `Not started` display rather than
   fabricated 0% resume data.
+- **TR05.3** Catalog components remain data-bound and virtualized, tolerate
+  missing artwork and long or localized text, and render cached metadata
+  without making a provider request.
 
 ### S06 — Import a guide without partial records
 
@@ -303,7 +315,9 @@ to feel like one Windows app. **Traces:** R3, R7. **Depends on:** S01, S02.
 
 **Acceptance:** I can navigate Library → Game → Reader → Game without losing
 context. The reader shows only controls supported by its format and remembers
-the last active guide without forcing it open at launch.
+the last active guide without forcing it open at launch. Shared typography,
+spacing, surfaces, states, and command treatment give every route a coherent
+Desktop Guides identity.
 
 - **T11.1** Build the `NavigationView` shell and library/game/reader/settings
   routes.
@@ -311,10 +325,19 @@ the last active guide without forcing it open at launch.
   `RestoreLocation`, `GetEstimatedProgress`) and capability flags.
 - **T11.3** Build the reader top bar, collapsible navigation area, and format
   command slots.
+- **T11.4** Define and implement the Desktop Guides design language as shared
+  WinUI resource dictionaries, type and spacing scales, surface and state
+  roles, icon and copy rules, and representative responsive layouts. Record a
+  version-compatible WinUI Gallery component inventory and adoption rules
+  before new provider and catalog UI is built.
 - **TR11.1** The shell does not inspect format-specific controls to read or
   save position.
 - **TR11.2** Disabled or unsupported actions are absent or clearly unavailable,
   never silently ignored.
+- **TR11.3** Production UI uses shared semantic resources and native theme
+  brushes rather than duplicated page-local values. Gallery-derived code is
+  adapted to the locked Windows App SDK, retains keyboard/focus/UIA behavior,
+  and introduces no dependency on the Gallery sample application.
 
 ### S12 — Resume each guide independently
 
@@ -364,14 +387,21 @@ S11.
 
 **Acceptance:** Font size chosen in one TXT/HTML guide persists across restart
 without changing another guide. Theme change applies to library and reader
-without breaking TXT whitespace or HTML offline behavior.
+and shared Settings components without breaking TXT whitespace, HTML offline
+behavior, or high-contrast system colors.
 
 - **T14.1** Add per-guide TXT/HTML font-size controls and saved preferences.
 - **T14.2** Add global theme setting with a Windows theme default.
 - **T14.3** Recheck location restoration after changing appearance.
+- **T14.4** Apply the shared design language to reader and Settings surfaces
+  after their functional controls exist. Adopt suitable Gallery command,
+  settings, teaching, and status patterns; justify and lock any Windows
+  Community Toolkit dependency before using a Toolkit-only component.
 - **TR14.1** Reader preferences are keyed by guide ID and have a bounded,
   accessible size range.
 - **TR14.2** Theme CSS or assets do not require a remote resource.
+- **TR14.3** Shared components update correctly for system, light, dark, and
+  high-contrast themes and remain usable at supported text and display scales.
 
 ### S15 — Recover from library and import errors
 
@@ -563,8 +593,10 @@ keyboard-accessible, and can be disabled without affecting the base reader.
 1. Finish **S01–S02** and write down TXT, HTML, and PDF engine decisions.
    PDF accessibility can change S10, S16, and the release promise.
 2. Build **S03** and **S11** as the core framework while validating T10.0.
-   S04–S05 can then proceed together. Build **S06** after S04, followed by
-   S07–S10 where dependencies allow.
+   Complete T11.4 before the provider and catalog UI expands. S04–S05 can then
+   proceed together, with T05.4 consolidating reusable catalog/workflow
+   components. Build **S06** after S04, followed by S07–S10 where dependencies
+   allow.
 3. Integrate **S12–S16** and **S20**, then run the clean-machine and offline
    gate in **S17**. Keep P2/P3 outside the first-release completion claim.
 4. S20 moved into P1 because the managed library is the user's only copy
