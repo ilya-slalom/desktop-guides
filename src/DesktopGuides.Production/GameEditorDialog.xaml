@@ -8,6 +8,18 @@
     AutomationProperties.AutomationId="GameEditorDialog">
     <StackPanel MaxWidth="440"
                 Spacing="{StaticResource DesktopGuidesSpacing16}">
+        <InfoBar x:Name="EditorNotice"
+                 IsOpen="False"
+                 IsClosable="False"
+                 Severity="Informational"
+                 AutomationProperties.AutomationId="GameEditorNotice">
+            <InfoBar.ActionButton>
+                <HyperlinkButton x:Name="EditorNoticeSettingsLink"
+                                 Content="Open Settings"
+                                 Click="OpenSettingsClicked"
+                                 AutomationProperties.AutomationId="GameEditorNoticeSettingsLink" />
+            </InfoBar.ActionButton>
+        </InfoBar>
         <StackPanel Spacing="{StaticResource DesktopGuidesSpacing4}">
             <TextBox x:Name="GameTitleInput"
                      Header="Title"

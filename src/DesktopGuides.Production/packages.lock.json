@@ -2,6 +2,15 @@
   "version": 2,
   "dependencies": {
     "net10.0-windows10.0.19041": {
+      "CommunityToolkit.WinUI.Controls.MetadataControl": {
+        "type": "Direct",
+        "requested": "[8.2.251219, )",
+        "resolved": "8.2.251219",
+        "contentHash": "2R2YAQLKHX++NH4bzoPW1kKhLJYXxFLfe6afYIl9J5pu9rf4YMqJhywiVWlV3z+daueEm+azvQFejsx1fZqirg==",
+        "dependencies": {
+          "Microsoft.WindowsAppSDK": "1.6.250108002"
+        }
+      },
       "CommunityToolkit.WinUI.Controls.SettingsControls": {
         "type": "Direct",
         "requested": "[8.2.251219, )",

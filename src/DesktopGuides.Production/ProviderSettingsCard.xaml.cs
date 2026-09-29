@@ -154,4 +154,6 @@ public sealed partial class ProviderSettingsCard : UserControl
         TestConnectionButton.IsEnabled = SaveButton.IsEnabled = !busy && services is not null;
         RemoveButton.IsEnabled = !busy && services is not null && saved != ProviderCredentials.None;
     }
+
+    internal void Expand() => ProviderSettingsExpander.IsExpanded = true;
 }

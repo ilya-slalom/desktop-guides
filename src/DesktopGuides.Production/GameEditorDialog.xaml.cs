@@ -1,5 +1,6 @@
 using DesktopGuides.Core.Library;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 
 namespace DesktopGuides.Production;
@@ -9,7 +10,7 @@ public sealed partial class GameEditorDialog : ContentDialog
     private readonly Func<GameDetails, Task> save;
     private bool saving;
 
-    public GameEditorDialog(Game? game, Func<GameDetails, Task> save)
+    public GameEditorDialog(Game? game, Func<GameDetails, Task> save, string? notice = null)
     {
         InitializeComponent();
         this.save = save;
@@ -21,8 +22,22 @@ public sealed partial class GameEditorDialog : ContentDialog
             GamePlatformInput.Text = game.Platform ?? string.Empty;
             GameNotesInput.Text = game.Notes ?? string.Empty;
         }
+        if (notice is not null)
+        {
+            EditorNotice.Message = notice;
+            AutomationProperties.SetName(EditorNotice, notice);
+            EditorNotice.IsOpen = true;
+        }
         Opened += (_, _) => GameTitleInput.Focus(FocusState.Programmatic);
         UpdateValidation();
+    }
+
+    internal bool OpenSettingsRequested { get; private set; }
+
+    private void OpenSettingsClicked(object sender, RoutedEventArgs args)
+    {
+        OpenSettingsRequested = true;
+        Hide();
     }
 
     private void InputChanged(object sender, TextChangedEventArgs args)
