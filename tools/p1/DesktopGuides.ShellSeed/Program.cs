@@ -276,10 +276,10 @@ if (args.Length == 2 &&
 
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second" or
-        "seed-design"))
+        "seed-design" or "seed-catalog"))
 {
     Console.Error.WriteLine(
-        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design " +
+        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog " +
         "<app-data-root> " +
         "or seed-linked-game|describe-providers <app-data-root> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
@@ -364,6 +364,76 @@ if (args[0] == "seed-design")
         designSettings with { LastActiveGuideId = walkthroughId });
     Console.WriteLine(
         $"Seeded design-language game {designGame.Id:N} and three guides.");
+    return 0;
+}
+
+if (args[0] == "seed-catalog")
+{
+    if ((await repository.ListGamesAsync()).Count != 0)
+    {
+        throw new InvalidOperationException("The catalog seed needs an empty library.");
+    }
+    ManagedArtworkStore catalogArt = new(paths);
+    int nextExternalId = 950000;
+
+    async Task AddWithArtwork(string title, string? platform, byte shade)
+    {
+        Guid id = Guid.NewGuid();
+        StoredArtwork stored = await catalogArt.StoreAsync(
+            id, SolidPng(60, 90, shade, (byte)(255 - shade), 0x80), CancellationToken.None);
+        GameMetadataSnapshot snapshot = new(
+            GameMetadataSnapshot.CurrentSchemaVersion, null, null, [], [], [], [], null,
+            GameTypeTag.MainGame, "SteamGridDB");
+        await repository.AddLinkedGameAsync(new NewLinkedGame(
+            id, title, platform,
+            new ProviderGameLink(ProviderGameLink.Igdb, (nextExternalId++).ToString(), DateTimeOffset.UtcNow),
+            snapshot, stored.RelativePath), CancellationToken.None);
+    }
+
+    string longTitle = "Catalog A " + new string('W', 150);
+    await AddWithArtwork(longTitle, "PC", 0x20);
+    await AddWithArtwork("Catalog B Short", "Windows", 0x40);
+
+    await AddWithArtwork("Catalog C Corrupt Art", "PC", 0x60);
+    for (int i = 0; i < 10; i++)
+    {
+        await AddWithArtwork($"Catalog C Missing Art {i}", "PC", 0x70);
+    }
+    foreach (Game seeded in await repository.ListGamesAsync())
+    {
+        if (seeded.ArtworkRelativePath is not { } relative) continue;
+        if (seeded.Title == "Catalog C Corrupt Art")
+        {
+            File.WriteAllBytes(catalogArt.ResolveFile(relative)!, [0, 1, 2, 3]);
+        }
+        else if (seeded.Title.StartsWith("Catalog C Missing Art ", StringComparison.Ordinal))
+        {
+            catalogArt.Delete(relative);
+        }
+    }
+
+    await repository.AddGameAsync("Catalog D Größe Überfall Äpfel", "PlayStation 5", null);
+    for (int i = 0; i < 484; i++)
+    {
+        string title = $"Catalog Game {i:D3}";
+        string? platform = i % 2 == 0 ? "Windows" : null;
+        if (i % 3 == 0) await AddWithArtwork(title, platform, (byte)(i % 200));
+        else await repository.AddGameAsync(title, platform, null);
+    }
+    await repository.AddGameAsync("كتالوج الألعاب", "PC", null);
+    await AddWithArtwork("ゼルダの伝説", "Nintendo Switch", 0xA0);
+
+    IReadOnlyList<Game> catalog = await repository.ListGamesAsync();
+    string[] expectedHead = [longTitle, "Catalog B Short", "Catalog C Corrupt Art", "Catalog C Missing Art 0"];
+    if (catalog.Count != 500 ||
+        !catalog.Take(4).Select(seeded => seeded.Title).SequenceEqual(expectedHead) ||
+        catalog[^1].Title != "ゼルダの伝説" ||
+        catalog.Count(seeded => seeded.Title.StartsWith("Catalog C Missing Art ", StringComparison.Ordinal) &&
+            seeded.ArtworkRelativePath is { } path && catalogArt.ResolveFile(path) is null) != 10)
+    {
+        throw new InvalidOperationException("The catalog seed did not read back in the expected order.");
+    }
+    Console.WriteLine("Seeded 500 catalog games.");
     return 0;
 }
 
