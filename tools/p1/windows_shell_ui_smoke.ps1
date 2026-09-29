@@ -7,7 +7,7 @@ param(
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
         'reader-render-error-observed', 'reader-render-error-result',
-        'late-guide-after-close', 'waiting-handoff', 'material',
+        'late-guide-after-close', 'waiting-handoff', 'material', 'catalog',
         'provider-none', 'provider-offline', 'provider-settings',
         'provider-live', 'provider-remove')]
     [string] $Mode,
@@ -452,6 +452,33 @@ try {
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
         throw "Expected keyboard focus on '$expected' after Back."
+    }
+
+    function Wait-FocusedGameRow([string] $expected) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+            if ($focused -and
+                $focused.Current.ControlType -eq [System.Windows.Automation.ControlType]::ListItem -and
+                (-not $expected -or $focused.Current.Name -eq $expected)) {
+                return $focused
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected keyboard focus on game row '$expected'."
+    }
+
+    function Get-RealizedGameRows {
+        $list = Wait-VisibleById 'GameList'
+        $condition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+            [System.Windows.Automation.ControlType]::ListItem)
+        # Virtualized items without a container have empty bounds. Count only
+        # rows that have a container, including the off-screen cache.
+        return @($list.FindAll($scope, $condition) | Where-Object {
+            -not $_.Current.BoundingRectangle.IsEmpty -and
+            $_.Current.BoundingRectangle.Height -gt 0
+        })
     }
 
     function Focus-OtherGuideWithoutSelection(
@@ -1223,6 +1250,112 @@ try {
         }
         $report.phases += 'stale-resume-hidden'
     }
+    elseif ($Mode -eq 'catalog') {
+        $longTitle = 'Catalog A ' + ('W' * 150)
+        $shortTitle = 'Catalog B Short'
+        # Built from code points: Windows PowerShell 5.1 reads this file as ANSI.
+        $lastTitle = [string]::new([char[]]@(
+            0x30BC, 0x30EB, 0x30C0, 0x306E, 0x4F1D, 0x8AAC))
+        $wideWidth = 1500
+        $narrowWidth = 600
+        $windowHeight = 720
+        $realizedLimit = 80
+
+        $workingArea = [System.Windows.Forms.SystemInformation]::WorkingArea
+        $report.workingArea = "$($workingArea.Width)x$($workingArea.Height)"
+        $dpi = [DesktopGuidesForegroundProbe]::Dpi($process.MainWindowHandle)
+        $report.windowDpi = $dpi
+        $report.scalePercent = [int][Math]::Round(($dpi / 96.0) * 100)
+
+        Resize-ShellWindow $wideWidth $windowHeight
+        [void](Wait-HiddenById 'ShellStatus')
+        $longRow = Wait-GameRow $longTitle
+        $shortRow = Wait-GameRow $shortTitle
+        [void](Wait-GameRow 'Catalog C Corrupt Art')
+        [void](Wait-GameRow 'Catalog C Missing Art 0')
+        $longHeight = $longRow.Current.BoundingRectangle.Height
+        $shortHeight = $shortRow.Current.BoundingRectangle.Height
+        $report.longRowHeight = $longHeight
+        $report.shortRowHeight = $shortHeight
+        if ($longHeight -gt ($shortHeight + 1)) {
+            throw "The long-title row is taller than a short row: $longHeight versus $shortHeight."
+        }
+        $topCount = (Get-RealizedGameRows).Count
+        $report.realizedRowsAtTop = $topCount
+        if ($topCount -ge $realizedLimit) {
+            throw "GameList realized $topCount rows at the top of a 500-game library."
+        }
+        $report.libraryWideScreenshot = Save-WindowScreenshot 'library-wide'
+        $report.phases += 'catalog-top-virtualized'
+
+        Focus-And-Verify 'AddGameButton'
+        [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
+        [void](Wait-FocusedGameRow $longTitle)
+        Start-Sleep -Milliseconds 500
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-HiddenById 'GameHeading')
+        [System.Windows.Forms.SendKeys]::SendWait('^{DOWN}')
+        [void](Wait-FocusedGameRow $shortTitle)
+        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        [void](Wait-Name 'GameHeading' $shortTitle)
+        [void](Wait-Status 'Game ready.')
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Status 'Library ready.')
+        Focus-And-Verify 'AddGameButton'
+        [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
+        [void](Wait-FocusedGameRow '')
+        [System.Windows.Forms.SendKeys]::SendWait('{END}')
+        [void](Wait-Name 'GameHeading' $lastTitle)
+        [void](Wait-Status 'Game ready.')
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Status 'Library ready.')
+        $report.phases += 'catalog-keyboard'
+
+        [void](Wait-HiddenById 'ShellStatus')
+        $list = Wait-VisibleById 'GameList'
+        $scroll = $list.GetCurrentPattern(
+            [System.Windows.Automation.ScrollPattern]::Pattern)
+        $scroll.SetScrollPercent(
+            [System.Windows.Automation.ScrollPattern]::NoScroll, 100)
+        [void](Wait-GameRow $lastTitle)
+        $endCount = (Get-RealizedGameRows).Count
+        $report.realizedRowsAtEnd = $endCount
+        if ($endCount -ge $realizedLimit) {
+            throw "GameList realized $endCount rows at the end of a 500-game library."
+        }
+        $report.libraryEndScreenshot = Save-WindowScreenshot 'library-end'
+        $report.phases += 'catalog-end-virtualized'
+
+        Resize-ShellWindow $narrowWidth $windowHeight
+        [void](Wait-GameRow $lastTitle)
+        $listBounds = (Wait-VisibleById 'GameList').Current.BoundingRectangle
+        foreach ($row in Get-RealizedGameRows) {
+            if ($row.Current.IsOffscreen) { continue }
+            $bounds = $row.Current.BoundingRectangle
+            if ($bounds.Left -lt ($listBounds.Left - 2) -or
+                $bounds.Right -gt ($listBounds.Right + 2)) {
+                throw "Game row '$($row.Current.Name)' is wider than GameList: $bounds in $listBounds."
+            }
+        }
+        $report.libraryNarrowScreenshot = Save-WindowScreenshot 'library-narrow'
+        $report.phases += 'catalog-narrow'
+
+        Start-Sleep -Milliseconds 1000
+        $status = Find-ById 'ShellStatus'
+        if ($status -and -not $status.Current.IsOffscreen) {
+            throw "The catalog showed a status: '$($status.Current.Name)'."
+        }
+        $loopback = @('127.0.0.1', '::1', '0.0.0.0', '::')
+        $remote = @(Get-NetTCPConnection -OwningProcess $ProcessId -ErrorAction SilentlyContinue |
+            Where-Object { $_.State -ne 'Listen' -and $_.RemoteAddress -notin $loopback })
+        $report.remoteConnections = $remote.Count
+        if ($remote.Count -gt 0) {
+            throw "The catalog opened $($remote.Count) non-loopback connection(s)."
+        }
+        $report.phases += 'catalog-no-provider-traffic'
+    }
     elseif ($Mode -eq 'long-list') {
         $target = 'ZZZ Focus Target Guide'
         Select-Element 'Route Test Game'
@@ -1767,7 +1900,7 @@ try {
 }
 catch {
     $report.error = $_ | Out-String
-    if (($Mode -eq 'game-editor' -or $Mode -like 'provider-*') -and $root) {
+    if (($Mode -eq 'game-editor' -or $Mode -eq 'catalog' -or $Mode -like 'provider-*') -and $root) {
         try {
             foreach ($id in @('ShellStatus', 'GameHeading',
                 'GameTitleFeedback', 'GameSaveError', 'GameSearchStatus',

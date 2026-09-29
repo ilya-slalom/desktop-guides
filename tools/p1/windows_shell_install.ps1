@@ -12,6 +12,8 @@ param(
 
     [switch] $ProviderOnly,
 
+    [switch] $CatalogOnly,
+
     # Paths only. The values are read in memory and never passed on.
     [string] $IgdbCredentialFile = 'E:\work\igdb_credentials.txt',
 
@@ -696,7 +698,9 @@ function Run-ShellSmoke(
     Register-ScheduledTask -TaskName $smokeTask -Action $action `
         -Principal $principal -Force | Out-Null
     Start-ScheduledTask -TaskName $smokeTask
-    $timeoutSeconds = if ($mode -like 'provider-*') { 240 } else { 60 }
+    $timeoutSeconds = if ($mode -like 'provider-*') { 240 }
+        elseif ($mode -eq 'catalog') { 120 }
+        else { 60 }
     $deadline = (Get-Date).AddSeconds($timeoutSeconds)
     do {
         Start-Sleep -Milliseconds 500
@@ -755,6 +759,35 @@ function Run-DesignLanguageScenarios {
         Restore-AppThemePreference $originalTheme
         $report.restoredAppTheme = Get-AppThemePreference
     }
+}
+
+function Run-CatalogScenarios {
+    Invoke-ShellSeed @('seed-catalog', $dataRoot) | Out-Null
+    $originalTheme = Get-AppThemePreference
+    try {
+        Set-AppThemePreference $true
+        Start-InstalledShell
+        $report.catalogLight = Run-ShellSmoke 'catalog' -ResultName 'catalog-light'
+        Close-InstalledShell
+
+        Set-AppThemePreference $false
+        Start-InstalledShell
+        $report.catalogDark = Run-ShellSmoke 'catalog' -ResultName 'catalog-dark'
+        Close-InstalledShell
+    }
+    finally {
+        Restore-AppThemePreference $originalTheme
+    }
+    $state = Get-ProviderState
+    if ($state.CredentialBlobExists) {
+        throw 'The catalog run found a provider credential blob.'
+    }
+    $missing = @($state.Games | Where-Object {
+        $_.Title -like 'Catalog C Missing Art*' -and -not $_.ArtworkExists })
+    if ($missing.Count -ne 10) {
+        throw "Expected 10 catalog games with missing artwork, found $($missing.Count)."
+    }
+    $report.catalogGames = @($state.Games).Count
 }
 
 function Set-StoredMaterial([string] $material) {
@@ -1082,6 +1115,12 @@ try {
         return
     }
 
+    if ($CatalogOnly) {
+        Run-CatalogScenarios
+        $report.success = $true
+        return
+    }
+
     Start-InstalledShell
     $report.empty = Run-ShellSmoke 'empty' -ExitDelayMilliseconds 2000
     $report.emptyAfterDelayedTask = Run-ShellSmoke 'empty'
@@ -1137,6 +1176,9 @@ try {
     }
     Run-DesignLanguageScenarios
     Run-MaterialScenarios
+
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    Run-CatalogScenarios
 
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-ProviderScenarios
