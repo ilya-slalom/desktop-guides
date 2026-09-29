@@ -230,8 +230,9 @@
                             <StackPanel x:Name="GameProviderDetails"
                                         Spacing="{StaticResource DesktopGuidesSpacing8}"
                                         Visibility="Collapsed">
-                                <toolkit:MetadataControl x:Name="GameFacts"
-                                                         AutomationProperties.AutomationId="GameFacts" />
+                                <local:AutomationGroup AutomationProperties.AutomationId="GameFacts">
+                                    <toolkit:MetadataControl x:Name="GameFacts" />
+                                </local:AutomationGroup>
                                 <ScrollViewer MaxHeight="120"
                                               HorizontalScrollBarVisibility="Disabled"
                                               VerticalScrollBarVisibility="Auto"

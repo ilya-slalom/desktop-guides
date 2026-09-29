@@ -590,8 +590,19 @@ on 29 September 2026, merge commit
 display-scaling verification to T16.2. The
 [T04.4 provider search design](t04-provider-search-design.md) records the
 provider decision: IGDB metadata with user-supplied Twitch credentials and
-SteamGridDB artwork with a user-supplied key. T04.4 implements search-first
-game addition before catalog and import UI consume the enriched Game model.
+SteamGridDB artwork with a user-supplied key. T04.4 was implemented and
+verified on 29 September 2026; the
+[installed result](results.md#m2-t044-provider-search--implementation-check-29-september-2026),
+[plan](t04-provider-search-plan.md), and
+[evidence](evidence/t04-provider-search/) record the Core/Infrastructure
+tests (`GameMetadataNormalizerTests`, `GameMetadataPresentationTests`,
+`ProviderGameImporterTests`, `ProviderMessagesTests`,
+`FallbackArtworkSourceTests` in Core; `IgdbClientTests`, `TwitchTokenSourceTests`,
+`ArtworkSourceTests`, `ProviderHttpTests`, `ProviderCredentialBlobTests`,
+`ArtworkValidatorTests`, `ManagedArtworkStoreTests`, and
+`GameMetadataJsonTests` in Infrastructure), the Windows 11 x64 harness
+phases, and the
+blocked-network controller removal record.
 
 ### UI design-language and Gallery adoption sequence
 

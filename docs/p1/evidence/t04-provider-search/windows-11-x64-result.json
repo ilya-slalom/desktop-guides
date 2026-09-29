@@ -1,0 +1,222 @@
+﻿{
+    "runId":  "86eb801ae79243ad9e388bbd55cd603b",
+    "observedAt":  "2026-09-29T06:16:02.3009237Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "AMD64",
+    "success":  true,
+    "windowsAppRuntime":  [
+                              "2.2.0.0",
+                              "2.3.1.0",
+                              "2.4.0.0",
+                              "2.5.1.0"
+                          ],
+    "dotnetSdk":  "10.0.401",
+    "sourcePackageSha256":  "97D3A0FE3FED6137C5AB593784BFC344CD2FC539C488371D7B88F8164D3225F9",
+    "certificateThumbprint":  "6A015380622CA50DF8359E4899FFE310A4C1E009",
+    "signedPackageSha256":  "8DE24CC59ABCF2FB492A31F350B9082C889EF72045C79F7EA7E4E095D4675D7D",
+    "packageFullName":  "DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+    "packageFamilyName":  "DesktopGuides.Preview_en8r599z3n35j",
+    "installLocation":  "C:\\Program Files\\WindowsApps\\DesktopGuides.Preview_0.1.0.0_x64__en8r599z3n35j",
+    "providers":  {
+                      "none":  {
+                                   "mode":  "provider-none",
+                                   "invocationId":  "d1ee0e1f5576437490731136822b2221",
+                                   "observedAt":  "2026-09-29T06:16:10.8798802Z",
+                                   "processId":  46688,
+                                   "sessionId":  1,
+                                   "exitDelayMilliseconds":  0,
+                                   "expectedScalePercent":  0,
+                                   "success":  true,
+                                   "phases":  [
+                                                  "library",
+                                                  "no-credentials-opens-manual-add-with-notice",
+                                                  "notice-opens-expanded-provider-settings"
+                                              ],
+                                   "noCredentialsScreenshot":  "E:\\work\\desktop-guides\\t04-providers-202609291411\\results-providers-2\\provider-none.add-game-no-credentials.png"
+                               },
+                      "offlineWithoutCredentials":  {
+                                                        "mode":  "provider-offline",
+                                                        "invocationId":  "6b157b9979ca404993a322a8e3e26864",
+                                                        "observedAt":  "2026-09-29T06:16:12.9585927Z",
+                                                        "processId":  46688,
+                                                        "sessionId":  1,
+                                                        "exitDelayMilliseconds":  0,
+                                                        "expectedScalePercent":  0,
+                                                        "success":  true,
+                                                        "phases":  [
+                                                                       "library",
+                                                                       "snapshot-and-cover-from-local-data",
+                                                                       "failed-refresh-keeps-snapshot"
+                                                                   ],
+                                                        "gameFacts":  "Released 2004, Main game, Platforms: PC (Microsoft Windows), PlayStation 2",
+                                                        "offlineGameScreenshot":  "E:\\work\\desktop-guides\\t04-providers-202609291411\\results-providers-2\\provider-offline-none.linked-game-notconfigured.png"
+                                                    },
+                      "settings":  {
+                                       "mode":  "provider-settings",
+                                       "invocationId":  "7f417730f10d4b36a40589cd88309762",
+                                       "observedAt":  "2026-09-29T06:16:14.9664539Z",
+                                       "processId":  46688,
+                                       "sessionId":  1,
+                                       "exitDelayMilliseconds":  0,
+                                       "expectedScalePercent":  0,
+                                       "success":  true,
+                                       "phases":  [
+                                                      "library",
+                                                      "test-with-no-credentials-asks-for-them",
+                                                      "wrong-secret-is-rejected",
+                                                      "real-credentials-connect",
+                                                      "credentials-saved"
+                                                  ],
+                                       "steamGridDbTested":  true,
+                                       "settingsScreenshot":  "E:\\work\\desktop-guides\\t04-providers-202609291411\\results-providers-2\\provider-settings.provider-settings-saved.png"
+                                   },
+                      "fixtureFields":  "IGDB accepted 22 fixture fields: cover.id,cover.image_id,external_games.external_game_source,external_games.id,external_games.uid,first_release_date,game_type.id,game_type.type,genres.id,genres.name,id,involved_companies.company.id,involved_companies.company.name,involved_companies.developer,involved_companies.id,involved_companies.publisher,name,platforms.id,platforms.name,summary,url,version_parent",
+                      "live":  {
+                                   "mode":  "provider-live",
+                                   "invocationId":  "46cf7d5c3e27499fb4514caf236ee7ac",
+                                   "observedAt":  "2026-09-29T06:16:29.4391974Z",
+                                   "processId":  27512,
+                                   "sessionId":  1,
+                                   "exitDelayMilliseconds":  0,
+                                   "expectedScalePercent":  0,
+                                   "success":  true,
+                                   "phases":  [
+                                                  "library",
+                                                  "typing-does-not-search",
+                                                  "search-returns-labelled-results",
+                                                  "pick-adds-linked-game-with-cover",
+                                                  "duplicate-add-opens-existing-game",
+                                                  "refresh-preserves-local-fields",
+                                                  "empty-search-says-so",
+                                                  "cancel-during-search-shows-nothing",
+                                                  "add-manually-from-search"
+                                              ],
+                                   "searchDialogScreenshot":  "E:\\work\\desktop-guides\\t04-providers-202609291411\\results-providers-2\\provider-live.add-game-search.png",
+                                   "searchResultCount":  17,
+                                   "searchResultNames":  [
+                                                             "Half-Life 2: MMod - Half-Life 2: Update, Other, 2018, PC (Microsoft Windows)",
+                                                             "Half-Life 2: MMod - Half-Life 2: Episode One, Other, 2018, PC (Microsoft Windows)",
+                                                             "Half-Life 2: MMod - Half-Life 2: Episode Two, Other, 2018, PC (Microsoft Windows)",
+                                                             "Half-Life, Main game, 1998, Linux, PC (Microsoft Windows), Mac",
+                                                             "Half-Life, Port, Dreamcast",
+                                                             "Half-Life, Port, 2001, PlayStation 2",
+                                                             "Half-Life 3, Main game, Linux, PC (Microsoft Windows), Mac",
+                                                             "Half-Life 2, Main game, 2004, Xbox, PlayStation 3, Linux and 4 more",
+                                                             "Half-Life: Sum, Other, 2020, PC (Microsoft Windows), Mac",
+                                                             "Half-Life: Loop, Other, PC (Microsoft Windows)",
+                                                             "Half-Life: Alyx, Main game, 2020, SteamVR",
+                                                             "Half-Life: MMod, Other, 2023, PC (Microsoft Windows)",
+                                                             "Half-Life: Life\u0027s End, Other, 2005, PC (Microsoft Windows)",
+                                                             "Half-Life Legacy, Other, 2025, Linux, PC (Microsoft Windows)",
+                                                             "Half-Life: C.A.G.E.D., Other, 2017, Linux, PC (Microsoft Windows), Mac",
+                                                             "Half-Life 2 RTX, Other, 2025, PC (Microsoft Windows)",
+                                                             "Half-Life ZDoom, Other, 2007, PC (Microsoft Windows)"
+                                                         ],
+                                   "searchResultsScreenshot":  "E:\\work\\desktop-guides\\t04-providers-202609291411\\results-providers-2\\provider-live.search-results.png",
+                                   "addedAttribution":  "Metadata from IGDB. Artwork from SteamGridDB.",
+                                   "addedFacts":  "Released 1998, Main game, Platforms: Linux, PC (Microsoft Windows), Mac",
+                                   "linkedGameScreenshot":  "E:\\work\\desktop-guides\\t04-providers-202609291411\\results-providers-2\\provider-live.linked-game-live.png",
+                                   "refreshStatus":  "21|Metadata refreshed.",
+                                   "cancelObserved":  true,
+                                   "cancelAttempts":  1,
+                                   "cancelReason":  null
+                               },
+                      "cancelDuringSearch":  "observed",
+                      "liveState":  {
+                                        "Games":  [
+                                                      {
+                                                          "Title":  "Half-Life",
+                                                          "Platform":  "My test platform",
+                                                          "Notes":  "My local notes.",
+                                                          "Provider":  "igdb",
+                                                          "ExternalId":  "231",
+                                                          "HasMetadata":  true,
+                                                          "ArtworkSource":  "SteamGridDB",
+                                                          "ArtworkRelativePath":  "artwork/4ab17404537d43359fce984d65270672/566163be410972d7af4c5ce383475200b0178a1bf864b4190ae3bd8e48e601b8.png",
+                                                          "ArtworkExists":  true
+                                                      },
+                                                      {
+                                                          "Title":  "Seeded Linked Game",
+                                                          "Platform":  null,
+                                                          "Notes":  null,
+                                                          "Provider":  "igdb",
+                                                          "ExternalId":  "900001",
+                                                          "HasMetadata":  true,
+                                                          "ArtworkSource":  "SteamGridDB",
+                                                          "ArtworkRelativePath":  "artwork/d718ed5e67284129ab5e130fd3c1d88d/1a2b21468347da786da01436d1acb3a05b91d9ace7854edb6129127c0d479666.png",
+                                                          "ArtworkExists":  true
+                                                      }
+                                                  ],
+                                        "ArtworkFiles":  2,
+                                        "StagingFiles":  0,
+                                        "CredentialBlobExists":  true
+                                    },
+                      "leakScanAfterLive":  {
+                                                "roots":  [
+                                                              "E:\\work\\desktop-guides\\t04-providers-202609291411\\results-providers-2",
+                                                              "C:\\Users\\Ilya\\AppData\\Local\\Packages\\DesktopGuides.Preview_en8r599z3n35j\\LocalState"
+                                                          ],
+                                                "filesWithCredentialValues":  [
+
+                                                                              ]
+                                            },
+                      "blockedNetwork":  "not-run: -AllowOfflineFirewallRule was not passed",
+                      "remove":  {
+                                     "mode":  "provider-remove",
+                                     "invocationId":  "a244840f64e04b569436782e8c72aa7f",
+                                     "observedAt":  "2026-09-29T06:16:41.2364458Z",
+                                     "processId":  41744,
+                                     "sessionId":  1,
+                                     "exitDelayMilliseconds":  0,
+                                     "expectedScalePercent":  0,
+                                     "success":  true,
+                                     "phases":  [
+                                                    "library",
+                                                    "remove-restores-manual-add"
+                                                ]
+                                 },
+                      "finalState":  {
+                                         "Games":  [
+                                                       {
+                                                           "Title":  "Half-Life",
+                                                           "Platform":  "My test platform",
+                                                           "Notes":  "My local notes.",
+                                                           "Provider":  "igdb",
+                                                           "ExternalId":  "231",
+                                                           "HasMetadata":  true,
+                                                           "ArtworkSource":  "SteamGridDB",
+                                                           "ArtworkRelativePath":  "artwork/4ab17404537d43359fce984d65270672/566163be410972d7af4c5ce383475200b0178a1bf864b4190ae3bd8e48e601b8.png",
+                                                           "ArtworkExists":  true
+                                                       },
+                                                       {
+                                                           "Title":  "Seeded Linked Game",
+                                                           "Platform":  null,
+                                                           "Notes":  null,
+                                                           "Provider":  "igdb",
+                                                           "ExternalId":  "900001",
+                                                           "HasMetadata":  true,
+                                                           "ArtworkSource":  "SteamGridDB",
+                                                           "ArtworkRelativePath":  "artwork/d718ed5e67284129ab5e130fd3c1d88d/1a2b21468347da786da01436d1acb3a05b91d9ace7854edb6129127c0d479666.png",
+                                                           "ArtworkExists":  true
+                                                       }
+                                                   ],
+                                         "ArtworkFiles":  2,
+                                         "StagingFiles":  0,
+                                         "CredentialBlobExists":  false
+                                     },
+                      "leakScanAfterRemove":  {
+                                                  "roots":  [
+                                                                "E:\\work\\desktop-guides\\t04-providers-202609291411\\results-providers-2",
+                                                                "C:\\Users\\Ilya\\AppData\\Local\\Packages\\DesktopGuides.Preview_en8r599z3n35j\\LocalState"
+                                                            ],
+                                                  "filesWithCredentialValues":  [
+
+                                                                                ]
+                                              }
+                  },
+    "launchedProcessId":  41744,
+    "launchedSessionId":  1,
+    "closedGracefully":  true,
+    "packageStillInstalled":  false,
+    "certificateStillTrusted":  false
+}

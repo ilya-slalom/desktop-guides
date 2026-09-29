@@ -5,7 +5,18 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $ResultDirectory,
 
-    [switch] $DesignOnly
+    [switch] $DesignOnly,
+
+    [switch] $ProviderOnly,
+
+    # Paths only. The values are read in memory and never passed on.
+    [string] $IgdbCredentialFile = 'E:\work\igdb_credentials.txt',
+
+    [string] $SteamGridDbCredentialFile = 'E:\work\steamgriddb_credentials.txt',
+
+    # Wait for windows_provider_offline_controller.ps1 to block the app's
+    # network access for one scenario. Needs the user's authorization.
+    [switch] $AllowOfflineFirewallRule
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,6 +40,7 @@ Assert-FreshPreviewProfile $env:LOCALAPPDATA
 . (Join-Path $PSScriptRoot 'windows_shell_task_cleanup.ps1')
 . (Join-Path $PSScriptRoot 'windows_shell_screenshot_stats.ps1')
 . (Join-Path $PSScriptRoot 'windows_shell_theme_preference.ps1')
+. (Join-Path $PSScriptRoot 'windows_provider_credentials.ps1')
 
 New-Item -ItemType Directory -Force $ResultDirectory | Out-Null
 $ResultDirectory = (Resolve-Path $ResultDirectory).Path
@@ -54,6 +66,7 @@ $secondLaunchTask = "DesktopGuides-P1-ShellSecondLaunch-$runId"
 $smokeTask = "DesktopGuides-P1-ShellSmoke-$runId"
 $launchResultPath = Join-Path $ResultDirectory 'launch.json'
 $secondLaunchResultPath = Join-Path $ResultDirectory 'second-launch.json'
+$dataRoot = $null
 
 function Get-InstalledShellProcesses {
     if (-not $installed) { return @() }
@@ -620,7 +633,10 @@ function Run-ShellSmoke(
     [string] $ResultName = $mode,
     [int] $ExpectedScalePercent = 0,
     [string] $ExpectedMaterial = '',
-    [string] $SwitchToMaterial = '') {
+    [string] $SwitchToMaterial = '',
+    [string] $IgdbCredentialFile = '',
+    [string] $SteamGridDbCredentialFile = '',
+    [string] $ExpectedProviderFailure = '') {
     $resultPath = Join-Path $ResultDirectory "$ResultName.json"
     Clear-ShellSmokeResult $resultPath
     $invocationId = [Guid]::NewGuid().ToString('N')
@@ -641,12 +657,22 @@ function Run-ShellSmoke(
     if ($SwitchToMaterial) {
         $arguments += ' -SwitchToMaterial ' + $SwitchToMaterial
     }
+    if ($IgdbCredentialFile) {
+        $arguments += ' -IgdbCredentialFile "' + $IgdbCredentialFile + '"'
+    }
+    if ($SteamGridDbCredentialFile) {
+        $arguments += ' -SteamGridDbCredentialFile "' + $SteamGridDbCredentialFile + '"'
+    }
+    if ($ExpectedProviderFailure) {
+        $arguments += ' -ExpectedProviderFailure ' + $ExpectedProviderFailure
+    }
     $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
         -Argument $arguments -WorkingDirectory $PSScriptRoot
     Register-ScheduledTask -TaskName $smokeTask -Action $action `
         -Principal $principal -Force | Out-Null
     Start-ScheduledTask -TaskName $smokeTask
-    $deadline = (Get-Date).AddSeconds(60)
+    $timeoutSeconds = if ($mode -like 'provider-*') { 240 } else { 60 }
+    $deadline = (Get-Date).AddSeconds($timeoutSeconds)
     do {
         Start-Sleep -Milliseconds 500
     } while (-not (Test-Path $resultPath) -and (Get-Date) -lt $deadline)
@@ -786,6 +812,160 @@ function Run-MaterialScenarios {
     }
 }
 
+function Invoke-ShellSeed([string[]] $SeedArguments) {
+    $output = @(dotnet run --project $seedProject -c Release --no-restore -- @SeedArguments)
+    if ($LASTEXITCODE -ne 0) {
+        throw "ShellSeed $($SeedArguments[0]) failed: $($output | Select-Object -Last 3)"
+    }
+    return $output | Select-Object -Last 1
+}
+
+function Get-ProviderState {
+    return Invoke-ShellSeed @('describe-providers', $dataRoot) | ConvertFrom-Json
+}
+
+function Assert-NoCredentialLeak([string[]] $Secrets, [string] $Label) {
+    $found = @(Find-SecretInFiles @($ResultDirectory, $dataRoot) $Secrets)
+    $report.providers["leakScan$Label"] = [ordered]@{
+        roots = @($ResultDirectory, $dataRoot)
+        filesWithCredentialValues = $found
+    }
+    if ($found.Count -gt 0) {
+        throw "Credential values were found in $($found.Count) file(s): $($found -join ', ')"
+    }
+}
+
+function Wait-HandshakeFile([string] $Path, [int] $Seconds) {
+    $deadline = (Get-Date).AddSeconds($Seconds)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-Path -LiteralPath $Path) {
+            $content = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+            if ($content.runId -eq $runId) { return $content }
+        }
+        Start-Sleep -Milliseconds 500
+    }
+    return $null
+}
+
+function Run-BlockedNetworkScenario {
+    $handshake = Join-Path $ResultDirectory 'offline-handshake'
+    New-Item -ItemType Directory -Force $handshake | Out-Null
+    [ordered]@{ runId = $runId; program = $expectedExecutablePath } |
+        ConvertTo-Json | Set-Content (Join-Path $handshake 'request.json') -Encoding UTF8
+    $blocked = Wait-HandshakeFile (Join-Path $handshake 'blocked.json') 120
+    if (-not $blocked) {
+        throw 'The offline controller did not confirm the firewall rule.'
+    }
+    $report.providers.firewallRule = $blocked.ruleName
+    try {
+        Start-InstalledShell
+        $report.providers.blockedNetwork = Run-ShellSmoke 'provider-offline' `
+            -ResultName 'provider-offline-blocked' -ExpectedProviderFailure 'Unavailable'
+        Close-InstalledShell
+    }
+    finally {
+        [ordered]@{ runId = $runId } | ConvertTo-Json |
+            Set-Content (Join-Path $handshake 'done.json') -Encoding UTF8
+        $restored = Wait-HandshakeFile (Join-Path $handshake 'restored.json') 60
+        $report.providers.firewallRuleRemoved = [bool]($restored -and $restored.removed)
+        if (-not $report.providers.firewallRuleRemoved) {
+            $cleanupErrors.Add('The offline controller did not confirm that it removed the firewall rule.')
+        }
+    }
+}
+
+function Run-ProviderScenarios {
+    $report.providers = [ordered]@{}
+    $providers = $report.providers
+    $fixtureDirectory = Join-Path $PSScriptRoot `
+        '..\..\tests\DesktopGuides.Infrastructure.Tests\Providers\Fixtures'
+    $secrets = @()
+    $igdbReady = $false
+    $steamGridDbFile = ''
+    try {
+        $secrets += @((Read-LabelledValues $IgdbCredentialFile `
+            @('igdb client id', 'igdb client secret')).Values)
+        $igdbReady = $true
+    }
+    catch {
+        $providers.live = 'skipped'
+        $providers.liveSkipReason = $_.Exception.Message
+    }
+    try {
+        $secrets += @((Read-LabelledValues $SteamGridDbCredentialFile `
+            @('steamgriddb api key')).Values)
+        $steamGridDbFile = $SteamGridDbCredentialFile
+    }
+    catch {
+        $providers.steamGridDb = 'skipped'
+        $providers.steamGridDbSkipReason = $_.Exception.Message
+    }
+
+    [void](Invoke-ShellSeed @('seed-linked-game', $dataRoot))
+    Start-InstalledShell
+    $providers.none = Run-ShellSmoke 'provider-none'
+    $providers.offlineWithoutCredentials = Run-ShellSmoke 'provider-offline' `
+        -ResultName 'provider-offline-none' -ExpectedProviderFailure 'NotConfigured'
+    if ($igdbReady) {
+        $providers.settings = Run-ShellSmoke 'provider-settings' `
+            -IgdbCredentialFile $IgdbCredentialFile `
+            -SteamGridDbCredentialFile $steamGridDbFile
+    }
+    Close-InstalledShell
+    if (-not $igdbReady) {
+        $providers.blockedNetwork = 'skipped: no IGDB credential file'
+        $providers.finalState = Get-ProviderState
+        return
+    }
+
+    $providers.fixtureFields = Invoke-ShellSeed @(
+        'check-igdb-fields', $IgdbCredentialFile, $fixtureDirectory)
+    $saved = Get-ProviderState
+    if (-not $saved.CredentialBlobExists) {
+        throw 'Saving provider credentials did not create providers.bin.'
+    }
+
+    Start-InstalledShell
+    $providers.live = Run-ShellSmoke 'provider-live'
+    Close-InstalledShell
+    $providers.cancelDuringSearch = if ($providers.live.cancelObserved) {
+        'observed'
+    } else {
+        "not-observed: $($providers.live.cancelReason)"
+    }
+    $state = Get-ProviderState
+    $halfLife = @($state.Games | Where-Object { $_.Title -eq 'Half-Life' })
+    if ($halfLife.Count -ne 1 -or $halfLife[0].Provider -ne 'igdb' -or
+        -not $halfLife[0].HasMetadata -or
+        $halfLife[0].Platform -ne 'My test platform' -or
+        $halfLife[0].Notes -ne 'My local notes.') {
+        throw "The added game was not stored as expected: $($halfLife | ConvertTo-Json -Compress)"
+    }
+    $withArtwork = @($state.Games | Where-Object { $_.ArtworkRelativePath })
+    if (@($withArtwork | Where-Object { -not $_.ArtworkExists }).Count -gt 0 -or
+        $state.ArtworkFiles -ne $withArtwork.Count -or $state.StagingFiles -ne 0) {
+        throw "Artwork files did not match the rows: $($state | ConvertTo-Json -Compress -Depth 4)"
+    }
+    $providers.liveState = $state
+    Assert-NoCredentialLeak $secrets 'AfterLive'
+
+    if ($AllowOfflineFirewallRule) {
+        Run-BlockedNetworkScenario
+    }
+    else {
+        $providers.blockedNetwork = 'not-run: -AllowOfflineFirewallRule was not passed'
+    }
+
+    Start-InstalledShell
+    $providers.remove = Run-ShellSmoke 'provider-remove'
+    Close-InstalledShell
+    $providers.finalState = Get-ProviderState
+    if ($providers.finalState.CredentialBlobExists) {
+        throw 'Removing provider credentials left providers.bin behind.'
+    }
+    Assert-NoCredentialLeak $secrets 'AfterRemove'
+}
+
 try {
     $report.windowsAppRuntime = @(
         Get-AppxPackage -Name 'Microsoft.WindowsAppRuntime.2*' |
@@ -860,6 +1040,12 @@ try {
         return
     }
 
+    if ($ProviderOnly) {
+        Run-ProviderScenarios
+        $report.success = $true
+        return
+    }
+
     Start-InstalledShell
     $report.empty = Run-ShellSmoke 'empty' -ExitDelayMilliseconds 2000
     $report.emptyAfterDelayedTask = Run-ShellSmoke 'empty'
@@ -915,6 +1101,10 @@ try {
     }
     Run-DesignLanguageScenarios
     Run-MaterialScenarios
+
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    Run-ProviderScenarios
+
     $report.success = $true
 }
 catch {
@@ -961,6 +1151,17 @@ catch {
     }
 }
 finally {
+    if ($dataRoot) {
+        $blob = Join-Path $dataRoot 'providers.bin'
+        if (Test-Path -LiteralPath $blob) {
+            Stop-InstalledShell -BestEffort
+            Remove-Item -LiteralPath $blob -Force -ErrorAction SilentlyContinue
+            $report.credentialBlobDeletedByCleanup = -not (Test-Path -LiteralPath $blob)
+            if (-not $report.credentialBlobDeletedByCleanup) {
+                $cleanupErrors.Add('Could not delete providers.bin during cleanup.')
+            }
+        }
+    }
     $tasksDrained = $true
     if (-not (Wait-ScheduledTaskIdle $smokeTask 10)) {
         Stop-ScheduledTask -TaskName $smokeTask -ErrorAction SilentlyContinue

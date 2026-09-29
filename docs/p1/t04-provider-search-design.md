@@ -1,10 +1,14 @@
 # T04.4 provider-backed search-first Add game design
 
-Status: design approved in conversation, 29 September 2026; written spec
-awaiting review. Prerequisites T03.2, T03.3, T04.1, T11.1, T11.4, and T15.2
-are merged (T11.4 through PR #13, merge commit
-`23e0694faae1938993c8f228116324d61fe5b1e1`). This document is the reviewed
-external-provider decision that T04.4 requires.
+Status: implemented and verified on Windows 11 x64, 29 September 2026. The
+[installed result](results.md#m2-t044-provider-search--implementation-check-29-september-2026)
+records Core/Infrastructure tests (150/150 and 213/213), the E2E provider
+scenarios on `pcsx2-win`, the blocked-network run with elevated controller,
+and leak scans. [Evidence](evidence/t04-provider-search/) includes the primary
+and first-run results, controller log, and screenshots. Prerequisites T03.2,
+T03.3, T04.1, T11.1, T11.4, and T15.2 are merged (T11.4 through PR #13, merge
+commit `23e0694faae1938993c8f228116324d61fe5b1e1`). This document is the
+reviewed external-provider decision that T04.4 requires.
 
 ## Intent
 

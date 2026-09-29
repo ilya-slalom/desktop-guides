@@ -38,6 +38,23 @@ switch-and-relaunch check. The harness puts the stored material back to Mica,
 restores the user's app theme, and removes the package and temporary trust.
 The full run repeats these checks after the existing shell regression.
 
+For provider E2E without the full shell regression, pass `-ProviderOnly` with
+`-IgdbCredentialFile` and `-SteamGridDbCredentialFile` paths. Credential
+values are read in memory and typed through UI Automation; they are never
+passed as arguments or written to result files. Harness checks cover provider
+settings, offline metadata display, live search and add, refresh preserving
+local edits, and credential removal. After each scenario, the harness scans
+result and package directories for credential values in UTF-8 and UTF-16LE;
+file names are recorded, but the scan never outputs a value. A missing
+credential file is recorded as `skipped`, not passed. With
+`-AllowOfflineFirewallRule`, a separate elevated controller adds a temporary
+Windows Firewall outbound block rule for the app's executable while a scenario
+with saved credentials runs. The rule blocks only the test executable, lasts
+at most 10 minutes, and requires the user's explicit authorization each time.
+The elevated controller removes the rule and reports its removal. Without the
+switch, the blocked-network scenario is recorded as not run. The full run adds
+the provider pass after the material passes, starting from an empty profile.
+
 Installed UI checks test what the app code controls, not Windows or WinUI.
 The material passes check the effective material the app reports through UI
 Automation, that no layer of ours hides the backdrop or leaves a seam, that
