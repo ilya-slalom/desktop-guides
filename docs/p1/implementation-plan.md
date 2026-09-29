@@ -612,7 +612,7 @@ PR #15, merge commit `a4bb44c8ef06053cf1b2e5b154641fb95cf5fa1a`. The
 facts, empty-state, busy-row and status `InfoBar` patterns into
 `Styles/Catalog.xaml` and move the Library game list onto the shared row.
 T05.4 was implemented and verified on 29 September 2026 in PR #16:
-CI run 36572000282 passed `core-tests` (including `LibraryGamePresentationTests`
+CI run 36577997048 passed `core-tests` (including `LibraryGamePresentationTests`
 and `ArtworkLoadTicketsTests`), both package builds and `production-shell-ui`
 with the new catalog scenario in light and dark. The host `-ProviderOnly` run
 passed Add game on the shared template.

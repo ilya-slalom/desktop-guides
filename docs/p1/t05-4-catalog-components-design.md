@@ -229,9 +229,13 @@ checks pass in CI, with screenshots. This unblocks T05.1, T04.2 and T06.1.
 - **Installed catalog scenario.** `production-shell-ui` in the same run, light and
   dark. Working area 1024×720 at 100%, so the 1500 px wide size clamps to the
   working area. Realized rows: 34 at the top and 21–22 at the end (limit 80),
-  from CI run 36572000282. Long row 76 DIPs, short row 76. The long-title and
+  from CI run 36577997048. Long row 76 DIPs, short row 76. The long-title and
   short-title covers each matched 2672 pixels of their seeded colour; the corrupt
-  and missing-art rows matched 0 and 29–38, under the 270-pixel limit. No status, no remote connections, no credential blob,
+  and missing-art rows matched 0 and 29–38, under the 270-pixel limit. At the
+  end of the list, where rows reuse containers, the last title and Catalog
+  Game 483 matched 2672 pixels each and Catalog Game 481, which has no cover,
+  matched 0 of either colour. The catalog phase took 9.1–9.6 s against the
+  120 s timeout. No status, no remote connections, no credential blob,
   10 missing-artwork games, 500 games.
 - **Live provider regression.** Host `-ProviderOnly` on 29 September 2026 with the
   CI x64 MSIX: `provider-live` passed all nine phases and found 16 Half-Life
@@ -245,5 +249,7 @@ checks pass in CI, with screenshots. This unblocks T05.1, T04.2 and T06.1.
   empty bounds for cached off-screen rows. The count now keeps those rows. A
   negative control proved both checks: a `StackPanel` items panel with row
   artwork turned off failed with 500 realized rows and 0 cover pixels. It ran on
-  the host because the control ran past CI's 120 s catalog timeout.
+  the host because the control ran past CI's 120 s catalog timeout. After the PR
+  review, the realized-row limit is checked before the slower checks, so a
+  regression like that reports its row count instead of timing out.
 - **Not run.** Portable build checks: T05.4 changes nothing in packaging.

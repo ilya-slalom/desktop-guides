@@ -1,8 +1,8 @@
 ﻿{
     "mode":  "catalog",
-    "invocationId":  "4b75838a737841b291b45575399f542c",
-    "observedAt":  "2026-09-29T13:11:30.0301413Z",
-    "processId":  8704,
+    "invocationId":  "dbf0b78ef6534131b5b00ff615712505",
+    "observedAt":  "2026-09-29T14:00:39.6500505Z",
+    "processId":  3180,
     "sessionId":  2,
     "exitDelayMilliseconds":  0,
     "expectedScalePercent":  0,
@@ -12,6 +12,7 @@
                    "catalog-artwork",
                    "catalog-top-virtualized",
                    "catalog-keyboard",
+                   "catalog-end-artwork",
                    "catalog-end-virtualized",
                    "catalog-narrow",
                    "catalog-no-provider-traffic"
@@ -34,7 +35,16 @@
                       },
     "libraryWideScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\catalog-light.library-wide.png",
     "realizedRowsAtEnd":  22,
+    "artworkPixelsAtEnd":  {
+                               "last":  2672,
+                               "game483":  2672,
+                               "game481":  {
+                                               "lastColour":  0,
+                                               "game483Colour":  0
+                                           }
+                           },
     "libraryEndScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\catalog-light.library-end.png",
     "libraryNarrowScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\catalog-light.library-narrow.png",
-    "remoteConnections":  0
+    "remoteConnections":  0,
+    "catalogSeconds":  9.6
 }
