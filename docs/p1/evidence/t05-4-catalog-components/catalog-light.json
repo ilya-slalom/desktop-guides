@@ -1,0 +1,50 @@
+﻿{
+    "mode":  "catalog",
+    "invocationId":  "dbf0b78ef6534131b5b00ff615712505",
+    "observedAt":  "2026-09-29T14:00:39.6500505Z",
+    "processId":  3180,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "catalog-artwork",
+                   "catalog-top-virtualized",
+                   "catalog-keyboard",
+                   "catalog-end-artwork",
+                   "catalog-end-virtualized",
+                   "catalog-narrow",
+                   "catalog-no-provider-traffic"
+               ],
+    "workingArea":  "1024x720",
+    "windowDpi":  96,
+    "scalePercent":  100,
+    "longRowHeight":  76,
+    "shortRowHeight":  76,
+    "realizedRowsAtTop":  34,
+    "gameListItemsAtTop":  34,
+    "otherItemNamesAtTop":  [
+
+                            ],
+    "artworkPixels":  {
+                          "long":  2672,
+                          "short":  2672,
+                          "corrupt":  0,
+                          "missing":  29
+                      },
+    "libraryWideScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\catalog-light.library-wide.png",
+    "realizedRowsAtEnd":  22,
+    "artworkPixelsAtEnd":  {
+                               "last":  2672,
+                               "game483":  2672,
+                               "game481":  {
+                                               "lastColour":  0,
+                                               "game483Colour":  0
+                                           }
+                           },
+    "libraryEndScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\catalog-light.library-end.png",
+    "libraryNarrowScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\catalog-light.library-narrow.png",
+    "remoteConnections":  0,
+    "catalogSeconds":  9.6
+}

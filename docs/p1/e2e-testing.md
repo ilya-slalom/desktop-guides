@@ -219,6 +219,23 @@ the fixture open. The signed normal toolbar run includes an artificial
 31-second pre-install delay to verify the installation wait exceeds the
 former 30-second cutoff.
 
+### Gates of record
+
+CI `production-shell-ui` runs the full installed harness on every PR and is the
+gate of record for the shell, design-language, material and catalog scenarios.
+It uploads the JSON results and screenshots, and PRs link to that artifact.
+Provider live scenarios skip on CI, because the runner has no credential files.
+Run them on the Windows host with `-ProviderOnly`, using the user's keys and
+normal provider requests. Use the host for other scenarios only to debug a CI
+failure; `-CatalogOnly` and `-DesignOnly` run one scenario group against a fresh
+install. A portable CI job, a fake-provider CI lane and a CI scheduled-task entry
+point are T17.2 work.
+
+When a host run installs a CI-built MSIX, stage the source with Windows line
+endings before building `DesktopGuides.ShellSeed`. The schema SQL is a raw
+string literal, so its stored text follows the source line endings, and the app
+rejects a library whose `sqlite_master` text differs from its own build.
+
 ## Scenario checklist
 
 Each row needs a named UI trace or result file from the signed, installed
@@ -228,6 +245,7 @@ production app. Add cases as the dependent P1 tasks complete.
 | --- | --- | --- |
 | Shell smoke | Fresh empty Library, Library/Game/Reader/Settings routes, rapid Game/Guide → Settings selections and Back, stale Resume, no P0 fixture controls, and a positive UI-accepted second launch that brings a background window to the foreground. Verify normalized boundary-length game input, a bounded 2,000-character note, and close during a blocked Edit metadata read without a late dialog or stalled shutdown. While guide A's lookup is held by a fixture read lock, select guide B and verify B's Reader, Back selection/focus, and persisted Resume. During another held lookup, request Close and select a later guide; the accepted earlier guide must still become Resume after drain. In a disposable fixture, remove a still-displayed later guide and clear Resume before the held lookup; its failed open must leave Resume empty. Also corrupt a guide after its Reader route opens but before its second metadata read; the render error must leave Resume empty after the format is restored and the user returns to Library. Hold the second game's metadata read and verify the previous guide row and selected-guide action are unavailable during loading, then check the second game's Reader after release. Launch a new window while an old guide write is blocked; verify the new window waits for the library lease and then shows the distinct guide saved by the old window. Pause a second launch after it selects the old instance, and pause a callback after it reaches the UI queue; close the old window in each case and verify the launch takes over. After a second launch receives UI acceptance, close the old window before the second process exits and verify it does not reopen. Retain verified process handles from the interactive launch handoff and wait for handle-confirmed exit before seeding or package cleanup. Reader is still a placeholder. | T04.1, T11.1, T11.3, TR11.1 |
 | Design language | With realistic game metadata, capture Library, Game, Reader, and Settings at wide and narrow widths. Verify semantic headings, named controls, keyboard focus, native `TitleBar` Back/pane actions, the Toolkit `SettingsCard` name and bounds, full-width route layout, automatic dismissal of routine `InfoBar` status, no title-bar/content overlap, long text, and system/light/dark resources in each window material. Solid strips across the pane/content boundary show no seam, Acrylic does not repeat the Solid fill, and the Acrylic edit-game dialog differs from the Solid one. Restore the stored material to Mica and the original Windows app theme exactly. | T11.4, TR11.3 |
+| Library catalog | Seed 500 games with valid, corrupt and missing managed artwork, a 160-character title, and German, Arabic and Japanese titles. In light and dark: fewer than 80 realized `GameList` rows at the top and after scrolling to the last game; the long-title row no taller than a short one; Tab into the list without opening a game, Ctrl+Down then Enter opens the focused game, and End opens the last; rows stay inside `GameList` at 600 px; no status, no non-loopback TCP connection and no credential blob. | T05.4, TR05.3, TR11.3 |
 | Install and upgrade | Signed MSIX installs in an interactive session; an older version upgrades under the same identity without losing a populated library. Verify package version, launch, and data after restart. | T17.1, T17.3, TR17.2 |
 | Provider-backed game addition | Search the selected provider, distinguish editions, add one result, and verify its provider provenance, normalized metadata, and validated artwork. Disconnect and relaunch to confirm the cached display remains usable. Exercise duplicate selection, cancellation, malformed/oversized data, unavailable service, and `Create manually`; failed attempts leave no game or managed artwork. Refresh source data and verify local title, platform, and notes remain unchanged. | T04.4, TR04.3, TR04.4 |
 | Import and offline reading | Add a game and import TXT, static HTML with local assets, and PDF through the UI. Remove the originals; while online in a fresh WebView2 profile, verify a reachable HTML canary receives zero guide-originated requests. Then remove all egress, relaunch, and open all three managed copies while recording disconnected state through the final check. | T04–T10, T17.3, TR17.1 |

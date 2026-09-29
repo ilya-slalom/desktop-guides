@@ -36,6 +36,7 @@
             <toolkit:SettingsCard ContentAlignment="Left">
                 <StackPanel Spacing="{StaticResource DesktopGuidesSpacing8}">
                     <InfoBar x:Name="ProviderSettingsStatus"
+                             Style="{StaticResource DesktopGuidesStatusInfoBarStyle}"
                              IsClosable="True"
                              AutomationProperties.AutomationId="ProviderSettingsStatus" />
                     <StackPanel Orientation="Horizontal" Spacing="{StaticResource DesktopGuidesSpacing8}">

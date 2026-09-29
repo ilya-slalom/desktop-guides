@@ -7,7 +7,7 @@ param(
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
         'reader-render-error-observed', 'reader-render-error-result',
-        'late-guide-after-close', 'waiting-handoff', 'material',
+        'late-guide-after-close', 'waiting-handoff', 'material', 'catalog',
         'provider-none', 'provider-offline', 'provider-settings',
         'provider-live', 'provider-remove')]
     [string] $Mode,
@@ -452,6 +452,85 @@ try {
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
         throw "Expected keyboard focus on '$expected' after Back."
+    }
+
+    function Wait-FocusedGameRow([string] $expected) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+            if ($focused -and
+                $focused.Current.ControlType -eq [System.Windows.Automation.ControlType]::ListItem -and
+                (-not $expected -or $focused.Current.Name -eq $expected)) {
+                return $focused
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected keyboard focus on game row '$expected'."
+    }
+
+    function Get-GameListItems {
+        $list = Wait-VisibleById 'GameList'
+        $condition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+            [System.Windows.Automation.ControlType]::ListItem)
+        return @($list.FindAll($scope, $condition))
+    }
+
+    # UIA lists the rows that have a container, including the off-screen
+    # cache, and reports empty bounds for the off-screen ones, so don't filter
+    # on bounds. The name check skips unnamed items and, defensively, any peer
+    # named after its .NET type; CI has shown none of those.
+    function Test-RealizedGameRow($item) {
+        $name = $item.Current.Name
+        return [bool]($name -and $name -notlike 'DesktopGuides.*')
+    }
+
+    function Get-RealizedGameRows {
+        return @(Get-GameListItems | Where-Object { Test-RealizedGameRow $_ })
+    }
+
+    # Counts screen pixels within 24 per channel of $rgb in the artwork column
+    # of a row. UIA bounds and CopyFromScreen both use physical pixels.
+    function Measure-RowArtwork($row, [int[]] $rgb, [double] $scale) {
+        Add-Type -AssemblyName System.Drawing
+        $bounds = $row.Current.BoundingRectangle
+        $width = [int][Math]::Min($bounds.Width, 120 * $scale)
+        $height = [int]$bounds.Height
+        if ($width -lt 1 -or $height -lt 1) {
+            throw "Game row '$($row.Current.Name)' has no visible bounds."
+        }
+        $bitmap = [System.Drawing.Bitmap]::new($width, $height)
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        try {
+            $graphics.CopyFromScreen(
+                [int]$bounds.X, [int]$bounds.Y, 0, 0, $bitmap.Size)
+            $hits = 0
+            for ($y = 0; $y -lt $height; $y++) {
+                for ($x = 0; $x -lt $width; $x++) {
+                    $pixel = $bitmap.GetPixel($x, $y)
+                    if ([Math]::Abs($pixel.R - $rgb[0]) -le 24 -and
+                        [Math]::Abs($pixel.G - $rgb[1]) -le 24 -and
+                        [Math]::Abs($pixel.B - $rgb[2]) -le 24) {
+                        $hits++
+                    }
+                }
+            }
+            return $hits
+        }
+        finally {
+            $graphics.Dispose()
+            $bitmap.Dispose()
+        }
+    }
+
+    function Wait-RowArtwork($row, [int[]] $rgb, [double] $scale, [double] $minimum) {
+        $deadline = (Get-Date).AddSeconds(10)
+        do {
+            $count = Measure-RowArtwork $row $rgb $scale
+            if ($count -ge $minimum) { return $count }
+            Start-Sleep -Milliseconds 250
+        } while ((Get-Date) -lt $deadline)
+        return $count
     }
 
     function Focus-OtherGuideWithoutSelection(
@@ -1223,6 +1302,177 @@ try {
         }
         $report.phases += 'stale-resume-hidden'
     }
+    elseif ($Mode -eq 'catalog') {
+        $catalogStarted = Get-Date
+        $longTitle = 'Catalog A ' + ('W' * 150)
+        $shortTitle = 'Catalog B Short'
+        # Built from code points: Windows PowerShell 5.1 reads this file as ANSI.
+        $lastTitle = [string]::new([char[]]@(
+            0x30BC, 0x30EB, 0x30C0, 0x306E, 0x4F1D, 0x8AAC))
+        $wideWidth = 1500
+        $narrowWidth = 600
+        $windowHeight = 720
+        $realizedLimit = 80
+
+        $workingArea = [System.Windows.Forms.SystemInformation]::WorkingArea
+        $report.workingArea = "$($workingArea.Width)x$($workingArea.Height)"
+        $dpi = [DesktopGuidesForegroundProbe]::Dpi($process.MainWindowHandle)
+        $report.windowDpi = $dpi
+        $report.scalePercent = [int][Math]::Round(($dpi / 96.0) * 100)
+
+        Resize-ShellWindow $wideWidth $windowHeight
+        [void](Wait-HiddenById 'ShellStatus')
+        $longRow = Wait-GameRow $longTitle
+        $shortRow = Wait-GameRow $shortTitle
+        [void](Wait-GameRow 'Catalog C Corrupt Art')
+        [void](Wait-GameRow 'Catalog C Missing Art 0')
+        $longHeight = $longRow.Current.BoundingRectangle.Height
+        $shortHeight = $shortRow.Current.BoundingRectangle.Height
+        $report.longRowHeight = $longHeight
+        $report.shortRowHeight = $shortHeight
+        if ($longHeight -gt ($shortHeight + 1)) {
+            throw "The long-title row is taller than a short row: $longHeight versus $shortHeight."
+        }
+        $items = Get-GameListItems
+        $topCount = @($items | Where-Object { Test-RealizedGameRow $_ }).Count
+        $report.realizedRowsAtTop = $topCount
+        $report.gameListItemsAtTop = $items.Count
+        $report.otherItemNamesAtTop = @($items |
+            Where-Object { -not (Test-RealizedGameRow $_) } |
+            ForEach-Object { $_.Current.Name } | Select-Object -Unique -First 3)
+        # Fail before the slower pixel and keyboard checks, so a broken
+        # virtualization reports its row count instead of a harness timeout.
+        if ($topCount -ge $realizedLimit) {
+            throw "GameList realized $topCount rows at the top of a 500-game library."
+        }
+
+        # Seeded covers are solid (shade, 255 - shade, 0x80). A loaded cover
+        # fills most of its 45x60 tile; the placeholder has none of that colour.
+        $scale = $dpi / 96.0
+        $loaded = 0.5 * 45 * 60 * $scale * $scale
+        $absent = 0.1 * 45 * 60 * $scale * $scale
+        $artwork = [ordered]@{
+            long = Wait-RowArtwork $longRow @(0x20, 0xDF, 0x80) $scale $loaded
+            short = Wait-RowArtwork $shortRow @(0x40, 0xBF, 0x80) $scale $loaded
+        }
+        $artwork.corrupt = Measure-RowArtwork (Wait-GameRow 'Catalog C Corrupt Art') @(0x60, 0x9F, 0x80) $scale
+        $artwork.missing = Measure-RowArtwork (Wait-GameRow 'Catalog C Missing Art 0') @(0x70, 0x8F, 0x80) $scale
+        $report.artworkPixels = $artwork
+
+        $failures = @()
+        foreach ($key in 'long', 'short') {
+            if ($artwork[$key] -lt $loaded) {
+                $failures += "The $key-title row shows no cover ($($artwork[$key]) matching pixels)."
+            }
+        }
+        foreach ($key in 'corrupt', 'missing') {
+            if ($artwork[$key] -ge $absent) {
+                $failures += "The $key-art row shows its seeded colour ($($artwork[$key]) pixels)."
+            }
+        }
+        if ($failures.Count -gt 0) {
+            throw ($failures -join ' ')
+        }
+        $report.phases += 'catalog-artwork'
+        $report.libraryWideScreenshot = Save-WindowScreenshot 'library-wide'
+        $report.phases += 'catalog-top-virtualized'
+
+        Focus-And-Verify 'AddGameButton'
+        [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
+        [void](Wait-FocusedGameRow $longTitle)
+        Start-Sleep -Milliseconds 500
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-HiddenById 'GameHeading')
+        [System.Windows.Forms.SendKeys]::SendWait('^{DOWN}')
+        [void](Wait-FocusedGameRow $shortTitle)
+        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        [void](Wait-Name 'GameHeading' $shortTitle)
+        [void](Wait-Status 'Game ready.')
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Status 'Library ready.')
+        Focus-And-Verify 'AddGameButton'
+        [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
+        [void](Wait-FocusedGameRow '')
+        [System.Windows.Forms.SendKeys]::SendWait('{END}')
+        [void](Wait-Name 'GameHeading' $lastTitle)
+        [void](Wait-Status 'Game ready.')
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Status 'Library ready.')
+        $report.phases += 'catalog-keyboard'
+
+        [void](Wait-HiddenById 'ShellStatus')
+        $list = Wait-VisibleById 'GameList'
+        $scroll = $list.GetCurrentPattern(
+            [System.Windows.Automation.ScrollPattern]::Pattern)
+        $scroll.SetScrollPercent(
+            [System.Windows.Automation.ScrollPattern]::NoScroll, 100)
+        [void](Wait-GameRow $lastTitle)
+        $endCount = (Get-RealizedGameRows).Count
+        $report.realizedRowsAtEnd = $endCount
+        if ($endCount -ge $realizedLimit) {
+            throw "GameList realized $endCount rows at the end of a 500-game library."
+        }
+        # Rows at the end use recycled containers: each shows its own cover
+        # or the placeholder, never a cover left by an earlier item. The seed
+        # ends with Catalog Game 479-483, an Arabic title and the last title.
+        $endArtwork = [ordered]@{
+            last = Wait-RowArtwork (Wait-GameRow $lastTitle) @(0xA0, 0x5F, 0x80) $scale $loaded
+            game483 = Wait-RowArtwork (Wait-GameRow 'Catalog Game 483') @(0x53, 0xAC, 0x80) $scale $loaded
+            game481 = [ordered]@{}
+        }
+        $row481 = Wait-GameRow 'Catalog Game 481'
+        $endArtwork.game481.lastColour = Measure-RowArtwork $row481 @(0xA0, 0x5F, 0x80) $scale
+        $endArtwork.game481.game483Colour = Measure-RowArtwork $row481 @(0x53, 0xAC, 0x80) $scale
+        $report.artworkPixelsAtEnd = $endArtwork
+        $failures = @()
+        foreach ($key in 'last', 'game483') {
+            if ($endArtwork[$key] -lt $loaded) {
+                $failures += "The $key row shows no cover at the end of the list ($($endArtwork[$key]) matching pixels)."
+            }
+        }
+        foreach ($key in 'lastColour', 'game483Colour') {
+            if ($endArtwork.game481[$key] -ge $absent) {
+                $failures += "Catalog Game 481 has no artwork but shows the $key ($($endArtwork.game481[$key]) pixels)."
+            }
+        }
+        if ($failures.Count -gt 0) {
+            throw ($failures -join ' ')
+        }
+        $report.phases += 'catalog-end-artwork'
+        $report.libraryEndScreenshot = Save-WindowScreenshot 'library-end'
+        $report.phases += 'catalog-end-virtualized'
+
+        Resize-ShellWindow $narrowWidth $windowHeight
+        [void](Wait-GameRow $lastTitle)
+        $listBounds = (Wait-VisibleById 'GameList').Current.BoundingRectangle
+        foreach ($row in Get-RealizedGameRows) {
+            $bounds = $row.Current.BoundingRectangle
+            if ($row.Current.IsOffscreen -or $bounds.IsEmpty) { continue }
+            if ($bounds.Left -lt ($listBounds.Left - 2) -or
+                $bounds.Right -gt ($listBounds.Right + 2)) {
+                throw "Game row '$($row.Current.Name)' is wider than GameList: $bounds in $listBounds."
+            }
+        }
+        $report.libraryNarrowScreenshot = Save-WindowScreenshot 'library-narrow'
+        $report.phases += 'catalog-narrow'
+
+        Start-Sleep -Milliseconds 1000
+        $status = Find-ById 'ShellStatus'
+        if ($status -and -not $status.Current.IsOffscreen) {
+            throw "The catalog showed a status: '$($status.Current.Name)'."
+        }
+        $loopback = @('127.0.0.1', '::1', '0.0.0.0', '::')
+        $remote = @(Get-NetTCPConnection -OwningProcess $ProcessId -ErrorAction SilentlyContinue |
+            Where-Object { $_.State -ne 'Listen' -and $_.RemoteAddress -notin $loopback })
+        $report.remoteConnections = $remote.Count
+        if ($remote.Count -gt 0) {
+            throw "The catalog opened $($remote.Count) non-loopback connection(s)."
+        }
+        $report.phases += 'catalog-no-provider-traffic'
+        $report.catalogSeconds = [Math]::Round(((Get-Date) - $catalogStarted).TotalSeconds, 1)
+    }
     elseif ($Mode -eq 'long-list') {
         $target = 'ZZZ Focus Target Guide'
         Select-Element 'Route Test Game'
@@ -1767,7 +2017,7 @@ try {
 }
 catch {
     $report.error = $_ | Out-String
-    if (($Mode -eq 'game-editor' -or $Mode -like 'provider-*') -and $root) {
+    if (($Mode -eq 'game-editor' -or $Mode -eq 'catalog' -or $Mode -like 'provider-*') -and $root) {
         try {
             foreach ($id in @('ShellStatus', 'GameHeading',
                 'GameTitleFeedback', 'GameSaveError', 'GameSearchStatus',
