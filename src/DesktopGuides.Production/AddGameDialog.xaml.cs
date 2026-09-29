@@ -1,3 +1,6 @@
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.WindowsRuntime;
 using DesktopGuides.Core.Providers;
 using DesktopGuides.Infrastructure.Providers;
 using Microsoft.UI.Xaml;
@@ -5,19 +8,19 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Windows.Storage.Streams;
 
 namespace DesktopGuides.Production;
 
-public sealed class GameSearchItem
+public sealed class GameSearchItem : INotifyPropertyChanged
 {
+    private ImageSource? thumbnail;
+
     internal GameSearchItem(ProviderSearchResult result)
     {
         Result = result;
         Summary = GameMetadataPresentation.ResultSummary(result);
         Platforms = GameMetadataPresentation.PlatformSummary(result.Platforms) ?? "No platforms listed";
-        Thumbnail = result.ThumbnailUrl is { } url
-            ? new BitmapImage(new Uri(url)) { DecodePixelWidth = 90 }
-            : null;
         AccessibleName = $"{result.Title}, {Summary}, {Platforms}";
     }
 
@@ -25,8 +28,20 @@ public sealed class GameSearchItem
     public string Title => Result.Title;
     public string Summary { get; }
     public string Platforms { get; }
-    public ImageSource? Thumbnail { get; }
     public string AccessibleName { get; }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    // Starts empty (grey placeholder) and is set once the thumbnail has loaded.
+    public ImageSource? Thumbnail
+    {
+        get => thumbnail;
+        internal set
+        {
+            thumbnail = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Thumbnail)));
+        }
+    }
 }
 
 internal enum AddGameOutcome { None, OpenGame, AddManually, OpenSettings }
@@ -35,16 +50,21 @@ public sealed partial class AddGameDialog : ContentDialog
 {
     private readonly IGameMetadataProvider provider;
     private readonly ProviderGameImporter importer;
+    private readonly ProviderThumbnailLoader thumbnails;
     private CancellationTokenSource? operation;
     private Task running = Task.CompletedTask;
+    private CancellationTokenSource? thumbnailLoad;
+    private Task loadingThumbnails = Task.CompletedTask;
     private Func<Task>? retry;
     private bool closing;
 
-    internal AddGameDialog(IGameMetadataProvider provider, ProviderGameImporter importer)
+    internal AddGameDialog(
+        IGameMetadataProvider provider, ProviderGameImporter importer, ProviderThumbnailLoader thumbnails)
     {
         InitializeComponent();
         this.provider = provider;
         this.importer = importer;
+        this.thumbnails = thumbnails;
         Opened += (_, _) => GameSearchInput.Focus(FocusState.Programmatic);
         Closing += DialogClosing;
     }
@@ -55,15 +75,17 @@ public sealed partial class AddGameDialog : ContentDialog
     private async void DialogClosing(ContentDialog sender, ContentDialogClosingEventArgs args)
     {
         closing = true;
-        if (operation is not { } current)
+        if (operation is null && loadingThumbnails.IsCompleted)
         {
             return;
         }
         var deferral = args.GetDeferral();
-        current.Cancel();
+        operation?.Cancel();
+        thumbnailLoad?.Cancel();
         try
         {
-            await running;
+            // Nothing may still use ProviderHttp once the window disposes it.
+            await Task.WhenAll(running, loadingThumbnails);
         }
         finally
         {
@@ -112,11 +134,14 @@ public sealed partial class AddGameDialog : ContentDialog
             return;
         }
         retry = () => SearchAsync(query);
+        StopThumbnails();
         GameSearchResults.ItemsSource = null;
+        List<GameSearchItem> items = [];
         await StartAsync("Searching IGDB…", async token =>
         {
             IReadOnlyList<ProviderSearchResult> results = await provider.SearchAsync(query, token);
-            GameSearchResults.ItemsSource = results.Select(result => new GameSearchItem(result)).ToList();
+            items = results.Select(result => new GameSearchItem(result)).ToList();
+            GameSearchResults.ItemsSource = items;
             if (results.Count == 0)
             {
                 ShowStatus(InfoBarSeverity.Informational, ProviderMessages.NoResults(query), ProviderRecovery.AddManually);
@@ -125,8 +150,59 @@ public sealed partial class AddGameDialog : ContentDialog
         if (!closing && GameSearchResults.Items.Count > 0)
         {
             GameSearchResults.Focus(FocusState.Programmatic);
+            loadingThumbnails = Task.WhenAll(loadingThumbnails, LoadThumbnailsAsync(items));
         }
     }
+
+    // Loads thumbnails one at a time after the results are shown. A thumbnail
+    // that fails keeps the placeholder and never shows a status message.
+    private async Task LoadThumbnailsAsync(IReadOnlyList<GameSearchItem> items)
+    {
+        using CancellationTokenSource cancel = new();
+        thumbnailLoad = cancel;
+        try
+        {
+            foreach (GameSearchItem item in items)
+            {
+                if (item.Result.ThumbnailUrl is not { } url ||
+                    await thumbnails.LoadAsync(url, cancel.Token) is not { } bytes)
+                {
+                    continue;
+                }
+                cancel.Token.ThrowIfCancellationRequested();
+                item.Thumbnail = await DecodeThumbnailAsync(bytes);
+            }
+        }
+        catch (OperationCanceledException) when (cancel.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            if (thumbnailLoad == cancel)
+            {
+                thumbnailLoad = null;
+            }
+        }
+    }
+
+    private static async Task<ImageSource?> DecodeThumbnailAsync(byte[] bytes)
+    {
+        try
+        {
+            using InMemoryRandomAccessStream stream = new();
+            await stream.WriteAsync(bytes.AsBuffer());
+            stream.Seek(0);
+            BitmapImage bitmap = new() { DecodePixelWidth = 90 };
+            await bitmap.SetSourceAsync(stream);
+            return bitmap;
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+    }
+
+    private void StopThumbnails() => thumbnailLoad?.Cancel();
 
     private async Task AddAsync(GameSearchItem item)
     {
@@ -135,6 +211,8 @@ public sealed partial class AddGameDialog : ContentDialog
             return;
         }
         retry = () => AddAsync(item);
+        // The add shares ProviderHttp's single request gate, so thumbnails stop first.
+        StopThumbnails();
         await StartAsync($"Adding {item.Title}…", async token =>
         {
             Added = await importer.AddAsync(item.Result.ExternalId, token);

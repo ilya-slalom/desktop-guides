@@ -11,11 +11,13 @@ internal sealed class ProviderServices : IDisposable
     {
         Http = new ProviderHttp();
         Tokens = new TwitchTokenSource(Http);
+        Thumbnails = new ProviderThumbnailLoader(Http);
         Credentials = new WindowsProviderCredentialStore(localStatePath);
     }
 
     public ProviderHttp Http { get; }
     public TwitchTokenSource Tokens { get; }
+    public ProviderThumbnailLoader Thumbnails { get; }
     public IProviderCredentialStore Credentials { get; }
 
     private IgdbClient? igdb;

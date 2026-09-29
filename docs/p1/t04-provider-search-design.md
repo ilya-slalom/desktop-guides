@@ -2,10 +2,10 @@
 
 Status: implemented and verified on Windows 11 x64, 29 September 2026. The
 [installed result](results.md#m2-t044-provider-search--implementation-check-29-september-2026)
-records Core/Infrastructure tests (150/150 and 213/213), the E2E provider
+records Core/Infrastructure tests (150/150 and 221/221), the E2E provider
 scenarios on `pcsx2-win`, the blocked-network run with elevated controller,
-and leak scans. [Evidence](evidence/t04-provider-search/) includes the primary
-and first-run results, controller log, and screenshots. Prerequisites T03.2,
+and leak scans. [Evidence](evidence/t04-provider-search/) includes the
+provider and blocked-network results, controller log, and screenshots. Prerequisites T03.2,
 T03.3, T04.1, T11.1, T11.4, and T15.2 are merged (T11.4 through PR #13, merge
 commit `23e0694faae1938993c8f228116324d61fe5b1e1`). This document is the
 reviewed external-provider decision that T04.4 requires.
@@ -94,6 +94,7 @@ Rules that follow from the decision:
 | `SteamGridDbArtworkSource` | Calls `/api/v2/grids/steam/{appId}?dimensions=600x900`. If that returns nothing, calls `/search/autocomplete/{title}` and then `/grids/game/{id}?dimensions=600x900`. |
 | `IgdbCoverArtworkSource` | Builds `https://images.igdb.com/igdb/image/upload/t_cover_big/{imageId}.jpg` |
 | `ProviderHttp` | A shared `HttpClient` policy: HTTPS only, a fixed host allow-list, no redirect to another host, a 15-second timeout per request, a 1 MB limit on JSON bodies and 5 MB on images, and one request at a time |
+| `ProviderThumbnailLoader` | Fetches a search-result thumbnail through `ProviderHttp` and checks it with `ArtworkValidator`. Returns nothing on a provider or validation failure, so the row keeps its placeholder. |
 | `ArtworkValidator` | Parses the signature and dimensions of PNG, JPEG, or WebP in managed code. Rejects any other format and images over 4096 px on either side. |
 | `ManagedArtworkStore` | Stages the file under `library/.artwork-staging/`, validates it, and moves it to `artwork/{gameId}/{sha256}.{ext}`. Runs the startup sweep. |
 | `ProviderCredentialBlob` | Formats and parses the credential JSON, with size and field limits. A corrupt blob is treated as not configured. |

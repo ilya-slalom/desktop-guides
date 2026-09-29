@@ -534,7 +534,7 @@ public sealed partial class ShellWindow : Window
                     await ShowManualAddAsync(ProviderMessages.ForIgdb(ProviderErrorKind.NotConfigured));
                     return;
                 }
-                AddGameDialog search = new(providers.Igdb, importer)
+                AddGameDialog search = new(providers.Igdb, importer, providers.Thumbnails)
                 {
                     XamlRoot = Navigation.XamlRoot
                 };

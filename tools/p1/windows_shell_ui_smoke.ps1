@@ -1489,6 +1489,9 @@ try {
         }
         $report.searchResultCount = $results.Count
         $report.searchResultNames = @($results | ForEach-Object { $_.Current.Name })
+        # Thumbnails load one at a time after the results show and are raw
+        # in the UIA tree, so give them time to appear in the screenshot.
+        Start-Sleep -Seconds 5
         $report.searchResultsScreenshot = Save-WindowScreenshot 'search-results'
         $halfLife = @($results | Where-Object { $_.Current.Name -like 'Half-Life, Main game, 1998, *' })
         if ($halfLife.Count -ne 1) {

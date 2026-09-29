@@ -97,7 +97,7 @@
                                 Height="60"
                                 CornerRadius="4"
                                 Background="{ThemeResource ControlFillColorSecondaryBrush}">
-                            <Image Source="{x:Bind Thumbnail}"
+                            <Image Source="{x:Bind Thumbnail, Mode=OneWay}"
                                    Stretch="UniformToFill"
                                    AutomationProperties.AccessibilityView="Raw" />
                         </Border>
