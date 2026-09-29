@@ -228,7 +228,8 @@
           "AngleSharp": "[1.8.2, )",
           "AngleSharp.Css": "[1.1.2, )",
           "DesktopGuides.Core": "[1.0.0, )",
-          "Microsoft.Data.Sqlite": "[10.0.12, )"
+          "Microsoft.Data.Sqlite": "[10.0.12, )",
+          "PdfPig": "[0.1.16, )"
         }
       },
       "AngleSharp": {
@@ -262,6 +263,12 @@
         "requested": "[1.0.4191.47, )",
         "resolved": "1.0.3719.77",
         "contentHash": "t+ucyKw5NTwMjsUrDF6R9Lk40lpcKQD1/HgyGFxl49tdA4h9dKlsj6FYGEmDRpFNfnTpENuTypMcdbrlkqBdDA=="
+      },
+      "PdfPig": {
+        "type": "CentralTransitive",
+        "requested": "[0.1.16, )",
+        "resolved": "0.1.16",
+        "contentHash": "qQcbsNMYVY+K5ELptax2S8thNMk0+rSQq3H/KdYj3LLcko8yTCz8y5KIvsKxIyAuTN0ZYNnfsZkM+0EvxTwHVA=="
       }
     },
     "net10.0-windows10.0.19041/win-arm64": {

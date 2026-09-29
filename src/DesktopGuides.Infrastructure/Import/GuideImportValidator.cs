@@ -2,6 +2,8 @@ using System.Text;
 using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Text;
+using UglyToad.PdfPig;
+using UglyToad.PdfPig.Exceptions;
 
 namespace DesktopGuides.Infrastructure.Import;
 
@@ -14,12 +16,16 @@ public sealed class GuideImportValidator : IGuideImportValidator
 {
     private const int SampleBytes = 2048;
     private const int SampleLines = 8;
+    private const int TextSamplePages = 5;
     private static readonly int[] LegacyCodePages = [437, 1252];
+    private static readonly byte[] PdfMarker = "%PDF-"u8.ToArray();
     private readonly GuideImportLimits limits;
+    private readonly StaticHtmlImportValidator html;
 
     public GuideImportValidator(GuideImportLimits? limits = null)
     {
         this.limits = limits ?? new GuideImportLimits();
+        html = new StaticHtmlImportValidator(this.limits.HtmlLimits);
     }
 
     public async Task<ImportInspection> InspectAsync(string fullPath, CancellationToken token)
@@ -49,7 +55,8 @@ public sealed class GuideImportValidator : IGuideImportValidator
         return format switch
         {
             GuideFormat.Txt => await InspectTxtAsync(source, title, token),
-            _ => throw new NotSupportedException("HTML and PDF validation are added next."),
+            GuideFormat.Html => await InspectHtmlAsync(source, title, token),
+            _ => await InspectPdfAsync(source, title, token),
         };
     }
 
@@ -101,6 +108,96 @@ public sealed class GuideImportValidator : IGuideImportValidator
             return new ImportNeedsTxtEncoding(source, title, Samples(bytes));
         }
     }
+
+    private async Task<ImportInspection> InspectHtmlAsync(
+        ImportSource source, string title, CancellationToken token)
+    {
+        // Report a locked entry as the picked file, before the scanner reads it.
+        using (OpenSource(source.FullPath, source.FileName))
+        {
+        }
+        StaticHtmlImportPreview preview;
+        try
+        {
+            preview = await html.PreviewAsync(source.FullPath, token);
+        }
+        catch (StaticHtmlScanException error)
+        {
+            throw new GuideImportException(ImportIssue.TooLarge, HtmlLimitMessage(error.Limit));
+        }
+        catch (StaticHtmlValidationException error) when (error.Issue == StaticHtmlValidationIssue.UnsafePath)
+        {
+            throw new GuideImportException(ImportIssue.Unreadable, "The guide refers to a file outside its folder.");
+        }
+        catch (StaticHtmlValidationException error) when (error.Issue == StaticHtmlValidationIssue.CaseCollision)
+        {
+            throw new GuideImportException(ImportIssue.Unreadable,
+                "The guide's folder has files whose names differ only by case.");
+        }
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
+        {
+            throw Missing(source.FileName);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            throw new GuideImportException(ImportIssue.Unreadable,
+                $"{source.FileName} or one of its linked files can't be opened.");
+        }
+        ImportWarning[] warnings = preview.Warnings
+            .Select(warning => new ImportWarning(warning.RelativePath ?? warning.RawTarget, warning.Message))
+            .ToArray();
+        return new ImportReady(new HtmlImportManifest(
+            source, title, preview.EntryRelativePath,
+            preview.Manifest.Assets.Count - 1, preview.Manifest.TotalBytes, warnings));
+    }
+
+    private static Task<ImportInspection> InspectPdfAsync(
+        ImportSource source, string title, CancellationToken token) =>
+        Task.Run<ImportInspection>(() =>
+        {
+            using FileStream stream = OpenSource(source.FullPath, source.FileName, asyncIo: false);
+            try
+            {
+                if (!StartsLikePdf(stream))
+                {
+                    throw NotPdf();
+                }
+                stream.Position = 0;
+                using PdfDocument document = PdfDocument.Open(stream);
+                int pages = document.NumberOfPages;
+                if (pages == 0)
+                {
+                    throw NotPdf();
+                }
+                bool hasText = false;
+                for (int number = 1; number <= Math.Min(pages, TextSamplePages) && !hasText; number++)
+                {
+                    token.ThrowIfCancellationRequested();
+                    hasText = document.GetPage(number).Text.Any(char.IsLetter);
+                }
+                return new ImportReady(new PdfImportManifest(source, title, pages, hasText));
+            }
+            catch (PdfDocumentEncryptedException)
+            {
+                throw new GuideImportException(ImportIssue.Encrypted,
+                    "Password-protected PDFs aren't supported. Remove the password and import again.");
+            }
+            catch (Exception error) when (error is not (GuideImportException or OperationCanceledException))
+            {
+                // PdfPig reports malformed files with several exception types.
+                throw NotPdf();
+            }
+        }, token);
+
+    private static bool StartsLikePdf(FileStream stream)
+    {
+        byte[] head = new byte[1024];
+        int read = stream.ReadAtLeast(head, head.Length, throwOnEndOfStream: false);
+        return head.AsSpan(0, read).IndexOf(PdfMarker) >= 0;
+    }
+
+    private static GuideImportException NotPdf() =>
+        new(ImportIssue.Unreadable, "This file isn't a readable PDF.");
 
     private static TxtEncodingSample[] Samples(byte[] bytes)
     {
