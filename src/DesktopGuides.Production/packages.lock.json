@@ -2,6 +2,15 @@
   "version": 2,
   "dependencies": {
     "net10.0-windows10.0.19041": {
+      "CommunityToolkit.WinUI.Controls.HeaderedControls": {
+        "type": "Direct",
+        "requested": "[8.2.251219, )",
+        "resolved": "8.2.251219",
+        "contentHash": "QCAQYgCEUCkLjjvalFAUFAeKJ//EbOfDkyThsFBvAqE/pVFh0xlzTV4kpOY513hNzHyc13Ezw6mrYLvsADrWWg==",
+        "dependencies": {
+          "Microsoft.WindowsAppSDK": "1.6.250108002"
+        }
+      },
       "CommunityToolkit.WinUI.Controls.MetadataControl": {
         "type": "Direct",
         "requested": "[8.2.251219, )",

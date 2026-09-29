@@ -1,7 +1,9 @@
+using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Navigation;
 using DesktopGuides.Core.Providers;
 using DesktopGuides.Infrastructure.Artwork;
+using DesktopGuides.Infrastructure.Import;
 using DesktopGuides.Infrastructure.Storage;
 using DesktopGuides.Production.Materials;
 using DesktopGuides.Production.Providers;
@@ -12,6 +14,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.Windows.Storage.Pickers;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using CommunityToolkit.WinUI.Controls;
@@ -50,6 +53,9 @@ public sealed partial class ShellWindow : Window
     private bool applyingMaterialSelection;
     private GameEditorDialog? activeGameEditor;
     private AddGameDialog? activeAddGameDialog;
+    private readonly GuideImportValidator importValidator = new();
+    private bool importRequested;
+    private ImportGuideDialog? activeImportDialog;
     private CancellationTokenSource? refreshCancel;
     private Task refreshTask = Task.CompletedTask;
 
@@ -263,6 +269,7 @@ public sealed partial class ShellWindow : Window
         statusDismissTimer.Stop();
         activeGameEditor?.Hide();
         activeAddGameDialog?.Hide();
+        activeImportDialog?.Hide();
         refreshCancel?.Cancel();
         ProviderSettings.Cancel();
         leaseWait.Cancel();
@@ -564,6 +571,7 @@ public sealed partial class ShellWindow : Window
                     case AddGameOutcome.OpenGame when search.Added is { } added:
                         navigator.OpenGame(added.Game.Id);
                         await RenderCurrentAsync();
+                        ImportGuideButton.Focus(FocusState.Programmatic);
                         if (added.AlreadyInLibrary)
                         {
                             ShowTransientStatus($"{added.Game.Title} is already in your library.");
@@ -622,6 +630,7 @@ public sealed partial class ShellWindow : Window
         {
             navigator.OpenGame(created.Id);
             await RenderCurrentAsync();
+            ImportGuideButton.Focus(FocusState.Programmatic);
         }
         else if (editor.OpenSettingsRequested)
         {
@@ -697,6 +706,86 @@ public sealed partial class ShellWindow : Window
                 EditGameButton.IsEnabled = true;
             }
         }
+    }
+
+    private async void ImportGuideClicked(object sender, RoutedEventArgs args)
+    {
+        if (importRequested || closeRequested || navigator.Current is not GameRoute route)
+        {
+            return;
+        }
+        importRequested = true;
+        ImportGuideButton.IsEnabled = false;
+        try
+        {
+            await RunNavigationAsync(async () =>
+            {
+                if (closeRequested ||
+                    navigator.Current is not GameRoute current ||
+                    current.GameId != route.GameId)
+                {
+                    return;
+                }
+                Game? game = await RequireRepository().GetGameAsync(route.GameId);
+                if (closeRequested)
+                {
+                    return;
+                }
+                if (game is null)
+                {
+                    ShowWarningStatus("This game is no longer in your library.");
+                    return;
+                }
+                string? path;
+                try
+                {
+                    path = await PickGuideFileAsync();
+                }
+                catch (COMException)
+                {
+                    ShowWarningStatus(ImportGuideDialog.PickerFailedMessage);
+                    return;
+                }
+                if (path is null || closeRequested)
+                {
+                    return;
+                }
+                ImportGuideDialog dialog = new(game.Title, path, importValidator, PickGuideFileAsync)
+                {
+                    XamlRoot = Navigation.XamlRoot
+                };
+                DialogSurface.Apply(dialog, EffectiveMaterial);
+                activeImportDialog = dialog;
+                try
+                {
+                    await dialog.ShowAsync();
+                }
+                finally
+                {
+                    activeImportDialog = null;
+                }
+            });
+        }
+        finally
+        {
+            importRequested = false;
+            if (!closeRequested && navigator.Current is GameRoute)
+            {
+                ImportGuideButton.IsEnabled = true;
+                ImportGuideButton.Focus(FocusState.Programmatic);
+            }
+        }
+    }
+
+    private async Task<string?> PickGuideFileAsync()
+    {
+        FileOpenPicker picker = new(AppWindow.Id);
+        foreach (string type in (string[])[".txt", ".html", ".htm", ".pdf"])
+        {
+            picker.FileTypeFilter.Add(type);
+        }
+        PickFileResult? result = await picker.PickSingleFileAsync();
+        return result?.Path;
     }
 
     private Task RunNavigationAsync(Func<Task> action) =>
@@ -896,6 +985,7 @@ public sealed partial class ShellWindow : Window
                     ClearProviderMetadata();
                     GameMetadataSurface.Visibility = Visibility.Collapsed;
                     EditGameButton.IsEnabled = false;
+                    ImportGuideButton.IsEnabled = false;
                     GameEmptyState.Visibility = Visibility.Collapsed;
                     GuideList.Visibility = Visibility.Collapsed;
                     GuideList.IsEnabled = false;
@@ -944,6 +1034,7 @@ public sealed partial class ShellWindow : Window
                             ? Visibility.Collapsed
                             : Visibility.Visible;
                     EditGameButton.IsEnabled = true;
+                    ImportGuideButton.IsEnabled = !importRequested;
                     Guide? selectedGuide = selectedGuideId is Guid id
                         ? guides.FirstOrDefault(item => item.Id == id)
                         : null;

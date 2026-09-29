@@ -59,4 +59,17 @@
                 Value="{ThemeResource DesktopGuidesSecondaryTextBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
+
+    <Style x:Key="DesktopGuidesDialogHeadingStyle"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource DesktopGuidesEmptyTitleStyle}" />
+
+    <Style x:Key="DesktopGuidesEncodingSampleStyle"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource DesktopGuidesSecondaryBodyStyle}">
+        <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="TextTrimming" Value="Clip" />
+        <Setter Property="IsTextSelectionEnabled" Value="False" />
+    </Style>
 </ResourceDictionary>
