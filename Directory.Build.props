@@ -1,0 +1,9 @@
+<Project>
+  <!-- `-p:Portable=true` builds the unpackaged, self-contained app. Its outputs
+       live outside the project folders so neither build globs the other's files. -->
+  <PropertyGroup Condition="'$(Portable)' == 'true'">
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)artifacts\portable\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)artifacts\portable\bin\$(MSBuildProjectName)\</BaseOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);bin\**;obj\**</DefaultItemExcludes>
+  </PropertyGroup>
+</Project>

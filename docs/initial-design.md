@@ -118,10 +118,16 @@ navigate the reader. All actions must also be reachable in the UI.
   and validate Windows 10 compatibility; WinUI 3 supports Windows 10 version
   1809 and later. The test matrix should include Windows 11, Windows 10 22H2,
   x64, and ARM64 before promising those combinations publicly.
-- **Delivery:** Start with a packaged WinUI 3 application (MSIX). Choose the
-  final distribution path and signing approach before release. Check for the
-  WebView2 Runtime at startup and make installation or repair understandable
-  on Windows systems where it is absent.
+- **Delivery:** Release the same WinUI 3 app in two forms for each tested CPU
+  target: a signed MSIX, and a portable, self-contained build — a folder that
+  bundles .NET and the Windows App SDK and runs from its executable without
+  installation. The MSIX keeps its data in the package's local folder; the
+  portable build has no package identity and keeps its data in
+  `%LOCALAPPDATA%\DesktopGuides`, so the two builds keep separate libraries
+  and run as separate single instances. Choose the signing approach before
+  release. Neither form bundles the WebView2 Runtime: check for it at startup
+  and make installation or repair understandable on Windows systems where it
+  is absent.
 - **Separation:** Keep format readers behind a small common contract so the
   library and progress services do not depend on a specific control.
 

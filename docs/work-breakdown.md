@@ -489,7 +489,8 @@ targets. Import, restart, offline read, resume, and removal pass on a clean
 machine. Missing WebView2 Runtime produces an actionable setup message.
 
 - **T17.1** Set MSIX identity, versioning, signing, and release output for
-  tested CPU targets.
+  tested CPU targets. Release output also includes the portable,
+  self-contained build (`-p:Portable=true`) for the same targets.
 - **T17.2** Add automated unit/integration coverage for storage, import,
   locators, and security rules plus signed, installed Windows UI workflows.
   Start full P1 E2E runs through an interactive scheduled task when controlled
@@ -497,7 +498,10 @@ machine. Missing WebView2 Runtime produces an actionable setup message.
 - **T17.3** Run clean-install, upgrade, and offline scenarios in an interactive
   Windows session on each promised OS/architecture combination; publish the
   tested matrix and PDF limitations. Follow the
-  [installed E2E procedure](p1/e2e-testing.md).
+  [installed E2E procedure](p1/e2e-testing.md). Signed-MSIX runs do not
+  cover the portable build; its release gates (first run without
+  installation, data location, and replacing the folder with a newer build)
+  are defined separately later.
 - **TR17.1** The final app needs no network access to display an imported TXT,
   HTML, or PDF guide after prerequisites are installed.
 - **TR17.2** No OS or architecture is advertised without a recorded install and

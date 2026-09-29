@@ -17,7 +17,7 @@ import, SQLite, completion tracking, and final release packaging belong to P1.
 | TXT view | One large text control is simple but may grow a large visual tree; line or chunk virtualization adds locator work. | Prototype chunked native rendering and compare with a simple control on the same fixtures. |
 | Local HTML | `file:` is simple but makes local resource and origin rules awkward; a virtual host supports relative assets but needs strict request and navigation controls. | Use one synthetic host mapped to one fixture root in WebView2; reject all other destinations. |
 | PDF | `Windows.Data.Pdf` provides native page rendering and a straightforward page locator; a text-capable engine may be needed for document text access. | Prototype native pages, then make the engine decision from accessibility, resume, and performance evidence. |
-| Windows App SDK deployment | Framework-dependent MSIX keeps the app package smaller but adds a framework dependency; self-contained deployment moves more bytes into the app. | Measure a framework-dependent package first, and document the installed prerequisites and an offline installation route. |
+| Windows App SDK deployment | Framework-dependent MSIX keeps the app package smaller but adds a framework dependency; self-contained deployment moves more bytes into the app. | Measure a framework-dependent package first, and document the installed prerequisites and an offline installation route. P1 adds a portable release build that has no package identity and bundles the Windows App SDK and .NET; the MSIX stays framework-dependent for the Windows App SDK. |
 
 P0 confirms these choices; it does not treat them as proven behavior. Any
 failed gate creates a short decision record and updates S08–S10 or S17 before P1.

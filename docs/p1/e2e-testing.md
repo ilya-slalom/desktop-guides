@@ -70,6 +70,24 @@ way, because with transparency off Windows draws it in the Solid fill color.
 High contrast runs only in T16.2. Enabling it makes Windows rewrite the active
 theme to `Custom.theme`, which this harness cannot restore.
 
+## Portable build
+
+Releases also ship a portable, self-contained build. Build it with
+`dotnet restore src\DesktopGuides.Production\DesktopGuides.Production.csproj --locked-mode -p:Platform=x64 -p:Portable=true`
+and then `dotnet publish` with the same project, `-c Release --no-restore
+-p:Platform=x64 -p:Portable=true`. The output goes to
+`artifacts\portable\bin\DesktopGuides.Production\x64\Release\net10.0-windows10.0.19041.0\win-x64\publish\`,
+kept apart from the MSIX build's `bin` and `obj` folders. Pass
+`-PortableExecutable <publish folder>\DesktopGuides.Production.exe` instead of
+`-PackagePath` to run the same scenarios against it. That mode skips the
+certificate, signing, install, and uninstall steps, so the interactive
+scheduled task needs no elevation. It refuses to start if
+`%LOCALAPPDATA%\DesktopGuides` exists, deletes only the folder it created, and
+rejects `-AllowOfflineFirewallRule`. It writes `portable-run.json` with
+`mode: "portable"`. A portable run is not evidence for any signed install,
+identity, upgrade, or package-data gate; the portable build's own release
+gates come later under T17.3.
+
 ## Runner contract
 
 1. Stage source, fixtures, scripts, and artifacts under
