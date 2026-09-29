@@ -126,9 +126,12 @@ public sealed class ProviderHttp : IDisposable
         return buffer.ToArray();
     }
 
+    // A date already past (server clock ahead of ours) means retry now.
     private static TimeSpan? RetryAfter(HttpResponseMessage response) =>
         response.Headers.RetryAfter?.Delta ??
-        (response.Headers.RetryAfter?.Date is { } date ? date - DateTimeOffset.UtcNow : null);
+        (response.Headers.RetryAfter?.Date is { } date
+            ? TimeSpan.FromTicks(Math.Max(0, (date - DateTimeOffset.UtcNow).Ticks))
+            : null);
 
     private static void RequireAllowed(Uri uri)
     {

@@ -53,6 +53,18 @@ public sealed class ProviderHttpTests
     }
 
     [Fact]
+    public async Task PastRetryAfterDateRetriesWithoutWaiting()
+    {
+        HttpResponseMessage busy = new(HttpStatusCode.TooManyRequests)
+        { Headers = { RetryAfter = new(DateTimeOffset.UtcNow.AddMinutes(-1)) } };
+        FakeHandler handler = FakeHandler.Returning(busy, FakeHandler.Json("[]"));
+
+        ProviderResponse response = await Send(Create(handler), Igdb);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal([TimeSpan.Zero], delays);
+    }
+
+    [Fact]
     public async Task LongOrMissingRetryAfterOrSecond429IsRateLimited()
     {
         HttpResponseMessage Busy(int? seconds) => new(HttpStatusCode.TooManyRequests)

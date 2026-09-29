@@ -1,94 +1,24 @@
 using System.Runtime.InteropServices.WindowsRuntime;
-using System.Security.Cryptography;
-using DesktopGuides.Core.Providers;
 using DesktopGuides.Infrastructure.Providers;
 using Windows.Security.Cryptography.DataProtection;
 using Windows.Storage.Streams;
 
 namespace DesktopGuides.Production.Providers;
 
-internal sealed class WindowsProviderCredentialStore(string localStatePath) : IProviderCredentialStore
+internal static class WindowsProviderCredentialStore
 {
-    private const int MaxProtectedBytes = 64 * 1024;
-    private readonly string path = Path.Combine(localStatePath, "providers.bin");
-    private readonly SemaphoreSlim gate = new(1, 1);
-    private ProviderCredentials? cached;
+    public static ProviderCredentialFile Create(string localStatePath) =>
+        new(Path.Combine(localStatePath, "providers.bin"), ProtectAsync, UnprotectAsync);
 
-    public async Task<ProviderCredentials> LoadAsync(CancellationToken token)
+    private static async Task<byte[]> ProtectAsync(byte[] plain)
     {
-        await gate.WaitAsync(token);
-        try
-        {
-            return cached ??= await ReadAsync(token);
-        }
-        finally
-        {
-            gate.Release();
-        }
+        IBuffer data = await new DataProtectionProvider("LOCAL=user").ProtectAsync(plain.AsBuffer());
+        return data.ToArray();
     }
 
-    public async Task SaveAsync(ProviderCredentials credentials, CancellationToken token)
+    private static async Task<byte[]> UnprotectAsync(byte[] protectedData)
     {
-        byte[] plain = ProviderCredentialBlob.Format(credentials);
-        string temp = path + ".tmp";
-        try
-        {
-            await gate.WaitAsync(token);
-            try
-            {
-                IBuffer protectedData = await new DataProtectionProvider("LOCAL=user").ProtectAsync(plain.AsBuffer());
-                await File.WriteAllBytesAsync(temp, protectedData.ToArray(), token);
-                File.Move(temp, path, overwrite: true);
-                cached = ProviderCredentialBlob.Parse(plain);
-            }
-            finally
-            {
-                File.Delete(temp);
-                gate.Release();
-            }
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(plain);
-        }
-    }
-
-    public async Task ClearAsync(CancellationToken token)
-    {
-        await gate.WaitAsync(token);
-        try
-        {
-            File.Delete(path);
-            cached = ProviderCredentials.None;
-        }
-        finally
-        {
-            gate.Release();
-        }
-    }
-
-    private async Task<ProviderCredentials> ReadAsync(CancellationToken token)
-    {
-        try
-        {
-            FileInfo file = new(path);
-            if (!file.Exists || file.Length is 0 or > MaxProtectedBytes) return ProviderCredentials.None;
-            byte[] protectedData = await File.ReadAllBytesAsync(path, token);
-            IBuffer plain = await new DataProtectionProvider().UnprotectAsync(protectedData.AsBuffer());
-            byte[] bytes = plain.ToArray();
-            try
-            {
-                return ProviderCredentialBlob.Parse(bytes);
-            }
-            finally
-            {
-                CryptographicOperations.ZeroMemory(bytes);
-            }
-        }
-        catch (Exception error) when (error is not OperationCanceledException)
-        {
-            // A blob this user can't unprotect or parse counts as not configured.
-            return ProviderCredentials.None;
-        }
+        IBuffer data = await new DataProtectionProvider().UnprotectAsync(protectedData.AsBuffer());
+        return data.ToArray();
     }
 }

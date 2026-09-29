@@ -1014,6 +1014,7 @@ public sealed partial class ShellWindow : Window
 
                 case SettingsRoute:
                     SettingsPanel.Visibility = Visibility.Visible;
+                    await ProviderSettings.ReloadIfUnreadableAsync();
                     ShowTransientStatus("Settings ready.");
                     break;
             }
@@ -1146,6 +1147,8 @@ public sealed partial class ShellWindow : Window
         finally
         {
             refreshCancel = null;
+            // Re-enable here: the user may have moved to another game, which won't re-render.
+            if (!closeRequested) RefreshMetadataButton.IsEnabled = true;
         }
         if (closeRequested)
         {

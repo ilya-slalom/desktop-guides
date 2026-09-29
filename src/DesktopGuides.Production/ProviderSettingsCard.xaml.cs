@@ -24,9 +24,28 @@ public sealed partial class ProviderSettingsCard : UserControl
     internal async Task InitializeAsync(ProviderServices providerServices)
     {
         services = providerServices;
-        saved = await services.Credentials.LoadAsync(CancellationToken.None);
-        ShowSaved();
+        await LoadSavedAsync();
         SetBusy(false);
+    }
+
+    // Retried each time Settings opens, because Save would otherwise overwrite keys it couldn't read.
+    internal async Task ReloadIfUnreadableAsync()
+    {
+        if (services?.Credentials.LastReadFailed != true || pending is not null) return;
+        await LoadSavedAsync();
+        if (!services.Credentials.LastReadFailed) ProviderSettingsStatus.IsOpen = false;
+        SetBusy(false);
+    }
+
+    private async Task LoadSavedAsync()
+    {
+        saved = await services!.Credentials.LoadAsync(CancellationToken.None);
+        ShowSaved();
+        if (services.Credentials.LastReadFailed)
+        {
+            Show(InfoBarSeverity.Error,
+                "Couldn't read saved credentials. Close any app that may be using them, then open Settings again.");
+        }
     }
 
     internal void Cancel() => pending?.Cancel();
@@ -151,8 +170,10 @@ public sealed partial class ProviderSettingsCard : UserControl
     private void SetBusy(bool busy)
     {
         ProviderBusy.IsActive = busy;
-        TestConnectionButton.IsEnabled = SaveButton.IsEnabled = !busy && services is not null;
-        RemoveButton.IsEnabled = !busy && services is not null && saved != ProviderCredentials.None;
+        bool ready = !busy && services is not null;
+        TestConnectionButton.IsEnabled = ready;
+        SaveButton.IsEnabled = ready && !services!.Credentials.LastReadFailed;
+        RemoveButton.IsEnabled = ready && saved != ProviderCredentials.None;
     }
 
     internal void Expand() => ProviderSettingsExpander.IsExpanded = true;

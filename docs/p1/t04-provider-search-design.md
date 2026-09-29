@@ -107,7 +107,8 @@ The allow-list holds `id.twitch.tv`, `api.igdb.com`, `images.igdb.com`,
 
 | Unit | Responsibility |
 | --- | --- |
-| `WindowsProviderCredentialStore` | Protects the credential blob with `DataProtectionProvider("LOCAL=user")` and stores it at `LocalState\providers.bin`. Remove deletes the file. |
+| `ProviderCredentialFile` | Stores the protected blob at `LocalState\providers.bin` and caches what it loads. A missing, undecryptable, or corrupt file counts as not configured. A file that exists but can't be read (for example, locked by another process) isn't cached and sets `LastReadFailed`; Settings then shows "Couldn't read saved credentials" and disables Save so it can't overwrite the saved keys. Remove deletes the file. |
+| `WindowsProviderCredentialStore` | Creates the `ProviderCredentialFile` with `DataProtectionProvider("LOCAL=user")` protection. |
 | "Game data providers" `SettingsCard` | `PasswordBox` fields for the IGDB client ID and secret, and for the SteamGridDB key. Saved values are never shown; the card displays "Saved". Buttons: Test connection, Save, Remove. Links to each provider's terms. |
 | `AddGameDialog` | An `AutoSuggestBox` that queries only on submit, a Search button, a virtualized `ListView` of results (thumbnail, title, year, platforms, type tag), a `ProgressRing` with Cancel, an `InfoBar` for status messages, and an "Add manually" link to the existing `GameEditorDialog` |
 | Game route | A `MetadataControl` for release year, type, and platforms. Also shows the summary, genres, companies, cover, attribution, and a Refresh metadata command (linked games only). |
@@ -260,6 +261,9 @@ Infrastructure, using `HttpMessageHandler` fakes and a temporary library:
   staged and unreferenced ones.
 - **`ProviderCredentialBlob`:** round-trip, size limits, and a corrupt blob
   treated as not configured.
+- **`ProviderCredentialFile`:** round-trip without plaintext on disk, a
+  missing or undecryptable file treated as not configured, and a locked file
+  reported as unreadable and read again once released.
 - **Schema v3:** a v2 library migrates with its games intact; a failing
   migration rolls back to v2; many unlinked games are allowed while a
   duplicate link is rejected; path and pairing checks.
