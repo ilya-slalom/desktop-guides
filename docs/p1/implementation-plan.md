@@ -604,6 +604,19 @@ tests (`GameMetadataNormalizerTests`, `GameMetadataPresentationTests`,
 phases, and the
 blocked-network controller removal record.
 
+T04.4 was merged through PR #14, merge commit
+`3e490de93a2733978c9000d754a8d618f0208563`, and the portable build through
+PR #15, merge commit `a4bb44c8ef06053cf1b2e5b154641fb95cf5fa1a`. The
+[T05.4 catalog components design](t05-4-catalog-components-design.md) and
+[plan](t05-4-catalog-components-plan.md) extract the artwork row, cover frame,
+facts, empty-state, busy-row and status `InfoBar` patterns into
+`Styles/Catalog.xaml` and move the Library game list onto the shared row.
+T05.4 was implemented and verified on 29 September 2026 on its feature branch:
+CI run 36563413921 passed `core-tests` (including `LibraryGamePresentationTests`
+and `ArtworkLoadTicketsTests`), both package builds and `production-shell-ui`
+with the new catalog scenario in light and dark. The host `-ProviderOnly` run
+passed Add game on the shared template.
+
 ### UI design-language and Gallery adoption sequence
 
 The WinUI Gallery is a reference catalog, not a package or shell dependency.

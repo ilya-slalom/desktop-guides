@@ -1,7 +1,7 @@
 # T05.4 catalog and workflow components design
 
-Status: design approved in conversation, 29 September 2026; spec awaiting
-review. Prerequisites T04.4 and T11.4 are merged.
+Status: implemented and verified 29 September 2026. Prerequisites T04.4 and
+T11.4 are merged.
 
 ## Intent
 
@@ -220,3 +220,24 @@ outcome is a set of shared catalog and workflow styles and templates, adopted
 by Add game, Game detail, the status surfaces and the Library game list. The
 virtualization, missing-artwork, text, keyboard, narrow-width and no-traffic
 checks pass in CI, with screenshots. This unblocks T05.1, T04.2 and T06.1.
+
+## T05.4 verification record
+
+- **Unit tests.** `core-tests` in CI run 36563413921: 165 Core and 233
+  Infrastructure passes, including `LibraryGamePresentationTests` and
+  `ArtworkLoadTicketsTests`.
+- **Installed catalog scenario.** `production-shell-ui` in the same run, light and
+  dark. Working area 1024×720 at 100%, so the 1500 px wide size clamps to the
+  working area. Realized rows: 7 at the top and 7 at the end (limit 80). Long row
+  76 DIPs, short row 76. No status, no remote connections, no credential blob,
+  10 missing-artwork games, 500 games.
+- **Live provider regression.** Host `-ProviderOnly` on 29 September 2026 with the
+  CI x64 MSIX: `provider-live` passed all nine phases and found 16 Half-Life
+  result rows on the shared template, including `Half-Life, Main game, 1998`.
+  Both credential leak scans found no files, and no firewall rule was used.
+- **Rulings.** The long title is 160 characters, because `GameDetails.TitleLimit`
+  is 160. The keyboard check uses Ctrl+Down and End instead of Down, because
+  `GameList` selection follows focus and plain Down opens a game.
+  `LibraryGamePresentation` lives in `Core/Library`. The realized-row count
+  includes cached off-screen containers.
+- **Not run.** Portable build checks: T05.4 changes nothing in packaging.
