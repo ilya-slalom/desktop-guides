@@ -239,5 +239,7 @@ checks pass in CI, with screenshots. This unblocks T05.1, T04.2 and T06.1.
   is 160. The keyboard check uses Ctrl+Down and End instead of Down, because
   `GameList` selection follows focus and plain Down opens a game.
   `LibraryGamePresentation` lives in `Core/Library`. The realized-row count
-  includes cached off-screen containers.
+  identifies rows that have a container by their UIA name. UIA reports empty
+  bounds for off-screen rows, so a bounds filter counts only visible rows and
+  can't detect a list that realizes every row.
 - **Not run.** Portable build checks: T05.4 changes nothing in packaging.

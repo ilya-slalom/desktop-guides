@@ -468,17 +468,68 @@ try {
         throw "Expected keyboard focus on game row '$expected'."
     }
 
-    function Get-RealizedGameRows {
+    function Get-GameListItems {
         $list = Wait-VisibleById 'GameList'
         $condition = [System.Windows.Automation.PropertyCondition]::new(
             [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
             [System.Windows.Automation.ControlType]::ListItem)
-        # Virtualized items without a container have empty bounds. Count only
-        # rows that have a container, including the off-screen cache.
-        return @($list.FindAll($scope, $condition) | Where-Object {
-            -not $_.Current.BoundingRectangle.IsEmpty -and
-            $_.Current.BoundingRectangle.Height -gt 0
-        })
+        return @($list.FindAll($scope, $condition))
+    }
+
+    # A row with a container is named after its game. An item without one is
+    # named after its .NET type. Bounds can't tell them apart: UIA reports
+    # empty bounds for off-screen rows that do have a container.
+    function Test-RealizedGameRow($item) {
+        $name = $item.Current.Name
+        return [bool]($name -and $name -notlike 'DesktopGuides.*')
+    }
+
+    function Get-RealizedGameRows {
+        return @(Get-GameListItems | Where-Object { Test-RealizedGameRow $_ })
+    }
+
+    # Counts screen pixels within 24 per channel of $rgb in the artwork column
+    # of a row. UIA bounds and CopyFromScreen both use physical pixels.
+    function Measure-RowArtwork($row, [int[]] $rgb, [double] $scale) {
+        Add-Type -AssemblyName System.Drawing
+        $bounds = $row.Current.BoundingRectangle
+        $width = [int][Math]::Min($bounds.Width, 120 * $scale)
+        $height = [int]$bounds.Height
+        if ($width -lt 1 -or $height -lt 1) {
+            throw "Game row '$($row.Current.Name)' has no visible bounds."
+        }
+        $bitmap = [System.Drawing.Bitmap]::new($width, $height)
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        try {
+            $graphics.CopyFromScreen(
+                [int]$bounds.X, [int]$bounds.Y, 0, 0, $bitmap.Size)
+            $hits = 0
+            for ($y = 0; $y -lt $height; $y++) {
+                for ($x = 0; $x -lt $width; $x++) {
+                    $pixel = $bitmap.GetPixel($x, $y)
+                    if ([Math]::Abs($pixel.R - $rgb[0]) -le 24 -and
+                        [Math]::Abs($pixel.G - $rgb[1]) -le 24 -and
+                        [Math]::Abs($pixel.B - $rgb[2]) -le 24) {
+                        $hits++
+                    }
+                }
+            }
+            return $hits
+        }
+        finally {
+            $graphics.Dispose()
+            $bitmap.Dispose()
+        }
+    }
+
+    function Wait-RowArtwork($row, [int[]] $rgb, [double] $scale, [double] $minimum) {
+        $deadline = (Get-Date).AddSeconds(10)
+        do {
+            $count = Measure-RowArtwork $row $rgb $scale
+            if ($count -ge $minimum) { return $count }
+            Start-Sleep -Milliseconds 250
+        } while ((Get-Date) -lt $deadline)
+        return $count
     }
 
     function Focus-OtherGuideWithoutSelection(
@@ -1280,11 +1331,45 @@ try {
         if ($longHeight -gt ($shortHeight + 1)) {
             throw "The long-title row is taller than a short row: $longHeight versus $shortHeight."
         }
-        $topCount = (Get-RealizedGameRows).Count
+        $items = Get-GameListItems
+        $topCount = @($items | Where-Object { Test-RealizedGameRow $_ }).Count
         $report.realizedRowsAtTop = $topCount
-        if ($topCount -ge $realizedLimit) {
-            throw "GameList realized $topCount rows at the top of a 500-game library."
+        $report.gameListItemsAtTop = $items.Count
+        $report.otherItemNamesAtTop = @($items |
+            Where-Object { -not (Test-RealizedGameRow $_) } |
+            ForEach-Object { $_.Current.Name } | Select-Object -Unique -First 3)
+
+        # Seeded covers are solid (shade, 255 - shade, 0x80). A loaded cover
+        # fills most of its 45x60 tile; the placeholder has none of that colour.
+        $scale = $dpi / 96.0
+        $loaded = 0.5 * 45 * 60 * $scale * $scale
+        $absent = 0.1 * 45 * 60 * $scale * $scale
+        $artwork = [ordered]@{
+            long = Wait-RowArtwork $longRow @(0x20, 0xDF, 0x80) $scale $loaded
+            short = Wait-RowArtwork $shortRow @(0x40, 0xBF, 0x80) $scale $loaded
         }
+        $artwork.corrupt = Measure-RowArtwork (Wait-GameRow 'Catalog C Corrupt Art') @(0x60, 0x9F, 0x80) $scale
+        $artwork.missing = Measure-RowArtwork (Wait-GameRow 'Catalog C Missing Art 0') @(0x70, 0x8F, 0x80) $scale
+        $report.artworkPixels = $artwork
+
+        $failures = @()
+        if ($topCount -ge $realizedLimit) {
+            $failures += "GameList realized $topCount rows at the top of a 500-game library."
+        }
+        foreach ($key in 'long', 'short') {
+            if ($artwork[$key] -lt $loaded) {
+                $failures += "The $key-title row shows no cover ($($artwork[$key]) matching pixels)."
+            }
+        }
+        foreach ($key in 'corrupt', 'missing') {
+            if ($artwork[$key] -ge $absent) {
+                $failures += "The $key-art row shows its seeded colour ($($artwork[$key]) pixels)."
+            }
+        }
+        if ($failures.Count -gt 0) {
+            throw ($failures -join ' ')
+        }
+        $report.phases += 'catalog-artwork'
         $report.libraryWideScreenshot = Save-WindowScreenshot 'library-wide'
         $report.phases += 'catalog-top-virtualized'
 
@@ -1332,8 +1417,8 @@ try {
         [void](Wait-GameRow $lastTitle)
         $listBounds = (Wait-VisibleById 'GameList').Current.BoundingRectangle
         foreach ($row in Get-RealizedGameRows) {
-            if ($row.Current.IsOffscreen) { continue }
             $bounds = $row.Current.BoundingRectangle
+            if ($row.Current.IsOffscreen -or $bounds.IsEmpty) { continue }
             if ($bounds.Left -lt ($listBounds.Left - 2) -or
                 $bounds.Right -gt ($listBounds.Right + 2)) {
                 throw "Game row '$($row.Current.Name)' is wider than GameList: $bounds in $listBounds."
