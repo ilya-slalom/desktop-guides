@@ -31,6 +31,13 @@ public sealed class SteamGridDbArtworkSource(
             : null;
     }
 
+    public async Task TestConnectionAsync(CancellationToken token)
+    {
+        string key = await apiKey(token) is { Length: > 0 } saved ? saved :
+            throw new ProviderException(ProviderErrorKind.NotConfigured, "Add a SteamGridDB API key to test it.");
+        using JsonDocument? _ = await GetAsync("grids/steam/70?dimensions=600x900", key, token);
+    }
+
     private async Task<ArtworkCandidate?> FirstGridAsync(string path, string key, CancellationToken token)
     {
         using JsonDocument? grids = await GetAsync(path, key, token);

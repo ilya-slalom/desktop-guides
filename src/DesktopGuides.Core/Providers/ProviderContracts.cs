@@ -34,3 +34,10 @@ public interface IArtworkSource
 {
     Task<ArtworkCandidate?> FindAsync(ArtworkHints hints, CancellationToken token);
 }
+
+public interface IProviderCredentialStore
+{
+    Task<ProviderCredentials> LoadAsync(CancellationToken token);
+    Task SaveAsync(ProviderCredentials credentials, CancellationToken token);
+    Task ClearAsync(CancellationToken token);
+}

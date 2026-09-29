@@ -87,13 +87,19 @@ public sealed partial class IgdbClient(
         "external_games.external_game_source,external_games.category; " +
         $"where id = {externalId}; limit 1;";
 
-    private async Task<JsonDocument> PostAsync(string body, CancellationToken token)
+    public async Task TestConnectionAsync(CancellationToken token)
+    {
+        using JsonDocument document = await PostAsync("fields id; limit 1;", token, freshToken: true);
+        RequireArray(document);
+    }
+
+    private async Task<JsonDocument> PostAsync(string body, CancellationToken token, bool freshToken = false)
     {
         IgdbCredentials current = await credentials(token) ??
             throw new ProviderException(ProviderErrorKind.NotConfigured, "Add IGDB credentials in Settings to search.");
         for (int attempt = 0; attempt < 2; attempt++)
         {
-            string accessToken = await tokens.GetTokenAsync(current, forceRefresh: attempt > 0, token);
+            string accessToken = await tokens.GetTokenAsync(current, forceRefresh: freshToken || attempt > 0, token);
             ProviderResponse response = await http.SendAsync(HttpMethod.Post, GamesUri, request =>
             {
                 request.Headers.Add("Client-ID", current.ClientId);

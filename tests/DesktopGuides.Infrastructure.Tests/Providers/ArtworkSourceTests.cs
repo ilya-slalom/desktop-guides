@@ -91,4 +91,22 @@ public sealed class ArtworkSourceTests
             await source.FindAsync(new ArtworkHints("Half-Life", null, "co1abc"), default));
         Assert.Null(await source.FindAsync(new ArtworkHints("Half-Life", null, null), default));
     }
+
+    [Fact]
+    public async Task SteamGridDbTestConnectionAcceptsNotFoundAndRejectsABadKey()
+    {
+        (SteamGridDbArtworkSource ok, FakeHandler handler) = Create("sgdb-key",
+            FakeHandler.Json("""{"success":false}""", HttpStatusCode.NotFound));
+        await ok.TestConnectionAsync(default);
+        Assert.Equal("Bearer sgdb-key", Assert.Single(handler.Requests).Request.Headers.Authorization!.ToString());
+
+        (SteamGridDbArtworkSource rejected, _) = Create("sgdb-key", new HttpResponseMessage(HttpStatusCode.Unauthorized));
+        Assert.Equal(ProviderErrorKind.InvalidCredentials,
+            (await Assert.ThrowsAsync<ProviderException>(() => rejected.TestConnectionAsync(default))).Kind);
+
+        (SteamGridDbArtworkSource missing, FakeHandler none) = Create(null);
+        Assert.Equal(ProviderErrorKind.NotConfigured,
+            (await Assert.ThrowsAsync<ProviderException>(() => missing.TestConnectionAsync(default))).Kind);
+        Assert.Empty(none.Requests);
+    }
 }

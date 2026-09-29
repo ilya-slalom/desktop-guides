@@ -144,6 +144,29 @@ public sealed class IgdbClientTests
         Assert.Equal(ProviderErrorKind.Unavailable, error.Kind);
     }
 
+    [Fact]
+    public async Task TestConnectionForcesAFreshTokenAndSendsOneLimitOneQuery()
+    {
+        (IgdbClient client, FakeHandler handler) = Create(Credentials,
+            Token("t1"), FakeHandler.Json("[]"), Token("t2"), FakeHandler.Json("[]"));
+
+        await client.TestConnectionAsync(default);
+        await client.TestConnectionAsync(default);
+
+        Assert.Equal(4, handler.Requests.Count);
+        Assert.Equal("fields id; limit 1;", handler.Requests[1].Body);
+        Assert.Equal("Bearer t2", handler.Requests[3].Request.Headers.Authorization!.ToString());
+    }
+
+    [Fact]
+    public async Task TestConnectionWithRejectedCredentialsHidesTheSecret()
+    {
+        (IgdbClient client, _) = Create(Credentials, new HttpResponseMessage(HttpStatusCode.BadRequest));
+        ProviderException error = await Assert.ThrowsAsync<ProviderException>(() => client.TestConnectionAsync(default));
+        Assert.Equal(ProviderErrorKind.InvalidCredentials, error.Kind);
+        Assert.DoesNotContain("very-secret", error.ToString());
+    }
+
     private sealed class SearchResultComparer : IEqualityComparer<ProviderSearchResult>
     {
         public bool Equals(ProviderSearchResult? x, ProviderSearchResult? y) =>
