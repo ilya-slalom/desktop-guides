@@ -1,3 +1,5 @@
+using DesktopGuides.Core.Providers;
+
 namespace DesktopGuides.Core.Library;
 
 public enum GuideFormat
@@ -20,7 +22,10 @@ public sealed record Game(
     string? Platform,
     string? Notes,
     DateTimeOffset CreatedUtc,
-    DateTimeOffset UpdatedUtc);
+    DateTimeOffset UpdatedUtc,
+    ProviderGameLink? Link = null,
+    GameMetadataSnapshot? Metadata = null,
+    string? ArtworkRelativePath = null);
 
 public sealed record Guide(
     Guid Id,
