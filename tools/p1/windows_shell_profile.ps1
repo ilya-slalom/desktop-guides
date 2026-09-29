@@ -15,3 +15,14 @@ function Assert-FreshPreviewProfile([string] $LocalAppDataPath) {
         throw 'A DesktopGuides.Preview profile already exists; refusing the fresh-profile install test.'
     }
 }
+
+# The portable build has no package profile; its data lives in
+# %LOCALAPPDATA%\DesktopGuides. The run owns that folder only if it starts absent.
+function Assert-FreshPortableProfile([string] $LocalAppDataPath) {
+    if ([string]::IsNullOrWhiteSpace($LocalAppDataPath)) {
+        throw 'Local app data path is unavailable.'
+    }
+    if (Test-Path -LiteralPath (Join-Path $LocalAppDataPath 'DesktopGuides')) {
+        throw 'A portable DesktopGuides data folder already exists; refusing the fresh-profile test.'
+    }
+}

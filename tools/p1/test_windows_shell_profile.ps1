@@ -38,6 +38,18 @@ try {
     Assert-Rejected { Assert-FreshPreviewProfile '' } `
         'An unavailable app-data path was accepted.'
 
+    Assert-FreshPortableProfile $scratch
+    $portableRoot = Join-Path $scratch 'DesktopGuides'
+    New-Item -ItemType Directory -Path $portableRoot | Out-Null
+    Assert-Rejected { Assert-FreshPortableProfile $scratch } `
+        'An existing portable data folder was accepted.'
+    Remove-Item -LiteralPath $portableRoot
+    Set-Content -LiteralPath $portableRoot -Value 'not a folder'
+    Assert-Rejected { Assert-FreshPortableProfile $scratch } `
+        'A file at the portable data path was accepted.'
+    Assert-Rejected { Assert-FreshPortableProfile '' } `
+        'An unavailable app-data path was accepted for the portable build.'
+
     Write-Output 'Fresh Preview profile guard checks passed.'
 }
 finally {

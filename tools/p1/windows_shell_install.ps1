@@ -1,6 +1,9 @@
 param(
-    [Parameter(Mandatory = $true)]
+    # Pass exactly one: the unsigned MSIX to sign and install, or a published
+    # portable DesktopGuides.Production.exe to launch in place.
     [string] $PackagePath,
+
+    [string] $PortableExecutable,
 
     [Parameter(Mandatory = $true)]
     [string] $ResultDirectory,
@@ -27,15 +30,33 @@ if ($targetSessionId -eq 0 -or
         Where-Object { $_.SessionId -eq $targetSessionId })) {
     throw 'Shell install test requires an interactive desktop session.'
 }
-$packageName = Split-Path $PackagePath -Leaf
-if ($packageName -notmatch '^DesktopGuides\.Production_[0-9]+(\.[0-9]+){3}_x64\.msix$') {
-    throw "Expected an x64 production MSIX, got $packageName."
-}
-if (Get-AppxPackage -Name DesktopGuides.Preview) {
-    throw 'A production preview package is already installed; refusing to replace it.'
+$portable = [bool]$PortableExecutable
+if ($portable -eq [bool]$PackagePath) {
+    throw 'Pass either -PackagePath or -PortableExecutable.'
 }
 . (Join-Path $PSScriptRoot 'windows_shell_profile.ps1')
-Assert-FreshPreviewProfile $env:LOCALAPPDATA
+if ($portable) {
+    if ((Split-Path $PortableExecutable -Leaf) -ne 'DesktopGuides.Production.exe' -or
+        -not (Test-Path -LiteralPath $PortableExecutable -PathType Leaf)) {
+        throw "Expected a portable DesktopGuides.Production.exe, got $PortableExecutable."
+    }
+    # The offline controller only accepts the installed package's executable.
+    if ($AllowOfflineFirewallRule) {
+        throw '-AllowOfflineFirewallRule applies only to the installed MSIX.'
+    }
+    $PortableExecutable = (Resolve-Path -LiteralPath $PortableExecutable).Path
+    Assert-FreshPortableProfile $env:LOCALAPPDATA
+}
+else {
+    $packageName = Split-Path $PackagePath -Leaf
+    if ($packageName -notmatch '^DesktopGuides\.Production_[0-9]+(\.[0-9]+){3}_x64\.msix$') {
+        throw "Expected an x64 production MSIX, got $packageName."
+    }
+    if (Get-AppxPackage -Name DesktopGuides.Preview) {
+        throw 'A production preview package is already installed; refusing to replace it.'
+    }
+    Assert-FreshPreviewProfile $env:LOCALAPPDATA
+}
 . (Join-Path $PSScriptRoot 'windows_shell_smoke_result.ps1')
 . (Join-Path $PSScriptRoot 'windows_shell_task_cleanup.ps1')
 . (Join-Path $PSScriptRoot 'windows_shell_screenshot_stats.ps1')
@@ -52,6 +73,8 @@ $report = [ordered]@{
     observedAt = (Get-Date).ToUniversalTime().ToString('o')
     osBuild = [Environment]::OSVersion.Version.ToString()
     cpuArchitecture = $env:PROCESSOR_ARCHITECTURE
+    # Portable runs are not evidence for the signed-install gates.
+    mode = if ($portable) { 'portable' } else { 'signed-msix' }
     success = $false
 }
 $certificate = $null
@@ -67,9 +90,11 @@ $smokeTask = "DesktopGuides-P1-ShellSmoke-$runId"
 $launchResultPath = Join-Path $ResultDirectory 'launch.json'
 $secondLaunchResultPath = Join-Path $ResultDirectory 'second-launch.json'
 $dataRoot = $null
+$portableDataRoot = if ($portable) { Join-Path $env:LOCALAPPDATA 'DesktopGuides' }
+$portableDataOwned = $false
 
 function Get-InstalledShellProcesses {
-    if (-not $installed) { return @() }
+    if (-not $expectedExecutablePath) { return @() }
     Get-CimInstance Win32_Process -Filter "Name = 'DesktopGuides.Production.exe'" |
         Where-Object {
             $_.SessionId -eq $targetSessionId -and
@@ -974,49 +999,60 @@ try {
             ForEach-Object { $_.ToString() }
     )
     $report.dotnetSdk = (dotnet --version)
-    $report.sourcePackageSha256 = (Get-FileHash $PackagePath -Algorithm SHA256).Hash
-    Copy-Item $PackagePath $signed -Force
-
-    $certificate = New-SelfSignedCertificate `
-        -Type CodeSigningCert `
-        -Subject 'CN=DesktopGuides Development' `
-        -CertStoreLocation 'Cert:\CurrentUser\My' `
-        -KeyExportPolicy NonExportable `
-        -HashAlgorithm SHA256 `
-        -NotAfter (Get-Date).AddDays(1)
-    $report.certificateThumbprint = $certificate.Thumbprint
-    Export-Certificate -Cert $certificate -FilePath $public | Out-Null
-    Import-Certificate -FilePath $public `
-        -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
-    $imported = $true
-
-    $signTool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' `
-        -Recurse -Filter signtool.exe |
-        Where-Object { $_.FullName -like '*\x64\signtool.exe' } |
-        Sort-Object FullName |
-        Select-Object -Last 1 -ExpandProperty FullName
-    if (-not $signTool) { throw 'Windows SDK SignTool is unavailable.' }
-    & $signTool sign /fd SHA256 /sha1 $certificate.Thumbprint /s My $signed
-    if ($LASTEXITCODE -ne 0) { throw "SignTool failed with exit code $LASTEXITCODE." }
-    & $signTool verify /pa $signed
-    if ($LASTEXITCODE -ne 0) { throw 'Signed MSIX verification failed.' }
-    $report.signedPackageSha256 = (Get-FileHash $signed -Algorithm SHA256).Hash
-
-    if (Get-AppxPackage -Name DesktopGuides.Preview) {
-        throw 'A production preview package appeared before test install.'
+    if ($portable) {
+        $report.portableExecutable = $PortableExecutable
+        $report.portableExecutableSha256 =
+            (Get-FileHash $PortableExecutable -Algorithm SHA256).Hash
+        $expectedExecutablePath = $PortableExecutable
+        Assert-FreshPortableProfile $env:LOCALAPPDATA
+        $portableDataOwned = $true
+        $dataRoot = $portableDataRoot
     }
-    Assert-FreshPreviewProfile $env:LOCALAPPDATA
-    Add-AppxPackage -Path $signed
-    $installed = Get-AppxPackage -Name DesktopGuides.Preview
-    if (-not $installed) { throw 'Production package did not install.' }
-    $report.packageFullName = $installed.PackageFullName
-    $report.packageFamilyName = $installed.PackageFamilyName
-    $report.installLocation = $installed.InstallLocation
-    $expectedExecutablePath = Join-Path $installed.InstallLocation `
-        'DesktopGuides.Production.exe'
+    else {
+        $report.sourcePackageSha256 = (Get-FileHash $PackagePath -Algorithm SHA256).Hash
+        Copy-Item $PackagePath $signed -Force
 
-    $dataRoot = Join-Path $env:LOCALAPPDATA `
-        "Packages\$($installed.PackageFamilyName)\LocalState"
+        $certificate = New-SelfSignedCertificate `
+            -Type CodeSigningCert `
+            -Subject 'CN=DesktopGuides Development' `
+            -CertStoreLocation 'Cert:\CurrentUser\My' `
+            -KeyExportPolicy NonExportable `
+            -HashAlgorithm SHA256 `
+            -NotAfter (Get-Date).AddDays(1)
+        $report.certificateThumbprint = $certificate.Thumbprint
+        Export-Certificate -Cert $certificate -FilePath $public | Out-Null
+        Import-Certificate -FilePath $public `
+            -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
+        $imported = $true
+
+        $signTool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' `
+            -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -like '*\x64\signtool.exe' } |
+            Sort-Object FullName |
+            Select-Object -Last 1 -ExpandProperty FullName
+        if (-not $signTool) { throw 'Windows SDK SignTool is unavailable.' }
+        & $signTool sign /fd SHA256 /sha1 $certificate.Thumbprint /s My $signed
+        if ($LASTEXITCODE -ne 0) { throw "SignTool failed with exit code $LASTEXITCODE." }
+        & $signTool verify /pa $signed
+        if ($LASTEXITCODE -ne 0) { throw 'Signed MSIX verification failed.' }
+        $report.signedPackageSha256 = (Get-FileHash $signed -Algorithm SHA256).Hash
+
+        if (Get-AppxPackage -Name DesktopGuides.Preview) {
+            throw 'A production preview package appeared before test install.'
+        }
+        Assert-FreshPreviewProfile $env:LOCALAPPDATA
+        Add-AppxPackage -Path $signed
+        $installed = Get-AppxPackage -Name DesktopGuides.Preview
+        if (-not $installed) { throw 'Production package did not install.' }
+        $report.packageFullName = $installed.PackageFullName
+        $report.packageFamilyName = $installed.PackageFamilyName
+        $report.installLocation = $installed.InstallLocation
+        $expectedExecutablePath = Join-Path $installed.InstallLocation `
+            'DesktopGuides.Production.exe'
+
+        $dataRoot = Join-Path $env:LOCALAPPDATA `
+            "Packages\$($installed.PackageFamilyName)\LocalState"
+    }
     New-Item -ItemType Directory -Force $dataRoot | Out-Null
     $seedProject = Join-Path $PSScriptRoot `
         'DesktopGuides.ShellSeed\DesktopGuides.ShellSeed.csproj'
@@ -1203,44 +1239,61 @@ finally {
     catch {
         $cleanupErrors.Add($_.Exception.Message)
     }
-    if ($installed) { Stop-InstalledShell -BestEffort }
+    if ($expectedExecutablePath) { Stop-InstalledShell -BestEffort }
     $shellProcessesAfterStop = @(Get-InstalledShellProcesses)
     if ($shellProcessesAfterStop.Count -gt 0) {
         $cleanupErrors.Add(
             "Installed shell processes remain after cleanup: $(
                 ($shellProcessesAfterStop | ForEach-Object { $_.ProcessId }) -join ', ').")
     }
-    $installedNow = @(Get-AppxPackage -Name DesktopGuides.Preview)
-    $ownedPackage = @($installedNow | Where-Object {
-        $installed -and $_.PackageFullName -eq $installed.PackageFullName
-    })
-    if ($ownedPackage.Count -eq 1 -and $tasksDrained -and
-        $shellProcessesAfterStop.Count -eq 0) {
-        Remove-AppxPackage -Package $ownedPackage[0].PackageFullName `
-            -ErrorAction SilentlyContinue
-    }
-    if ($certificate) {
-        if ($imported) {
-            Remove-Item "Cert:\LocalMachine\TrustedPeople\$($certificate.Thumbprint)" `
+    if ($portable) {
+        # Only a folder this run created is deleted, and only once nothing
+        # can still be writing to it.
+        if ($portableDataOwned -and $tasksDrained -and
+            $shellProcessesAfterStop.Count -eq 0) {
+            Remove-Item -LiteralPath $portableDataRoot -Recurse -Force `
                 -ErrorAction SilentlyContinue
         }
-        Remove-Item "Cert:\CurrentUser\My\$($certificate.Thumbprint)" `
-            -ErrorAction SilentlyContinue
+        $report.portableDataStillPresent = $portableDataOwned -and
+            (Test-Path -LiteralPath $portableDataRoot)
+        if ($report.portableDataStillPresent) {
+            $report.success = $false
+            $report.cleanupError = 'The portable data folder this run created remains.'
+        }
     }
-    Remove-Item $public -ErrorAction SilentlyContinue
-    $remainingPackages = @(Get-AppxPackage -Name DesktopGuides.Preview)
-    $report.packageStillInstalled = $remainingPackages.Count -gt 0
-    $report.certificateStillTrusted = if ($certificate) {
-        Test-Path "Cert:\LocalMachine\TrustedPeople\$($certificate.Thumbprint)"
-    } else { $false }
-    if ($report.packageStillInstalled -or $report.certificateStillTrusted) {
-        $report.success = $false
-        $report.cleanupError = if ($remainingPackages.Count -gt 0 -and
-            ($ownedPackage.Count -eq 0 -or
-             $remainingPackages[0].PackageFullName -ne $installed.PackageFullName)) {
-            'A Preview package not confirmed as test-owned remains untouched.'
-        } else {
-            'Temporary package or certificate remains.'
+    else {
+        $installedNow = @(Get-AppxPackage -Name DesktopGuides.Preview)
+        $ownedPackage = @($installedNow | Where-Object {
+            $installed -and $_.PackageFullName -eq $installed.PackageFullName
+        })
+        if ($ownedPackage.Count -eq 1 -and $tasksDrained -and
+            $shellProcessesAfterStop.Count -eq 0) {
+            Remove-AppxPackage -Package $ownedPackage[0].PackageFullName `
+                -ErrorAction SilentlyContinue
+        }
+        if ($certificate) {
+            if ($imported) {
+                Remove-Item "Cert:\LocalMachine\TrustedPeople\$($certificate.Thumbprint)" `
+                    -ErrorAction SilentlyContinue
+            }
+            Remove-Item "Cert:\CurrentUser\My\$($certificate.Thumbprint)" `
+                -ErrorAction SilentlyContinue
+        }
+        Remove-Item $public -ErrorAction SilentlyContinue
+        $remainingPackages = @(Get-AppxPackage -Name DesktopGuides.Preview)
+        $report.packageStillInstalled = $remainingPackages.Count -gt 0
+        $report.certificateStillTrusted = if ($certificate) {
+            Test-Path "Cert:\LocalMachine\TrustedPeople\$($certificate.Thumbprint)"
+        } else { $false }
+        if ($report.packageStillInstalled -or $report.certificateStillTrusted) {
+            $report.success = $false
+            $report.cleanupError = if ($remainingPackages.Count -gt 0 -and
+                ($ownedPackage.Count -eq 0 -or
+                 $remainingPackages[0].PackageFullName -ne $installed.PackageFullName)) {
+                'A Preview package not confirmed as test-owned remains untouched.'
+            } else {
+                'Temporary package or certificate remains.'
+            }
         }
     }
     if ($cleanupErrors.Count -gt 0) {
@@ -1248,6 +1301,8 @@ finally {
         $report.processCleanupErrors = @($cleanupErrors)
     }
     $report | ConvertTo-Json -Depth 8 |
-        Set-Content (Join-Path $ResultDirectory 'signed-install.json') -Encoding UTF8
+        Set-Content (Join-Path $ResultDirectory $(
+            if ($portable) { 'portable-run.json' } else { 'signed-install.json' })) `
+            -Encoding UTF8
 }
 if (-not $report.success) { exit 1 }

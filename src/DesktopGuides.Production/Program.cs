@@ -1,4 +1,5 @@
 using DesktopGuides.Infrastructure.Activation;
+using DesktopGuides.Infrastructure.Storage;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
@@ -7,7 +8,11 @@ namespace DesktopGuides.Production;
 
 internal static class Program
 {
-    private const string InstanceKey = "DesktopGuides.Preview.Main";
+    // The MSIX and portable builds keep separate libraries, so each is its own
+    // single instance.
+    private static readonly string InstanceKey = AppDataRoot.HasPackageIdentity()
+        ? "DesktopGuides.Preview.Main"
+        : "DesktopGuides.Portable.Main";
     private const string ActivationProbeName =
         @"Local\DesktopGuides.Preview.RedirectedActivation";
     private const string RedirectSelectedProbeName =

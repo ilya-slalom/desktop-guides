@@ -200,7 +200,10 @@ public sealed partial class ShellWindow : Window
     {
         try
         {
-            string dataRoot = ApplicationData.Current.LocalFolder.Path;
+            string dataRoot = AppDataRoot.Resolve(
+                AppDataRoot.HasPackageIdentity(),
+                () => ApplicationData.Current.LocalFolder.Path,
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
             ShowBusyStatus("Waiting for previous window...");
             libraryLease = await LibrarySessionLease.AcquireAsync(
                 dataRoot, leaseWait.Token);
