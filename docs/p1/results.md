@@ -1216,13 +1216,13 @@ host's missing optional `mspdbcmf.exe` caused only the existing
 symbols-package warning.
 
 Code-review fixes on top of `f94fc15` then passed **150/150 Core** and
-**227/227 Infrastructure** on the same host, plus the credential-helper
+**228/228 Infrastructure** on the same host, plus the credential-helper
 checks and a Release x64 production build with no warnings. They re-enable
 Refresh metadata when a refresh finishes on another page, treat a
 `Retry-After` date in the past as retry now, and stop an existing but
 locked `providers.bin` from counting as "not configured": the load isn't
 cached, Settings reports that it couldn't read the saved credentials and
-disables Save until a later read succeeds. The installed E2E below was not
+disables Save until its own reload succeeds when Settings is opened again. The installed E2E below was not
 re-run for these fixes.
 
 The installed E2E ran on `pcsx2-win` (OS build `10.0.26200.0`, AMD64, .NET

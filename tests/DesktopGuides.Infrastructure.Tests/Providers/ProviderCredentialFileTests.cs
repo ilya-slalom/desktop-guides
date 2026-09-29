@@ -63,6 +63,22 @@ public sealed class ProviderCredentialFileTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveAfterAFailedReadClearsTheFailure()
+    {
+        await Create().SaveAsync(Full, CancellationToken.None);
+        ProviderCredentialFile store = Create();
+        using (new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            await store.LoadAsync(CancellationToken.None);
+        }
+
+        ProviderCredentials next = Full with { SteamGridDbKey = "sgdb-key-2" };
+        await store.SaveAsync(next, CancellationToken.None);
+        Assert.False(store.LastReadFailed);
+        Assert.Equal(next, await store.LoadAsync(CancellationToken.None));
+    }
+
+    [Fact]
     public async Task ClearRemovesTheFile()
     {
         ProviderCredentialFile store = Create();

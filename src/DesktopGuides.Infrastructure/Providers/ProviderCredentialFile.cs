@@ -103,7 +103,8 @@ public sealed class ProviderCredentialFile(
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
-            // A blob this user can't unprotect or parse counts as not configured.
+            // A blob this user can't unprotect or parse counts as not configured. DPAPI
+            // LOCAL=user failures (other user, lost key, damaged blob) don't clear up on retry.
             return ProviderCredentials.None;
         }
     }

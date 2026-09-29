@@ -12,6 +12,9 @@ public sealed partial class ProviderSettingsCard : UserControl
     private ProviderServices? services;
     private ProviderCredentials saved = ProviderCredentials.None;
     private CancellationTokenSource? pending;
+    // The card's own load result: another caller's successful read clears the store's flag
+    // without refreshing `saved`, and Save must not merge blank fields into a stale `saved`.
+    private bool loadFailed;
 
     public ProviderSettingsCard()
     {
@@ -31,17 +34,18 @@ public sealed partial class ProviderSettingsCard : UserControl
     // Retried each time Settings opens, because Save would otherwise overwrite keys it couldn't read.
     internal async Task ReloadIfUnreadableAsync()
     {
-        if (services?.Credentials.LastReadFailed != true || pending is not null) return;
+        if (services is null || !loadFailed || pending is not null) return;
         await LoadSavedAsync();
-        if (!services.Credentials.LastReadFailed) ProviderSettingsStatus.IsOpen = false;
-        SetBusy(false);
+        if (!loadFailed) ProviderSettingsStatus.IsOpen = false;
+        if (pending is null) SetBusy(false);
     }
 
     private async Task LoadSavedAsync()
     {
         saved = await services!.Credentials.LoadAsync(CancellationToken.None);
+        loadFailed = services.Credentials.LastReadFailed;
         ShowSaved();
-        if (services.Credentials.LastReadFailed)
+        if (loadFailed)
         {
             Show(InfoBarSeverity.Error,
                 "Couldn't read saved credentials. Close any app that may be using them, then open Settings again.");
@@ -55,6 +59,7 @@ public sealed partial class ProviderSettingsCard : UserControl
         ProviderCredentials next = Pending();
         await services!.Credentials.SaveAsync(next, token);
         saved = next;
+        loadFailed = false;
         ShowSaved();
         Show(InfoBarSeverity.Success, "Provider credentials saved.");
         CredentialsChanged?.Invoke(this, EventArgs.Empty);
@@ -64,6 +69,7 @@ public sealed partial class ProviderSettingsCard : UserControl
     {
         await services!.Credentials.ClearAsync(token);
         saved = ProviderCredentials.None;
+        loadFailed = false;
         ShowSaved();
         Show(InfoBarSeverity.Informational, "Provider credentials removed.");
         CredentialsChanged?.Invoke(this, EventArgs.Empty);
@@ -172,7 +178,7 @@ public sealed partial class ProviderSettingsCard : UserControl
         ProviderBusy.IsActive = busy;
         bool ready = !busy && services is not null;
         TestConnectionButton.IsEnabled = ready;
-        SaveButton.IsEnabled = ready && !services!.Credentials.LastReadFailed;
+        SaveButton.IsEnabled = ready && !loadFailed;
         RemoveButton.IsEnabled = ready && saved != ProviderCredentials.None;
     }
 
