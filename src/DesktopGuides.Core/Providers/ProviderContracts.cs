@@ -8,3 +8,16 @@ public interface IArtworkStore
     void Delete(string relativePath);
     string? ResolveFile(string relativePath);
 }
+
+public sealed record IgdbCredentials(string ClientId, string ClientSecret)
+{
+    public override string ToString() => $"IgdbCredentials {{ ClientId = {ClientId}, ClientSecret = *** }}";
+}
+
+public sealed record ProviderCredentials(IgdbCredentials? Igdb, string? SteamGridDbKey)
+{
+    public static ProviderCredentials None { get; } = new(null, null);
+
+    public override string ToString() =>
+        $"ProviderCredentials {{ Igdb = {(Igdb is null ? "none" : "saved")}, SteamGridDbKey = {(SteamGridDbKey is null ? "none" : "saved")} }}";
+}
