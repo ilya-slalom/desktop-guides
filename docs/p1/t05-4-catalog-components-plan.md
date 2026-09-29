@@ -55,9 +55,11 @@ the design doc's verification record.
 - **`LibraryGamePresentation` location.** It goes in `src/DesktopGuides.Core/Library/`,
   next to the `Game` model, rather than in the provider presentation folder, because
   it describes Library games, not provider results.
-- **Realized-row bound.** "Fewer than 80" counts `ListItem` descendants of `GameList`
-  that have non-empty bounds, so virtualized items without a container are
-  excluded. The count includes realized off-screen containers in the list's cache.
+- **Realized-row bound.** "Fewer than 80" counts the named `ListItem` descendants
+  of `GameList`. UIA lists only items with a container, including off-screen
+  containers in the list's cache, and reports empty bounds for those, so the
+  count does not filter on bounds. (The final-review fix in d53c3e6 replaced an
+  earlier bounds filter that counted only the visible rows.)
 
 ## Review Focus
 

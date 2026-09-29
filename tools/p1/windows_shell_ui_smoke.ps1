@@ -478,7 +478,8 @@ try {
 
     # UIA lists the rows that have a container, including the off-screen
     # cache, and reports empty bounds for the off-screen ones, so don't filter
-    # on bounds. The name check drops any item peer named after its .NET type.
+    # on bounds. The name check skips unnamed items and, defensively, any peer
+    # named after its .NET type; CI has shown none of those.
     function Test-RealizedGameRow($item) {
         $name = $item.Current.Name
         return [bool]($name -and $name -notlike 'DesktopGuides.*')
@@ -1302,6 +1303,7 @@ try {
         $report.phases += 'stale-resume-hidden'
     }
     elseif ($Mode -eq 'catalog') {
+        $catalogStarted = Get-Date
         $longTitle = 'Catalog A ' + ('W' * 150)
         $shortTitle = 'Catalog B Short'
         # Built from code points: Windows PowerShell 5.1 reads this file as ANSI.
@@ -1338,6 +1340,11 @@ try {
         $report.otherItemNamesAtTop = @($items |
             Where-Object { -not (Test-RealizedGameRow $_) } |
             ForEach-Object { $_.Current.Name } | Select-Object -Unique -First 3)
+        # Fail before the slower pixel and keyboard checks, so a broken
+        # virtualization reports its row count instead of a harness timeout.
+        if ($topCount -ge $realizedLimit) {
+            throw "GameList realized $topCount rows at the top of a 500-game library."
+        }
 
         # Seeded covers are solid (shade, 255 - shade, 0x80). A loaded cover
         # fills most of its 45x60 tile; the placeholder has none of that colour.
@@ -1353,9 +1360,6 @@ try {
         $report.artworkPixels = $artwork
 
         $failures = @()
-        if ($topCount -ge $realizedLimit) {
-            $failures += "GameList realized $topCount rows at the top of a 500-game library."
-        }
         foreach ($key in 'long', 'short') {
             if ($artwork[$key] -lt $loaded) {
                 $failures += "The $key-title row shows no cover ($($artwork[$key]) matching pixels)."
@@ -1410,6 +1414,32 @@ try {
         if ($endCount -ge $realizedLimit) {
             throw "GameList realized $endCount rows at the end of a 500-game library."
         }
+        # Rows at the end use recycled containers: each shows its own cover
+        # or the placeholder, never a cover left by an earlier item.
+        $endArtwork = [ordered]@{
+            last = Wait-RowArtwork (Wait-GameRow $lastTitle) @(0xA0, 0x5F, 0x80) $scale $loaded
+            game498 = Wait-RowArtwork (Wait-GameRow 'Catalog Game 498') @(0x62, 0x9D, 0x80) $scale $loaded
+            game499 = [ordered]@{}
+        }
+        $row499 = Wait-GameRow 'Catalog Game 499'
+        $endArtwork.game499.lastColour = Measure-RowArtwork $row499 @(0xA0, 0x5F, 0x80) $scale
+        $endArtwork.game499.game498Colour = Measure-RowArtwork $row499 @(0x62, 0x9D, 0x80) $scale
+        $report.artworkPixelsAtEnd = $endArtwork
+        $failures = @()
+        foreach ($key in 'last', 'game498') {
+            if ($endArtwork[$key] -lt $loaded) {
+                $failures += "The $key row shows no cover at the end of the list ($($endArtwork[$key]) matching pixels)."
+            }
+        }
+        foreach ($key in 'lastColour', 'game498Colour') {
+            if ($endArtwork.game499[$key] -ge $absent) {
+                $failures += "Catalog Game 499 has no artwork but shows the $key ($($endArtwork.game499[$key]) pixels)."
+            }
+        }
+        if ($failures.Count -gt 0) {
+            throw ($failures -join ' ')
+        }
+        $report.phases += 'catalog-end-artwork'
         $report.libraryEndScreenshot = Save-WindowScreenshot 'library-end'
         $report.phases += 'catalog-end-virtualized'
 
@@ -1440,6 +1470,7 @@ try {
             throw "The catalog opened $($remote.Count) non-loopback connection(s)."
         }
         $report.phases += 'catalog-no-provider-traffic'
+        $report.catalogSeconds = [Math]::Round(((Get-Date) - $catalogStarted).TotalSeconds, 1)
     }
     elseif ($Mode -eq 'long-list') {
         $target = 'ZZZ Focus Target Guide'
