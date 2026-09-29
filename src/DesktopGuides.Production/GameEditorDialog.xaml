@@ -9,8 +9,8 @@
     <StackPanel MaxWidth="440"
                 Spacing="{StaticResource DesktopGuidesSpacing16}">
         <InfoBar x:Name="EditorNotice"
+                 Style="{StaticResource DesktopGuidesStatusInfoBarStyle}"
                  IsOpen="False"
-                 IsClosable="False"
                  Severity="Informational"
                  AutomationProperties.AutomationId="GameEditorNotice">
             <InfoBar.ActionButton>
@@ -52,8 +52,8 @@
                        AutomationProperties.AutomationId="GameNotesFeedback" />
         </StackPanel>
         <InfoBar x:Name="SaveError"
+                 Style="{StaticResource DesktopGuidesStatusInfoBarStyle}"
                  IsOpen="False"
-                 IsClosable="False"
                  Severity="Error"
                  AutomationProperties.AutomationId="GameSaveError" />
     </StackPanel>

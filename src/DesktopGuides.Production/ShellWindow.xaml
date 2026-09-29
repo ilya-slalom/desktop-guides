@@ -77,9 +77,9 @@
             </Grid.RowDefinitions>
 
             <InfoBar x:Name="ShellStatusInfoBar"
+                     Style="{StaticResource DesktopGuidesStatusInfoBarStyle}"
                      Margin="0,0,0,16"
                      IsOpen="True"
-                     IsClosable="False"
                      Severity="Informational"
                      Message="Opening library…"
                      AutomationProperties.AutomationId="ShellStatus"
@@ -127,8 +127,7 @@
 
                 <Grid Grid.Row="3">
                     <Border x:Name="LibraryEmptyState"
-                            Style="{StaticResource DesktopGuidesElevatedSurfaceStyle}"
-                            VerticalAlignment="Top"
+                            Style="{StaticResource DesktopGuidesEmptyStateStyle}"
                             AutomationProperties.AutomationId="LibraryEmptyState">
                         <StackPanel Spacing="{StaticResource DesktopGuidesSpacing8}">
                             <FontIcon Glyph="&#xE82D;"
@@ -145,9 +144,9 @@
                         </StackPanel>
                     </Border>
                     <ListView x:Name="GameList"
-                              DisplayMemberPath="Title"
                               SelectionMode="Single"
                               Style="{StaticResource DesktopGuidesListStyle}"
+                              ItemTemplate="{StaticResource DesktopGuidesArtworkRowTemplate}"
                               SelectionChanged="GameSelected"
                               AutomationProperties.AutomationId="GameList"
                               AutomationProperties.Name="Games" />
@@ -201,10 +200,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <Border x:Name="GameCoverFrame"
-                                Width="120"
-                                Height="180"
-                                CornerRadius="4"
-                                VerticalAlignment="Top"
+                                Style="{StaticResource DesktopGuidesCoverFrameStyle}"
                                 Visibility="Collapsed">
                             <Image x:Name="GameCover"
                                    Stretch="UniformToFill"
@@ -231,7 +227,7 @@
                                         Spacing="{StaticResource DesktopGuidesSpacing8}"
                                         Visibility="Collapsed">
                                 <local:AutomationGroup AutomationProperties.AutomationId="GameFacts">
-                                    <toolkit:MetadataControl x:Name="GameFacts" />
+                                    <toolkit:MetadataControl x:Name="GameFacts" Style="{StaticResource DesktopGuidesFactsStyle}" />
                                 </local:AutomationGroup>
                                 <ScrollViewer MaxHeight="120"
                                               HorizontalScrollBarVisibility="Disabled"
@@ -286,8 +282,7 @@
 
                 <Grid Grid.Row="3">
                     <Border x:Name="GameEmptyState"
-                            Style="{StaticResource DesktopGuidesElevatedSurfaceStyle}"
-                            VerticalAlignment="Top"
+                            Style="{StaticResource DesktopGuidesEmptyStateStyle}"
                             AutomationProperties.AutomationId="GameGuideEmptyState">
                         <StackPanel Spacing="{StaticResource DesktopGuidesSpacing8}">
                             <TextBlock x:Name="GameEmpty"

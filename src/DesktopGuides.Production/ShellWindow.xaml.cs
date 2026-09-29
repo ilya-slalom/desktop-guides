@@ -32,6 +32,9 @@ public sealed partial class ShellWindow : Window
     private SqliteLibraryRepository? repository;
     private ProviderServices? providers;
     private ManagedArtworkStore? artwork;
+    private const int RowArtworkDecodeWidth = 90;
+    private const int DetailCoverDecodeWidth = 240;
+    private readonly ArtworkListLoader gameArtwork;
     private ProviderGameImporter? importer;
     private Guid? resumeGuideId;
     private Guid? pendingGuideFocus;
@@ -64,6 +67,7 @@ public sealed partial class ShellWindow : Window
         statusDismissTimer.Tick += (_, _) => ShellStatusInfoBar.IsOpen = false;
         ApplyWindowMaterial(WindowMaterial.Mica);
         Navigation.SelectedItem = LibraryItem;
+        gameArtwork = ArtworkListLoader.Attach(GameList, LoadRowArtworkAsync);
         GameList.AddHandler(
             UIElement.TappedEvent, new TappedEventHandler(GameTapped), true);
         GameList.AddHandler(
@@ -359,9 +363,9 @@ public sealed partial class ShellWindow : Window
 
     private async void GameSelected(object sender, SelectionChangedEventArgs args)
     {
-        if (GameList.SelectedItem is Game game)
+        if (GameList.SelectedItem is LibraryGameItem item)
         {
-            await RunNavigationAsync(() => OpenGameAsync(game.Id));
+            await RunNavigationAsync(() => OpenGameAsync(item.Game.Id));
         }
     }
 
@@ -377,9 +381,9 @@ public sealed partial class ShellWindow : Window
     {
         while (source is not null && !ReferenceEquals(source, GameList))
         {
-            if (source is ListViewItem row && row.Content is Game game)
+            if (source is ListViewItem row && row.Content is LibraryGameItem item)
             {
-                return game;
+                return item.Game;
             }
             source = VisualTreeHelper.GetParent(source);
         }
@@ -865,7 +869,8 @@ public sealed partial class ShellWindow : Window
                     {
                         return false;
                     }
-                    GameList.ItemsSource = games;
+                    gameArtwork.CancelAll();
+                    GameList.ItemsSource = games.Select(game => new LibraryGameItem(game)).ToList();
                     LibraryEmptyState.Visibility =
                         games.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
                     GameList.Visibility =
@@ -927,7 +932,7 @@ public sealed partial class ShellWindow : Window
                     GamePlatform.Visibility = game.Platform is null ? Visibility.Collapsed : Visibility.Visible;
                     GameNotes.Text = game.Notes ?? string.Empty;
                     GameNotesScroll.Visibility = game.Notes is null ? Visibility.Collapsed : Visibility.Visible;
-                    ImageSource? cover = await LoadCoverAsync(game.ArtworkRelativePath);
+                    ImageSource? cover = await LoadCoverAsync(game.ArtworkRelativePath, DetailCoverDecodeWidth);
                     if (generation != renderGeneration)
                     {
                         return false;
@@ -1042,9 +1047,10 @@ public sealed partial class ShellWindow : Window
         RefreshMetadataButton.Visibility = Visibility.Collapsed;
     }
 
-    // Reads the cached file through a stream, so a cover never triggers a
-    // network request and a damaged file only hides the cover.
-    private async Task<ImageSource?> LoadCoverAsync(string? relativePath)
+    // Reads the managed file through a stream, so artwork never triggers a
+    // network request and a damaged or missing file only leaves the placeholder.
+    private async Task<ImageSource?> LoadCoverAsync(
+        string? relativePath, int decodeWidth, CancellationToken token = default)
     {
         if (relativePath is null || artwork?.ResolveFile(relativePath) is not { } path)
         {
@@ -1053,8 +1059,10 @@ public sealed partial class ShellWindow : Window
         try
         {
             using FileStream file = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-            BitmapImage bitmap = new() { DecodePixelWidth = 240 };
+            token.ThrowIfCancellationRequested();
+            BitmapImage bitmap = new() { DecodePixelWidth = decodeWidth };
             await bitmap.SetSourceAsync(file.AsRandomAccessStream());
+            token.ThrowIfCancellationRequested();
             return bitmap;
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or COMException)
@@ -1062,6 +1070,11 @@ public sealed partial class ShellWindow : Window
             return null;
         }
     }
+
+    private Task<ImageSource?> LoadRowArtworkAsync(ArtworkItem item, CancellationToken token) =>
+        item is LibraryGameItem game
+            ? LoadCoverAsync(game.ArtworkRelativePath, RowArtworkDecodeWidth, token)
+            : Task.FromResult<ImageSource?>(null);
 
     private void ShowProviderMetadata(Game game, ImageSource? cover)
     {
