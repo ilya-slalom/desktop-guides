@@ -102,8 +102,9 @@ public sealed class ProviderHttp : IDisposable
             {
                 throw new ProviderException(ProviderErrorKind.Timeout, $"{uri.Host} took too long to respond.");
             }
-            catch (HttpRequestException)
+            catch (Exception error) when (error is HttpRequestException or IOException)
             {
+                // IOException covers a connection that drops while the body is read.
                 throw Unavailable(uri, "could not be reached");
             }
         }

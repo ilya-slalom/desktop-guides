@@ -1040,6 +1040,28 @@ public sealed class SqliteLibraryRepositoryTests
         Assert.NotNull(new ManagedArtworkStore(directory.Paths).ResolveFile(stored.RelativePath));
     }
 
+    [Fact]
+    public async Task StartupLeavesAnEmptyGameFolderItCannotDelete()
+    {
+        using TestLibrary directory = new();
+        directory.Paths.EnsureCreated();
+        string folder = Path.Combine(directory.Paths.ArtworkRoot, Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        // Windows refuses to remove a read-only directory.
+        File.SetAttributes(folder, File.GetAttributes(folder) | FileAttributes.ReadOnly);
+        try
+        {
+            await using SqliteLibraryRepository repository = new(directory.Paths);
+            await repository.InitializeAsync();
+            Assert.True(Directory.Exists(folder));
+            Assert.Empty(await repository.ListGamesAsync());
+        }
+        finally
+        {
+            File.SetAttributes(folder, FileAttributes.Directory);
+        }
+    }
+
     private static SqliteConnection OpenWithForeignKeys(string databasePath)
     {
         SqliteConnection connection = new(new SqliteConnectionStringBuilder

@@ -91,7 +91,7 @@ public sealed partial class ManagedArtworkStore(ILibraryPaths paths) : IArtworkS
                 if (!ArtworkFile().IsMatch(fileName) || !File.Exists(file)) review++;
                 else if (!referenced.Contains($"artwork/{name}/{fileName}")) TryDelete(file);
             }
-            if (!Directory.EnumerateFileSystemEntries(entry).Any()) Directory.Delete(entry);
+            if (!Directory.EnumerateFileSystemEntries(entry).Any()) TryDeleteFolder(entry);
         }
         return review;
     }
@@ -104,6 +104,13 @@ public sealed partial class ManagedArtworkStore(ILibraryPaths paths) : IArtworkS
     private static void TryDelete(string file)
     {
         try { File.Delete(file); }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
+    private static void TryDeleteFolder(string folder)
+    {
+        try { Directory.Delete(folder); }
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
     }
