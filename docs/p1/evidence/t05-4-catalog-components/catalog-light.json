@@ -1,0 +1,40 @@
+﻿{
+    "mode":  "catalog",
+    "invocationId":  "4b75838a737841b291b45575399f542c",
+    "observedAt":  "2026-09-29T13:11:30.0301413Z",
+    "processId":  8704,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "catalog-artwork",
+                   "catalog-top-virtualized",
+                   "catalog-keyboard",
+                   "catalog-end-virtualized",
+                   "catalog-narrow",
+                   "catalog-no-provider-traffic"
+               ],
+    "workingArea":  "1024x720",
+    "windowDpi":  96,
+    "scalePercent":  100,
+    "longRowHeight":  76,
+    "shortRowHeight":  76,
+    "realizedRowsAtTop":  34,
+    "gameListItemsAtTop":  34,
+    "otherItemNamesAtTop":  [
+
+                            ],
+    "artworkPixels":  {
+                          "long":  2672,
+                          "short":  2672,
+                          "corrupt":  0,
+                          "missing":  29
+                      },
+    "libraryWideScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\catalog-light.library-wide.png",
+    "realizedRowsAtEnd":  22,
+    "libraryEndScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\catalog-light.library-end.png",
+    "libraryNarrowScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\catalog-light.library-narrow.png",
+    "remoteConnections":  0
+}
