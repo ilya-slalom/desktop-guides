@@ -228,8 +228,10 @@ checks pass in CI, with screenshots. This unblocks T05.1, T04.2 and T06.1.
   `ArtworkLoadTicketsTests`.
 - **Installed catalog scenario.** `production-shell-ui` in the same run, light and
   dark. Working area 1024×720 at 100%, so the 1500 px wide size clamps to the
-  working area. Realized rows: 7 at the top and 7 at the end (limit 80). Long row
-  76 DIPs, short row 76. No status, no remote connections, no credential blob,
+  working area. Realized rows: 34 at the top and 21–22 at the end (limit 80),
+  from CI run 36572000282. Long row 76 DIPs, short row 76. The long-title and
+  short-title covers each matched 2672 pixels of their seeded colour; the corrupt
+  and missing-art rows matched 0 and 29–38, under the 270-pixel limit. No status, no remote connections, no credential blob,
   10 missing-artwork games, 500 games.
 - **Live provider regression.** Host `-ProviderOnly` on 29 September 2026 with the
   CI x64 MSIX: `provider-live` passed all nine phases and found 16 Half-Life
@@ -238,8 +240,10 @@ checks pass in CI, with screenshots. This unblocks T05.1, T04.2 and T06.1.
 - **Rulings.** The long title is 160 characters, because `GameDetails.TitleLimit`
   is 160. The keyboard check uses Ctrl+Down and End instead of Down, because
   `GameList` selection follows focus and plain Down opens a game.
-  `LibraryGamePresentation` lives in `Core/Library`. The realized-row count
-  identifies rows that have a container by their UIA name. UIA reports empty
-  bounds for off-screen rows, so a bounds filter counts only visible rows and
-  can't detect a list that realizes every row.
+  `LibraryGamePresentation` lives in `Core/Library`. The first CI run counted
+  7 realized rows, because it dropped rows with empty bounds and UIA reports
+  empty bounds for cached off-screen rows. The count now keeps those rows. A
+  negative control proved both checks: a `StackPanel` items panel with row
+  artwork turned off failed with 500 realized rows and 0 cover pixels. It ran on
+  the host because the control ran past CI's 120 s catalog timeout.
 - **Not run.** Portable build checks: T05.4 changes nothing in packaging.

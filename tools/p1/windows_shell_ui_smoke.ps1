@@ -476,9 +476,9 @@ try {
         return @($list.FindAll($scope, $condition))
     }
 
-    # A row with a container is named after its game. An item without one is
-    # named after its .NET type. Bounds can't tell them apart: UIA reports
-    # empty bounds for off-screen rows that do have a container.
+    # UIA lists the rows that have a container, including the off-screen
+    # cache, and reports empty bounds for the off-screen ones, so don't filter
+    # on bounds. The name check drops any item peer named after its .NET type.
     function Test-RealizedGameRow($item) {
         $name = $item.Current.Name
         return [bool]($name -and $name -notlike 'DesktopGuides.*')
