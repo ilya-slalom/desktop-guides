@@ -64,7 +64,8 @@ public sealed record AppSettings(
 
 public sealed record StartupReconciliationReport(
     int ResolvedOperationCount,
-    int ReviewOrphanCount);
+    int ReviewOrphanCount,
+    int ArtworkReviewCount = 0);
 
 public sealed record NewLinkedGame(
     Guid Id,

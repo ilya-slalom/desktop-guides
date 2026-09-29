@@ -9,6 +9,8 @@ public interface ILibraryPaths
     string TrashRoot { get; }
     string RecoveryRoot { get; }
     string DatabasePath { get; }
+    string ArtworkRoot { get; }
+    string ArtworkStagingRoot { get; }
 
     void EnsureCreated();
     void ValidateDatabasePath();

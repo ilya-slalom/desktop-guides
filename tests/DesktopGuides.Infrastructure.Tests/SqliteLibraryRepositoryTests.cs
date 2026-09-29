@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Providers;
+using DesktopGuides.Infrastructure.Artwork;
 using DesktopGuides.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
 using Xunit;
@@ -993,6 +994,50 @@ public sealed class SqliteLibraryRepositoryTests
         state.Parameters.AddWithValue("$id", guideId.ToString("N"));
         state.Parameters.AddWithValue("$now", Now.ToUnixTimeMilliseconds());
         state.ExecuteNonQuery();
+    }
+
+    [Fact]
+    public async Task SweepRemovesArtworkOfDeletedGame()
+    {
+        using TestLibrary directory = new();
+        Guid id = Guid.NewGuid();
+        StoredArtwork stored;
+        await using (SqliteLibraryRepository repository = new(directory.Paths))
+        {
+            await repository.InitializeAsync();
+            stored = await new ManagedArtworkStore(directory.Paths)
+                .StoreAsync(id, Artwork.TestImages.Png(4, 4), default);
+            await repository.AddLinkedGameAsync(Linked(id, artwork: stored.RelativePath));
+            using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+            using SqliteCommand delete = connection.CreateCommand();
+            delete.CommandText = "DELETE FROM Games";
+            delete.ExecuteNonQuery();
+        }
+
+        await using SqliteLibraryRepository reopened = new(directory.Paths);
+        await reopened.InitializeAsync();
+        Assert.Null(new ManagedArtworkStore(directory.Paths).ResolveFile(stored.RelativePath));
+        Assert.Equal(0, reopened.LastStartupReconciliation!.ReviewOrphanCount);
+        Assert.Equal(0, reopened.LastStartupReconciliation.ArtworkReviewCount);
+    }
+
+    [Fact]
+    public async Task StartupKeepsArtworkOfLinkedGame()
+    {
+        using TestLibrary directory = new();
+        Guid id = Guid.NewGuid();
+        StoredArtwork stored;
+        await using (SqliteLibraryRepository repository = new(directory.Paths))
+        {
+            await repository.InitializeAsync();
+            stored = await new ManagedArtworkStore(directory.Paths)
+                .StoreAsync(id, Artwork.TestImages.Png(5, 5), default);
+            await repository.AddLinkedGameAsync(Linked(id, artwork: stored.RelativePath));
+        }
+
+        await using SqliteLibraryRepository reopened = new(directory.Paths);
+        await reopened.InitializeAsync();
+        Assert.NotNull(new ManagedArtworkStore(directory.Paths).ResolveFile(stored.RelativePath));
     }
 
     private static SqliteConnection OpenWithForeignKeys(string databasePath)

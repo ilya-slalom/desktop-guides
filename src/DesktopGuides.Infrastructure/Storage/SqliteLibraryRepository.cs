@@ -1,6 +1,7 @@
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Paths;
 using DesktopGuides.Core.Providers;
+using DesktopGuides.Infrastructure.Artwork;
 using Microsoft.Data.Sqlite;
 
 namespace DesktopGuides.Infrastructure.Storage;
@@ -498,7 +499,19 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         paths.EnsureCreated();
         using SqliteConnection connection = OpenConnection(create: true);
         MigrateOrValidate(connection);
-        LastStartupReconciliation = new FileOperationReconciler(paths).Run(connection);
+        StartupReconciliationReport report = new FileOperationReconciler(paths).Run(connection);
+        int artworkReview = new ManagedArtworkStore(paths).Sweep(ReadArtworkReferences(connection));
+        LastStartupReconciliation = report with { ArtworkReviewCount = artworkReview };
+    }
+
+    private static HashSet<string> ReadArtworkReferences(SqliteConnection connection)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT ArtworkRelativePath FROM Games WHERE ArtworkRelativePath IS NOT NULL";
+        using SqliteDataReader reader = command.ExecuteReader();
+        HashSet<string> references = new(StringComparer.Ordinal);
+        while (reader.Read()) references.Add(reader.GetString(0));
+        return references;
     }
 
     private void MigrateOrValidate(SqliteConnection connection)
