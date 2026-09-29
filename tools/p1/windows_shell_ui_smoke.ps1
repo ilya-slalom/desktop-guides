@@ -1,13 +1,13 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('empty', 'game-editor', 'game-editor-persisted',
-        'normal', 'stale', 'long-list', 'switch-game',
+        'normal', 'design-language', 'stale', 'long-list', 'switch-game',
         'switch-game-prepare', 'switch-game-loading', 'queue-guide',
         'queue-guide-write', 'prepare-game-editor-close',
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
         'reader-render-error-observed', 'reader-render-error-result',
-        'late-guide-after-close', 'waiting-handoff')]
+        'late-guide-after-close', 'waiting-handoff', 'material')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -30,7 +30,16 @@ param(
     [string] $ExpectedResumeGuide = 'Route Test Guide',
 
     [ValidateRange(0, 5000)]
-    [int] $ExitDelayMilliseconds = 0
+    [int] $ExitDelayMilliseconds = 0,
+
+    [ValidateRange(0, 400)]
+    [int] $ExpectedScalePercent = 0,
+
+    [ValidateSet('Mica', 'Acrylic', 'Solid')]
+    [string] $ExpectedMaterial = 'Mica',
+
+    [ValidateSet('', 'Mica', 'Acrylic', 'Solid')]
+    [string] $SwitchToMaterial = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,9 +50,11 @@ $report = [ordered]@{
     processId = $ProcessId
     sessionId = $SessionId
     exitDelayMilliseconds = $ExitDelayMilliseconds
+    expectedScalePercent = $ExpectedScalePercent
     success = $false
     phases = @()
 }
+$lastStatusSequence = -1L
 
 try {
     Add-Type -AssemblyName UIAutomationClient
@@ -86,6 +97,29 @@ try {
         return $root.FindFirst($scope, $condition)
     }
 
+    function Find-RawById([string] $id) {
+        $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
+        $pending = [System.Collections.Generic.Queue[System.Windows.Automation.AutomationElement]]::new()
+        $pending.Enqueue($root)
+        while ($pending.Count -gt 0) {
+            $element = $pending.Dequeue()
+            try {
+                if ($element.Current.AutomationId -eq $id) {
+                    return $element
+                }
+                $child = $walker.GetFirstChild($element)
+                while ($child) {
+                    $pending.Enqueue($child)
+                    $child = $walker.GetNextSibling($child)
+                }
+            }
+            catch [System.Windows.Automation.ElementNotAvailableException] {
+                # The window can redraw while the raw tree is traversed.
+            }
+        }
+        return $null
+    }
+
     function Wait-Name([string] $id, [string] $expected) {
         $deadline = (Get-Date).AddSeconds(15)
         do {
@@ -99,6 +133,49 @@ try {
         throw "Expected visible '$id' named '$expected'."
     }
 
+    function Wait-Status(
+        [string] $expected,
+        [switch] $AllowHidden) {
+        $transient = $expected -in @(
+            'Library ready.',
+            'Game ready.',
+            'Guide details ready.',
+            'Settings ready.')
+        $lastObserved = 'status probe was not found'
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $probe = Find-RawById 'ShellContent'
+            $status = if ($probe) { $probe.Current.ItemStatus } else { '' }
+            if ($probe) {
+                $lastObserved = "status probe contained '$status'"
+            }
+            $separator = $status.IndexOf('|')
+            $sequence = 0L
+            $message = ''
+            if ($separator -gt 0 -and
+                [long]::TryParse(
+                    $status.Substring(0, $separator), [ref] $sequence)) {
+                $message = $status.Substring($separator + 1)
+            }
+            if ($message -eq $expected -and
+                $sequence -gt $script:lastStatusSequence) {
+                if ($transient -or $AllowHidden) {
+                    $script:lastStatusSequence = $sequence
+                    return $probe
+                }
+                $visibleStatus = Find-ById 'ShellStatus'
+                if ($visibleStatus -and
+                    $visibleStatus.Current.Name -eq $expected -and
+                    -not $visibleStatus.Current.IsOffscreen) {
+                    $script:lastStatusSequence = $sequence
+                    return $probe
+                }
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected shell status '$expected'; $lastObserved."
+    }
+
     function Wait-VisibleById([string] $id) {
         $deadline = (Get-Date).AddSeconds(15)
         do {
@@ -109,6 +186,18 @@ try {
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
         throw "Expected visible '$id'."
+    }
+
+    function Wait-HiddenById([string] $id) {
+        $deadline = (Get-Date).AddSeconds(10)
+        do {
+            $element = Find-ById $id
+            if (-not $element -or $element.Current.IsOffscreen) {
+                return
+            }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected '$id' to hide."
     }
 
     function Wait-EnabledById([string] $id) {
@@ -189,9 +278,9 @@ try {
     }
 
     function Find-PaneToggle {
-        $toggle = Find-ById 'TogglePaneButton'
+        $toggle = Find-ById 'PART_PaneToggleButton'
         if (-not $toggle) {
-            throw 'Expected the NavigationView pane toggle button.'
+            throw 'Expected the TitleBar pane toggle button.'
         }
         return $toggle
     }
@@ -242,7 +331,7 @@ try {
         $deadline = (Get-Date).AddSeconds(15)
         do {
             foreach ($button in @(
-                (Find-ById 'NavigationViewBackButton'),
+                (Find-ById 'PART_BackButton'),
                 ($root.FindFirst($scope, $namedButton)))) {
                 if ($button -and -not $button.Current.IsOffscreen) {
                     $pattern = $null
@@ -413,6 +502,97 @@ try {
         return $target
     }
 
+    function Resize-ShellWindow([int] $width, [int] $height) {
+        $workingArea = [System.Windows.Forms.SystemInformation]::WorkingArea
+        $targetWidth = [Math]::Min($width, $workingArea.Width)
+        $targetHeight = [Math]::Min($height, $workingArea.Height)
+        $targetX = $workingArea.X +
+            [int][Math]::Floor(($workingArea.Width - $targetWidth) / 2)
+        $targetY = $workingArea.Y +
+            [int][Math]::Floor(($workingArea.Height - $targetHeight) / 2)
+        [DesktopGuidesForegroundProbe]::Resize(
+            $process.MainWindowHandle,
+            $targetX, $targetY, $targetWidth, $targetHeight)
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $bounds = $root.Current.BoundingRectangle
+            if ([Math]::Abs($bounds.Width - $targetWidth) -le 8 -and
+                [Math]::Abs($bounds.Height - $targetHeight) -le 8) {
+                Start-Sleep -Milliseconds 300
+                return
+            }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+        throw "Shell did not resize to $targetWidth x $targetHeight."
+    }
+
+    function Assert-HeadingLevel([string] $id, [int] $expected) {
+        $element = Wait-VisibleById $id
+        $value = $element.GetCurrentPropertyValue(
+            [System.Windows.Automation.AutomationElement]::HeadingLevelProperty)
+        if ([int]$value -ne $expected) {
+            throw "Expected '$id' heading level $expected, got $value."
+        }
+    }
+
+    function Assert-InsideWindow([string] $id) {
+        $element = Wait-VisibleById $id
+        $bounds = $element.Current.BoundingRectangle
+        $window = $root.Current.BoundingRectangle
+        $tolerance = 2
+        if ($bounds.Left -lt ($window.Left - $tolerance) -or
+            $bounds.Top -lt ($window.Top - $tolerance) -or
+            $bounds.Right -gt ($window.Right + $tolerance) -or
+            $bounds.Bottom -gt ($window.Bottom + $tolerance)) {
+            throw "'$id' is clipped outside the shell window: $bounds."
+        }
+    }
+
+    function Assert-ReachesWindowRightEdge([string] $id) {
+        $element = if ($id -eq 'ShellContent') {
+            Find-RawById $id
+        }
+        else {
+            Wait-VisibleById $id
+        }
+        if (-not $element) {
+            throw "Expected '$id' in the UI Automation tree."
+        }
+        $bounds = $element.Current.BoundingRectangle
+        $window = $root.Current.BoundingRectangle
+        $dpi = [DesktopGuidesForegroundProbe]::Dpi($process.MainWindowHandle)
+        $tolerance = [Math]::Ceiling(16 * ($dpi / 96.0))
+        if ([Math]::Abs($window.Right - $bounds.Right) -gt $tolerance) {
+            throw "'$id' leaves an unexpected right gutter: $bounds in $window."
+        }
+    }
+
+    function Assert-NoOverlap([string] $firstId, [string] $secondId) {
+        $first = Wait-VisibleById $firstId
+        $second = Wait-VisibleById $secondId
+        $a = $first.Current.BoundingRectangle
+        $b = $second.Current.BoundingRectangle
+        $overlap = $a.Left -lt $b.Right -and $a.Right -gt $b.Left -and
+            $a.Top -lt $b.Bottom -and $a.Bottom -gt $b.Top
+        if ($overlap) {
+            throw "'$firstId' overlaps '$secondId': $a and $b."
+        }
+    }
+
+    function Focus-And-Verify([string] $id) {
+        $element = Wait-EnabledById $id
+        $element.SetFocus()
+        $deadline = (Get-Date).AddSeconds(10)
+        do {
+            $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+            if ($focused -and $focused.Current.AutomationId -eq $id) {
+                return
+            }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected keyboard focus on '$id'."
+    }
+
     function Save-WindowScreenshot([string] $view) {
         Add-Type -AssemblyName System.Drawing
         $path = [System.IO.Path]::ChangeExtension($ResultPath, "$view.png")
@@ -443,21 +623,71 @@ try {
         }
     }
 
+    function Get-ComboSelection([string] $id) {
+        $combo = Wait-VisibleById $id
+        $selection = $combo.GetCurrentPattern(
+            [System.Windows.Automation.SelectionPattern]::Pattern).Current.GetSelection()
+        if ($selection.Length -ne 1) { throw "$id has $($selection.Length) selected items." }
+        return $selection[0].Current.Name
+    }
+
+    function Assert-EffectiveMaterial([string] $material) {
+        $status = (Wait-VisibleById 'WindowMaterialSelector').Current.ItemStatus
+        if ($status -ne $material) {
+            throw "Expected the $material window background to be applied, found '$status'."
+        }
+    }
+
+    function Select-ComboItem([string] $id, [string] $name) {
+        $combo = Wait-VisibleById $id
+        $expand = $combo.GetCurrentPattern(
+            [System.Windows.Automation.ExpandCollapsePattern]::Pattern)
+        $expand.Expand()
+        $item = $null
+        $deadline = (Get-Date).AddSeconds(5)
+        do {
+            $itemCondition = [System.Windows.Automation.AndCondition]::new(
+                [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::NameProperty, $name),
+                [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                    [System.Windows.Automation.ControlType]::ListItem))
+            # WinUI hosts the open drop-down in a popup outside the ComboBox subtree.
+            $item = $combo.FindFirst($scope, $itemCondition)
+            if (-not $item) { $item = $root.FindFirst($scope, $itemCondition) }
+            if (-not $item) { Start-Sleep -Milliseconds 100 }
+        } while (-not $item -and (Get-Date) -lt $deadline)
+        if (-not $item) { throw "$id has no item named $name." }
+        $item.GetCurrentPattern(
+            [System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+        if ($expand.Current.ExpandCollapseState -ne
+                [System.Windows.Automation.ExpandCollapseState]::Collapsed) {
+            $expand.Collapse()
+        }
+    }
+
+    function Assert-ShellForeground {
+        if ([DesktopGuidesForegroundProbe]::GetForegroundWindow() -ne
+                $process.MainWindowHandle) {
+            throw 'The shell was not the foreground window; its backdrop would be inactive.'
+        }
+    }
+
     if ($Mode -eq 'waiting-handoff') {
-        [void](Wait-Name 'ShellStatus' 'Waiting for previous window...')
+        [void](Wait-Status 'Waiting for previous window...')
         $report.phases += 'waiting-for-library-lease'
     }
     elseif ($Mode -eq 'queue-guide') {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         Open-GuideFromGame 'Blocked Write Guide'
-        [void](Wait-Name 'ShellStatus' 'Opening guide...')
+        [void](Wait-Status 'Opening guide...')
         $report.phases += 'guide-action-started'
     }
     elseif ($Mode -eq 'queue-guide-write') {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         Open-GuideFromGame 'Blocked Write Guide'
         [void](Wait-Name 'ReaderHeading' 'Blocked Write Guide')
-        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        [void](Wait-Status 'Guide details ready.')
         $report.phases += 'guide-reader-open-while-save-blocked'
     }
     elseif ($Mode -eq 'queue-game-editor') {
@@ -479,35 +709,33 @@ try {
     }
     elseif ($Mode -eq 'queue-later-guide') {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         [void](Wait-SelectedGuide 'Route Test Guide')
         Invoke-Element (Wait-Name 'OpenSelectedGuide' 'Open Route Test Guide')
-        [void](Wait-Name 'ShellStatus' 'Opening guide...')
+        [void](Wait-Status 'Opening guide...')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         Select-Element 'Blocked Write Guide'
         [void](Wait-SelectedGuide 'Blocked Write Guide')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Opening guide...')
         $report.phases += 'later-guide-selected-while-first-read-blocked'
     }
     elseif ($Mode -eq 'late-guide-after-close') {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Opening guide...')
+        [void](Wait-Status 'Opening guide...' -AllowHidden)
         [void](Wait-SelectedGuide 'Blocked Write Guide')
         Select-Element 'Route Test Guide'
         [void](Wait-SelectedGuide 'Route Test Guide')
-        [void](Wait-Name 'ShellStatus' 'Opening guide...')
         $report.phases += 'guide-selected-after-close-request'
     }
     elseif ($Mode -eq 'queue-reader-render-error') {
         [void](Wait-Name 'LibraryHeading' 'Library')
-        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        [void](Wait-Status 'Library ready.')
         Select-Element 'Route Test Game'
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         Open-GuideFromGame 'Route Test Guide'
         [void](Wait-Name 'ReaderBackToGame' 'Back to game')
-        [void](Wait-Name 'ShellStatus' ('Loading guide' + [char]0x2026))
+        [void](Wait-Status ('Loading guide' + [char]0x2026))
         $report.phases += 'reader-route-open-before-render-fault'
     }
     elseif ($Mode -in @('later-guide-result', 'later-guide-failed-result',
@@ -516,7 +744,7 @@ try {
         # These modes continue a shell left on Reader, Game, or Library.
     }
     else {
-        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        [void](Wait-Status 'Library ready.')
         [void](Wait-Name 'LibraryHeading' 'Library')
         if (Find-ById 'FixturePicker') {
             throw 'The production shell exposes a P0 fixture picker.'
@@ -532,10 +760,188 @@ try {
         }
         $report.phases += 'empty-library'
     }
+    elseif ($Mode -eq 'design-language') {
+        $designGame = 'The Legend of Zelda: Tears of the Kingdom'
+        $designGuide = 'Complete Story Walkthrough'
+        $wideWidth = 1500
+        $narrowWidth = 600
+        $windowHeight = 720
+
+        $dpi = [DesktopGuidesForegroundProbe]::Dpi($process.MainWindowHandle)
+        $report.windowDpi = $dpi
+        $report.scalePercent = [int][Math]::Round(($dpi / 96.0) * 100)
+        if ($ExpectedScalePercent -gt 0 -and
+            [Math]::Abs($report.scalePercent - $ExpectedScalePercent) -gt 1) {
+            throw "Expected $ExpectedScalePercent% display scale, got $($report.scalePercent)%."
+        }
+
+        Resize-ShellWindow $wideWidth $windowHeight
+        [void](Wait-HiddenById 'ShellStatus')
+        Assert-InsideWindow 'AppTitleBar'
+        Assert-InsideWindow 'PART_PaneToggleButton'
+        Assert-InsideWindow 'PART_BackButton'
+        Assert-ReachesWindowRightEdge 'ShellContent'
+        Assert-HeadingLevel 'LibraryHeading' 1
+        Assert-InsideWindow 'LibraryHeading'
+        Assert-InsideWindow 'AddGameButton'
+        Focus-And-Verify 'AddGameButton'
+        $report.libraryWideScreenshot =
+            Save-WindowScreenshot 'library-wide'
+        $report.phases += 'library-wide-focus-and-heading'
+
+        Resize-ShellWindow $narrowWidth $windowHeight
+        Assert-InsideWindow 'LibraryHeading'
+        Assert-InsideWindow 'AddGameButton'
+        Assert-NoOverlap 'PART_PaneToggleButton' 'LibraryHeading'
+        Assert-NoOverlap 'PART_PaneToggleButton' 'AddGameButton'
+        Assert-NoOverlap 'PART_BackButton' 'LibraryHeading'
+        [void](Wait-GameRow $designGame)
+        $report.libraryNarrowScreenshot =
+            Save-WindowScreenshot 'library-narrow'
+        $report.phases += 'library-narrow'
+
+        Resize-ShellWindow $wideWidth $windowHeight
+        Press-Enter (Wait-GameRow $designGame)
+        [void](Wait-Name 'GameHeading' $designGame)
+        [void](Wait-Name 'GamePlatform' 'Nintendo Switch')
+        [void](Wait-Name 'GameNotes' (
+            'Keep the main story, shrine routes, and armor upgrades together ' +
+            'for quick reference while playing.'))
+        [void](Wait-Status 'Game ready.')
+        [void](Wait-HiddenById 'ShellStatus')
+        Assert-HeadingLevel 'GameHeading' 1
+        Assert-InsideWindow 'GameHeading'
+        Assert-InsideWindow 'EditGameButton'
+        Assert-ReachesWindowRightEdge 'ShellContent'
+        $report.gameWideScreenshot = Save-WindowScreenshot 'game-wide'
+        $report.phases += 'game-wide-full-width-metadata'
+
+        Resize-ShellWindow $narrowWidth $windowHeight
+        Assert-InsideWindow 'GameHeading'
+        Assert-InsideWindow 'EditGameButton'
+        Assert-InsideWindow 'GameNotesScroll'
+        Assert-NoOverlap 'PART_PaneToggleButton' 'GameHeading'
+        Assert-NoOverlap 'PART_PaneToggleButton' 'EditGameButton'
+        Assert-NoOverlap 'PART_BackButton' 'GameHeading'
+        [void](Wait-GuideRow $designGuide)
+        $report.gameNarrowScreenshot = Save-WindowScreenshot 'game-narrow'
+        $report.phases += 'game-narrow-long-title'
+
+        Resize-ShellWindow $wideWidth $windowHeight
+        Press-Enter (Wait-GuideRow $designGuide)
+        [void](Wait-Name 'ReaderHeading' $designGuide)
+        [void](Wait-Name 'ReaderGameName' $designGame)
+        [void](Wait-Name 'ReaderFormat' 'TXT')
+        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-HiddenById 'ShellStatus')
+        Assert-HeadingLevel 'ReaderHeading' 1
+        Assert-InsideWindow 'ReaderHeading'
+        Assert-InsideWindow 'ReaderBackToGame'
+        $report.readerWideScreenshot = Save-WindowScreenshot 'reader-wide'
+        $report.phases += 'reader-wide'
+
+        Resize-ShellWindow $narrowWidth $windowHeight
+        Assert-InsideWindow 'ReaderHeading'
+        Assert-InsideWindow 'ReaderBackToGame'
+        Assert-InsideWindow 'ReaderFormat'
+        Assert-InsideWindow 'ReaderPlaceholder'
+        Assert-NoOverlap 'PART_PaneToggleButton' 'ReaderBackToGame'
+        Assert-NoOverlap 'PART_BackButton' 'ReaderBackToGame'
+        $report.readerNarrowScreenshot =
+            Save-WindowScreenshot 'reader-narrow'
+        $report.phases += 'reader-narrow'
+
+        Resize-ShellWindow $wideWidth $windowHeight
+        Select-Element 'Settings'
+        [void](Wait-Name 'SettingsHeading' 'Settings')
+        [void](Wait-Name 'LibraryStorageSettingsCard' (
+            'Library storage. Your library is stored on this device.'))
+        [void](Wait-Status 'Settings ready.')
+        [void](Wait-HiddenById 'ShellStatus')
+        Assert-HeadingLevel 'SettingsHeading' 1
+        Resize-ShellWindow $narrowWidth $windowHeight
+        Assert-InsideWindow 'SettingsHeading'
+        Assert-InsideWindow 'LibraryStorageSettingsCard'
+        Assert-NoOverlap 'PART_PaneToggleButton' 'SettingsHeading'
+        Assert-NoOverlap 'PART_BackButton' 'SettingsHeading'
+        $report.settingsNarrowScreenshot =
+            Save-WindowScreenshot 'settings-narrow'
+        $report.phases += 'settings-narrow'
+
+        Resize-ShellWindow $wideWidth $windowHeight
+        Assert-InsideWindow 'SettingsHeading'
+        Assert-InsideWindow 'LibraryStorageSettingsCard'
+        $report.settingsWideScreenshot =
+            Save-WindowScreenshot 'settings-wide'
+        $report.phases += 'settings-wide'
+    }
+    elseif ($Mode -eq 'material') {
+        $designGame = 'The Legend of Zelda: Tears of the Kingdom'
+        $designGuide = 'Complete Story Walkthrough'
+        Resize-ShellWindow 1500 720
+        Select-Element 'Settings'
+        [void](Wait-Name 'WindowMaterialSettingsCard' (
+            'Window background. Choose how much of your desktop shows behind the app.'))
+        $selected = Get-ComboSelection 'WindowMaterialSelector'
+        if ($selected -ne $ExpectedMaterial) {
+            throw "Expected $ExpectedMaterial window background, found $selected."
+        }
+        Assert-EffectiveMaterial $selected
+        $report.phases += "material-$selected-restored"
+
+        if ($SwitchToMaterial) {
+            Select-ComboItem 'WindowMaterialSelector' $SwitchToMaterial
+            [void](Wait-Status "Window background set to $SwitchToMaterial.")
+            $selected = $SwitchToMaterial
+            Assert-EffectiveMaterial $selected
+            $report.phases += "material-switched-$selected"
+        }
+        [void](Wait-HiddenById 'ShellStatus')
+        Assert-ShellForeground
+        $report.settingsScreenshot = Save-WindowScreenshot "material-$selected-settings"
+
+        Select-Element 'Library'
+        [void](Wait-GameRow $designGame)
+        Start-Sleep -Milliseconds 400
+        Assert-ShellForeground
+        $report.libraryScreenshot = Save-WindowScreenshot "material-$selected-library"
+        # windows_shell_install.ps1 measures the pane/content strip from these bounds.
+        $window = $root.Current.BoundingRectangle
+        $report.libraryBounds = [ordered]@{
+            windowLeft = $window.Left
+            windowHeight = $window.Height
+            contentLeft = (Find-RawById 'ShellContent').Current.BoundingRectangle.Left
+        }
+
+        Press-Enter (Wait-GameRow $designGame)
+        [void](Wait-Name 'GameHeading' $designGame)
+        Invoke-Element (Wait-EnabledById 'EditGameButton')
+        [void](Wait-VisibleById 'GameTitleInput')
+        Assert-ShellForeground
+        $report.dialogScreenshot = Save-WindowScreenshot "material-$selected-edit-game"
+        # The dialog's own peer spans the smoke layer, so anchor on the primary
+        # button inside the dialog panel's command area.
+        $primary = (Wait-VisibleById 'PrimaryButton').Current.BoundingRectangle
+        $report.dialogBounds = [ordered]@{
+            buttonLeft = $primary.Left - $window.Left
+            buttonBottom = $primary.Bottom - $window.Top
+        }
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+        Wait-EditorClosed
+
+        Press-Enter (Wait-GuideRow $designGuide)
+        [void](Wait-Name 'ReaderHeading' $designGuide)
+        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-HiddenById 'ShellStatus')
+        Assert-ShellForeground
+        $report.readerScreenshot = Save-WindowScreenshot "material-$selected-reader"
+        $report.material = $selected
+        $report.phases += "material-$selected-captured"
+    }
     elseif ($Mode -eq 'prepare-game-editor-close') {
         Select-Element 'Route Test Game'
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         $report.phases += 'game-ready-for-editor-close'
     }
     elseif ($Mode -eq 'game-editor') {
@@ -596,7 +1002,7 @@ try {
         [void](Wait-Name 'GameTitleFeedback' "$($renamed.Length) / 160 characters")
         Press-Enter (Wait-VisibleById 'GameTitleInput')
         [void](Wait-Name 'GameHeading' $renamed)
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         $notes = Wait-VisibleById 'GameNotes'
         if ($notes.Current.Name.Length -ne 2000) {
             throw 'The saved 2,000-character game note was not rendered in full.'
@@ -606,10 +1012,10 @@ try {
             ($root.Current.BoundingRectangle.Height / 3)) {
             throw 'Long game notes exceeded their bounded metadata region.'
         }
-        $guideList = Wait-VisibleById 'GuideList'
-        if ($guideList.Current.BoundingRectangle.Height -lt
-            ($root.Current.BoundingRectangle.Height / 5)) {
-            throw 'Long game notes left no usable guide-list area.'
+        $emptyGuide = Wait-Name 'GameEmpty' 'No guides in this game.'
+        if ($emptyGuide.Current.BoundingRectangle.Top -le
+            $notesScroll.Current.BoundingRectangle.Bottom) {
+            throw 'Long game notes overlap the empty guide state.'
         }
         Start-Sleep -Milliseconds 500
         $report.longNotesScreenshot = Save-WindowScreenshot 'long-notes'
@@ -619,12 +1025,12 @@ try {
         Set-Text 'GameNotesInput' ''
         Press-Enter (Wait-VisibleById 'GameTitleInput')
         [void](Wait-Name 'GameHeading' $renamed)
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         $report.phases += 'edit-by-id-and-clear-optional-fields'
 
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
-        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        [void](Wait-Status 'Library ready.')
         Invoke-Element (Wait-EnabledById 'AddGameButton')
         Set-Text 'GameTitleInput' $renamed
         [void](Wait-Name 'GameTitleFeedback' "$($renamed.Length) / 160 characters")
@@ -632,7 +1038,7 @@ try {
         [void](Wait-Name 'GameHeading' $renamed)
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
-        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        [void](Wait-Status 'Library ready.')
         $count = Count-GameRows $renamed
         if ($count -ne 2) {
             throw "Library showed $count selectable duplicate-title games, expected two."
@@ -658,7 +1064,7 @@ try {
         $target = 'ZZZ Focus Target Guide'
         Select-Element 'Route Test Game'
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         $list = Find-ById 'GuideList'
         $condition = [System.Windows.Automation.PropertyCondition]::new(
             [System.Windows.Automation.AutomationElement]::NameProperty, $target)
@@ -670,20 +1076,20 @@ try {
         $report.phases += 'tail-guide-outside-initial-viewport'
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
-        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        [void](Wait-Status 'Library ready.')
         Invoke-Element (Wait-Name 'ResumeGuide' "Resume $target")
         [void](Wait-Name 'ReaderHeading' $target)
-        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        [void](Wait-Status 'Guide details ready.')
         Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         [void](Wait-SelectedGuide $target)
         Wait-FocusedGuide $target
         [void](Wait-Name 'OpenSelectedGuide' "Open $target")
         $report.phases += 'virtualized-guide-back-focus'
         [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
         [void](Wait-Name 'ReaderHeading' $target)
-        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        [void](Wait-Status 'Guide details ready.')
         $report.phases += 'virtualized-guide-enter-reopen'
     }
     elseif ($Mode -eq 'switch-game-prepare') {
@@ -692,11 +1098,11 @@ try {
         [void](Wait-Name 'ReaderHeading' $target)
         Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         [void](Wait-SelectedGuide $target)
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
-        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        [void](Wait-Status 'Library ready.')
         $report.phases += 'first-game-guide-retained-before-switch'
     }
     elseif ($Mode -eq 'switch-game-loading') {
@@ -704,14 +1110,15 @@ try {
         $loading = 'Loading game' + [char]0x2026
         Select-Element 'Second Test Game'
         [void](Wait-Name 'GameHeading' $loading)
-        [void](Wait-Name 'ShellStatus' $loading)
+        [void](Wait-Status $loading)
         $list = Find-ById 'GuideList'
-        if (-not $list -or $list.Current.IsEnabled) {
+        if ($list -and -not $list.Current.IsOffscreen -and
+            $list.Current.IsEnabled) {
             throw 'The guide list was available while the second game loaded.'
         }
         $oldCondition = [System.Windows.Automation.PropertyCondition]::new(
             [System.Windows.Automation.AutomationElement]::NameProperty, $target)
-        if ($list.FindAll($scope, $oldCondition).Count -ne 0) {
+        if ($list -and $list.FindAll($scope, $oldCondition).Count -ne 0) {
             throw 'The first game guide row was visible while the second game loaded.'
         }
         $open = Find-ById 'OpenSelectedGuide'
@@ -722,7 +1129,7 @@ try {
     }
     elseif ($Mode -eq 'switch-game') {
         [void](Wait-Name 'GameHeading' 'Second Test Game')
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         $list = Find-ById 'GuideList'
         $oldCondition = [System.Windows.Automation.PropertyCondition]::new(
             [System.Windows.Automation.AutomationElement]::NameProperty,
@@ -751,23 +1158,23 @@ try {
     elseif ($Mode -eq 'later-guide-result') {
         [void](Wait-Name 'ReaderHeading' 'Blocked Write Guide')
         [void](Wait-Name 'ReaderGameName' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        [void](Wait-Status 'Guide details ready.')
         $report.phases += 'later-guide-opened'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         [void](Wait-SelectedGuide 'Blocked Write Guide')
         Wait-FocusedGuide 'Blocked Write Guide'
         $report.phases += 'later-guide-back-selection-and-focus'
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
-        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        [void](Wait-Status 'Library ready.')
         [void](Wait-Name 'ResumeGuide' 'Resume Blocked Write Guide')
         $report.phases += 'later-guide-persisted-for-resume'
     }
     elseif ($Mode -eq 'later-guide-failed-result') {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'This guide is no longer in your library.')
+        [void](Wait-Status 'This guide is no longer in your library.')
         $reader = Find-ById 'ReaderHeading'
         if ($reader -and -not $reader.Current.IsOffscreen) {
             throw 'A Reader opened after the later guide was removed.'
@@ -775,7 +1182,7 @@ try {
         $report.phases += 'later-guide-failed-without-opening-reader'
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
-        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        [void](Wait-Status 'Library ready.')
         $resume = Find-ById 'ResumeGuide'
         if ($resume -and -not $resume.Current.IsOffscreen) {
             throw 'A superseded guide became Resume after the later guide failed.'
@@ -784,19 +1191,19 @@ try {
     }
     elseif ($Mode -eq 'reader-render-error-observed') {
         [void](Wait-Name 'ReaderBackToGame' 'Back to game')
-        [void](Wait-Name 'ShellStatus' `
+        [void](Wait-Status `
             'Could not load this view: Stored guide format is invalid.')
         $report.phases += 'reader-render-read-failed-on-reader-route'
     }
     elseif ($Mode -eq 'reader-render-error-result') {
-        [void](Wait-Name 'ShellStatus' `
+        [void](Wait-Status `
             'Could not load this view: Stored guide format is invalid.')
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
-        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        [void](Wait-Status 'Library ready.')
         $resume = Find-ById 'ResumeGuide'
         if ($resume -and -not $resume.Current.IsOffscreen) {
             throw 'A guide whose Reader failed to render became Resume.'
@@ -815,7 +1222,7 @@ try {
         if ($commands -and -not $commands.Current.IsOffscreen) {
             throw 'The preview reader exposed commands without an adapter.'
         }
-        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        [void](Wait-Status 'Guide details ready.')
         Wait-PaneState 'Navigation pane closed'
         $report.readerScreenshot = Save-WindowScreenshot 'reader'
         $report.phases += 'resume-reader'
@@ -828,9 +1235,9 @@ try {
         $report.phases += 'reader-pane-toggle'
 
         $readerBack = Wait-Name 'ReaderBackToGame' 'Back to game'
-        Click-Element $readerBack
+        Invoke-Element $readerBack
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         [void](Wait-SelectedGuide $ExpectedResumeGuide)
         Wait-FocusedGuide $ExpectedResumeGuide
         $report.phases += 'reader-back-game'
@@ -839,27 +1246,30 @@ try {
         $report.gameScreenshot = Save-WindowScreenshot 'game'
         Invoke-Element $openSelected
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
-        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        [void](Wait-Status 'Guide details ready.')
         $report.phases += 'uia-reopen-selected-guide'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Status 'Game ready.')
         [void](Wait-SelectedGuide $ExpectedResumeGuide)
         Wait-FocusedGuide $ExpectedResumeGuide
 
         Click-Element (Wait-SelectedGuide $ExpectedResumeGuide)
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
-        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        [void](Wait-Status 'Guide details ready.')
         $report.phases += 'pointer-reopen-selected-guide'
         Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Status 'Game ready.')
         [void](Wait-SelectedGuide $ExpectedResumeGuide)
         Wait-FocusedGuide $ExpectedResumeGuide
         Activate-SelectedGuide $ExpectedResumeGuide
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
-        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        [void](Wait-Status 'Guide details ready.')
         $report.phases += 'keyboard-reopen-selected-guide'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Status 'Game ready.')
         [void](Wait-SelectedGuide $ExpectedResumeGuide)
         Wait-FocusedGuide $ExpectedResumeGuide
         $otherGuide = if ($ExpectedResumeGuide -eq 'Route Test Guide') {
@@ -871,85 +1281,85 @@ try {
         Focus-OtherGuideWithoutSelection $ExpectedResumeGuide $otherGuide
         [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
         [void](Wait-Name 'ReaderHeading' $otherGuide)
-        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        [void](Wait-Status 'Guide details ready.')
         $report.phases += 'focused-guide-enter'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         Open-GuideFromGame $ExpectedResumeGuide
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
-        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        [void](Wait-Status 'Guide details ready.')
         $report.phases += 'restore-route-guide'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
-        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        [void](Wait-Status 'Library ready.')
         $report.phases += 'game-back-library'
 
         Click-Element (Wait-GameRow 'Route Test Game')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         Click-Element (Wait-GuideRow 'Route Test Guide')
         [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
-        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        [void](Wait-Status 'Guide details ready.')
         Click-Element (Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         $report.phases += 'pointer-library-game-reader-game'
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
-        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        [void](Wait-Status 'Library ready.')
 
         Press-Enter (Wait-GameRow 'Route Test Game')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         Press-Enter (Wait-GuideRow 'Route Test Guide')
         [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
-        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        [void](Wait-Status 'Guide details ready.')
         Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         $report.phases += 'keyboard-library-game-reader-game'
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
-        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        [void](Wait-Status 'Library ready.')
 
         Select-Element 'Settings'
         [void](Wait-Name 'SettingsHeading' 'Settings')
         $report.phases += 'settings'
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
-        [void](Wait-Name 'ShellStatus' 'Library ready.')
+        [void](Wait-Status 'Library ready.')
         $report.phases += 'settings-back-library'
 
         Press-Enter (Wait-GameRow 'Route Test Game')
         Select-Element 'Settings'
         [void](Wait-Name 'SettingsHeading' 'Settings')
-        [void](Wait-Name 'ShellStatus' 'Settings ready.')
+        [void](Wait-Status 'Settings ready.')
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         $report.phases += 'rapid-game-settings-back-game'
 
         $rapidGuide = Select-DifferentGuideFromGame
         Select-Element 'Settings'
         [void](Wait-Name 'SettingsHeading' 'Settings')
-        [void](Wait-Name 'ShellStatus' 'Settings ready.')
+        [void](Wait-Status 'Settings ready.')
         Go-Back
         [void](Wait-Name 'ReaderHeading' $rapidGuide)
-        [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+        [void](Wait-Status 'Guide details ready.')
         $report.phases += 'rapid-guide-settings-back-reader'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Name 'ShellStatus' 'Game ready.')
+        [void](Wait-Status 'Game ready.')
         $report.phases += 'library-game-reader-game'
         if ($rapidGuide -ne 'Route Test Guide') {
             Open-GuideFromGame 'Route Test Guide'
             [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
-            [void](Wait-Name 'ShellStatus' 'Guide details ready.')
+            [void](Wait-Status 'Guide details ready.')
             Go-Back
             [void](Wait-Name 'GameHeading' 'Route Test Game')
-            [void](Wait-Name 'ShellStatus' 'Game ready.')
+            [void](Wait-Status 'Game ready.')
             $report.phases += 'restore-last-guide-for-relaunch'
         }
     }

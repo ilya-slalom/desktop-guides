@@ -1056,3 +1056,133 @@ the passing rerun checked the actual `LocalState\library\library.sqlite`.
 T17.1 still requires the final public Name and certificate Subject, protected
 public signing integration, and an upgrade of public candidate versions.
 The user-deferred runtime-free VM and Windows 10 checks remain T17.3 gates.
+
+## M2 T11.4 design language — implementation check, 28 September 2026
+
+T11.4 adds app-level semantic resources for theme colors, spacing, shape,
+typography, surfaces, lists, buttons, and status presentation. Library, Game,
+Reader, Settings, the game editor, and the reader toolbar consume those
+resources. The representative routes use responsive page padding, bounded
+metadata, native WinUI heading semantics, directed empty states, a native
+`TitleBar`, a Mica system backdrop, and full-width shell content. Routine
+ready messages use a top `InfoBar` and close after three seconds; loading
+remains visible until replaced, and warnings/errors remain dismissible. The
+[design plan](t11-design-language-plan.md) records the chosen quiet field-guide
+direction and the WinUI Gallery revision and component inventory. A follow-up
+pins MIT-licensed
+`CommunityToolkit.WinUI.Controls.SettingsControls` `8.2.251219` and replaces
+the representative local-storage surface with an adaptive Toolkit
+`SettingsCard`; Windows App SDK remains `2.5.1`.
+
+On the Windows 11 x64 host at `E:\work\desktop-guides`, 73/73 Core tests,
+90/90 Infrastructure tests, and all seven PowerShell harness checks passed.
+Fresh Release production packages built for x64 and ARM64. The x64 package
+SHA-256 was
+`DCA67246134FF1BD305B6AFEA3B8B40B2C25D92AA8A0C09B0D5266EFD9811C14`;
+the ARM64 package SHA-256 was
+`6C3B7C01635552A8446B9B91A8BE63256C4C96F295A4C9EC23E6E2FF0B5DA8BE`.
+The host's missing optional `mspdbcmf.exe` produced only the existing
+symbols-package warning.
+
+The final interactive signed-install run passed the complete existing shell
+regression and all four design-language modes. Each mode checked Library,
+Game, Reader, and Settings at wide and narrow widths, semantic headings,
+focus, UIA names, title-bar Back and pane actions, full-width bounds, automatic
+routine-status dismissal, the Toolkit Settings-card name and bounds, long
+metadata, and control overlap. Light and dark screenshot luminance measured
+238.56 and 39.74. That run also passed a high-contrast mode, which changed
+flags `126` to `127` with `High Contrast Black` and restored them; the window
+materials follow-up below moves high contrast to T16.2. The original
+light-app preference was also restored.
+The package, package profile, temporary certificate trust, and scheduled
+tasks were absent after cleanup.
+
+The exact-source final run passed every shell and design phase. Shell
+automation reads a sequenced status marker from the raw UI Automation view
+rather than requiring the transient user-facing `InfoBar` to remain visible
+or exposing a dismissed message through normal accessibility views.
+
+The linked reader-toolbar package includes the shared design token dictionary
+and retains the native command label position so wide layouts keep `Zoom in`
+visible. Its installed Windows run passed overlap ownership, simulated timeout
+cleanup, all toolbar commands, and the 31-second delayed install/receipt path.
+
+The run used the host's current 96 DPI / 100% display scale. The user deferred
+200% display-scaling verification to T16.2. Windows 10 and installed ARM64
+behavior also remain unverified; the local ARM64 result is a package build
+only.
+
+### Window materials follow-up
+
+User review asked for a seamless backdrop, a working dark Acrylic, and dialogs
+that match the window. The window backdrop now runs unbroken behind the title
+bar, navigation pane, and route background, because the `NavigationView`
+content layer and its border are transparent. A Settings `Window background`
+card stores Mica (default), Acrylic, or Solid in SQLite `AppSettings` through
+an atomic read-modify-write; unsupported materials fall back to Solid with a
+warning. Acrylic uses the Base `DesktopAcrylicBackdrop` with the default
+system backdrop configuration, so it follows the app theme and turns solid
+while the window is inactive. The reader page uses the opaque
+`SolidBackgroundFillColorQuarternaryBrush`. In Acrylic mode, `ContentDialog`
+uses in-app acrylic; in Mica and Solid it keeps the default dialog.
+
+Earlier material evidence was captured without translucency. From `279dfe1`
+to `8bc7e5d`, the harness recreated the `Personalize` registry key when it
+switched the app theme, which deleted the host's transparency setting and its
+other values. Those screenshots showed backdrop fallback colors, so they did
+not prove that Mica or Acrylic let the desktop through. `8bc7e5d` fixed the
+harness; the runs below kept every `Personalize` value. With real translucency,
+Thin Acrylic in light theme over a dark window measured 2.4:1 for secondary
+text and 3.0:1 for body text, so Acrylic now uses Base acrylic.
+
+From a snapshot of `eec9782` on the same host, with transparency
+effects on: locked restores, 73/73 Core tests, 98/98 Infrastructure tests,
+and all nine PowerShell harness checks passed, and Release packages built for
+x64 and ARM64. The x64 package SHA-256 was
+`0E96D957ACE66139CB3F1FA960CED667E855D4A33BE6650E425C0E82C0E7100E`;
+the ARM64 package SHA-256 was
+`510FEAA3E4F40B874D5E473D4E1D24E770365B5802781A4BCED937C115C54FCB`.
+The full signed-install regression passed. It ran the system, light, and dark
+design-language modes and six material passes: light and dark × Solid,
+Acrylic, and Mica, plus a switch-and-relaunch check. A strip across the
+pane/content boundary had a channel range of 0 for Solid, so no seam was
+visible. Mica showed the wallpaper tint (light 249/241/235 and dark 35/31/28,
+against Solid 243 and 32). Acrylic measured 214 in light and 42 in dark. These
+checks cover the app code only: Acrylic fails only if it repeats the Solid
+fill within one level on every channel, which is what one of our layers
+covering the backdrop would show. Mica is not checked this way, because with
+transparency off Windows draws it in the Solid fill color. How Windows tints
+either material is recorded, not asserted.
+Light Acrylic text measured 5.46:1 for secondary text and 12.34:1 for body
+text. A 160×4 strip in the Acrylic edit-game command band showed the in-app
+acrylic noise (channel range 4, Solid 0); the check accepts that noise or the
+fallback color, because live in-app acrylic takes its tint from the content
+behind it. The report records the dialog difference for each theme.
+
+A second interactive run switched the Windows app theme while the app stayed
+open. Library luminance followed from 46 to 209 and back to 46, and with Edit
+game open from 41 to 168 and back to 41. With transparency effects turned off,
+Mica matched Solid and Acrylic showed its fallback color (249 light, 44 dark);
+the run then restored the setting. After each run, the package, certificate
+trust, and scheduled tasks were gone, and the `Personalize` values, the
+high-contrast flags (`126`), and the active `Custom.theme` were unchanged.
+On a snapshot of `fb3a393`, the reader-toolbar installed smoke passed all
+eight phases, including focus restoration after the page and find dialogs; its
+code and harness have not changed since.
+
+High contrast moves to T16.2: enabling it makes Windows rewrite the active
+theme to `Custom.theme`, which this harness cannot restore. Optional colorful
+icons from the MIT Fluent UI System Icons `*_color` set are T11.5; WinUI
+Gallery has no colored icon set.
+
+Selected installed evidence includes the
+[wide](evidence/t11-design-language/design-light.library-wide.png) and
+[narrow](evidence/t11-design-language/design-light.library-narrow.png) light
+Library, the [light Acrylic Library](evidence/t11-design-language/material-light-acrylic.library.png), [dark Acrylic Library](evidence/t11-design-language/material-dark-acrylic.library.png),
+[dark Acrylic Reader](evidence/t11-design-language/material-dark-acrylic.reader.png),
+[dark Acrylic Edit game](evidence/t11-design-language/material-dark-acrylic.edit-game.png),
+[light Solid Library](evidence/t11-design-language/material-light-solid.library.png),
+and the [Window background card](evidence/t11-design-language/material-light-mica.settings.png).
+The sanitized
+[result record](evidence/t11-design-language/windows-11-x64-result.json)
+lists every material pass and the package and screenshot hashes.

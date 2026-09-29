@@ -1,0 +1,533 @@
+{
+  "task": "T11.4",
+  "observedAt": "2026-09-28T16:41:58.7523582Z",
+  "status": "passed-with-deferred-scale-and-high-contrast",
+  "environment": {
+    "osBuild": "10.0.26200.0",
+    "cpuArchitecture": "AMD64",
+    "dotnetSdk": "10.0.401",
+    "windowsAppRuntime": [
+      "2.2.0.0",
+      "2.3.1.0",
+      "2.4.0.0",
+      "2.5.1.0"
+    ]
+  },
+  "sourceCommit": "eec9782",
+  "headlessChecks": {
+    "coreTests": {
+      "passed": 73,
+      "failed": 0
+    },
+    "infrastructureTests": {
+      "passed": 98,
+      "failed": 0
+    },
+    "powershellHarnessChecksPassed": 9,
+    "lockedRestoresPassed": true
+  },
+  "packages": {
+    "x64": {
+      "name": "DesktopGuides.Production_0.1.0.0_x64.msix",
+      "bytes": 66337763,
+      "sha256": "0E96D957ACE66139CB3F1FA960CED667E855D4A33BE6650E425C0E82C0E7100E",
+      "installedWorkflowPassed": true
+    },
+    "ARM64": {
+      "name": "DesktopGuides.Production_0.1.0.0_arm64.msix",
+      "bytes": 64393577,
+      "sha256": "510FEAA3E4F40B874D5E473D4E1D24E770365B5802781A4BCED937C115C54FCB",
+      "buildPassed": true,
+      "runtimeTested": false
+    }
+  },
+  "installedWorkflow": {
+    "success": true,
+    "signedPackageSha256": "33B959D2EBE46CCC2A36E59A0D2E81D4CDEC2CDC185D183C35F8F3582113D0B6",
+    "interactiveSessionId": 1,
+    "fullExistingShellRegressionPassed": true,
+    "designLanguage": {
+      "system": {
+        "success": true,
+        "windowDpi": 96,
+        "scalePercent": 100,
+        "phases": [
+          "library",
+          "library-wide-focus-and-heading",
+          "library-narrow",
+          "game-wide-full-width-metadata",
+          "game-narrow-long-title",
+          "reader-wide",
+          "reader-narrow",
+          "settings-narrow",
+          "settings-wide"
+        ]
+      },
+      "light": {
+        "success": true,
+        "windowDpi": 96,
+        "scalePercent": 100,
+        "phases": [
+          "library",
+          "library-wide-focus-and-heading",
+          "library-narrow",
+          "game-wide-full-width-metadata",
+          "game-narrow-long-title",
+          "reader-wide",
+          "reader-narrow",
+          "settings-narrow",
+          "settings-wide"
+        ]
+      },
+      "dark": {
+        "success": true,
+        "windowDpi": 96,
+        "scalePercent": 100,
+        "phases": [
+          "library",
+          "library-wide-focus-and-heading",
+          "library-narrow",
+          "game-wide-full-width-metadata",
+          "game-narrow-long-title",
+          "reader-wide",
+          "reader-narrow",
+          "settings-narrow",
+          "settings-wide"
+        ]
+      }
+    },
+    "themeLuminance": {
+      "light": 234.42,
+      "dark": 35.44
+    },
+    "windowMaterials": {
+      "thresholds": {
+        "solidStripMaxChannelRange": 2,
+        "acrylicFailsWhen": "the library strip repeats the Solid fill within 1 level on every channel (an app layer covers the backdrop); Mica is recorded only, since its transparency-off fallback equals the Solid fill",
+        "dialogStrip": "160x4 px, 8 px below the primary button",
+        "dialogAcrylicVisibleWhen": "mean difference from Solid > 2 (fallback color) or noise range at least 2 above Solid (live in-app acrylic)"
+      },
+      "passes": {
+        "light-Solid": {
+          "success": true,
+          "phases": [
+            "library",
+            "material-Solid-restored",
+            "material-Solid-captured"
+          ],
+          "libraryBounds": {
+            "windowLeft": 530,
+            "windowHeight": 720,
+            "contentLeft": 779
+          },
+          "libraryStrip": {
+            "meanR": 243,
+            "meanG": 243,
+            "meanB": 243,
+            "maxChannelRange": 0
+          },
+          "dialogBounds": {
+            "buttonLeft": 530,
+            "buttonBottom": 578
+          },
+          "dialogStrip": {
+            "meanR": 243,
+            "meanG": 243,
+            "meanB": 243,
+            "maxChannelRange": 0
+          }
+        },
+        "light-Acrylic": {
+          "success": true,
+          "phases": [
+            "library",
+            "material-Acrylic-restored",
+            "material-Acrylic-captured"
+          ],
+          "libraryBounds": {
+            "windowLeft": 530,
+            "windowHeight": 720,
+            "contentLeft": 779
+          },
+          "libraryStrip": {
+            "meanR": 214,
+            "meanG": 214,
+            "meanB": 214,
+            "maxChannelRange": 0
+          },
+          "dialogBounds": {
+            "buttonLeft": 530,
+            "buttonBottom": 578
+          },
+          "dialogStrip": {
+            "meanR": 244.87,
+            "meanG": 244.87,
+            "meanB": 244.87,
+            "maxChannelRange": 4
+          }
+        },
+        "light-Mica": {
+          "success": true,
+          "phases": [
+            "library",
+            "material-Mica-restored",
+            "material-Mica-captured"
+          ],
+          "libraryBounds": {
+            "windowLeft": 530,
+            "windowHeight": 720,
+            "contentLeft": 779
+          },
+          "libraryStrip": {
+            "meanR": 249,
+            "meanG": 241,
+            "meanB": 234.91,
+            "maxChannelRange": 1
+          },
+          "dialogBounds": {
+            "buttonLeft": 530,
+            "buttonBottom": 578
+          },
+          "dialogStrip": {
+            "meanR": 243,
+            "meanG": 243,
+            "meanB": 243,
+            "maxChannelRange": 0
+          }
+        },
+        "light-dialogDifference": {
+          "meanDifference": 1.87,
+          "rangeDifference": 4
+        },
+        "dark-Solid": {
+          "success": true,
+          "phases": [
+            "library",
+            "material-Solid-restored",
+            "material-Solid-captured"
+          ],
+          "libraryBounds": {
+            "windowLeft": 530,
+            "windowHeight": 720,
+            "contentLeft": 779
+          },
+          "libraryStrip": {
+            "meanR": 32,
+            "meanG": 32,
+            "meanB": 32,
+            "maxChannelRange": 0
+          },
+          "dialogBounds": {
+            "buttonLeft": 530,
+            "buttonBottom": 578
+          },
+          "dialogStrip": {
+            "meanR": 32,
+            "meanG": 32,
+            "meanB": 32,
+            "maxChannelRange": 0
+          }
+        },
+        "dark-Acrylic": {
+          "success": true,
+          "phases": [
+            "library",
+            "material-Acrylic-restored",
+            "material-Acrylic-captured"
+          ],
+          "libraryBounds": {
+            "windowLeft": 530,
+            "windowHeight": 720,
+            "contentLeft": 779
+          },
+          "libraryStrip": {
+            "meanR": 42,
+            "meanG": 42,
+            "meanB": 42,
+            "maxChannelRange": 0
+          },
+          "dialogBounds": {
+            "buttonLeft": 530,
+            "buttonBottom": 578
+          },
+          "dialogStrip": {
+            "meanR": 45.65,
+            "meanG": 45.65,
+            "meanB": 45.65,
+            "maxChannelRange": 4
+          }
+        },
+        "dark-Mica": {
+          "success": true,
+          "phases": [
+            "library",
+            "material-Mica-restored",
+            "material-Mica-captured"
+          ],
+          "libraryBounds": {
+            "windowLeft": 530,
+            "windowHeight": 720,
+            "contentLeft": 779
+          },
+          "libraryStrip": {
+            "meanR": 35,
+            "meanG": 31,
+            "meanB": 27.67,
+            "maxChannelRange": 1
+          },
+          "dialogBounds": {
+            "buttonLeft": 530,
+            "buttonBottom": 578
+          },
+          "dialogStrip": {
+            "meanR": 32,
+            "meanG": 32,
+            "meanB": 32,
+            "maxChannelRange": 0
+          }
+        },
+        "dark-dialogDifference": {
+          "meanDifference": 13.65,
+          "rangeDifference": 4
+        }
+      },
+      "switchAndRelaunch": {
+        "switched": {
+          "success": true,
+          "phases": [
+            "library",
+            "material-Mica-restored",
+            "material-switched-Acrylic",
+            "material-Acrylic-captured"
+          ]
+        },
+        "persisted": {
+          "success": true,
+          "phases": [
+            "library",
+            "material-Acrylic-restored",
+            "material-Acrylic-captured"
+          ]
+        }
+      },
+      "storedMaterialRestoredTo": "Mica",
+      "notes": [
+        "Captured with Windows transparency effects on. Mica shows the wallpaper tint (light 249/241/235, dark 35/31/28 against Solid 243 and 32).",
+        "Acrylic is Base desktop acrylic. Its tint depends on what Windows finds behind the window, so it is recorded, not asserted: in this run it measured 214 in light and 42 in dark (transparency-off fallback 249 and 44). The Acrylic edit-game command band showed in-app acrylic noise (range 4, Solid 0).",
+        "Light Acrylic text contrast over a dark window: secondary text 5.46:1, body text 12.34:1 (Thin acrylic measured 2.4:1 and 3.0:1 before the switch to Base)."
+      ],
+      "scope": "Checks cover app code only: reported effective material, our layers (seam, no Solid cover), the Acrylic dialog style, and persistence. Windows and WinUI rendering of Mica and Acrylic is not asserted."
+    },
+    "readerToolbarRegression": {
+      "success": true,
+      "packageSha256": "2877A33D4BA452CA533D3A0268AFFEFF4190647994C64943E7866DFA4A58921F",
+      "phases": [
+        "initial-no-session-capabilities",
+        "worker-capability-change-text-dispatch",
+        "page-dialog-restores-overflow-focus",
+        "find-dialog-restores-overflow-focus",
+        "all-capabilities-dispatch",
+        "narrow-primary-command-overflow",
+        "worker-capability-removal",
+        "detached-session-event-ignored"
+      ],
+      "installReceiptVerified": true
+    },
+    "highContrast": "deferred-to-T16.2",
+    "appTheme": {
+      "original": {
+        "path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+        "hasValue": true,
+        "value": 0
+      },
+      "restored": {
+        "path": "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+        "hasValue": true,
+        "value": 0
+      }
+    },
+    "cleanup": {
+      "packageStillInstalled": false,
+      "certificateStillTrusted": false,
+      "testScheduledTasksStillRegistered": false,
+      "hostHighContrastFlagsUnchanged": 126,
+      "hostActiveThemeUnchanged": "Custom.theme",
+      "hostPersonalizeValuesPreserved": {
+        "AppsUseLightTheme": 0,
+        "EnableTransparency": 1,
+        "ColorPrevalence": 0
+      }
+    },
+    "windowChrome": {
+      "nativeTitleBarBackAndPaneActionsPassed": true,
+      "fullWidthShellBoundsPassed": true,
+      "routineInfoBarAutoDismissSeconds": 3,
+      "routineInfoBarAutoDismissPassed": true,
+      "persistentAutomationStatusPassed": true,
+      "persistentAutomationStatusAccessibilityView": "Raw",
+      "persistentAutomationStatusSequenced": true,
+      "settingsCardTopAlignmentReviewed": true,
+      "seamlessBackdropPassed": true
+    },
+    "transparencyChecks": {
+      "liveThemeSwitchLuminance": {
+        "library": [
+          46.32,
+          208.99,
+          46.47
+        ],
+        "editGameDialog": [
+          41.06,
+          168.11,
+          41.04
+        ]
+      },
+      "transparencyOffLibraryStrip": {
+        "light-Solid": 243,
+        "light-Mica": 243,
+        "light-Acrylic": 249,
+        "dark-Solid": 32,
+        "dark-Mica": 32,
+        "dark-Acrylic": 44
+      },
+      "hostTransparencyRestored": true
+    }
+  },
+  "screenshots": [
+    {
+      "file": "design-dark.library-narrow.png",
+      "bytes": 72883,
+      "sha256": "86324CE6394824B38231B2CC090CAE9EE41CBEE7BC0C80C6E0EB5EBF03F84BE1"
+    },
+    {
+      "file": "design-dark.library-wide.png",
+      "bytes": 129552,
+      "sha256": "34DD1F6BDC37CABF42C07FFDA2A2E215603326164D1DB3932624A134E7BDFFED"
+    },
+    {
+      "file": "design-light.library-narrow.png",
+      "bytes": 80705,
+      "sha256": "5D22A75A683BAA9AD9992621AF062B9879E4F850A7851C037F44E398979E3DFD"
+    },
+    {
+      "file": "design-light.library-wide.png",
+      "bytes": 134955,
+      "sha256": "43CE2402DAB8E85D72A9A275B08607D34FEE0F0E7AEB230EA728FD6F6E087C02"
+    },
+    {
+      "file": "material-dark-acrylic.edit-game.png",
+      "bytes": 217301,
+      "sha256": "8D9777E137589D80D5C2A7374F88751661F834914DCC2281AA13F9DC34B6119A"
+    },
+    {
+      "file": "material-dark-acrylic.library.png",
+      "bytes": 61122,
+      "sha256": "1F89041ADCB2F3A4356F2DCF3C16AEBB1E1B771966FD12F0469020CE266DE64D"
+    },
+    {
+      "file": "material-dark-acrylic.reader.png",
+      "bytes": 62292,
+      "sha256": "D4093DAA7E57FA1AE69E34DE56BC65C19A94D160A16C58F408CC5F682B5B2F72"
+    },
+    {
+      "file": "material-dark-mica.edit-game.png",
+      "bytes": 135799,
+      "sha256": "D2D69E6E1EF1D20E719C949AF0500E0F5B4D7E9B6785F1F80E53ADDCC5457C1E"
+    },
+    {
+      "file": "material-dark-mica.library.png",
+      "bytes": 130558,
+      "sha256": "A114B4B3CA1504420D7655D452C20803852F1B283BFA0919A5D7E3F3B4A3D63C"
+    },
+    {
+      "file": "material-dark-mica.reader.png",
+      "bytes": 87867,
+      "sha256": "C5A73D2E24E6387C29603E5EF1EE67D096402149CB477DD7C1A4AC3DC26BF18B"
+    },
+    {
+      "file": "material-dark-solid.edit-game.png",
+      "bytes": 104355,
+      "sha256": "ABAB0390587ABA8EDDE047DEAB580F643730F38C02B77548812325471EBFB849"
+    },
+    {
+      "file": "material-dark-solid.library.png",
+      "bytes": 61491,
+      "sha256": "D9E05CBB712E2EA399161D6A691C3E8C9291965584F9B7754B7C832BA485F5CB"
+    },
+    {
+      "file": "material-dark-solid.reader.png",
+      "bytes": 62303,
+      "sha256": "9949588B94DDF02B40D60B340765FD608EDA2FB34AEB579698C4DA463111CBDB"
+    },
+    {
+      "file": "material-light-acrylic.edit-game.png",
+      "bytes": 121557,
+      "sha256": "1179AFCE6223EBFD06443ABC471DAC6FC10DE5AE3D8251DCA90BBEFC4B25CD22"
+    },
+    {
+      "file": "material-light-acrylic.library.png",
+      "bytes": 61593,
+      "sha256": "DB331CB0FE2F15DE75A532B14E1479FFC2B23C193532726230199619C57A7E4C"
+    },
+    {
+      "file": "material-light-acrylic.reader.png",
+      "bytes": 64362,
+      "sha256": "DD5925061A2BC31CB85B3AF7252B4C9AF8EE626A784D4C0EE484FDF2D949B9CF"
+    },
+    {
+      "file": "material-light-mica.edit-game.png",
+      "bytes": 149749,
+      "sha256": "423808BA1C5DDB17955EF4F129875D740FA0FBC260B3E2045E710E66C85BC577"
+    },
+    {
+      "file": "material-light-mica.library.png",
+      "bytes": 134468,
+      "sha256": "97445C73D350D31019D545A8E97883DA29342920AF09D94C8642FC85D5F8E001"
+    },
+    {
+      "file": "material-light-mica.reader.png",
+      "bytes": 97094,
+      "sha256": "81A55230BC4D0BF97B9F35992C91E7BA39DF82D9531A47B3693C4BC877A031A0"
+    },
+    {
+      "file": "material-light-mica.settings.png",
+      "bytes": 130925,
+      "sha256": "4AE9E4E254592C2CFE1D78E5128A352E6E0E73BC3181A031C284F32DA057D674"
+    },
+    {
+      "file": "material-light-solid.edit-game.png",
+      "bytes": 110113,
+      "sha256": "27F22BE7800CDA4C5B4143F682A979F8AE241BBEA8D451966EC05CF668EB1A45"
+    },
+    {
+      "file": "material-light-solid.library.png",
+      "bytes": 61583,
+      "sha256": "ACAF7DA7F643C095C324A1A9E940DCB5F1A1CAAAE378CB10F82659D92985D837"
+    },
+    {
+      "file": "material-light-solid.reader.png",
+      "bytes": 64323,
+      "sha256": "869E5AB461452FB3C55AFA4CD3BF56D179CD047496AFB3ECD629708DB40B5D4E"
+    }
+  ],
+  "deferred": {
+    "displayScaling": "200% testing deferred by the user; this run used 96 DPI / 100%.",
+    "highContrast": "Deferred to T16.2: enabling it makes Windows rewrite the active theme to Custom.theme, which the harness cannot restore.",
+    "colorfulIcons": "T11.5.",
+    "windows10Runtime": "Deferred.",
+    "ARM64InstalledWorkflow": "Deferred; package build only in this local run."
+  },
+  "toolkit": {
+    "windowsAppSdk": "2.5.1",
+    "package": "CommunityToolkit.WinUI.Controls.SettingsControls",
+    "version": "8.2.251219",
+    "component": "SettingsCard",
+    "installedUiaNameAndBoundsPassed": true
+  },
+  "verificationNotes": [
+    "The exact-source installed run passed the complete existing shell regression, the system/light/dark design-language modes, and all six window-material passes plus switch-and-relaunch, with Windows transparency effects on.",
+    "Routine ready notifications auto-dismiss visually while the shell retains a sequenced marker in the raw UI Automation view for deterministic installed checks.",
+    "The window backdrop runs unbroken behind the title bar, pane, and route background. Mica is the default; Settings offers Mica, Acrylic, or Solid. In Acrylic mode, ContentDialog uses in-app acrylic; transient flyouts keep their default acrylic.",
+    "Earlier runs (from 279dfe1 to 8bc7e5d) recreated the Personalize registry key when switching the app theme, which deleted the host transparency setting; their screenshots showed backdrop fallback colors. 8bc7e5d fixed the harness, and this run kept every Personalize value."
+  ]
+}

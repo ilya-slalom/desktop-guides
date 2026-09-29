@@ -6,25 +6,28 @@
     CloseButtonText="Cancel"
     DefaultButton="Primary"
     AutomationProperties.AutomationId="GameEditorDialog">
-    <StackPanel MaxWidth="420" Spacing="14">
-        <StackPanel Spacing="4">
+    <StackPanel MaxWidth="440"
+                Spacing="{StaticResource DesktopGuidesSpacing16}">
+        <StackPanel Spacing="{StaticResource DesktopGuidesSpacing4}">
             <TextBox x:Name="GameTitleInput"
                      Header="Title"
                      TextChanged="InputChanged"
                      AutomationProperties.AutomationId="GameTitleInput" />
             <TextBlock x:Name="TitleFeedback"
+                       Style="{StaticResource DesktopGuidesMetadataStyle}"
                        AutomationProperties.AutomationId="GameTitleFeedback"
                        AutomationProperties.LiveSetting="Polite" />
         </StackPanel>
-        <StackPanel Spacing="4">
+        <StackPanel Spacing="{StaticResource DesktopGuidesSpacing4}">
             <TextBox x:Name="GamePlatformInput"
                      Header="Platform (optional)"
                      TextChanged="InputChanged"
                      AutomationProperties.AutomationId="GamePlatformInput" />
             <TextBlock x:Name="PlatformFeedback"
+                       Style="{StaticResource DesktopGuidesMetadataStyle}"
                        AutomationProperties.AutomationId="GamePlatformFeedback" />
         </StackPanel>
-        <StackPanel Spacing="4">
+        <StackPanel Spacing="{StaticResource DesktopGuidesSpacing4}">
             <TextBox x:Name="GameNotesInput"
                      Header="Notes (optional)"
                      AcceptsReturn="True"
@@ -33,6 +36,7 @@
                      TextChanged="InputChanged"
                      AutomationProperties.AutomationId="GameNotesInput" />
             <TextBlock x:Name="NotesFeedback"
+                       Style="{StaticResource DesktopGuidesMetadataStyle}"
                        AutomationProperties.AutomationId="GameNotesFeedback" />
         </StackPanel>
         <InfoBar x:Name="SaveError"

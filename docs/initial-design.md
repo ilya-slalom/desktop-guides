@@ -31,7 +31,7 @@ This design assumes:
 | --- | --- | --- |
 | [Pocket Codex](https://www.pocketcodex.app/) | Focused offline TXT, HTML, and PDF reading; several guides per game; automatic per-guide resume; optional sync | Use the reading and library model for the first release. Revisit sync after local storage and conflict rules are proven. |
 | [Pixel Guide](https://github.com/rexmont/Pixel-Guide-Android) ([feature summary](https://pixelguide.app/)) | TXT reflow, tables of contents, in-guide search, reader themes, PDF fit-to-width, local HTML, controller use, maps/manuals, and online sources | Include fit-to-width PDF and core reader controls first. Add richer navigation and formats in stages. Do not copy Android-specific UI or integrations. |
-| [WinUI Gallery](https://github.com/microsoft/WinUI-Gallery) | First-party WinUI 3 controls, Fluent styles, interaction guidance, and XAML examples | Use a version-compatible Gallery release as a design and component reference. Prefer built-in WinUI controls and theme resources; adapt examples to Desktop Guides rather than copying the Gallery shell or taking a runtime dependency on the sample app. |
+| [WinUI Gallery](https://github.com/microsoft/WinUI-Gallery) | First-party WinUI 3 controls, Fluent styles, interaction guidance, XAML examples, and selected Windows Community Toolkit controls | Use a version-compatible Gallery release as a design and component reference. Prefer built-in WinUI controls and theme resources, and add stable Toolkit packages when a recorded task benefits from their behavior. Adapt examples to Desktop Guides rather than copying the Gallery shell or taking a runtime dependency on the sample app. |
 
 Pocket Codex and Pixel Guide describe product behavior; WinUI Gallery is an
 implementation reference. None requires reusing its application code or
@@ -82,7 +82,13 @@ Use Segoe UI Variable with the system UI font fallback, system accent and theme
 resources, left-aligned hierarchy, and compact Windows-native controls. Use
 cards where artwork or a group boundary carries meaning; use flat rows and
 separators for dense guide lists instead of placing every item in an identical
-rounded container.
+rounded container. The shell uses the native WinUI `TitleBar`, `AppWindow`
+lifecycle APIs, and a Mica system backdrop. Route panels fill the available
+window width; individual readers may constrain text measure when that improves
+legibility. Routine status messages appear in a transient `InfoBar`, while
+warnings and actionable errors remain dismissible. Acrylic is also an
+optional full-window material chosen in Settings; transient flyouts keep their
+default acrylic, and reading surfaces stay opaque.
 
 Opening a guide shows a reader with a compact top bar (game and guide title,
 back, appearance controls, and `Mark complete`) and a collapsible navigation

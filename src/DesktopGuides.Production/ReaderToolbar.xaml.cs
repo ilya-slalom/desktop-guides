@@ -1,4 +1,6 @@
+using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Reading;
+using DesktopGuides.Production.Materials;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -16,6 +18,8 @@ public sealed partial class ReaderToolbar : UserControl
     }
 
     public event Action<string>? CommandFailed;
+
+    internal WindowMaterial DialogMaterial { get; set; } = WindowMaterial.Mica;
 
     public void SetSession(IReaderSession? value)
     {
@@ -131,6 +135,7 @@ public sealed partial class ReaderToolbar : UserControl
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = XamlRoot
         };
+        DialogSurface.Apply(dialog, DialogMaterial);
         dialog.Opened += (_, _) => input.Focus(FocusState.Programmatic);
         try
         {

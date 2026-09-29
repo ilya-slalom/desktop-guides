@@ -56,6 +56,22 @@ if (args.Length == 4 &&
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "set-material")
+{
+    if (!Enum.TryParse(args[2], false, out WindowMaterial material) ||
+        !Enum.IsDefined(material) || material.ToString() != args[2])
+    {
+        Console.Error.WriteLine("Material must be Mica, Acrylic, or Solid.");
+        return 2;
+    }
+    await using SqliteLibraryRepository materialRepository =
+        new(new ManagedPathResolver(args[1]));
+    await materialRepository.InitializeAsync();
+    await materialRepository.UpdateSettingsAsync(
+        settings => settings with { WindowMaterial = material });
+    return 0;
+}
+
 if (args.Length == 2 && args[0] == "invalidate-blocked-guide")
 {
     ManagedPathResolver fixturePaths = new(args[1]);
@@ -151,10 +167,12 @@ if (args.Length == 2 &&
 }
 
 if (args.Length != 2 ||
-    args[0] is not ("seed" or "stale" or "seed-long" or "seed-second"))
+    args[0] is not ("seed" or "stale" or "seed-long" or "seed-second" or
+        "seed-design"))
 {
     Console.Error.WriteLine(
-        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second <app-data-root> " +
+        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design " +
+        "<app-data-root> " +
         "or invalidate-blocked-guide <app-data-root> " +
         "or corrupt-reader-guide|restore-reader-guide <app-data-root> " +
         "or hold-write-lock|hold-read-lock <app-data-root> <ready-path> <release-path>");
@@ -209,6 +227,33 @@ if (args[0] == "seed-second")
         DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
     Console.WriteLine(
         $"Seeded second game {secondGame.Id:N} and guide {secondGuideId:N}.");
+    return 0;
+}
+
+if (args[0] == "seed-design")
+{
+    Game designGame = await repository.AddGameAsync(
+        "The Legend of Zelda: Tears of the Kingdom",
+        "Nintendo Switch",
+        "Keep the main story, shrine routes, and armor upgrades together " +
+        "for quick reference while playing.");
+    Guid walkthroughId = Guid.NewGuid();
+    long designTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    foreach ((Guid guideId, string title) in new[]
+             {
+                 (walkthroughId, "Complete Story Walkthrough"),
+                 (Guid.NewGuid(), "Shrine and Lightroot Checklist"),
+                 (Guid.NewGuid(), "Armor Upgrade Materials")
+             })
+    {
+        await InsertGuideAsync(
+            paths, designGame.Id, guideId, title, designTimestamp);
+    }
+    AppSettings designSettings = await repository.GetSettingsAsync();
+    await repository.SaveSettingsAsync(
+        designSettings with { LastActiveGuideId = walkthroughId });
+    Console.WriteLine(
+        $"Seeded design-language game {designGame.Id:N} and three guides.");
     return 0;
 }
 

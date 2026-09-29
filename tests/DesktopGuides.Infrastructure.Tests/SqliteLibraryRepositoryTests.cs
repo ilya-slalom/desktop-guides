@@ -574,6 +574,111 @@ public sealed class SqliteLibraryRepositoryTests
         Assert.Empty(Directory.GetFiles(directory.Paths.RecoveryRoot));
     }
 
+    [Fact]
+    public async Task PersistsWindowMaterialAcrossReopen()
+    {
+        using TestLibrary directory = new();
+        await using (SqliteLibraryRepository repository = new(directory.Paths))
+        {
+            await repository.InitializeAsync();
+            Assert.Equal(WindowMaterial.Mica, (await repository.GetSettingsAsync()).WindowMaterial);
+            await repository.SaveSettingsAsync(
+                new AppSettings(ThemePreference.System, null, WindowMaterial.Acrylic));
+        }
+
+        await using SqliteLibraryRepository reopened = new(directory.Paths);
+        await reopened.InitializeAsync();
+        Assert.Equal(
+            new AppSettings(ThemePreference.System, null, WindowMaterial.Acrylic),
+            await reopened.GetSettingsAsync());
+    }
+
+    [Theory]
+    [InlineData("Glass")]
+    [InlineData("acrylic")]
+    [InlineData("1")]
+    public async Task ReadsUnknownStoredWindowMaterialAsMica(string value)
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        using (SqliteCommand command = connection.CreateCommand())
+        {
+            command.CommandText = "INSERT INTO Settings (Key, Value) VALUES ('WindowMaterial', $value)";
+            command.Parameters.AddWithValue("$value", value);
+            command.ExecuteNonQuery();
+        }
+
+        // A newer build may store a material this one does not know; the next save replaces it.
+        Assert.Equal(WindowMaterial.Mica, (await repository.GetSettingsAsync()).WindowMaterial);
+        await repository.UpdateSettingsAsync(s => s with { WindowMaterial = WindowMaterial.Solid });
+        Assert.Equal(WindowMaterial.Solid, (await repository.GetSettingsAsync()).WindowMaterial);
+    }
+
+    [Fact]
+    public async Task RejectsUndefinedWindowMaterialOnSave()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => repository.SaveSettingsAsync(
+            new AppSettings(ThemePreference.System, null, (WindowMaterial)42)));
+    }
+
+    [Fact]
+    public async Task ConcurrentSettingsUpdatesKeepBothChanges()
+    {
+        using TestLibrary directory = new();
+        Guid guide = Guid.NewGuid();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+
+        Task<AppSettings>[] updates = Enumerable.Range(0, 20)
+            .Select(i => i % 2 == 0
+                ? repository.UpdateSettingsAsync(s => s with { WindowMaterial = WindowMaterial.Solid })
+                : repository.UpdateSettingsAsync(s => s with { LastActiveGuideId = guide }))
+            .ToArray();
+        await Task.WhenAll(updates);
+
+        Assert.Equal(
+            new AppSettings(ThemePreference.System, guide, WindowMaterial.Solid),
+            await repository.GetSettingsAsync());
+    }
+
+    [Fact]
+    public async Task UpdateSettingsRejectsUndefinedValuesWithoutWriting()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        await repository.SaveSettingsAsync(
+            new AppSettings(ThemePreference.Dark, null, WindowMaterial.Acrylic));
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            repository.UpdateSettingsAsync(s => s with { WindowMaterial = (WindowMaterial)42 }));
+
+        Assert.Equal(
+            new AppSettings(ThemePreference.Dark, null, WindowMaterial.Acrylic),
+            await repository.GetSettingsAsync());
+    }
+
+    [Fact]
+    public async Task IgnoresUnknownSettingsKeysFromOtherVersions()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        using (SqliteCommand command = connection.CreateCommand())
+        {
+            command.CommandText = "INSERT INTO Settings (Key, Value) VALUES ('FutureSetting', 'x')";
+            command.ExecuteNonQuery();
+        }
+
+        Assert.Equal(new AppSettings(ThemePreference.System, null), await repository.GetSettingsAsync());
+    }
+
     private static void InsertGuide(
         string databasePath, Guid guideId, Guid gameId, string? managedRoot = null)
     {

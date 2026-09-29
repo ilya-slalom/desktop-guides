@@ -149,7 +149,11 @@ of affected guides and requires confirmation.
   prevent an accidental duplicate provider ID, and retain T04.1 as the manual
   fallback. Provider cancellation, timeout, unavailable service, malformed
   data, and artwork failure leave no partial game or files. Do not embed a
-  confidential provider secret in the Windows client.
+  confidential provider secret in the Windows client. Use the stable Toolkit
+  `MetadataControl` for compact edition/provider facts when its accessible
+  flattened text remains sufficient; keep query submission and cancel
+  explicit with native controls rather than issuing provider requests from
+  suggestion keystrokes.
 - **TR04.1** Game removal deletes its guide metadata, reading state, reader
   preferences, provider link/snapshot, cached artwork, and managed guide
   content as one recoverable operation.
@@ -175,6 +179,8 @@ guides without requiring network access. Empty, loading, unavailable-artwork,
 and no-result states use the same interaction language as Add game and import.
 
 - **T05.1** Implement sorted game list/grid and guide cards or rows in WinUI 3.
+  Reuse the Toolkit `MetadataControl` for short platform, source, format, and
+  reading-state facts while keeping the surrounding item virtualizable.
 - **T05.2** Add library title search and empty, loading, and no-result states.
 - **T05.3** Keep query, selection, and navigation stable on Back and when a
   game or guide is edited.
@@ -182,7 +188,8 @@ and no-result states use the same interaction language as Add game and import.
   the T04.4 provider flow using reviewed, version-compatible WinUI Gallery
   patterns. Cover artwork/result items, metadata groups, progress and status
   surfaces, and empty/loading/error states without wrapping standard controls
-  when a style or data template is sufficient.
+  when a style or data template is sufficient. Lock the stable Toolkit
+  `MetadataControl` package here if T04.4 has not already introduced it.
 - **TR05.1** Search compares titles case-insensitively and does not open or
   parse guide content.
 - **TR05.2** An unread guide has an explicit `Not started` display rather than
@@ -202,6 +209,9 @@ asset warnings. Canceling or failing import leaves no visible guide or managed
 files. A successful guide opens after the original file is moved or deleted.
 
 - **T06.1** Add file picker and import preview scoped to the selected game.
+  Use Toolkit `HeaderedContentControl` for repeated file-details and warning
+  groups when it improves heading association; retain native `InfoBar`,
+  progress, picker, and confirmation controls.
 - **T06.2** Validate supported format and readability; provide a TXT encoding
   choice when automatic detection is uncertain.
 - **T06.3** Copy into an isolated staging directory, fingerprint content, then
@@ -329,7 +339,20 @@ Desktop Guides identity.
   WinUI resource dictionaries, type and spacing scales, surface and state
   roles, icon and copy rules, and representative responsive layouts. Record a
   version-compatible WinUI Gallery component inventory and adoption rules
-  before new provider and catalog UI is built.
+  before new provider and catalog UI is built. Introduce the stable Toolkit
+  `SettingsCard` for the representative Settings surface. Use the native
+  WinUI `TitleBar`, `AppWindow` lifecycle integration, a seamless window
+  backdrop with a Mica (default), Acrylic, or Solid setting and matching
+  dialogs, and transient `InfoBar`; route panels fill the available content
+  width without a shell-level maximum. Verify these behaviors in the signed
+  installed shell. High contrast moves to T16.2.
+- **T11.5** Add an optional Settings "Colorful icons" toggle that swaps
+  navigation and route icons for Fluent UI System Icons `*_color` SVGs (MIT),
+  packaged as assets and shown through `ImageIcon`. Monochrome Segoe Fluent
+  icons stay the default and are always used in high contrast. Verify the icon
+  set, license notice, asset size, theme and high-contrast screenshots, and UIA
+  names. WinUI Gallery has no colored icon set, so this uses the external
+  library.
 - **TR11.1** The shell does not inspect format-specific controls to read or
   save position.
 - **TR11.2** Disabled or unsupported actions are absent or clearly unavailable,
@@ -337,7 +360,9 @@ Desktop Guides identity.
 - **TR11.3** Production UI uses shared semantic resources and native theme
   brushes rather than duplicated page-local values. Gallery-derived code is
   adapted to the locked Windows App SDK, retains keyboard/focus/UIA behavior,
-  and introduces no dependency on the Gallery sample application.
+  and introduces no dependency on the Gallery sample application. Routine
+  status surfaces clear automatically, while progress, warning, and error
+  states remain available for as long as the user needs them.
 
 ### S12 — Resume each guide independently
 
@@ -372,7 +397,10 @@ losing my place. **Traces:** R6. **Depends on:** S03, S05, S12.
 immediately. Returning to in progress preserves the saved locator. Reaching
 the final page does not silently mark the guide complete.
 
-- **T13.1** Add completion actions to guide detail and reader views.
+- **T13.1** Add completion actions to guide detail and reader views. Use a
+  Toolkit `Segmented` control for the bounded `In progress` / `Complete`
+  choice when UI Automation exposes the selected state correctly; otherwise
+  retain equivalent native radio buttons.
 - **T13.2** Store completion time separately from reading location and
   percentage.
 - **TR13.1** Completion status is derived from an explicit user action, not
@@ -391,12 +419,16 @@ and shared Settings components without breaking TXT whitespace, HTML offline
 behavior, or high-contrast system colors.
 
 - **T14.1** Add per-guide TXT/HTML font-size controls and saved preferences.
-- **T14.2** Add global theme setting with a Windows theme default.
+- **T14.2** Add global theme setting with a Windows theme default. Present the
+  bounded `System` / `Light` / `Dark` choice with Toolkit `Segmented`, with an
+  accessible native-radio fallback if installed testing finds a regression.
 - **T14.3** Recheck location restoration after changing appearance.
 - **T14.4** Apply the shared design language to reader and Settings surfaces
   after their functional controls exist. Adopt suitable Gallery command,
-  settings, teaching, and status patterns; justify and lock any Windows
-  Community Toolkit dependency before using a Toolkit-only component.
+  settings, teaching, and status patterns. Use Toolkit `SettingsCard` and
+  `SettingsExpander` for settings rows/groups and the T14.2 `Segmented`
+  appearance choice; justify and centrally lock each Toolkit package before
+  use.
 - **TR14.1** Reader preferences are keyed by guide ID and have a bounded,
   accessible size range.
 - **TR14.2** Theme CSS or assets do not require a remote resource.
@@ -438,7 +470,10 @@ reader, and the UI remains usable with Windows scaling and high contrast.
 - **T16.1** Map and document `Ctrl+O`, library `Ctrl+F`, `Esc`, and page
   navigation; keep every shortcut action in the visible UI.
 - **T16.2** Audit keyboard order, focus restoration, AutomationProperties,
-  touch target size, DPI scaling, and high contrast.
+  touch target size, DPI scaling, and high contrast, after T11.5. Run the
+  high-contrast pass deferred from T11.4: before enabling high contrast, save
+  the active `.theme` path and wallpaper, and restore them exactly afterward,
+  or run in a disposable Windows profile or VM.
 - **T16.3** Record PDF document-text access behavior from the chosen engine
   and provide an accurate user-facing limitation if needed.
 - **TR16.1** No essential flow depends on hover or a keyboard-only gesture.
@@ -484,7 +519,10 @@ library and points to Export in Settings.
 - **T20.1** Define a versioned manifest and archive of a consistent SQLite
   snapshot and managed guide files.
 - **T20.2** Build export, validation, and restore flows with cancel/replace
-  conflict handling.
+  conflict handling. Place Export and Restore actions in Toolkit
+  `SettingsCard` rows and group advanced restore details in
+  `SettingsExpander`; destructive replacement still uses a native
+  confirmation dialog.
 - **TR20.1** Restore validates checksums, paths, guide references, and provider
   artwork references in staging before modifying the active library.
 - **TR20.2** The export includes no credentials, transient WebView2 data, or
@@ -504,7 +542,9 @@ sections form a usable table of contents when available.
 - **T18.1** Add TXT search over normalized text and HTML search over permitted
   DOM text.
 - **T18.2** Add HTML heading/anchor collection and conservative TXT section
-  heuristics with manual fallback when no TOC is found.
+  heuristics with manual fallback when no TOC is found. Use a native
+  `TreeView` for the table of contents and Toolkit `GridSplitter` only when
+  the optional reader pane is user-resizable.
 - **TR18.1** Search and TOC controls appear only where supported; failures to
   detect sections do not block ordinary scrolling.
 
@@ -519,7 +559,8 @@ a clear way back to the original formatting.
 
 - **T19.1** Add guide-scoped bookmark records and reader navigation.
 - **T19.2** Build opt-in TXT paragraph detection and reflow with a persistent
-  preformatted fallback.
+  preformatted fallback. Use Toolkit `Segmented` for the bounded
+  `Original` / `Reflow` view choice.
 - **TR19.1** Reflow never modifies imported source bytes or the canonical
   normalized-text locator.
 
@@ -551,7 +592,10 @@ readable offline.
 
 - **T22.1** Review one source at a time for API/usage terms and attribution.
 - **T22.2** Build source adapter, preview, download/capture, and import through
-  the existing staging pipeline.
+  the existing staging pipeline. Consider Toolkit `RichSuggestBox` only for a
+  source that supports cancellable incremental suggestions without creating
+  excessive or confidential client-side requests; otherwise use the native
+  explicit-search pattern from T04.4.
 - **TR22.1** Network failures cannot corrupt existing local library data.
 - **TR22.2** Online browsing and previously imported offline reading remain
   separate capabilities.

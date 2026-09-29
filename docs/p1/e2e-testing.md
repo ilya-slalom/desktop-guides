@@ -29,6 +29,30 @@ task entry point on both the local host and CI so their session and result
 checks match. The task runner and full scenario suite still need
 implementation under T17.2.
 
+For focused design-language iteration, pass `-DesignOnly` to
+`tools/p1/windows_shell_install.ps1`. It still signs and installs the
+production MSIX interactively, seeds realistic game metadata, checks all four
+representative routes at wide and narrow widths in system/light/dark, then
+runs the material passes: light and dark × Solid, Acrylic, and Mica, plus a
+switch-and-relaunch check. The harness puts the stored material back to Mica,
+restores the user's app theme, and removes the package and temporary trust.
+The full run repeats these checks after the existing shell regression.
+
+Installed UI checks test what the app code controls, not Windows or WinUI.
+The material passes check the effective material the app reports through UI
+Automation, that no layer of ours hides the backdrop or leaves a seam, that
+the Acrylic dialog style is applied, and that the chosen material persists.
+Windows and WinUI render Mica and Acrylic, including blur, tint, the
+transparency setting, and fallbacks, so the harness neither measures that
+output against fixed values nor changes host conditions to steady it. A pixel
+check is used only where it is the one way to see an app effect, and then it
+tolerates any Windows rendering: Acrylic fails only if it repeats the Solid
+fill within one level on every channel. Mica is recorded but not checked this
+way, because with transparency off Windows draws it in the Solid fill color.
+
+High contrast runs only in T16.2. Enabling it makes Windows rewrite the active
+theme to `Custom.theme`, which this harness cannot restore.
+
 ## Runner contract
 
 1. Stage source, fixtures, scripts, and artifacts under
@@ -168,6 +192,7 @@ production app. Add cases as the dependent P1 tasks complete.
 | Scenario | Required observation | Task / requirement |
 | --- | --- | --- |
 | Shell smoke | Fresh empty Library, Library/Game/Reader/Settings routes, rapid Game/Guide → Settings selections and Back, stale Resume, no P0 fixture controls, and a positive UI-accepted second launch that brings a background window to the foreground. Verify normalized boundary-length game input, a bounded 2,000-character note, and close during a blocked Edit metadata read without a late dialog or stalled shutdown. While guide A's lookup is held by a fixture read lock, select guide B and verify B's Reader, Back selection/focus, and persisted Resume. During another held lookup, request Close and select a later guide; the accepted earlier guide must still become Resume after drain. In a disposable fixture, remove a still-displayed later guide and clear Resume before the held lookup; its failed open must leave Resume empty. Also corrupt a guide after its Reader route opens but before its second metadata read; the render error must leave Resume empty after the format is restored and the user returns to Library. Hold the second game's metadata read and verify the previous guide row and selected-guide action are unavailable during loading, then check the second game's Reader after release. Launch a new window while an old guide write is blocked; verify the new window waits for the library lease and then shows the distinct guide saved by the old window. Pause a second launch after it selects the old instance, and pause a callback after it reaches the UI queue; close the old window in each case and verify the launch takes over. After a second launch receives UI acceptance, close the old window before the second process exits and verify it does not reopen. Retain verified process handles from the interactive launch handoff and wait for handle-confirmed exit before seeding or package cleanup. Reader is still a placeholder. | T04.1, T11.1, T11.3, TR11.1 |
+| Design language | With realistic game metadata, capture Library, Game, Reader, and Settings at wide and narrow widths. Verify semantic headings, named controls, keyboard focus, native `TitleBar` Back/pane actions, the Toolkit `SettingsCard` name and bounds, full-width route layout, automatic dismissal of routine `InfoBar` status, no title-bar/content overlap, long text, and system/light/dark resources in each window material. Solid strips across the pane/content boundary show no seam, Acrylic does not repeat the Solid fill, and the Acrylic edit-game dialog differs from the Solid one. Restore the stored material to Mica and the original Windows app theme exactly. | T11.4, TR11.3 |
 | Install and upgrade | Signed MSIX installs in an interactive session; an older version upgrades under the same identity without losing a populated library. Verify package version, launch, and data after restart. | T17.1, T17.3, TR17.2 |
 | Provider-backed game addition | Search the selected provider, distinguish editions, add one result, and verify its provider provenance, normalized metadata, and validated artwork. Disconnect and relaunch to confirm the cached display remains usable. Exercise duplicate selection, cancellation, malformed/oversized data, unavailable service, and `Create manually`; failed attempts leave no game or managed artwork. Refresh source data and verify local title, platform, and notes remain unchanged. | T04.4, TR04.3, TR04.4 |
 | Import and offline reading | Add a game and import TXT, static HTML with local assets, and PDF through the UI. Remove the originals; while online in a fresh WebView2 profile, verify a reachable HTML canary receives zero guide-originated requests. Then remove all egress, relaunch, and open all three managed copies while recording disconnected state through the final check. | T04–T10, T17.3, TR17.1 |
@@ -176,10 +201,10 @@ production app. Add cases as the dependent P1 tasks complete.
 | Accessibility and PDF limits | Drive import/read/complete/export with keyboard and UIA; record focus, high contrast, DPI, and Narrator checks. Tagged PDF text must be accessible; scanned, locked, and long PDFs get their stated checks and limits. | T10.2–T10.3, T16.1–T16.3 |
 | Prerequisites and target matrix | On a disposable runtime-free Windows 11 x64 VM, observe missing Windows App Runtime/WebView2 behavior and offline-installer recovery. Repeat the complete installed workflow on each advertised OS/CPU target. | T17.3, TR17.2 |
 
-The runtime-free VM gate is deferred. Windows 10 x64 and the complete P1
-ARM64 workflow remain untested. The current Windows 11 x64 shell smoke
-does not imply that the later import, reader, backup, or release scenarios
-have passed.
+The runtime-free VM gate is deferred. Windows 10 x64, 200% display scaling,
+and the complete P1 ARM64 workflow remain untested. The current Windows 11
+x64 shell smoke does not imply that the later import, reader, backup, or
+release scenarios have passed.
 
 ## Evidence and exit
 

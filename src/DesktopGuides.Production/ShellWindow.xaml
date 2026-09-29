@@ -2,187 +2,368 @@
     x:Class="DesktopGuides.Production.ShellWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:toolkit="using:CommunityToolkit.WinUI.Controls"
     xmlns:local="using:DesktopGuides.Production">
-    <NavigationView x:Name="Navigation"
-                    PaneTitle="Desktop Guides"
+    <Grid x:Name="ShellRoot"
+          Background="{ThemeResource DesktopGuidesWindowBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border x:Name="SolidCanvas"
+                Grid.RowSpan="2"
+                Background="{ThemeResource DesktopGuidesCanvasBrush}"
+                Visibility="Collapsed"
+                AutomationProperties.AccessibilityView="Raw" />
+
+        <TitleBar x:Name="AppTitleBar"
+                  Title="Desktop Guides"
+                  Subtitle="Offline game guide library"
+                  IsBackButtonVisible="True"
+                  IsBackButtonEnabled="False"
+                  IsPaneToggleButtonVisible="True"
+                  BackRequested="TitleBarBackRequested"
+                  PaneToggleRequested="TitleBarPaneToggleRequested"
+                  AutomationProperties.AutomationId="AppTitleBar">
+            <TitleBar.IconSource>
+                <FontIconSource Glyph="&#xE82D;" />
+            </TitleBar.IconSource>
+        </TitleBar>
+
+        <NavigationView x:Name="Navigation"
+                    Grid.Row="1"
                     PaneDisplayMode="Auto"
-                    IsBackButtonVisible="Visible"
+                    CompactPaneLength="48"
+                    OpenPaneLength="240"
+                    IsBackButtonVisible="Collapsed"
+                    IsPaneToggleButtonVisible="False"
                     IsSettingsVisible="True"
+                    Background="{ThemeResource DesktopGuidesWindowBackgroundBrush}"
                     AutomationProperties.AutomationId="Navigation"
-                    ItemInvoked="NavigationInvoked"
-                    BackRequested="NavigationBackRequested">
+                    ItemInvoked="NavigationInvoked">
+        <NavigationView.Resources>
+            <ResourceDictionary>
+                <ResourceDictionary.ThemeDictionaries>
+                    <ResourceDictionary x:Key="Default">
+                        <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+                        <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="Transparent" />
+                    </ResourceDictionary>
+                    <ResourceDictionary x:Key="HighContrast">
+                        <StaticResource x:Key="NavigationViewContentBackground" ResourceKey="SystemColorWindowColorBrush" />
+                        <StaticResource x:Key="NavigationViewContentGridBorderBrush" ResourceKey="SystemColorWindowTextColorBrush" />
+                    </ResourceDictionary>
+                </ResourceDictionary.ThemeDictionaries>
+            </ResourceDictionary>
+        </NavigationView.Resources>
         <NavigationView.MenuItems>
             <NavigationViewItem x:Name="LibraryItem"
                                 Content="Library"
                                 Icon="Home"
                                 AutomationProperties.AutomationId="LibraryNavigation" />
         </NavigationView.MenuItems>
-        <Grid Padding="32" RowSpacing="16">
+
+        <Grid x:Name="ShellContent"
+              Padding="{StaticResource DesktopGuidesPagePadding}"
+              HorizontalAlignment="Stretch"
+              Background="{ThemeResource DesktopGuidesWindowBackgroundBrush}"
+              AutomationProperties.AutomationId="ShellContent"
+              AutomationProperties.Name="Page content"
+              AutomationProperties.AccessibilityView="Raw"
+              SizeChanged="ShellContentSizeChanged">
             <Grid.RowDefinitions>
-                <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Grid x:Name="LibraryPanel" RowSpacing="16">
+            <InfoBar x:Name="ShellStatusInfoBar"
+                     Margin="0,0,0,16"
+                     IsOpen="True"
+                     IsClosable="False"
+                     Severity="Informational"
+                     Message="Opening library…"
+                     AutomationProperties.AutomationId="ShellStatus"
+                     AutomationProperties.Name="Opening library…"
+                     AutomationProperties.LiveSetting="Polite" />
+
+            <Grid x:Name="LibraryPanel"
+                  Grid.Row="1"
+                  RowSpacing="{StaticResource DesktopGuidesSpacing16}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <Grid ColumnSpacing="16">
+
+                <Grid ColumnSpacing="{StaticResource DesktopGuidesSpacing16}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="Library"
-                               FontSize="32"
-                               FontWeight="SemiBold"
+                               Style="{StaticResource DesktopGuidesPageTitleStyle}"
                                AutomationProperties.AutomationId="LibraryHeading" />
                     <Button x:Name="AddGameButton"
                             Grid.Column="1"
                             Content="Add game"
+                            Style="{StaticResource DesktopGuidesPrimaryActionButtonStyle}"
                             VerticalAlignment="Center"
                             Click="AddGameClicked"
                             AutomationProperties.AutomationId="AddGameButton" />
                 </Grid>
+
+                <TextBlock Grid.Row="1"
+                           Text="Keep the guides for every game together and ready offline."
+                           Style="{StaticResource DesktopGuidesSecondaryBodyStyle}" />
+
                 <Button x:Name="ResumeButton"
-                        Grid.Row="1"
+                        Grid.Row="2"
+                        HorizontalAlignment="Left"
                         Visibility="Collapsed"
+                        Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
                         Click="ResumeClicked"
                         AutomationProperties.AutomationId="ResumeGuide" />
-                <TextBlock x:Name="LibraryEmpty"
-                           Grid.Row="2"
-                           Text="No games in your library."
-                           TextWrapping="Wrap"
-                           AutomationProperties.AutomationId="LibraryEmpty" />
-                <ListView x:Name="GameList"
-                          Grid.Row="3"
-                          DisplayMemberPath="Title"
-                          SelectionMode="Single"
-                          SelectionChanged="GameSelected"
-                          AutomationProperties.AutomationId="GameList" />
+
+                <Grid Grid.Row="3">
+                    <Border x:Name="LibraryEmptyState"
+                            Style="{StaticResource DesktopGuidesElevatedSurfaceStyle}"
+                            VerticalAlignment="Top"
+                            AutomationProperties.AutomationId="LibraryEmptyState">
+                        <StackPanel Spacing="{StaticResource DesktopGuidesSpacing8}">
+                            <FontIcon Glyph="&#xE82D;"
+                                      FontSize="24"
+                                      HorizontalAlignment="Left"
+                                      Foreground="{ThemeResource DesktopGuidesAccentBrush}"
+                                      AutomationProperties.AccessibilityView="Raw" />
+                            <TextBlock x:Name="LibraryEmpty"
+                                       Text="No games in your library."
+                                       Style="{StaticResource DesktopGuidesEmptyTitleStyle}"
+                                       AutomationProperties.AutomationId="LibraryEmpty" />
+                            <TextBlock Text="Add a game to organize walkthroughs and reference guides."
+                                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <ListView x:Name="GameList"
+                              DisplayMemberPath="Title"
+                              SelectionMode="Single"
+                              Style="{StaticResource DesktopGuidesListStyle}"
+                              SelectionChanged="GameSelected"
+                              AutomationProperties.AutomationId="GameList"
+                              AutomationProperties.Name="Games" />
+                </Grid>
             </Grid>
 
-            <Grid x:Name="GamePanel" RowSpacing="16" Visibility="Collapsed">
+            <Grid x:Name="GamePanel"
+                  Grid.Row="1"
+                  RowSpacing="{StaticResource DesktopGuidesSpacing16}"
+                  Visibility="Collapsed">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <Grid ColumnSpacing="16">
+
+                <Grid ColumnSpacing="{StaticResource DesktopGuidesSpacing16}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="GameHeading"
-                               FontSize="32"
-                               FontWeight="SemiBold"
-                               TextWrapping="Wrap"
+                               Style="{StaticResource DesktopGuidesPageTitleStyle}"
                                AutomationProperties.AutomationId="GameHeading" />
                     <Button x:Name="EditGameButton"
                             Grid.Column="1"
                             Content="Edit game"
+                            Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
                             VerticalAlignment="Center"
                             Click="EditGameClicked"
                             AutomationProperties.AutomationId="EditGameButton" />
                 </Grid>
-                <StackPanel Grid.Row="1" Spacing="6">
-                    <TextBlock x:Name="GamePlatform"
-                               TextWrapping="Wrap"
-                               AutomationProperties.AutomationId="GamePlatform" />
-                    <ScrollViewer x:Name="GameNotesScroll"
-                                  MaxHeight="96"
-                                  HorizontalScrollBarVisibility="Disabled"
-                                  VerticalScrollBarVisibility="Auto"
-                                  AutomationProperties.AutomationId="GameNotesScroll"
-                                  AutomationProperties.Name="Game notes">
-                        <TextBlock x:Name="GameNotes"
-                                   TextWrapping="Wrap"
-                                   IsTextSelectionEnabled="True"
-                                   AutomationProperties.AutomationId="GameNotes" />
-                    </ScrollViewer>
-                </StackPanel>
-                <Grid Grid.Row="2">
-                    <TextBlock x:Name="GameEmpty"
-                               Text="No guides in this game."
-                               TextWrapping="Wrap" />
+
+                <Border x:Name="GameMetadataSurface"
+                        Grid.Row="1"
+                        Style="{StaticResource DesktopGuidesSurfaceStyle}"
+                        AutomationProperties.AutomationId="GameMetadataSurface">
+                    <StackPanel Spacing="{StaticResource DesktopGuidesSpacing8}">
+                        <TextBlock x:Name="GamePlatform"
+                                   Style="{StaticResource DesktopGuidesBodyStyle}"
+                                   AutomationProperties.AutomationId="GamePlatform" />
+                        <ScrollViewer x:Name="GameNotesScroll"
+                                      MaxHeight="96"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      VerticalScrollBarVisibility="Auto"
+                                      AutomationProperties.AutomationId="GameNotesScroll"
+                                      AutomationProperties.Name="Game notes">
+                            <TextBlock x:Name="GameNotes"
+                                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                                       IsTextSelectionEnabled="True"
+                                       AutomationProperties.AutomationId="GameNotes" />
+                        </ScrollViewer>
+                    </StackPanel>
+                </Border>
+
+                <Grid Grid.Row="2"
+                      ColumnSpacing="{StaticResource DesktopGuidesSpacing16}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Guides"
+                               Style="{StaticResource DesktopGuidesSectionTitleStyle}" />
                     <Button x:Name="OpenSelectedGuideButton"
+                            Grid.Column="1"
                             Content="Open selected guide"
-                            HorizontalAlignment="Left"
                             Visibility="Collapsed"
+                            Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
                             Click="OpenSelectedGuideClicked"
                             AutomationProperties.AutomationId="OpenSelectedGuide" />
                 </Grid>
-                <ListView x:Name="GuideList"
-                          Grid.Row="3"
-                          DisplayMemberPath="Title"
-                          SelectionMode="Single"
-                          SelectionChanged="GuideSelected"
-                          AutomationProperties.AutomationId="GuideList" />
+
+                <Grid Grid.Row="3">
+                    <Border x:Name="GameEmptyState"
+                            Style="{StaticResource DesktopGuidesElevatedSurfaceStyle}"
+                            VerticalAlignment="Top"
+                            AutomationProperties.AutomationId="GameGuideEmptyState">
+                        <StackPanel Spacing="{StaticResource DesktopGuidesSpacing8}">
+                            <TextBlock x:Name="GameEmpty"
+                                       Text="No guides in this game."
+                                       Style="{StaticResource DesktopGuidesEmptyTitleStyle}"
+                                       AutomationProperties.AutomationId="GameEmpty" />
+                            <TextBlock Text="Guides you import for this game will appear here."
+                                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}" />
+                        </StackPanel>
+                    </Border>
+                    <ListView x:Name="GuideList"
+                              DisplayMemberPath="Title"
+                              SelectionMode="Single"
+                              Style="{StaticResource DesktopGuidesListStyle}"
+                              SelectionChanged="GuideSelected"
+                              AutomationProperties.AutomationId="GuideList"
+                              AutomationProperties.Name="Guides" />
+                </Grid>
             </Grid>
 
-            <Grid x:Name="ReaderPanel" RowSpacing="12" Visibility="Collapsed">
+            <Grid x:Name="ReaderPanel"
+                  Grid.Row="1"
+                  RowSpacing="{StaticResource DesktopGuidesSpacing12}"
+                  Visibility="Collapsed">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
+
                 <Button x:Name="ReaderBackButton"
                         Content="Back to game"
                         HorizontalAlignment="Left"
+                        Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
                         Click="ReaderBackClicked"
                         AutomationProperties.AutomationId="ReaderBackToGame" />
-                <Grid Grid.Row="1" ColumnSpacing="16">
+
+                <Grid Grid.Row="1"
+                      ColumnSpacing="{StaticResource DesktopGuidesSpacing16}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel Spacing="4">
+                    <StackPanel Spacing="{StaticResource DesktopGuidesSpacing4}">
                         <TextBlock x:Name="ReaderHeading"
-                                   FontSize="28"
-                                   FontWeight="SemiBold"
-                                   TextWrapping="Wrap"
+                                   Style="{StaticResource DesktopGuidesPageTitleStyle}"
                                    AutomationProperties.AutomationId="ReaderHeading" />
                         <TextBlock x:Name="ReaderGameName"
-                                   TextWrapping="Wrap"
+                                   Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
                                    AutomationProperties.AutomationId="ReaderGameName" />
                     </StackPanel>
-                    <TextBlock x:Name="ReaderFormat"
-                               Grid.Column="1"
-                               VerticalAlignment="Top"
-                               AutomationProperties.AutomationId="ReaderFormat" />
+                    <Border Grid.Column="1"
+                            Padding="10,4"
+                            VerticalAlignment="Top"
+                            Background="{ThemeResource DesktopGuidesSurfaceBrush}"
+                            BorderBrush="{ThemeResource DesktopGuidesBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource DesktopGuidesControlCornerRadius}">
+                        <TextBlock x:Name="ReaderFormat"
+                                   Style="{StaticResource DesktopGuidesMetadataStyle}"
+                                   AutomationProperties.AutomationId="ReaderFormat" />
+                    </Border>
                 </Grid>
+
                 <local:ReaderToolbar x:Name="ReaderActions"
                                      Grid.Row="2" />
-                <ContentControl x:Name="ReaderSurface"
-                                Grid.Row="3">
-                    <TextBlock x:Name="ReaderPlaceholder"
-                               Text="Reading this guide is unavailable in this preview."
-                               TextWrapping="Wrap"
-                               AutomationProperties.AutomationId="ReaderPlaceholder" />
-                </ContentControl>
+
+                <Border Grid.Row="3"
+                        Style="{StaticResource DesktopGuidesElevatedSurfaceStyle}"
+                        Background="{ThemeResource DesktopGuidesReadingSurfaceBrush}">
+                    <ContentControl x:Name="ReaderSurface">
+                        <TextBlock x:Name="ReaderPlaceholder"
+                                   Text="Reading this guide is unavailable in this preview."
+                                   Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                                   AutomationProperties.AutomationId="ReaderPlaceholder" />
+                    </ContentControl>
+                </Border>
             </Grid>
 
-            <StackPanel x:Name="SettingsPanel"
-                        Spacing="16"
-                        Visibility="Collapsed">
+            <Grid x:Name="SettingsPanel"
+                  Grid.Row="1"
+                  RowSpacing="{StaticResource DesktopGuidesSpacing16}"
+                  Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
                 <TextBlock Text="Settings"
-                           FontSize="32"
-                           FontWeight="SemiBold"
+                           Style="{StaticResource DesktopGuidesPageTitleStyle}"
                            AutomationProperties.AutomationId="SettingsHeading" />
-                <TextBlock Text="Your library is stored on this device."
-                           TextWrapping="Wrap" />
-            </StackPanel>
-
-            <TextBlock x:Name="ShellStatus"
-                       Grid.Row="1"
-                       Text="Opening library…"
-                       TextWrapping="Wrap"
-                       AutomationProperties.AutomationId="ShellStatus"
-                       AutomationProperties.LiveSetting="Polite" />
+                <TextBlock Grid.Row="1"
+                           Text="Manage how Desktop Guides stores and presents your library."
+                           Style="{StaticResource DesktopGuidesSecondaryBodyStyle}" />
+                <ScrollViewer Grid.Row="2"
+                              VerticalScrollBarVisibility="Auto"
+                              VerticalContentAlignment="Top">
+                    <StackPanel Spacing="{StaticResource DesktopGuidesSpacing4}">
+                        <toolkit:SettingsCard
+                            x:Name="LibraryStorageSettingsCard"
+                            Header="Library storage"
+                            Description="Your library is stored on this device."
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Top"
+                            IsClickEnabled="False"
+                            AutomationProperties.AutomationId="LibraryStorageSettingsCard"
+                            AutomationProperties.Name="Library storage. Your library is stored on this device.">
+                            <toolkit:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE8F1;"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                            </toolkit:SettingsCard.HeaderIcon>
+                        </toolkit:SettingsCard>
+                        <toolkit:SettingsCard
+                            x:Name="WindowMaterialSettingsCard"
+                            Header="Window background"
+                            Description="Choose how much of your desktop shows behind the app."
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="WindowMaterialSettingsCard"
+                            AutomationProperties.Name="Window background. Choose how much of your desktop shows behind the app.">
+                            <toolkit:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE790;"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                            </toolkit:SettingsCard.HeaderIcon>
+                            <ComboBox x:Name="WindowMaterialSelector"
+                                      MinWidth="160"
+                                      IsEnabled="False"
+                                      SelectionChanged="WindowMaterialSelectionChanged"
+                                      AutomationProperties.AutomationId="WindowMaterialSelector"
+                                      AutomationProperties.Name="Window background">
+                                <ComboBoxItem Content="Mica" Tag="Mica" />
+                                <ComboBoxItem Content="Acrylic" Tag="Acrylic" />
+                                <ComboBoxItem Content="Solid" Tag="Solid" />
+                            </ComboBox>
+                        </toolkit:SettingsCard>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
         </Grid>
-    </NavigationView>
+        </NavigationView>
+    </Grid>
 </Window>

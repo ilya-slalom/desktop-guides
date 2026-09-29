@@ -19,9 +19,15 @@
     <Manifest Include="$(ApplicationManifest)" />
     <Content Include="../../../src/DesktopGuides.App/Assets/*.png"
              Link="Assets/%(Filename)%(Extension)" />
+    <Page Include="../../../src/DesktopGuides.Production/Styles/DesignTokens.xaml"
+          Link="Styles/DesignTokens.xaml" />
     <Page Include="../../../src/DesktopGuides.Production/ReaderToolbar.xaml"
           Link="ReaderToolbar.xaml" />
     <Compile Include="../../../src/DesktopGuides.Production/ReaderToolbar.xaml.cs"
              Link="ReaderToolbar.xaml.cs" />
+    <Page Include="../../../src/DesktopGuides.Production/Styles/Dialogs.xaml"
+          Link="Styles/Dialogs.xaml" />
+    <Compile Include="../../../src/DesktopGuides.Production/Materials/DialogSurface.cs"
+             Link="Materials/DialogSurface.cs" />
   </ItemGroup>
 </Project>

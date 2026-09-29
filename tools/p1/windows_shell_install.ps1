@@ -3,7 +3,9 @@ param(
     [string] $PackagePath,
 
     [Parameter(Mandatory = $true)]
-    [string] $ResultDirectory
+    [string] $ResultDirectory,
+
+    [switch] $DesignOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -25,6 +27,8 @@ if (Get-AppxPackage -Name DesktopGuides.Preview) {
 Assert-FreshPreviewProfile $env:LOCALAPPDATA
 . (Join-Path $PSScriptRoot 'windows_shell_smoke_result.ps1')
 . (Join-Path $PSScriptRoot 'windows_shell_task_cleanup.ps1')
+. (Join-Path $PSScriptRoot 'windows_shell_screenshot_stats.ps1')
+. (Join-Path $PSScriptRoot 'windows_shell_theme_preference.ps1')
 
 New-Item -ItemType Directory -Force $ResultDirectory | Out-Null
 $ResultDirectory = (Resolve-Path $ResultDirectory).Path
@@ -612,8 +616,12 @@ function Assert-AcceptedThenClose {
 function Run-ShellSmoke(
     [string] $mode,
     [string] $expectedResumeGuide = 'Route Test Guide',
-    [int] $ExitDelayMilliseconds = 0) {
-    $resultPath = Join-Path $ResultDirectory "$mode.json"
+    [int] $ExitDelayMilliseconds = 0,
+    [string] $ResultName = $mode,
+    [int] $ExpectedScalePercent = 0,
+    [string] $ExpectedMaterial = '',
+    [string] $SwitchToMaterial = '') {
+    $resultPath = Join-Path $ResultDirectory "$ResultName.json"
     Clear-ShellSmokeResult $resultPath
     $invocationId = [Guid]::NewGuid().ToString('N')
     $script = Join-Path $PSScriptRoot 'windows_shell_ui_smoke.ps1'
@@ -625,7 +633,14 @@ function Run-ShellSmoke(
         ' -SessionId ' + $targetSessionId +
         ' -ExecutablePath "' + $expectedExecutablePath + '"' +
         ' -ExpectedResumeGuide "' + $expectedResumeGuide + '"' +
-        ' -ExitDelayMilliseconds ' + $ExitDelayMilliseconds
+        ' -ExitDelayMilliseconds ' + $ExitDelayMilliseconds +
+        ' -ExpectedScalePercent ' + $ExpectedScalePercent
+    if ($ExpectedMaterial) {
+        $arguments += ' -ExpectedMaterial ' + $ExpectedMaterial
+    }
+    if ($SwitchToMaterial) {
+        $arguments += ' -SwitchToMaterial ' + $SwitchToMaterial
+    }
     $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
         -Argument $arguments -WorkingDirectory $PSScriptRoot
     Register-ScheduledTask -TaskName $smokeTask -Action $action `
@@ -647,6 +662,128 @@ function Run-ShellSmoke(
         throw "Installed $mode shell smoke failed: $($result.error)"
     }
     return $result
+}
+
+function Run-DesignLanguageScenarios {
+    $originalTheme = Get-AppThemePreference
+    $report.originalAppTheme = $originalTheme
+    # High contrast rewrites the active Windows theme, so T16.2 owns that pass.
+    $report.highContrast = 'deferred-to-T16.2'
+    try {
+        Start-InstalledShell
+        $report.designLanguageSystem = Run-ShellSmoke `
+            'design-language' -ResultName 'design-system'
+        Close-InstalledShell
+
+        Set-AppThemePreference $true
+        Start-InstalledShell
+        $report.designLanguageLight = Run-ShellSmoke `
+            'design-language' -ResultName 'design-light'
+        Close-InstalledShell
+
+        Set-AppThemePreference $false
+        Start-InstalledShell
+        $report.designLanguageDark = Run-ShellSmoke `
+            'design-language' -ResultName 'design-dark'
+        Close-InstalledShell
+
+        $lightLuminance = Get-ScreenshotLuminance `
+            $report.designLanguageLight.libraryWideScreenshot
+        $darkLuminance = Get-ScreenshotLuminance `
+            $report.designLanguageDark.libraryWideScreenshot
+        if ($lightLuminance -le ($darkLuminance + 40)) {
+            throw "Light and dark screenshots did not differ enough: " +
+                "$lightLuminance versus $darkLuminance."
+        }
+        $report.themeLuminance = [ordered]@{
+            light = $lightLuminance
+            dark = $darkLuminance
+        }
+    }
+    finally {
+        Restore-AppThemePreference $originalTheme
+        $report.restoredAppTheme = Get-AppThemePreference
+    }
+}
+
+function Set-StoredMaterial([string] $material) {
+    dotnet run --project $seedProject -c Release --no-restore -- `
+        set-material $dataRoot $material
+    if ($LASTEXITCODE -ne 0) { throw "Could not store the $material window background." }
+}
+
+function Measure-LibraryStrip($result) {
+    $bounds = $result.libraryBounds
+    $region = Get-BoundaryStripRegion $bounds.windowLeft $bounds.windowHeight `
+        $bounds.contentLeft
+    $strip = Get-ScreenshotRegionStats $result.libraryScreenshot `
+        $region.X $region.Y $region.Width $region.Height
+    $result | Add-Member -NotePropertyName libraryStrip -NotePropertyValue $strip
+    # The dialog command area between the button row and the panel's bottom edge.
+    $dialog = Get-DialogStripRegion $result.dialogBounds.buttonLeft `
+        $result.dialogBounds.buttonBottom
+    $dialogStrip = Get-ScreenshotRegionStats $result.dialogScreenshot `
+        $dialog.X $dialog.Y $dialog.Width $dialog.Height
+    $result | Add-Member -NotePropertyName dialogStrip -NotePropertyValue $dialogStrip
+    return $result
+}
+
+# These passes check what the app controls: the material it reports, its own
+# layers, the dialog style, and the stored choice. How Windows renders Mica
+# and Acrylic is not tested.
+function Run-MaterialScenarios {
+    $originalTheme = Get-AppThemePreference
+    $report.materials = [ordered]@{}
+    try {
+        foreach ($light in @($true, $false)) {
+            $themeName = if ($light) { 'light' } else { 'dark' }
+            Set-AppThemePreference $light
+            foreach ($material in @('Solid', 'Acrylic', 'Mica')) {
+                Set-StoredMaterial $material
+                Start-InstalledShell
+                $report.materials["$themeName-$material"] = Measure-LibraryStrip (
+                    Run-ShellSmoke 'material' -ResultName "material-$themeName-$material" `
+                        -ExpectedMaterial $material)
+                Close-InstalledShell
+            }
+            $solid = $report.materials["$themeName-Solid"].libraryStrip
+            if ($solid.maxChannelRange -gt 2) {
+                throw "The $themeName Solid window shows a pane/content seam: " +
+                    "range $($solid.maxChannelRange)."
+            }
+            # Mica is not checked: with transparency off, Windows draws it in
+            # the same color as our Solid fill.
+            $acrylic = $report.materials["$themeName-Acrylic"].libraryStrip
+            if (Test-MatchesSolidFill $acrylic $solid) {
+                throw "The $themeName Acrylic window shows the Solid fill; " +
+                    'an app layer covers the backdrop.'
+            }
+            $solidDialog = $report.materials["$themeName-Solid"].dialogStrip
+            $acrylicDialog = $report.materials["$themeName-Acrylic"].dialogStrip
+            $report.materials["$themeName-dialogDifference"] =
+                Get-AcrylicSurfaceDifference $acrylicDialog $solidDialog
+            if (-not (Test-AcrylicSurfaceVisible $acrylicDialog $solidDialog)) {
+                throw "The $themeName Acrylic dialog matched the Solid dialog."
+            }
+        }
+
+        Set-AppThemePreference $true
+        Set-StoredMaterial 'Mica'
+        Start-InstalledShell
+        $report.materialSwitch = Run-ShellSmoke 'material' `
+            -ResultName 'material-switch' -ExpectedMaterial 'Mica' `
+            -SwitchToMaterial 'Acrylic'
+        Close-InstalledShell
+        Start-InstalledShell
+        $report.materialPersisted = Run-ShellSmoke 'material' `
+            -ResultName 'material-persisted' -ExpectedMaterial 'Acrylic'
+        Close-InstalledShell
+    }
+    finally {
+        Set-StoredMaterial 'Mica'
+        Restore-AppThemePreference $originalTheme
+        $report.restoredAppTheme = Get-AppThemePreference
+    }
 }
 
 try {
@@ -711,6 +848,18 @@ try {
     Register-ScheduledTask -TaskName $launchTask -Action $launchAction `
         -Principal $principal -Force | Out-Null
 
+    if ($DesignOnly) {
+        dotnet run --project $seedProject -c Release --no-restore -- `
+            seed-design $dataRoot
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Could not seed the design-language metadata.'
+        }
+        Run-DesignLanguageScenarios
+        Run-MaterialScenarios
+        $report.success = $true
+        return
+    }
+
     Start-InstalledShell
     $report.empty = Run-ShellSmoke 'empty' -ExitDelayMilliseconds 2000
     $report.emptyAfterDelayedTask = Run-ShellSmoke 'empty'
@@ -756,6 +905,16 @@ try {
     Start-InstalledShell
     Assert-GameSwitchClearsWhileLoading
     Close-InstalledShell
+
+    Get-ChildItem -LiteralPath $dataRoot -Force |
+        Remove-Item -Recurse -Force
+    dotnet run --project $seedProject -c Release --no-restore -- `
+        seed-design $dataRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not seed the design-language metadata.'
+    }
+    Run-DesignLanguageScenarios
+    Run-MaterialScenarios
     $report.success = $true
 }
 catch {
