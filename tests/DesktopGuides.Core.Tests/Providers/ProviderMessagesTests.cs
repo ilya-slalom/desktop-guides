@@ -25,4 +25,14 @@ public sealed class ProviderMessagesTests
     [Fact]
     public void NoResultsMessageQuotesTheQuery() =>
         Assert.Equal("No games match \"zelda\".", ProviderMessages.NoResults("zelda"));
+
+    [Theory]
+    [InlineData(ProviderErrorKind.NotConfigured, ProviderRecovery.OpenSettings | ProviderRecovery.AddManually)]
+    [InlineData(ProviderErrorKind.InvalidCredentials, ProviderRecovery.OpenSettings)]
+    [InlineData(ProviderErrorKind.Unavailable, ProviderRecovery.Retry | ProviderRecovery.AddManually)]
+    [InlineData(ProviderErrorKind.Timeout, ProviderRecovery.Retry)]
+    [InlineData(ProviderErrorKind.RateLimited, ProviderRecovery.Retry)]
+    [InlineData(ProviderErrorKind.MalformedData, ProviderRecovery.AddManually)]
+    public void RecoveryActionsMatchTheSpecTable(ProviderErrorKind kind, ProviderRecovery expected) =>
+        Assert.Equal(expected, ProviderMessages.RecoveryFor(kind));
 }

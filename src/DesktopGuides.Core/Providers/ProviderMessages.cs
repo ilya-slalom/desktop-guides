@@ -1,5 +1,14 @@
 namespace DesktopGuides.Core.Providers;
 
+[Flags]
+public enum ProviderRecovery
+{
+    None = 0,
+    OpenSettings = 1,
+    AddManually = 2,
+    Retry = 4,
+}
+
 public static class ProviderMessages
 {
     public static string ForIgdb(ProviderErrorKind kind) => kind switch
@@ -21,4 +30,13 @@ public static class ProviderMessages
     };
 
     public static string NoResults(string query) => $"No games match \"{query}\".";
+
+    public static ProviderRecovery RecoveryFor(ProviderErrorKind kind) => kind switch
+    {
+        ProviderErrorKind.NotConfigured => ProviderRecovery.OpenSettings | ProviderRecovery.AddManually,
+        ProviderErrorKind.InvalidCredentials => ProviderRecovery.OpenSettings,
+        ProviderErrorKind.Timeout or ProviderErrorKind.RateLimited => ProviderRecovery.Retry,
+        ProviderErrorKind.MalformedData => ProviderRecovery.AddManually,
+        _ => ProviderRecovery.Retry | ProviderRecovery.AddManually,
+    };
 }
