@@ -44,9 +44,12 @@ Rules that follow from the decision:
 - Linked games show "Metadata from IGDB" and, where the artwork came from
   SteamGridDB, "Artwork from SteamGridDB". The Settings card links to each
   service's terms.
-- Implementation Task 1 checks the current IGDB/Twitch and SteamGridDB terms
-  pages and records in this section the date checked and any attribution
-  wording they require.
+- Terms checked 2026-09-29: IGDB API (https://www.igdb.com/api), Twitch
+  Developer Agreement (https://legal.twitch.com/legal/developer-agreement/),
+  and SteamGridDB Terms (https://www.steamgriddb.com/terms) pages not
+  retrievable via standard HTTP fetch (JavaScript-rendered or access
+  restricted); re-check before release to confirm attribution requirements and
+  verify no prohibition on offline caching of metadata or artwork.
 - The authentication layer is swappable. A future proxy would replace
   `TwitchTokenSource` and `IgdbClient` behind `IGameMetadataProvider`,
   and no other component would change.
@@ -78,13 +81,12 @@ Rules that follow from the decision:
 | `IgdbCoverArtworkSource` | Builds `https://images.igdb.com/igdb/image/upload/t_cover_big/{imageId}.jpg` |
 | `ProviderHttp` | A shared `HttpClient` policy: HTTPS only, a fixed host allow-list, no redirect to another host, a 15-second timeout per request, a 1 MB limit on JSON bodies and 5 MB on images, and one request at a time |
 | `ArtworkValidator` | Parses the signature and dimensions of PNG, JPEG, or WebP in managed code. Rejects any other format and images over 4096 px on either side. |
-| `ManagedArtworkStore` | Stages the file under `.staging/artwork/`, validates it, and moves it to `artwork/{gameId}/{sha256}.{ext}`. Runs the startup sweep. |
+| `ManagedArtworkStore` | Stages the file under `library/.artwork-staging/`, validates it, and moves it to `artwork/{gameId}/{sha256}.{ext}`. Runs the startup sweep. |
 | `ProviderCredentialBlob` | Formats and parses the credential JSON, with size and field limits. A corrupt blob is treated as not configured. |
 | Schema v3 | Migrates `Games` in one transaction (below) |
 
-The allow-list holds `id.twitch.tv`, `api.igdb.com`, `images.igdb.com`, and
-`www.steamgriddb.com`, plus the SteamGridDB image CDN hosts. Task 1 records
-those CDN hosts after checking real API responses.
+The allow-list holds `id.twitch.tv`, `api.igdb.com`, `images.igdb.com`,
+`www.steamgriddb.com`, and `cdn2.steamgriddb.com`.
 
 ### Production (WinUI)
 
@@ -157,11 +159,13 @@ all set or all null; the repository enforces this when it writes.
 Artwork files are immutable and named by content, and a database row
 references a file only after the file is in place. At startup, after the
 existing guide reconciliation runs, a sweep deletes everything under
-`.staging/artwork/` and every file under `artwork/` that no row
-references. Deleting a game leaves its artwork unreferenced, and the sweep
-removes it too. The sweep only touches files that match the canonical
-artwork path pattern, and it records a count of anything else instead of
-deleting it.
+`library/.artwork-staging/` and every file under `artwork/` that no row
+references. Artwork staging uses its own directory because
+`FileOperationReconciler.CountReviewOrphans` treats all entries under
+`library/.staging/` as orphans needing review. Deleting a game leaves its
+artwork unreferenced, and the sweep removes it too. The sweep only touches
+files that match the canonical artwork path pattern, and it records a count
+of anything else instead of deleting it.
 
 ### Offline
 
@@ -236,8 +240,9 @@ Infrastructure, using `HttpMessageHandler` fakes and a temporary library:
   a redirect to another host.
 - **`ArtworkValidator`:** accepts valid PNG, JPEG, and WebP headers, and
   rejects a bad signature, an oversized file, and oversized dimensions.
-- **`ManagedArtworkStore`:** staging, moving into place, and a sweep that
-  keeps referenced files and removes staged and unreferenced ones.
+- **`ManagedArtworkStore`:** staging under `library/.artwork-staging/`,
+  moving into place, and a sweep that keeps referenced files and removes
+  staged and unreferenced ones.
 - **`ProviderCredentialBlob`:** round-trip, size limits, and a corrupt blob
   treated as not configured.
 - **Schema v3:** a v2 library migrates with its games intact; a failing
