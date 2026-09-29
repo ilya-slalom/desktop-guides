@@ -360,6 +360,7 @@
                                 <ComboBoxItem Content="Solid" Tag="Solid" />
                             </ComboBox>
                         </toolkit:SettingsCard>
+                        <local:ProviderSettingsCard x:Name="ProviderSettings" />
                     </StackPanel>
                 </ScrollViewer>
             </Grid>

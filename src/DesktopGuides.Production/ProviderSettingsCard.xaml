@@ -1,0 +1,72 @@
+<UserControl
+    x:Class="DesktopGuides.Production.ProviderSettingsCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:toolkit="using:CommunityToolkit.WinUI.Controls">
+    <toolkit:SettingsExpander
+        x:Name="ProviderSettingsExpander"
+        Header="Game data providers"
+        Description="Add your IGDB credentials to search for games."
+        HorizontalAlignment="Stretch"
+        AutomationProperties.AutomationId="ProviderSettingsExpander">
+        <toolkit:SettingsExpander.HeaderIcon>
+            <FontIcon Glyph="&#xE721;" AutomationProperties.AccessibilityView="Raw" />
+        </toolkit:SettingsExpander.HeaderIcon>
+        <toolkit:SettingsExpander.Items>
+            <toolkit:SettingsCard Header="IGDB client ID"
+                                  Description="From your Twitch developer application.">
+                <PasswordBox x:Name="IgdbClientIdInput"
+                             MinWidth="260" MaxLength="64"
+                             AutomationProperties.AutomationId="IgdbClientIdInput"
+                             AutomationProperties.Name="IGDB client ID" />
+            </toolkit:SettingsCard>
+            <toolkit:SettingsCard Header="IGDB client secret">
+                <PasswordBox x:Name="IgdbClientSecretInput"
+                             MinWidth="260" MaxLength="128"
+                             AutomationProperties.AutomationId="IgdbClientSecretInput"
+                             AutomationProperties.Name="IGDB client secret" />
+            </toolkit:SettingsCard>
+            <toolkit:SettingsCard Header="SteamGridDB API key"
+                                  Description="Optional. Used for cover art.">
+                <PasswordBox x:Name="SteamGridDbKeyInput"
+                             MinWidth="260" MaxLength="128"
+                             AutomationProperties.AutomationId="SteamGridDbKeyInput"
+                             AutomationProperties.Name="SteamGridDB API key" />
+            </toolkit:SettingsCard>
+            <toolkit:SettingsCard ContentAlignment="Left">
+                <StackPanel Spacing="{StaticResource DesktopGuidesSpacing8}">
+                    <InfoBar x:Name="ProviderSettingsStatus"
+                             IsClosable="True"
+                             AutomationProperties.AutomationId="ProviderSettingsStatus" />
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource DesktopGuidesSpacing8}">
+                        <Button x:Name="TestConnectionButton"
+                                Content="Test connection"
+                                Click="TestClicked"
+                                AutomationProperties.AutomationId="ProviderTestButton" />
+                        <Button x:Name="SaveButton"
+                                Content="Save"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Click="SaveClicked"
+                                AutomationProperties.AutomationId="ProviderSaveButton" />
+                        <Button x:Name="RemoveButton"
+                                Content="Remove"
+                                Click="RemoveClicked"
+                                AutomationProperties.AutomationId="ProviderRemoveButton" />
+                        <ProgressRing x:Name="ProviderBusy"
+                                      Width="20" Height="20"
+                                      IsActive="False"
+                                      AutomationProperties.AutomationId="ProviderBusy" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource DesktopGuidesSpacing16}">
+                        <HyperlinkButton Content="Twitch developer agreement (IGDB)"
+                                         NavigateUri="https://legal.twitch.com/legal/developer-agreement/"
+                                         AutomationProperties.AutomationId="IgdbTermsLink" />
+                        <HyperlinkButton Content="SteamGridDB terms"
+                                         NavigateUri="https://www.steamgriddb.com/terms"
+                                         AutomationProperties.AutomationId="SteamGridDbTermsLink" />
+                    </StackPanel>
+                </StackPanel>
+            </toolkit:SettingsCard>
+        </toolkit:SettingsExpander.Items>
+    </toolkit:SettingsExpander>
+</UserControl>

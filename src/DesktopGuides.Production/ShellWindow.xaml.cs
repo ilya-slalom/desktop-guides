@@ -2,6 +2,7 @@ using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Navigation;
 using DesktopGuides.Infrastructure.Storage;
 using DesktopGuides.Production.Materials;
+using DesktopGuides.Production.Providers;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -23,6 +24,7 @@ public sealed partial class ShellWindow : Window
     private Task initializationTask = Task.CompletedTask;
     private LibrarySessionLease? libraryLease;
     private SqliteLibraryRepository? repository;
+    private ProviderServices? providers;
     private Guid? resumeGuideId;
     private Guid? pendingGuideFocus;
     private int guideFocusRenderGeneration = -1;
@@ -194,6 +196,8 @@ public sealed partial class ShellWindow : Window
             ShowBusyStatus("Loading library...");
             repository = new SqliteLibraryRepository(new ManagedPathResolver(dataRoot));
             await repository.InitializeAsync();
+            providers = new ProviderServices(dataRoot);
+            await ProviderSettings.InitializeAsync(providers);
             WindowMaterial requestedMaterial = WindowMaterial.Mica;
             try
             {
@@ -237,6 +241,7 @@ public sealed partial class ShellWindow : Window
         closeRequested = true;
         statusDismissTimer.Stop();
         activeGameEditor?.Hide();
+        ProviderSettings.Cancel();
         leaseWait.Cancel();
         Task pendingNavigation = navigationQueue.StopAndDrainAsync();
         Program.ReleaseInstanceKey();
@@ -265,6 +270,7 @@ public sealed partial class ShellWindow : Window
                     {
                         await repository.DisposeAsync();
                     }
+                    providers?.Dispose();
                 }
                 finally
                 {
