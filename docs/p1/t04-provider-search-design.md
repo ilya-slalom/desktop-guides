@@ -44,12 +44,22 @@ Rules that follow from the decision:
 - Linked games show "Metadata from IGDB" and, where the artwork came from
   SteamGridDB, "Artwork from SteamGridDB". The Settings card links to each
   service's terms.
-- Terms checked 2026-09-29: IGDB API (https://www.igdb.com/api), Twitch
-  Developer Agreement (https://legal.twitch.com/legal/developer-agreement/),
-  and SteamGridDB Terms (https://www.steamgriddb.com/terms) pages not
-  retrievable via standard HTTP fetch (JavaScript-rendered or access
-  restricted); re-check before release to confirm attribution requirements and
-  verify no prohibition on offline caching of metadata or artwork.
+- Terms checked 2026-09-29:
+  - IGDB API (https://api-docs.igdb.com/): "The IGDB.com API is free for
+    non-commercial usage under the terms of the Twitch Developer Service
+    Agreement." Images removed or replaced exist for 30 days before deletion.
+  - Twitch Developer Agreement
+    (https://legal.twitch.com/legal/developer-agreement/): requires "a clear
+    path to the source from displays of Program Materials" and to
+    "Appropriately attribute uses of Program Materials"; prohibits storing
+    copies of Program Materials except for 24-hour caching without sharing.
+  - SteamGridDB Terms (https://www.steamgriddb.com/terms): page
+    JavaScript-rendered; terms not verified.
+  - Accepted risk: the app stores permanent metadata snapshots and cached
+    artwork as personal, non-commercial use. The 24-hour caching clause is
+    knowingly breached if "Program Materials" covers IGDB data. Attribution is
+    met by "Metadata from IGDB" / "Artwork from SteamGridDB" plus the IGDB
+    page link. The snapshot stores no Twitch user data and is never shared.
 - The authentication layer is swappable. A future proxy would replace
   `TwitchTokenSource` and `IgdbClient` behind `IGameMetadataProvider`,
   and no other component would change.
