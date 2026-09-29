@@ -21,3 +21,9 @@ public sealed record ProviderCredentials(IgdbCredentials? Igdb, string? SteamGri
     public override string ToString() =>
         $"ProviderCredentials {{ Igdb = {(Igdb is null ? "none" : "saved")}, SteamGridDbKey = {(SteamGridDbKey is null ? "none" : "saved")} }}";
 }
+
+public interface IGameMetadataProvider
+{
+    Task<IReadOnlyList<ProviderSearchResult>> SearchAsync(string query, CancellationToken token);
+    Task<ProviderGameRecord> GetAsync(string externalId, CancellationToken token);
+}

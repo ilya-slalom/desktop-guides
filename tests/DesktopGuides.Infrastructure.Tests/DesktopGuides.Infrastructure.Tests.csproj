@@ -13,4 +13,7 @@
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <ProjectReference Include="../../src/DesktopGuides.Infrastructure/DesktopGuides.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="Providers\Fixtures\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
