@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using DesktopGuides.Core.Providers;
@@ -12,36 +11,23 @@ using Windows.Storage.Streams;
 
 namespace DesktopGuides.Production;
 
-public sealed class GameSearchItem : INotifyPropertyChanged
+public sealed class GameSearchItem : ArtworkItem
 {
-    private ImageSource? thumbnail;
-
     internal GameSearchItem(ProviderSearchResult result)
+        : this(
+            result,
+            GameMetadataPresentation.ResultSummary(result),
+            GameMetadataPresentation.PlatformSummary(result.Platforms) ?? "No platforms listed")
+    {
+    }
+
+    private GameSearchItem(ProviderSearchResult result, string summary, string platforms)
+        : base(result.Title, summary, platforms, $"{result.Title}, {summary}, {platforms}")
     {
         Result = result;
-        Summary = GameMetadataPresentation.ResultSummary(result);
-        Platforms = GameMetadataPresentation.PlatformSummary(result.Platforms) ?? "No platforms listed";
-        AccessibleName = $"{result.Title}, {Summary}, {Platforms}";
     }
 
     internal ProviderSearchResult Result { get; }
-    public string Title => Result.Title;
-    public string Summary { get; }
-    public string Platforms { get; }
-    public string AccessibleName { get; }
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    // Starts empty (grey placeholder) and is set once the thumbnail has loaded.
-    public ImageSource? Thumbnail
-    {
-        get => thumbnail;
-        internal set
-        {
-            thumbnail = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Thumbnail)));
-        }
-    }
 }
 
 internal enum AddGameOutcome { None, OpenGame, AddManually, OpenSettings }
@@ -62,6 +48,7 @@ public sealed partial class AddGameDialog : ContentDialog
         IGameMetadataProvider provider, ProviderGameImporter importer, ProviderThumbnailLoader thumbnails)
     {
         InitializeComponent();
+        ArtworkListLoader.NameRows(GameSearchResults);
         this.provider = provider;
         this.importer = importer;
         this.thumbnails = thumbnails;
