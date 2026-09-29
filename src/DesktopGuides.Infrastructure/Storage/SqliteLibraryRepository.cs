@@ -8,10 +8,10 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
 {
     private sealed record SchemaObject(string Type, string Name, string Table, string Sql);
 
-    private static readonly Lazy<IReadOnlyList<SchemaObject>> VersionOneSchema =
-        new(() => BuildExpectedSchema(1));
-    private static readonly Lazy<IReadOnlyList<SchemaObject>> VersionTwoSchema =
-        new(() => BuildExpectedSchema(2));
+    private static readonly Lazy<IReadOnlyDictionary<int, IReadOnlyList<SchemaObject>>> ExpectedSchemas =
+        new(() => LibrarySchema.Migrations.ToDictionary(
+            migration => migration.Version,
+            migration => BuildExpectedSchema(migration.Version)));
 
     private readonly ILibraryPaths paths;
     private readonly TimeProvider clock;
@@ -537,12 +537,10 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                 throw new InvalidDataException("Library database contains orphaned records.");
             }
         }
-        IReadOnlyList<SchemaObject> expectedSchema = expectedVersion switch
+        if (!ExpectedSchemas.Value.TryGetValue(expectedVersion, out IReadOnlyList<SchemaObject>? expectedSchema))
         {
-            1 => VersionOneSchema.Value,
-            2 => VersionTwoSchema.Value,
-            _ => throw new InvalidDataException("Unsupported library schema version.")
-        };
+            throw new InvalidDataException("Unsupported library schema version.");
+        }
         if (!ReadSchema(connection, transaction).SequenceEqual(expectedSchema))
         {
             throw new InvalidDataException("Library database schema is incomplete or altered.");
@@ -558,11 +556,10 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         }.ToString());
         reference.Open();
         using SqliteCommand migration = reference.CreateCommand();
-        migration.CommandText = LibrarySchema.Version1;
-        migration.ExecuteNonQuery();
-        if (version == 2)
+        foreach ((int nextVersion, string sql) in LibrarySchema.Migrations)
         {
-            migration.CommandText = LibrarySchema.Version2;
+            if (nextVersion > version) break;
+            migration.CommandText = sql;
             migration.ExecuteNonQuery();
         }
         return ReadSchema(reference, null);

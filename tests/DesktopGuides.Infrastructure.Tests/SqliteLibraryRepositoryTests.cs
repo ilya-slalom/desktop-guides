@@ -56,7 +56,7 @@ public sealed class SqliteLibraryRepositoryTests
         using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
         using SqliteCommand version = connection.CreateCommand();
         version.CommandText = "PRAGMA user_version";
-        Assert.Equal(2L, (long)version.ExecuteScalar()!);
+        Assert.Equal(3L, (long)version.ExecuteScalar()!);
         using SqliteCommand index = connection.CreateCommand();
         index.CommandText = """
             SELECT name FROM sqlite_schema
@@ -249,7 +249,7 @@ public sealed class SqliteLibraryRepositoryTests
 
         using SqliteCommand version = active.CreateCommand();
         version.CommandText = "PRAGMA user_version";
-        Assert.Equal(2L, (long)version.ExecuteScalar()!);
+        Assert.Equal(3L, (long)version.ExecuteScalar()!);
         using SqliteCommand index = active.CreateCommand();
         index.CommandText = """
             SELECT name FROM sqlite_schema
@@ -677,6 +677,137 @@ public sealed class SqliteLibraryRepositoryTests
         }
 
         Assert.Equal(new AppSettings(ThemePreference.System, null), await repository.GetSettingsAsync());
+    }
+
+    [Fact]
+    public async Task UpgradesPopulatedVersionTwoAndKeepsGames()
+    {
+        using TestLibrary directory = new();
+        Guid gameId = Guid.NewGuid();
+        CreatePopulatedVersionTwo(directory, gameId);
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+
+        Game game = Assert.Single(await repository.ListGamesAsync());
+        Assert.Equal(gameId, game.Id);
+        Assert.Null(game.Link);
+        Assert.Equal(3L, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.Single(Directory.GetFiles(directory.Paths.RecoveryRoot, "*.sqlite"));
+    }
+
+    [Fact]
+    public async Task FailedVersionThreeMigrationStaysAtVersionTwo()
+    {
+        using TestLibrary directory = new();
+        Guid gameId = Guid.NewGuid();
+        CreatePopulatedVersionTwo(directory, gameId);
+
+        await using (SqliteLibraryRepository failing = new(directory.Paths, null, version =>
+        {
+            if (version == 3) throw new IOException("Injected after v3 columns were added.");
+        }))
+        {
+            await Assert.ThrowsAsync<InvalidDataException>(() => failing.InitializeAsync());
+        }
+
+        Assert.Equal(2L, ReadUserVersion(directory.Paths.DatabasePath));
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand columns = connection.CreateCommand();
+        columns.CommandText = "SELECT count(*) FROM pragma_table_info('Games') WHERE name = 'ProviderName'";
+        Assert.Equal(0L, (long)columns.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public async Task ManyUnlinkedGamesAreAllowedButADuplicateLinkIsRejected()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+
+        InsertRawGame(connection, Guid.NewGuid(), null, null, null);
+        InsertRawGame(connection, Guid.NewGuid(), null, null, null);
+        InsertRawGame(connection, Guid.NewGuid(), "igdb", "1942", null);
+        SqliteException duplicate = Assert.Throws<SqliteException>(
+            () => InsertRawGame(connection, Guid.NewGuid(), "igdb", "1942", null));
+        Assert.Equal(2067, duplicate.SqliteExtendedErrorCode);
+    }
+
+    [Theory]
+    [InlineData("steam", "1942", null)]
+    [InlineData("igdb", null, null)]
+    [InlineData(null, "1942", null)]
+    [InlineData("igdb", "123456789012345678901", null)]
+    [InlineData(null, null, "artwork/other/a.png")]
+    [InlineData(null, null, "content/a.png")]
+    public async Task ProviderPairingAndArtworkPathChecksRejectBadRows(
+        string? provider, string? externalId, string? artwork)
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+
+        SqliteException error = Assert.Throws<SqliteException>(
+            () => InsertRawGame(connection, Guid.NewGuid(), provider, externalId, artwork));
+        Assert.Equal(275, error.SqliteExtendedErrorCode); // SQLITE_CONSTRAINT_CHECK
+    }
+
+    [Fact]
+    public async Task ArtworkPathUnderTheGamesOwnFolderIsAccepted()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        Guid id = Guid.NewGuid();
+
+        InsertRawGame(connection, id, "igdb", "7", $"artwork/{id:N}/{new string('a', 64)}.png");
+    }
+
+    private static void CreatePopulatedVersionTwo(TestLibrary directory, Guid gameId)
+    {
+        directory.Paths.EnsureCreated();
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "PRAGMA journal_mode=WAL";
+        command.ExecuteNonQuery();
+        command.CommandText = LibrarySchema.Version1;
+        command.ExecuteNonQuery();
+        command.CommandText = LibrarySchema.Version2;
+        command.ExecuteNonQuery();
+        command.CommandText = """
+            INSERT INTO Games (Id, Title, CreatedUtcMs, UpdatedUtcMs)
+            VALUES ($id, 'Version two game', $now, $now)
+            """;
+        command.Parameters.AddWithValue("$id", gameId.ToString("N"));
+        command.Parameters.AddWithValue("$now", Now.ToUnixTimeMilliseconds());
+        command.ExecuteNonQuery();
+    }
+
+    private static void InsertRawGame(
+        SqliteConnection connection, Guid id, string? provider, string? externalId, string? artwork)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO Games (Id, Title, CreatedUtcMs, UpdatedUtcMs,
+                ProviderName, ProviderGameId, ArtworkRelativePath)
+            VALUES ($id, 'Raw', 0, 0, $provider, $externalId, $artwork)
+            """;
+        command.Parameters.AddWithValue("$id", id.ToString("N"));
+        command.Parameters.AddWithValue("$provider", (object?)provider ?? DBNull.Value);
+        command.Parameters.AddWithValue("$externalId", (object?)externalId ?? DBNull.Value);
+        command.Parameters.AddWithValue("$artwork", (object?)artwork ?? DBNull.Value);
+        command.ExecuteNonQuery();
+    }
+
+    private static long ReadUserVersion(string databasePath)
+    {
+        using SqliteConnection connection = OpenWithForeignKeys(databasePath);
+        using SqliteCommand version = connection.CreateCommand();
+        version.CommandText = "PRAGMA user_version";
+        return (long)version.ExecuteScalar()!;
     }
 
     private static void InsertGuide(

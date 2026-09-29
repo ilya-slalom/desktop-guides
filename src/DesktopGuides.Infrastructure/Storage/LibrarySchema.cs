@@ -2,7 +2,7 @@ namespace DesktopGuides.Infrastructure.Storage;
 
 internal static class LibrarySchema
 {
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     public const string Version1 = """
         CREATE TABLE Games (
@@ -72,9 +72,29 @@ internal static class LibrarySchema
         PRAGMA user_version = 2;
         """;
 
+    public const string Version3 = """
+        ALTER TABLE Games ADD COLUMN ProviderName TEXT
+            CHECK (ProviderName IS NULL OR ProviderName = 'igdb');
+        ALTER TABLE Games ADD COLUMN ProviderGameId TEXT
+            CHECK ((ProviderName IS NULL) = (ProviderGameId IS NULL) AND
+                   (ProviderGameId IS NULL OR length(ProviderGameId) BETWEEN 1 AND 20));
+        ALTER TABLE Games ADD COLUMN MetadataJson TEXT
+            CHECK (MetadataJson IS NULL OR length(MetadataJson) <= 65536);
+        ALTER TABLE Games ADD COLUMN MetadataRetrievedUtcMs INTEGER
+            CHECK (MetadataRetrievedUtcMs IS NULL OR MetadataRetrievedUtcMs >= 0);
+        ALTER TABLE Games ADD COLUMN ArtworkRelativePath TEXT
+            CHECK (ArtworkRelativePath IS NULL OR
+                   ArtworkRelativePath LIKE 'artwork/' || Id || '/%');
+        CREATE UNIQUE INDEX UX_Games_Provider
+            ON Games(ProviderName, ProviderGameId) WHERE ProviderName IS NOT NULL;
+
+        PRAGMA user_version = 3;
+        """;
+
     public static readonly (int Version, string Sql)[] Migrations =
     [
         (1, Version1),
-        (2, Version2)
+        (2, Version2),
+        (3, Version3)
     ];
 }
