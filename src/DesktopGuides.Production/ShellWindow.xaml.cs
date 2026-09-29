@@ -1,13 +1,20 @@
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Navigation;
+using DesktopGuides.Core.Providers;
+using DesktopGuides.Infrastructure.Artwork;
 using DesktopGuides.Infrastructure.Storage;
 using DesktopGuides.Production.Materials;
+using DesktopGuides.Production.Providers;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
+using System.Globalization;
+using System.Runtime.InteropServices;
+using CommunityToolkit.WinUI.Controls;
 using Windows.Storage;
 using Windows.System;
 using DispatcherQueueTimer = Microsoft.UI.Dispatching.DispatcherQueueTimer;
@@ -23,6 +30,9 @@ public sealed partial class ShellWindow : Window
     private Task initializationTask = Task.CompletedTask;
     private LibrarySessionLease? libraryLease;
     private SqliteLibraryRepository? repository;
+    private ProviderServices? providers;
+    private ManagedArtworkStore? artwork;
+    private ProviderGameImporter? importer;
     private Guid? resumeGuideId;
     private Guid? pendingGuideFocus;
     private int guideFocusRenderGeneration = -1;
@@ -36,6 +46,9 @@ public sealed partial class ShellWindow : Window
     private bool gameEditorRequested;
     private bool applyingMaterialSelection;
     private GameEditorDialog? activeGameEditor;
+    private AddGameDialog? activeAddGameDialog;
+    private CancellationTokenSource? refreshCancel;
+    private Task refreshTask = Task.CompletedTask;
 
     internal WindowMaterial EffectiveMaterial { get; private set; } = WindowMaterial.Solid;
 
@@ -192,8 +205,13 @@ public sealed partial class ShellWindow : Window
             libraryLease = await LibrarySessionLease.AcquireAsync(
                 dataRoot, leaseWait.Token);
             ShowBusyStatus("Loading library...");
-            repository = new SqliteLibraryRepository(new ManagedPathResolver(dataRoot));
+            ManagedPathResolver paths = new(dataRoot);
+            repository = new SqliteLibraryRepository(paths);
+            artwork = new ManagedArtworkStore(paths);
             await repository.InitializeAsync();
+            providers = new ProviderServices(dataRoot);
+            await ProviderSettings.InitializeAsync(providers);
+            importer = providers.CreateImporter(repository, artwork);
             WindowMaterial requestedMaterial = WindowMaterial.Mica;
             try
             {
@@ -237,6 +255,9 @@ public sealed partial class ShellWindow : Window
         closeRequested = true;
         statusDismissTimer.Stop();
         activeGameEditor?.Hide();
+        activeAddGameDialog?.Hide();
+        refreshCancel?.Cancel();
+        ProviderSettings.Cancel();
         leaseWait.Cancel();
         Task pendingNavigation = navigationQueue.StopAndDrainAsync();
         Program.ReleaseInstanceKey();
@@ -249,7 +270,7 @@ public sealed partial class ShellWindow : Window
         await Task.Yield();
         try
         {
-            await Task.WhenAll(initializationTask, pendingNavigation);
+            await Task.WhenAll(initializationTask, pendingNavigation, refreshTask);
         }
         finally
         {
@@ -265,6 +286,7 @@ public sealed partial class ShellWindow : Window
                     {
                         await repository.DisposeAsync();
                     }
+                    providers?.Dispose();
                 }
                 finally
                 {
@@ -506,29 +528,50 @@ public sealed partial class ShellWindow : Window
                 {
                     return;
                 }
-                Game? created = null;
-                GameEditorDialog editor = new(null, async details =>
+                if (importer is null || providers is null ||
+                    !await providers.HasIgdbCredentialsAsync(CancellationToken.None))
                 {
-                    created = await RequireRepository().AddGameAsync(
-                        details.Title, details.Platform, details.Notes);
-                })
+                    await ShowManualAddAsync(ProviderMessages.ForIgdb(ProviderErrorKind.NotConfigured));
+                    return;
+                }
+                AddGameDialog search = new(providers.Igdb, importer, providers.Thumbnails)
                 {
                     XamlRoot = Navigation.XamlRoot
                 };
-                DialogSurface.Apply(editor, EffectiveMaterial);
-                activeGameEditor = editor;
+                DialogSurface.Apply(search, EffectiveMaterial);
+                activeAddGameDialog = search;
                 try
                 {
-                    if (await editor.ShowAsync() == ContentDialogResult.Primary &&
-                        created is not null && !closeRequested)
-                    {
-                        navigator.OpenGame(created.Id);
-                        await RenderCurrentAsync();
-                    }
+                    await search.ShowAsync();
                 }
                 finally
                 {
-                    activeGameEditor = null;
+                    activeAddGameDialog = null;
+                }
+                if (closeRequested)
+                {
+                    return;
+                }
+                switch (search.Outcome)
+                {
+                    case AddGameOutcome.OpenGame when search.Added is { } added:
+                        navigator.OpenGame(added.Game.Id);
+                        await RenderCurrentAsync();
+                        if (added.AlreadyInLibrary)
+                        {
+                            ShowTransientStatus($"{added.Game.Title} is already in your library.");
+                        }
+                        else if (added.ArtworkMissing)
+                        {
+                            ShowWarningStatus("Game added. Its cover couldn't be downloaded.");
+                        }
+                        break;
+                    case AddGameOutcome.AddManually:
+                        await ShowManualAddAsync(null);
+                        break;
+                    case AddGameOutcome.OpenSettings:
+                        await OpenSettingsFromDialogAsync();
+                        break;
                 }
             });
         }
@@ -540,6 +583,50 @@ public sealed partial class ShellWindow : Window
                 AddGameButton.IsEnabled = true;
             }
         }
+    }
+
+    private async Task ShowManualAddAsync(string? notice)
+    {
+        Game? created = null;
+        GameEditorDialog editor = new(null, async details =>
+        {
+            created = await RequireRepository().AddGameAsync(
+                details.Title, details.Platform, details.Notes);
+        }, notice)
+        {
+            XamlRoot = Navigation.XamlRoot
+        };
+        DialogSurface.Apply(editor, EffectiveMaterial);
+        activeGameEditor = editor;
+        ContentDialogResult result;
+        try
+        {
+            result = await editor.ShowAsync();
+        }
+        finally
+        {
+            activeGameEditor = null;
+        }
+        if (closeRequested)
+        {
+            return;
+        }
+        if (result == ContentDialogResult.Primary && created is not null)
+        {
+            navigator.OpenGame(created.Id);
+            await RenderCurrentAsync();
+        }
+        else if (editor.OpenSettingsRequested)
+        {
+            await OpenSettingsFromDialogAsync();
+        }
+    }
+
+    private async Task OpenSettingsFromDialogAsync()
+    {
+        navigator.OpenSettings();
+        await RenderCurrentAsync();
+        ProviderSettings.Expand();
     }
 
     private async void EditGameClicked(object sender, RoutedEventArgs args)
@@ -798,6 +885,7 @@ public sealed partial class ShellWindow : Window
                     GameHeading.Text = "Loading game…";
                     GamePlatform.Text = string.Empty;
                     GameNotes.Text = string.Empty;
+                    ClearProviderMetadata();
                     GameMetadataSurface.Visibility = Visibility.Collapsed;
                     EditGameButton.IsEnabled = false;
                     GameEmptyState.Visibility = Visibility.Collapsed;
@@ -833,9 +921,18 @@ public sealed partial class ShellWindow : Window
                     }
                     GameHeading.Text = game.Title;
                     GamePlatform.Text = game.Platform ?? string.Empty;
+                    GamePlatform.Visibility = game.Platform is null ? Visibility.Collapsed : Visibility.Visible;
                     GameNotes.Text = game.Notes ?? string.Empty;
+                    GameNotesScroll.Visibility = game.Notes is null ? Visibility.Collapsed : Visibility.Visible;
+                    ImageSource? cover = await LoadCoverAsync(game.ArtworkRelativePath);
+                    if (generation != renderGeneration)
+                    {
+                        return false;
+                    }
+                    ShowProviderMetadata(game, cover);
                     GameMetadataSurface.Visibility =
-                        game.Platform is null && game.Notes is null
+                        game.Platform is null && game.Notes is null &&
+                        game.Metadata is null && cover is null
                             ? Visibility.Collapsed
                             : Visibility.Visible;
                     EditGameButton.IsEnabled = true;
@@ -917,6 +1014,7 @@ public sealed partial class ShellWindow : Window
 
                 case SettingsRoute:
                     SettingsPanel.Visibility = Visibility.Visible;
+                    await ProviderSettings.ReloadIfUnreadableAsync();
                     ShowTransientStatus("Settings ready.");
                     break;
             }
@@ -930,6 +1028,151 @@ public sealed partial class ShellWindow : Window
             }
             return false;
         }
+    }
+
+    private void ClearProviderMetadata()
+    {
+        GameCover.Source = null;
+        GameCoverFrame.Visibility = Visibility.Collapsed;
+        GameProviderDetails.Visibility = Visibility.Collapsed;
+        GameProviderLink.Visibility = Visibility.Collapsed;
+        RefreshMetadataButton.Visibility = Visibility.Collapsed;
+    }
+
+    // Reads the cached file through a stream, so a cover never triggers a
+    // network request and a damaged file only hides the cover.
+    private async Task<ImageSource?> LoadCoverAsync(string? relativePath)
+    {
+        if (relativePath is null || artwork?.ResolveFile(relativePath) is not { } path)
+        {
+            return null;
+        }
+        try
+        {
+            using FileStream file = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            BitmapImage bitmap = new() { DecodePixelWidth = 240 };
+            await bitmap.SetSourceAsync(file.AsRandomAccessStream());
+            return bitmap;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or COMException)
+        {
+            return null;
+        }
+    }
+
+    private void ShowProviderMetadata(Game game, ImageSource? cover)
+    {
+        GameCover.Source = cover;
+        GameCoverFrame.Visibility = cover is null ? Visibility.Collapsed : Visibility.Visible;
+        RefreshMetadataButton.Visibility = game.Link is null ? Visibility.Collapsed : Visibility.Visible;
+        RefreshMetadataButton.IsEnabled = refreshCancel is null;
+        if (game.Metadata is not { } metadata)
+        {
+            GameProviderDetails.Visibility = Visibility.Collapsed;
+            return;
+        }
+        List<MetadataItem> facts = [];
+        if (metadata.FirstReleaseDate is { } released)
+        {
+            string year = released.Year.ToString(CultureInfo.InvariantCulture);
+            facts.Add(new MetadataItem { Label = year, AccessibleLabel = $"Released {year}" });
+        }
+        facts.Add(new MetadataItem { Label = GameMetadataPresentation.TypeLabel(metadata.Type) });
+        if (GameMetadataPresentation.PlatformSummary(metadata.Platforms) is { } platforms)
+        {
+            facts.Add(new MetadataItem { Label = platforms, AccessibleLabel = $"Platforms: {platforms}" });
+        }
+        GameFacts.Items = facts;
+        SetOptionalText(GameSummary, metadata.Summary);
+        SetOptionalText(GameGenres,
+            metadata.Genres.Count == 0 ? null : $"Genres: {string.Join(", ", metadata.Genres)}");
+        SetOptionalText(GameCompanies, GameMetadataPresentation.Companies(metadata));
+        GameAttribution.Text = string.Join(". ", GameMetadataPresentation.Attribution(metadata)) + ".";
+        if (GameMetadataNormalizer.NormalizeProviderUrl(metadata.ProviderUrl) is { } url)
+        {
+            GameProviderLink.NavigateUri = new Uri(url);
+            GameProviderLink.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            GameProviderLink.Visibility = Visibility.Collapsed;
+        }
+        GameProviderDetails.Visibility = Visibility.Visible;
+    }
+
+    private static void SetOptionalText(TextBlock block, string? text)
+    {
+        block.Text = text ?? string.Empty;
+        block.Visibility = text is null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void RefreshMetadataClicked(object sender, RoutedEventArgs args)
+    {
+        if (closeRequested || refreshCancel is not null || importer is null ||
+            navigator.Current is not GameRoute route)
+        {
+            return;
+        }
+        refreshTask = RefreshMetadataAsync(route.GameId, importer);
+    }
+
+    private async Task RefreshMetadataAsync(Guid gameId, ProviderGameImporter refresher)
+    {
+        using CancellationTokenSource cancel = new();
+        refreshCancel = cancel;
+        RefreshMetadataButton.IsEnabled = false;
+        ShowBusyStatus("Refreshing metadata…");
+        ProviderRefreshResult? result = null;
+        string? error = null;
+        try
+        {
+            result = await refresher.RefreshAsync(gameId, cancel.Token);
+        }
+        catch (OperationCanceledException) when (cancel.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (ProviderException failure)
+        {
+            error = ProviderMessages.ForIgdb(failure.Kind);
+        }
+        catch (KeyNotFoundException)
+        {
+            error = "This game is no longer in your library.";
+        }
+        catch (Exception failure)
+        {
+            error = $"Could not refresh metadata: {failure.Message}";
+        }
+        finally
+        {
+            refreshCancel = null;
+            // Re-enable here: the user may have moved to another game, which won't re-render.
+            if (!closeRequested) RefreshMetadataButton.IsEnabled = true;
+        }
+        if (closeRequested)
+        {
+            return;
+        }
+        await RunNavigationAsync(async () =>
+        {
+            if (navigator.Current is GameRoute current && current.GameId == gameId)
+            {
+                await RenderCurrentAsync();
+            }
+            if (error is not null)
+            {
+                ShowErrorStatus(error);
+            }
+            else if (result!.ArtworkMissing)
+            {
+                ShowWarningStatus("Metadata refreshed. A new cover couldn't be downloaded.");
+            }
+            else
+            {
+                ShowTransientStatus("Metadata refreshed.");
+            }
+        });
     }
 
     private SqliteLibraryRepository RequireRepository() =>

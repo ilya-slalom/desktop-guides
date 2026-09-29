@@ -1,0 +1,11 @@
+[
+  { "id": 231, "name": "Half-Life", "first_release_date": 911433600,
+    "game_type": { "id": 0, "type": "Main Game" },
+    "platforms": [ { "id": 6, "name": "PC (Microsoft Windows)" }, { "id": 8, "name": "PlayStation 2" } ],
+    "cover": { "id": 1, "image_id": "co1abc" } },
+  { "id": 7351, "name": "Half-Life: Source", "first_release_date": 1086048000,
+    "game_type": { "id": 9, "type": "Remaster" }, "version_parent": 231,
+    "platforms": [ { "id": 6, "name": "PC (Microsoft Windows)" } ] },
+  { "id": 0, "name": "Broken" },
+  { "id": 99, "name": "   " }
+]

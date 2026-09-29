@@ -169,12 +169,21 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock x:Name="GameHeading"
                                Style="{StaticResource DesktopGuidesPageTitleStyle}"
                                AutomationProperties.AutomationId="GameHeading" />
-                    <Button x:Name="EditGameButton"
+                    <Button x:Name="RefreshMetadataButton"
                             Grid.Column="1"
+                            Content="Refresh metadata"
+                            Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed"
+                            Click="RefreshMetadataClicked"
+                            AutomationProperties.AutomationId="RefreshMetadataButton" />
+                    <Button x:Name="EditGameButton"
+                            Grid.Column="2"
                             Content="Edit game"
                             Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
                             VerticalAlignment="Center"
@@ -186,22 +195,76 @@
                         Grid.Row="1"
                         Style="{StaticResource DesktopGuidesSurfaceStyle}"
                         AutomationProperties.AutomationId="GameMetadataSurface">
-                    <StackPanel Spacing="{StaticResource DesktopGuidesSpacing8}">
-                        <TextBlock x:Name="GamePlatform"
-                                   Style="{StaticResource DesktopGuidesBodyStyle}"
-                                   AutomationProperties.AutomationId="GamePlatform" />
-                        <ScrollViewer x:Name="GameNotesScroll"
-                                      MaxHeight="96"
-                                      HorizontalScrollBarVisibility="Disabled"
-                                      VerticalScrollBarVisibility="Auto"
-                                      AutomationProperties.AutomationId="GameNotesScroll"
-                                      AutomationProperties.Name="Game notes">
-                            <TextBlock x:Name="GameNotes"
-                                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
-                                       IsTextSelectionEnabled="True"
-                                       AutomationProperties.AutomationId="GameNotes" />
-                        </ScrollViewer>
-                    </StackPanel>
+                    <Grid ColumnSpacing="{StaticResource DesktopGuidesSpacing16}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border x:Name="GameCoverFrame"
+                                Width="120"
+                                Height="180"
+                                CornerRadius="4"
+                                VerticalAlignment="Top"
+                                Visibility="Collapsed">
+                            <Image x:Name="GameCover"
+                                   Stretch="UniformToFill"
+                                   AutomationProperties.Name="Cover art"
+                                   AutomationProperties.AutomationId="GameCover" />
+                        </Border>
+                        <StackPanel Grid.Column="1"
+                                    Spacing="{StaticResource DesktopGuidesSpacing8}">
+                            <TextBlock x:Name="GamePlatform"
+                                       Style="{StaticResource DesktopGuidesBodyStyle}"
+                                       AutomationProperties.AutomationId="GamePlatform" />
+                            <ScrollViewer x:Name="GameNotesScroll"
+                                          MaxHeight="96"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto"
+                                          AutomationProperties.AutomationId="GameNotesScroll"
+                                          AutomationProperties.Name="Game notes">
+                                <TextBlock x:Name="GameNotes"
+                                           Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                                           IsTextSelectionEnabled="True"
+                                           AutomationProperties.AutomationId="GameNotes" />
+                            </ScrollViewer>
+                            <StackPanel x:Name="GameProviderDetails"
+                                        Spacing="{StaticResource DesktopGuidesSpacing8}"
+                                        Visibility="Collapsed">
+                                <local:AutomationGroup AutomationProperties.AutomationId="GameFacts">
+                                    <toolkit:MetadataControl x:Name="GameFacts" />
+                                </local:AutomationGroup>
+                                <ScrollViewer MaxHeight="120"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              VerticalScrollBarVisibility="Auto"
+                                              AutomationProperties.Name="Game summary">
+                                    <TextBlock x:Name="GameSummary"
+                                               Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                                               TextWrapping="Wrap"
+                                               IsTextSelectionEnabled="True"
+                                               AutomationProperties.AutomationId="GameSummary" />
+                                </ScrollViewer>
+                                <TextBlock x:Name="GameGenres"
+                                           Style="{StaticResource DesktopGuidesMetadataStyle}"
+                                           TextWrapping="Wrap"
+                                           AutomationProperties.AutomationId="GameGenres" />
+                                <TextBlock x:Name="GameCompanies"
+                                           Style="{StaticResource DesktopGuidesMetadataStyle}"
+                                           TextWrapping="Wrap"
+                                           AutomationProperties.AutomationId="GameCompanies" />
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="{StaticResource DesktopGuidesSpacing12}">
+                                    <TextBlock x:Name="GameAttribution"
+                                               VerticalAlignment="Center"
+                                               Style="{StaticResource DesktopGuidesMetadataStyle}"
+                                               AutomationProperties.AutomationId="GameAttribution" />
+                                    <HyperlinkButton x:Name="GameProviderLink"
+                                                     Content="View on IGDB"
+                                                     Visibility="Collapsed"
+                                                     AutomationProperties.AutomationId="GameProviderLink" />
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
                 <Grid Grid.Row="2"
@@ -360,6 +423,7 @@
                                 <ComboBoxItem Content="Solid" Tag="Solid" />
                             </ComboBox>
                         </toolkit:SettingsCard>
+                        <local:ProviderSettingsCard x:Name="ProviderSettings" />
                     </StackPanel>
                 </ScrollViewer>
             </Grid>

@@ -1,3 +1,5 @@
+using DesktopGuides.Core.Providers;
+
 namespace DesktopGuides.Core.Library;
 
 public enum GuideFormat
@@ -20,7 +22,10 @@ public sealed record Game(
     string? Platform,
     string? Notes,
     DateTimeOffset CreatedUtc,
-    DateTimeOffset UpdatedUtc);
+    DateTimeOffset UpdatedUtc,
+    ProviderGameLink? Link = null,
+    GameMetadataSnapshot? Metadata = null,
+    string? ArtworkRelativePath = null);
 
 public sealed record Guide(
     Guid Id,
@@ -59,4 +64,19 @@ public sealed record AppSettings(
 
 public sealed record StartupReconciliationReport(
     int ResolvedOperationCount,
-    int ReviewOrphanCount);
+    int ReviewOrphanCount,
+    int ArtworkReviewCount = 0);
+
+public sealed record NewLinkedGame(
+    Guid Id,
+    string Title,
+    string? Platform,
+    ProviderGameLink Link,
+    GameMetadataSnapshot Metadata,
+    string? ArtworkRelativePath);
+
+public sealed class DuplicateProviderLinkException(Guid existingGameId)
+    : Exception("This game is already in the library.")
+{
+    public Guid ExistingGameId { get; } = existingGameId;
+}

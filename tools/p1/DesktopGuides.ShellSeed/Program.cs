@@ -1,5 +1,13 @@
+using System.IO.Compression;
+using System.Net;
 using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Providers;
+using DesktopGuides.Infrastructure.Artwork;
+using DesktopGuides.Infrastructure.Providers;
 using DesktopGuides.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
 
@@ -69,6 +77,106 @@ if (args.Length == 3 && args[0] == "set-material")
     await materialRepository.InitializeAsync();
     await materialRepository.UpdateSettingsAsync(
         settings => settings with { WindowMaterial = material });
+    return 0;
+}
+
+if (args.Length == 2 && args[0] == "seed-linked-game")
+{
+    ManagedPathResolver linkedPaths = new(args[1]);
+    await using SqliteLibraryRepository linkedRepository = new(linkedPaths);
+    await linkedRepository.InitializeAsync();
+    Guid gameId = Guid.NewGuid();
+    StoredArtwork cover = await new ManagedArtworkStore(linkedPaths)
+        .StoreAsync(gameId, SolidPng(60, 90, 0x2E, 0x5E, 0x8C), CancellationToken.None);
+    GameMetadataSnapshot snapshot = new(
+        GameMetadataSnapshot.CurrentSchemaVersion,
+        "A seeded summary that the offline check reads back.",
+        new DateOnly(2004, 11, 16),
+        ["Shooter"],
+        ["Seed Developer"],
+        ["Seed Publisher"],
+        ["PC (Microsoft Windows)", "PlayStation 2"],
+        "https://www.igdb.com/games/seeded-linked-game",
+        GameTypeTag.MainGame,
+        "SteamGridDB");
+    await linkedRepository.AddLinkedGameAsync(new NewLinkedGame(
+        gameId, "Seeded Linked Game", null,
+        new ProviderGameLink(ProviderGameLink.Igdb, "900001", DateTimeOffset.UtcNow),
+        snapshot, cover.RelativePath), CancellationToken.None);
+    Console.WriteLine($"Seeded linked game {gameId:N}.");
+    return 0;
+}
+
+if (args.Length == 2 && args[0] == "describe-providers")
+{
+    ManagedPathResolver describePaths = new(args[1]);
+    await using SqliteLibraryRepository describeRepository = new(describePaths);
+    await describeRepository.InitializeAsync();
+    ManagedArtworkStore store = new(describePaths);
+    var games = (await describeRepository.ListGamesAsync()).Select(game => new
+    {
+        game.Title,
+        game.Platform,
+        game.Notes,
+        Provider = game.Link?.Provider,
+        ExternalId = game.Link?.ExternalId,
+        HasMetadata = game.Metadata is not null,
+        ArtworkSource = game.Metadata?.ArtworkSource,
+        game.ArtworkRelativePath,
+        ArtworkExists = game.ArtworkRelativePath is { } path && store.ResolveFile(path) is not null,
+    });
+    int CountFiles(string root) => Directory.Exists(root)
+        ? Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Count()
+        : 0;
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        Games = games,
+        ArtworkFiles = CountFiles(describePaths.ArtworkRoot),
+        StagingFiles = CountFiles(describePaths.ArtworkStagingRoot),
+        CredentialBlobExists = File.Exists(Path.Combine(args[1], "providers.bin")),
+    }));
+    return 0;
+}
+
+if (args.Length == 3 && args[0] == "check-igdb-fields")
+{
+    Dictionary<string, string> labelled = File.ReadLines(args[1])
+        .Select(line => line.Split(':', 2))
+        .Where(parts => parts.Length == 2)
+        .GroupBy(parts => parts[0].Trim().ToLowerInvariant())
+        .ToDictionary(group => group.Key, group => group.Last()[1].Trim());
+    if (!labelled.TryGetValue("igdb client id", out string? clientId) ||
+        !labelled.TryGetValue("igdb client secret", out string? clientSecret))
+    {
+        Console.Error.WriteLine("The IGDB credential file has no client id or client secret line.");
+        return 2;
+    }
+    SortedSet<string> fields = [];
+    foreach (string fixture in Directory.EnumerateFiles(args[2], "igdb-*.json"))
+    {
+        CollectFieldPaths(JsonNode.Parse(File.ReadAllText(fixture)), string.Empty, fields);
+    }
+    using ProviderHttp http = new();
+    using TwitchTokenSource tokens = new(http);
+    string token = await tokens.GetTokenAsync(
+        new IgdbCredentials(clientId, clientSecret), false, CancellationToken.None);
+    string body = $"fields {string.Join(",", fields)}; search \"Half-Life\"; limit 1;";
+    ProviderResponse response = await http.SendAsync(
+        HttpMethod.Post, new Uri("https://api.igdb.com/v4/games"), request =>
+        {
+            request.Headers.Add("Client-ID", clientId);
+            request.Headers.Authorization = new("Bearer", token);
+            request.Content = new StringContent(body, Encoding.UTF8, "text/plain");
+        }, ProviderHttp.MaxJsonBytes, CancellationToken.None);
+    if (response.StatusCode != HttpStatusCode.OK ||
+        JsonNode.Parse(response.Body) is not JsonArray { Count: > 0 })
+    {
+        Console.Error.WriteLine(
+            $"IGDB rejected the fixture fields (HTTP {(int)response.StatusCode}): " +
+            Encoding.UTF8.GetString(response.Body));
+        return 1;
+    }
+    Console.WriteLine($"IGDB accepted {fields.Count} fixture fields: {string.Join(",", fields)}");
     return 0;
 }
 
@@ -173,6 +281,8 @@ if (args.Length != 2 ||
     Console.Error.WriteLine(
         "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design " +
         "<app-data-root> " +
+        "or seed-linked-game|describe-providers <app-data-root> " +
+        "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
         "or invalidate-blocked-guide <app-data-root> " +
         "or corrupt-reader-guide|restore-reader-guide <app-data-root> " +
         "or hold-write-lock|hold-read-lock <app-data-root> <ready-path> <release-path>");
@@ -316,4 +426,91 @@ static async Task InsertGuideAsync(
     command.Parameters.AddWithValue("$bytes", bytes.LongLength);
     command.Parameters.AddWithValue("$now", now);
     command.ExecuteNonQuery();
+}
+
+static void CollectFieldPaths(JsonNode? node, string prefix, SortedSet<string> fields)
+{
+    switch (node)
+    {
+        case JsonArray array:
+            foreach (JsonNode? item in array) CollectFieldPaths(item, prefix, fields);
+            break;
+        case JsonObject item:
+            foreach ((string name, JsonNode? value) in item)
+            {
+                string path = prefix.Length == 0 ? name : $"{prefix}.{name}";
+                // Expanded objects and object arrays become dotted paths
+                // such as platforms.name; scalars and ID arrays are leaves.
+                bool expanded = value is JsonObject ||
+                    (value is JsonArray items && items.Any(entry => entry is JsonObject));
+                if (expanded)
+                {
+                    CollectFieldPaths(value, path, fields);
+                }
+                else
+                {
+                    fields.Add(path);
+                }
+            }
+            break;
+    }
+}
+
+// A valid, decodable RGB PNG of one colour, so the offline check needs no
+// provider image.
+static byte[] SolidPng(int width, int height, byte red, byte green, byte blue)
+{
+    byte[] raw = new byte[height * (1 + width * 3)];
+    for (int row = 0; row < height; row++)
+    {
+        int offset = row * (1 + width * 3);
+        for (int x = 0; x < width; x++)
+        {
+            raw[offset + 1 + x * 3] = red;
+            raw[offset + 2 + x * 3] = green;
+            raw[offset + 3 + x * 3] = blue;
+        }
+    }
+    using MemoryStream compressed = new();
+    using (ZLibStream zlib = new(compressed, CompressionLevel.Optimal, leaveOpen: true))
+    {
+        zlib.Write(raw);
+    }
+    byte[] header = new byte[13];
+    System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(header, width);
+    System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(header.AsSpan(4), height);
+    header[8] = 8; // bit depth
+    header[9] = 2; // colour type: RGB
+    using MemoryStream png = new();
+    png.Write([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+    WriteChunk(png, "IHDR", header);
+    WriteChunk(png, "IDAT", compressed.ToArray());
+    WriteChunk(png, "IEND", []);
+    return png.ToArray();
+}
+
+static void WriteChunk(Stream stream, string type, byte[] data)
+{
+    Span<byte> length = stackalloc byte[4];
+    System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(length, data.Length);
+    stream.Write(length);
+    byte[] typed = [.. Encoding.ASCII.GetBytes(type), .. data];
+    stream.Write(typed);
+    Span<byte> crc = stackalloc byte[4];
+    System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(crc, Crc32(typed));
+    stream.Write(crc);
+}
+
+static uint Crc32(byte[] bytes)
+{
+    uint crc = 0xFFFFFFFF;
+    foreach (byte value in bytes)
+    {
+        crc ^= value;
+        for (int bit = 0; bit < 8; bit++)
+        {
+            crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320 : crc >> 1;
+        }
+    }
+    return ~crc;
 }

@@ -117,6 +117,23 @@ public sealed class ManagedPathResolverTests
             directory.Paths.GetPlannedGuideFile(Guid.NewGuid(), path));
     }
 
+    [Fact]
+    public void ArtworkRootsSitBesideContentAndOutsideGuideStaging()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "desktop-guides-paths-" + Guid.NewGuid());
+        try
+        {
+            ManagedPathResolver paths = new(root);
+            paths.EnsureCreated();
+            Assert.Equal(Path.Combine(paths.LibraryRoot, "artwork"), paths.ArtworkRoot);
+            Assert.Equal(Path.Combine(paths.LibraryRoot, ".artwork-staging"), paths.ArtworkStagingRoot);
+            Assert.True(Directory.Exists(paths.ArtworkRoot));
+            Assert.True(Directory.Exists(paths.ArtworkStagingRoot));
+            Assert.False(paths.ArtworkStagingRoot.StartsWith(paths.StagingRoot + Path.DirectorySeparatorChar));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
     private sealed class TestLibrary : IDisposable
     {
         public TestLibrary()

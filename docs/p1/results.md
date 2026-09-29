@@ -1186,3 +1186,108 @@ and the [Window background card](evidence/t11-design-language/material-light-mic
 The sanitized
 [result record](evidence/t11-design-language/windows-11-x64-result.json)
 lists every material pass and the package and screenshot hashes.
+
+## M2 T04.4 provider search — implementation check, 29 September 2026
+
+The [T04.4 provider design](t04-provider-search-design.md) selects IGDB
+metadata with user-supplied Twitch credentials and SteamGridDB artwork with
+a user-supplied key. Neither service is scraped; no proxy or shared secret
+is used. New Core test classes are `GameMetadataNormalizerTests`,
+`GameMetadataPresentationTests`, `ProviderGameImporterTests`,
+`ProviderMessagesTests`, and `FallbackArtworkSourceTests`. New
+Infrastructure test classes are `IgdbClientTests`, `TwitchTokenSourceTests`,
+`ArtworkSourceTests`, `ProviderHttpTests`, `ProviderCredentialBlobTests`,
+`ArtworkValidatorTests`, `ManagedArtworkStoreTests`,
+`ProviderThumbnailLoaderTests`, and `GameMetadataJsonTests`;
+`SqliteLibraryRepositoryTests` and `ManagedPathResolverTests` gained
+provider-link and artwork-path cases.
+
+On the Windows 11 x64 host at `E:\work\desktop-guides`, source commit
+`0c05d8c` plus the final-review fix working tree, Core/Infrastructure tests
+passed **150/150 Core** and **221/221 Infrastructure**, and the
+credential-helper checks passed. The fixes map a connection that drops while
+a provider body is read to Unavailable, keep the startup artwork sweep from
+blocking library open when an empty game folder cannot be deleted, and load
+search thumbnails through `ProviderHttp` and `ArtworkValidator` instead of
+letting WinUI fetch them. The unsigned Release x64 production package built
+with SHA-256
+`18960E2E7AB5124A1C7879BB48F06BB8554890100FA168C30DAF59278031FE07`. The
+host's missing optional `mspdbcmf.exe` caused only the existing
+symbols-package warning.
+
+Code-review fixes on top of `f94fc15` then passed **150/150 Core** and
+**228/228 Infrastructure** on the same host, plus the credential-helper
+checks and a Release x64 production build with no warnings. They re-enable
+Refresh metadata when a refresh finishes on another page, treat a
+`Retry-After` date in the past as retry now, and stop an existing but
+locked `providers.bin` from counting as "not configured": the load isn't
+cached, Settings reports that it couldn't read the saved credentials and
+disables Save until its own reload succeeds when Settings is opened again. The installed E2E below was not
+re-run for these fixes.
+
+The installed E2E ran on `pcsx2-win` (OS build `10.0.26200.0`, AMD64, .NET
+SDK `10.0.401`, Windows App Runtime `2.2.0.0/2.3.1.0/2.4.0.0/2.5.1.0`) on
+29 September 2026. The provider pass without the firewall rule used the
+package above, signed afresh with SHA-256
+`D48D1D849B05C4D02B84ABBF8F2C3174EA92A1E68E32AB363D4D9C98F4BE532D`. The
+blocked-network run with the elevated controller and
+`-AllowOfflineFirewallRule` used the earlier package
+`97D3A0FE3FED6137C5AB593784BFC344CD2FC539C488371D7B88F8164D3225F9`
+(source `cb513ea` plus the Task 12 working tree), signed as
+`A7206117B1D8385C47297940EEC7B9D00AD381F8F6F803747D81465393B24817`. The
+user authorized the firewall rule before that run. It was not repeated: the
+thumbnail fix does not touch offline paths, because an offline search fails
+before any result or thumbnail is shown.
+
+The primary [offline result](evidence/t04-provider-search/windows-11-x64-offline-result.json)
+(runId `d4c7fe163ae64ae1a01664d8816d7f92`, 2026-09-29T06:55Z) reports
+`success: true`, all provider scenarios (`none`, `offlineWithoutCredentials`,
+`settings`, `live`, `blockedNetwork`, `remove`) with their phases,
+`fixtureFields` "IGDB accepted 22 fixture fields", search result count 19
+(1–20 allowed), attribution "Metadata from IGDB. Artwork from SteamGridDB.",
+refresh status "Metadata refreshed.", `cancelDuringSearch: observed` (1
+attempt), both leak scans with empty `filesWithCredentialValues`, and
+`packageStillInstalled: false`. The
+[controller log](evidence/t04-provider-search/offline-controller.json)
+records rule `DesktopGuides-P1-ProviderOffline-d4c7fe163ae64ae1a01664d8816d7f92`,
+`outcome: done`, and `ruleRemoved: true`. The
+[provider result](evidence/t04-provider-search/windows-11-x64-result.json)
+(runId `e0bfbd4329cb411b97ab2b8ce22320ad`, 2026-09-29T07:35Z) reports
+`success: true`, the `none`, `offlineWithoutCredentials`, `settings`, `live`,
+and `remove` scenarios with their phases, `fixtureFields` "IGDB accepted 22
+fixture fields", search result count 19, the same attribution and refresh
+status, `cancelDuringSearch: observed`, both leak scans empty, and
+`blockedNetwork` recorded as not run without the switch. Its
+[search results](evidence/t04-provider-search/provider-live.search-results.png)
+show the cover thumbnails loaded through `ProviderHttp`.
+
+Both runs removed the temporary package, certificate trust, and scheduled
+tasks. The final-state `CredentialBlobExists: false` confirmed `providers.bin`
+was deleted. The controller's re-scan on the host of all copied evidence found
+0 files with credential values (10 files, 3 values). Screenshots were also
+inspected by eye. No pre-existing Preview package or profile existed; no backup
+was needed.
+
+An **app change** made while getting this green: the game route's UIA tree
+now exposes GameFacts, because an `AutomationGroup` wrapper reports the
+`MetadataControl` text to UIA. Harness fixes: provider modes no longer wait
+for a second `Library ready.` status. Row-count assertions wait for visible rows.
+Close-AddGameSearch uses the dialog's Close button instead of Esc. The first
+blocked-network attempt failed on the row-count race before it requested a
+rule, so none was created. The second created its rule, then failed when Esc
+did not close Add game; the controller removed that rule (`outcome: done`,
+`ruleRemoved: true`). The recorded run is the third. For the provider pass, the smoke now waits
+5 seconds before the search-results screenshot, because thumbnails load one
+at a time after the rows appear and are raw in the UIA tree; the first
+attempt with the fixed package captured the rows before any thumbnail had
+loaded. An earlier attempt in the same run folder stopped before install
+work because the seed tool had not been restored there.
+
+Selected evidence includes
+[Add game with no credentials](evidence/t04-provider-search/provider-none.add-game-no-credentials.png),
+[seeded offline game](evidence/t04-provider-search/provider-offline-none.linked-game-notconfigured.png),
+[Settings saved](evidence/t04-provider-search/provider-settings.provider-settings-saved.png),
+[Add game search](evidence/t04-provider-search/provider-live.add-game-search.png),
+[search results](evidence/t04-provider-search/provider-live.search-results.png),
+[linked live game](evidence/t04-provider-search/provider-live.linked-game-live.png), and
+[offline search](evidence/t04-provider-search/provider-offline-blocked.search-offline.png).

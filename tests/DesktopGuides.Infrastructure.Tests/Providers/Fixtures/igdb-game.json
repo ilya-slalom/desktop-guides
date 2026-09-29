@@ -1,0 +1,14 @@
+[
+  { "id": 231, "name": "Half-Life", "summary": "Gordon Freeman\u0007 fights.\r\nAgain.",
+    "url": "https://www.igdb.com/games/half-life", "first_release_date": 911433600,
+    "game_type": { "id": 0, "type": "Main Game" },
+    "genres": [ { "id": 5, "name": "Shooter" }, { "id": 5, "name": "Shooter" } ],
+    "platforms": [ { "id": 6, "name": "PC (Microsoft Windows)" } ],
+    "involved_companies": [
+      { "id": 1, "developer": true, "publisher": false, "company": { "id": 56, "name": "Valve" } },
+      { "id": 2, "developer": false, "publisher": true, "company": { "id": 57, "name": "Sierra Entertainment" } } ],
+    "cover": { "id": 1, "image_id": "co1abc" },
+    "external_games": [
+      { "id": 9, "uid": "gog-1", "external_game_source": 5 },
+      { "id": 10, "uid": "70", "external_game_source": 1 } ] }
+]

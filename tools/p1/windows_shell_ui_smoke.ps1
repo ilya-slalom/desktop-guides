@@ -7,7 +7,9 @@ param(
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
         'reader-render-error-observed', 'reader-render-error-result',
-        'late-guide-after-close', 'waiting-handoff', 'material')]
+        'late-guide-after-close', 'waiting-handoff', 'material',
+        'provider-none', 'provider-offline', 'provider-settings',
+        'provider-live', 'provider-remove')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -39,7 +41,16 @@ param(
     [string] $ExpectedMaterial = 'Mica',
 
     [ValidateSet('', 'Mica', 'Acrylic', 'Solid')]
-    [string] $SwitchToMaterial = ''
+    [string] $SwitchToMaterial = '',
+
+    [string] $IgdbCredentialFile = '',
+
+    [string] $SteamGridDbCredentialFile = '',
+
+    # The provider failure Refresh and search should report: no saved
+    # credentials, or credentials saved while the network is blocked.
+    [ValidateSet('NotConfigured', 'Unavailable')]
+    [string] $ExpectedProviderFailure = 'NotConfigured'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -61,6 +72,7 @@ try {
     Add-Type -AssemblyName UIAutomationTypes
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -Path (Join-Path $PSScriptRoot 'windows_shell_foreground_probe.cs')
+    . (Join-Path $PSScriptRoot 'windows_provider_credentials.ps1')
     $deadline = (Get-Date).AddSeconds(30)
     do {
         $installedProcess = Get-CimInstance Win32_Process `
@@ -134,13 +146,13 @@ try {
     }
 
     function Wait-Status(
-        [string] $expected,
+        [string[]] $expected,
         [switch] $AllowHidden) {
-        $transient = $expected -in @(
+        $transient = @($expected | Where-Object { $_ -in @(
             'Library ready.',
             'Game ready.',
             'Guide details ready.',
-            'Settings ready.')
+            'Settings ready.') }).Count -gt 0
         $lastObserved = 'status probe was not found'
         $deadline = (Get-Date).AddSeconds(15)
         do {
@@ -157,7 +169,7 @@ try {
                     $status.Substring(0, $separator), [ref] $sequence)) {
                 $message = $status.Substring($separator + 1)
             }
-            if ($message -eq $expected -and
+            if ($message -in $expected -and
                 $sequence -gt $script:lastStatusSequence) {
                 if ($transient -or $AllowHidden) {
                     $script:lastStatusSequence = $sequence
@@ -165,7 +177,7 @@ try {
                 }
                 $visibleStatus = Find-ById 'ShellStatus'
                 if ($visibleStatus -and
-                    $visibleStatus.Current.Name -eq $expected -and
+                    $visibleStatus.Current.Name -eq $message -and
                     -not $visibleStatus.Current.IsOffscreen) {
                     $script:lastStatusSequence = $sequence
                     return $probe
@@ -173,7 +185,7 @@ try {
             }
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
-        throw "Expected shell status '$expected'; $lastObserved."
+        throw "Expected shell status '$($expected -join "' or '")'; $lastObserved. Last consumed sequence: $script:lastStatusSequence."
     }
 
     function Wait-VisibleById([string] $id) {
@@ -671,6 +683,157 @@ try {
                 $process.MainWindowHandle) {
             throw 'The shell was not the foreground window; its backdrop would be inactive.'
         }
+    }
+
+    $providerFailureMessages = @{
+        NotConfigured = 'Add IGDB credentials in Settings to search.'
+        Unavailable = "Can't reach IGDB. Check your connection."
+    }
+
+    function Open-ProviderSettings {
+        Select-Element 'Settings'
+        [void](Wait-Name 'SettingsHeading' 'Settings')
+        Expand-ProviderSettings
+    }
+
+    function Expand-ProviderSettings {
+        $expander = Wait-VisibleById 'ProviderSettingsExpander'
+        $pattern = $null
+        if ($expander.TryGetCurrentPattern(
+            [System.Windows.Automation.ExpandCollapsePattern]::Pattern,
+            [ref]$pattern)) {
+            if ($pattern.Current.ExpandCollapseState -ne
+                [System.Windows.Automation.ExpandCollapseState]::Expanded) {
+                $pattern.Expand()
+            }
+        }
+        else {
+            Click-Element $expander
+        }
+        [void](Wait-VisibleById 'IgdbClientIdInput')
+    }
+
+    function Assert-ProviderSettingsExpanded {
+        $expander = Wait-VisibleById 'ProviderSettingsExpander'
+        $pattern = $null
+        if ($expander.TryGetCurrentPattern(
+            [System.Windows.Automation.ExpandCollapsePattern]::Pattern,
+            [ref]$pattern) -and
+            $pattern.Current.ExpandCollapseState -ne
+                [System.Windows.Automation.ExpandCollapseState]::Expanded) {
+            throw 'The provider settings card was not expanded.'
+        }
+        [void](Wait-VisibleById 'IgdbClientIdInput')
+    }
+
+    # Types a value into a PasswordBox. It checks focus first, so a value
+    # is never typed into the wrong control, and its errors never include
+    # the value.
+    function Enter-Secret([string] $id, [string] $value, [switch] $Replace) {
+        $element = Wait-EnabledById $id
+        $element.SetFocus()
+        Start-Sleep -Milliseconds 150
+        $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+        if (-not $focused -or $focused.Current.AutomationId -ne $id) {
+            throw "Focus did not reach $id, so nothing was typed."
+        }
+        try {
+            if ($Replace) { [System.Windows.Forms.SendKeys]::SendWait('^a{DEL}') }
+            [System.Windows.Forms.SendKeys]::SendWait((ConvertTo-SendKeysLiteral $value))
+        }
+        catch {
+            throw "Typing into $id failed."
+        }
+    }
+
+    function Assert-Absent([string] $id) {
+        $element = Find-ById $id
+        if ($element -and -not $element.Current.IsOffscreen) {
+            throw "'$id' was visible."
+        }
+    }
+
+    function Open-AddGameSearch {
+        Invoke-Element (Wait-EnabledById 'AddGameButton')
+        [void](Wait-VisibleById 'GameSearchInput')
+        Assert-Absent 'GameTitleInput'
+    }
+
+    # The AutoSuggestBox exposes its text through its inner edit box.
+    function Set-SearchQuery([string] $query) {
+        $box = Wait-VisibleById 'GameSearchInput'
+        $pattern = $null
+        if (-not $box.TryGetCurrentPattern(
+            [System.Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) {
+            $edit = $box.FindFirst($scope,
+                [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                    [System.Windows.Automation.ControlType]::Edit))
+            if (-not $edit) { throw 'The search box has no editable text.' }
+            $pattern = $edit.GetCurrentPattern(
+                [System.Windows.Automation.ValuePattern]::Pattern)
+        }
+        $pattern.SetValue($query)
+    }
+
+    function Get-SearchResults {
+        $list = Find-ById 'GameSearchResults'
+        if (-not $list -or $list.Current.IsOffscreen) { return @() }
+        return @($list.FindAll(
+            [System.Windows.Automation.TreeScope]::Children,
+            [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::ListItem)))
+    }
+
+    function Search-Games([string] $query) {
+        Set-SearchQuery $query
+        Invoke-Element (Wait-EnabledById 'GameSearchButton')
+        $deadline = (Get-Date).AddSeconds(30)
+        do {
+            Start-Sleep -Milliseconds 250
+            # The busy row is a StackPanel with no automation peer; its
+            # Cancel button shows exactly while work runs.
+            $busy = Find-ById 'GameSearchCancel'
+            $running = $busy -and -not $busy.Current.IsOffscreen
+            $status = Find-ById 'GameSearchStatus'
+            $hasStatus = $status -and -not $status.Current.IsOffscreen -and
+                $status.Current.Name
+            $results = Get-SearchResults
+            if (-not $running -and ($results.Count -gt 0 -or $hasStatus)) {
+                return $results
+            }
+        } while ((Get-Date) -lt $deadline)
+        throw "Search for '$query' did not finish."
+    }
+
+    function Activate-Item($item) {
+        $pattern = $null
+        if ($item.TryGetCurrentPattern(
+            [System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
+            $pattern.Invoke()
+        }
+        else {
+            Click-Element $item
+        }
+    }
+
+    # Escape can land in the search box instead of the dialog, so use the
+    # dialog's Close button.
+    function Close-AddGameSearch {
+        Invoke-Element (Wait-EnabledById 'CloseButton')
+        Wait-HiddenById 'GameSearchInput'
+    }
+
+    function Get-FactsName {
+        $facts = Wait-VisibleById 'GameFacts'
+        if ($facts.Current.Name) { return $facts.Current.Name }
+        $text = $facts.FindFirst($scope,
+            [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::Text))
+        if ($text) { return $text.Current.Name }
+        return ''
     }
 
     if ($Mode -eq 'waiting-handoff') {
@@ -1210,6 +1373,243 @@ try {
         }
         $report.phases += 'reader-render-error-did-not-save-resume'
     }
+    elseif ($Mode -eq 'provider-none') {
+        Invoke-Element (Wait-EnabledById 'AddGameButton')
+        [void](Wait-Name 'GameEditorNotice' $providerFailureMessages.NotConfigured)
+        [void](Wait-VisibleById 'GameTitleInput')
+        Assert-Absent 'GameSearchInput'
+        $report.noCredentialsScreenshot = Save-WindowScreenshot 'add-game-no-credentials'
+        $report.phases += 'no-credentials-opens-manual-add-with-notice'
+
+        Invoke-Element (Wait-VisibleById 'GameEditorNoticeSettingsLink')
+        Wait-EditorClosed
+        [void](Wait-Status 'Settings ready.')
+        Assert-ProviderSettingsExpanded
+        [void](Wait-Name 'ProviderSettingsExpander' `
+            'Game data providers. Add your IGDB credentials to search for games.')
+        $report.phases += 'notice-opens-expanded-provider-settings'
+        Go-Back
+        [void](Wait-Status 'Library ready.')
+    }
+    elseif ($Mode -eq 'provider-offline') {
+        (Wait-GameRow 'Seeded Linked Game').GetCurrentPattern(
+            [System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+        [void](Wait-Name 'GameHeading' 'Seeded Linked Game')
+        [void](Wait-Status 'Game ready.')
+        [void](Wait-VisibleById 'GameCover')
+        $facts = Get-FactsName
+        foreach ($expected in @('Released 2004', 'Main game',
+            'Platforms: PC (Microsoft Windows), PlayStation 2')) {
+            if (-not $facts.Contains($expected)) {
+                throw "Game facts '$facts' did not include '$expected'."
+            }
+        }
+        [void](Wait-Name 'GameSummary' 'A seeded summary that the offline check reads back.')
+        [void](Wait-Name 'GameGenres' 'Genres: Shooter')
+        [void](Wait-Name 'GameCompanies' 'Developed by Seed Developer. Published by Seed Publisher.')
+        [void](Wait-Name 'GameAttribution' 'Metadata from IGDB. Artwork from SteamGridDB.')
+        [void](Wait-VisibleById 'GameProviderLink')
+        $report.gameFacts = $facts
+        $report.offlineGameScreenshot = Save-WindowScreenshot "linked-game-$($ExpectedProviderFailure.ToLowerInvariant())"
+        $report.phases += 'snapshot-and-cover-from-local-data'
+
+        Invoke-Element (Wait-EnabledById 'RefreshMetadataButton')
+        $expectedFailure = $providerFailureMessages[$ExpectedProviderFailure]
+        [void](Wait-Status $expectedFailure)
+        [void](Wait-Name 'GameHeading' 'Seeded Linked Game')
+        [void](Wait-Name 'GameAttribution' 'Metadata from IGDB. Artwork from SteamGridDB.')
+        [void](Wait-EnabledById 'RefreshMetadataButton')
+        $report.phases += 'failed-refresh-keeps-snapshot'
+
+        # Return to Library so the next smoke in this shell starts where the
+        # shared prelude expects, with 'Library ready.' as the latest status.
+        Go-Back
+        [void](Wait-Status 'Library ready.')
+        if ($ExpectedProviderFailure -eq 'Unavailable') {
+            Open-AddGameSearch
+            [void](Search-Games 'Half-Life')
+            [void](Wait-Name 'GameSearchStatus' $expectedFailure)
+            [void](Wait-VisibleById 'GameSearchRetry')
+            if ((Get-SearchResults).Count -ne 0) {
+                throw 'A failed search showed results.'
+            }
+            $report.offlineSearchScreenshot = Save-WindowScreenshot 'search-offline'
+            Close-AddGameSearch
+            $report.phases += 'offline-search-reports-unavailable'
+        }
+    }
+    elseif ($Mode -eq 'provider-settings') {
+        $igdb = Read-LabelledValues $IgdbCredentialFile @('igdb client id', 'igdb client secret')
+        $steamGridDbKey = $null
+        if ($SteamGridDbCredentialFile) {
+            $steamGridDbKey = (Read-LabelledValues $SteamGridDbCredentialFile @('steamgriddb api key'))['steamgriddb api key']
+        }
+        Open-ProviderSettings
+        Invoke-Element (Wait-EnabledById 'ProviderTestButton')
+        [void](Wait-Name 'ProviderSettingsStatus' 'Enter credentials to test them.')
+        $report.phases += 'test-with-no-credentials-asks-for-them'
+
+        Enter-Secret 'IgdbClientIdInput' $igdb['igdb client id']
+        Enter-Secret 'IgdbClientSecretInput' 'desktop-guides-wrong-secret'
+        Invoke-Element (Wait-EnabledById 'ProviderTestButton')
+        [void](Wait-Name 'ProviderSettingsStatus' 'IGDB rejected the client ID or secret.')
+        $report.phases += 'wrong-secret-is-rejected'
+
+        Enter-Secret 'IgdbClientSecretInput' $igdb['igdb client secret'] -Replace
+        $expectedTest = 'IGDB connected.'
+        if ($steamGridDbKey) {
+            Enter-Secret 'SteamGridDbKeyInput' $steamGridDbKey
+            $expectedTest = 'IGDB connected. SteamGridDB connected.'
+        }
+        Invoke-Element (Wait-EnabledById 'ProviderTestButton')
+        [void](Wait-Name 'ProviderSettingsStatus' $expectedTest)
+        $report.steamGridDbTested = [bool]$steamGridDbKey
+        $report.phases += 'real-credentials-connect'
+
+        Invoke-Element (Wait-EnabledById 'ProviderSaveButton')
+        [void](Wait-Name 'ProviderSettingsStatus' 'Provider credentials saved.')
+        [void](Wait-Name 'ProviderSettingsExpander' 'Game data providers. IGDB credentials saved.')
+        $report.settingsScreenshot = Save-WindowScreenshot 'provider-settings-saved'
+        $report.phases += 'credentials-saved'
+        Go-Back
+        [void](Wait-Status 'Library ready.')
+    }
+    elseif ($Mode -eq 'provider-live') {
+        Open-AddGameSearch
+        Set-SearchQuery 'Half-Life'
+        Start-Sleep -Seconds 1
+        Assert-Absent 'GameSearchCancel'
+        if ((Get-SearchResults).Count -ne 0) { throw 'Typing alone showed results.' }
+        $report.searchDialogScreenshot = Save-WindowScreenshot 'add-game-search'
+        $report.phases += 'typing-does-not-search'
+
+        $results = Search-Games 'Half-Life'
+        if ($results.Count -lt 1 -or $results.Count -gt 20) {
+            throw "Search returned $($results.Count) results; expected 1 to 20."
+        }
+        $report.searchResultCount = $results.Count
+        $report.searchResultNames = @($results | ForEach-Object { $_.Current.Name })
+        # Thumbnails load one at a time after the results show and are raw
+        # in the UIA tree, so give them time to appear in the screenshot.
+        Start-Sleep -Seconds 5
+        $report.searchResultsScreenshot = Save-WindowScreenshot 'search-results'
+        $halfLife = @($results | Where-Object { $_.Current.Name -like 'Half-Life, Main game, 1998, *' })
+        if ($halfLife.Count -ne 1) {
+            throw "Expected one 1998 Half-Life result; found $($halfLife.Count)."
+        }
+        $report.phases += 'search-returns-labelled-results'
+
+        Activate-Item $halfLife[0]
+        Wait-HiddenById 'GameSearchInput'
+        [void](Wait-Name 'GameHeading' 'Half-Life')
+        # GameProviderDetails is a StackPanel with no automation peer; the
+        # facts group inside it shows exactly when the details do.
+        [void](Wait-VisibleById 'GameFacts')
+        $attribution = (Wait-VisibleById 'GameAttribution').Current.Name
+        if ($attribution -notin @(
+            'Metadata from IGDB. Artwork from SteamGridDB.',
+            'Metadata and artwork from IGDB.')) {
+            throw "Unexpected attribution '$attribution'."
+        }
+        [void](Wait-VisibleById 'GameCover')
+        [void](Wait-VisibleById 'GameProviderLink')
+        $report.addedAttribution = $attribution
+        $report.addedFacts = Get-FactsName
+        $report.linkedGameScreenshot = Save-WindowScreenshot 'linked-game-live'
+        $report.phases += 'pick-adds-linked-game-with-cover'
+
+        Go-Back
+        [void](Wait-Status 'Library ready.')
+        Open-AddGameSearch
+        $again = Search-Games 'Half-Life'
+        Activate-Item @($again | Where-Object { $_.Current.Name -like 'Half-Life, Main game, 1998, *' })[0]
+        Wait-HiddenById 'GameSearchInput'
+        [void](Wait-Status 'Half-Life is already in your library.' -AllowHidden)
+        [void](Wait-Name 'GameHeading' 'Half-Life')
+        Go-Back
+        [void](Wait-Status 'Library ready.')
+        # 'Library ready.' can precede the realized rows; count only once
+        # the list shows its games.
+        [void](Wait-GameRow 'Seeded Linked Game')
+        [void](Wait-GameRow 'Half-Life')
+        if ((Count-GameRows 'Half-Life') -ne 1) { throw 'A duplicate add created a second row.' }
+        $report.phases += 'duplicate-add-opens-existing-game'
+
+        (Wait-GameRow 'Half-Life').GetCurrentPattern(
+            [System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+        [void](Wait-Status 'Game ready.')
+        Invoke-Element (Wait-EnabledById 'EditGameButton')
+        Set-Text 'GamePlatformInput' 'My test platform'
+        Set-Text 'GameNotesInput' 'My local notes.'
+        Press-Enter (Wait-VisibleById 'GameTitleInput')
+        Wait-EditorClosed
+        [void](Wait-Name 'GamePlatform' 'My test platform')
+        Invoke-Element (Wait-EnabledById 'RefreshMetadataButton')
+        $refreshed = Wait-Status @('Metadata refreshed.',
+            "Metadata refreshed. A new cover couldn't be downloaded.") -AllowHidden
+        $report.refreshStatus = $refreshed.Current.ItemStatus
+        [void](Wait-Name 'GameHeading' 'Half-Life')
+        [void](Wait-Name 'GamePlatform' 'My test platform')
+        [void](Wait-Name 'GameNotes' 'My local notes.')
+        $report.phases += 'refresh-preserves-local-fields'
+
+        Go-Back
+        [void](Wait-Status 'Library ready.')
+        Open-AddGameSearch
+        [void](Search-Games 'zzqx no such game 91377')
+        [void](Wait-Name 'GameSearchStatus' 'No games match "zzqx no such game 91377".')
+        $report.phases += 'empty-search-says-so'
+
+        # Ruling T12-a: record whether Cancel was seen, never assume it.
+        $report.cancelObserved = $false
+        $report.cancelAttempts = 0
+        for ($attempt = 1; $attempt -le 3 -and -not $report.cancelObserved; $attempt++) {
+            $report.cancelAttempts = $attempt
+            Set-SearchQuery 'Final Fantasy'
+            Invoke-Element (Wait-EnabledById 'GameSearchButton')
+            $cancel = Find-ById 'GameSearchCancel'
+            if (-not $cancel -or $cancel.Current.IsOffscreen) {
+                $report.cancelReason = 'The search finished before Cancel could be pressed.'
+                Start-Sleep -Seconds 2
+                continue
+            }
+            Invoke-Element $cancel
+            Wait-HiddenById 'GameSearchCancel'
+            $status = Find-ById 'GameSearchStatus'
+            if ((Get-SearchResults).Count -eq 0 -and
+                (-not $status -or $status.Current.IsOffscreen)) {
+                $report.cancelObserved = $true
+                $report.cancelReason = $null
+            }
+            else {
+                $report.cancelReason = 'The search completed while Cancel was pressed.'
+            }
+        }
+        if ($report.cancelObserved) { $report.phases += 'cancel-during-search-shows-nothing' }
+
+        Invoke-Element (Wait-VisibleById 'AddGameManuallyLink')
+        [void](Wait-VisibleById 'GameTitleInput')
+        Assert-Absent 'GameEditorNotice'
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+        Wait-EditorClosed
+        # Cancelling the editor stays on Library and posts no new status.
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        $report.phases += 'add-manually-from-search'
+    }
+    elseif ($Mode -eq 'provider-remove') {
+        Open-ProviderSettings
+        Invoke-Element (Wait-EnabledById 'ProviderRemoveButton')
+        [void](Wait-Name 'ProviderSettingsStatus' 'Provider credentials removed.')
+        [void](Wait-Name 'ProviderSettingsExpander' `
+            'Game data providers. Add your IGDB credentials to search for games.')
+        Go-Back
+        [void](Wait-Status 'Library ready.')
+        Invoke-Element (Wait-EnabledById 'AddGameButton')
+        [void](Wait-Name 'GameEditorNotice' $providerFailureMessages.NotConfigured)
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+        Wait-EditorClosed
+        $report.phases += 'remove-restores-manual-add'
+    }
     elseif ($Mode -eq 'normal') {
         $resume = Wait-Name 'ResumeGuide' "Resume $ExpectedResumeGuide"
         Invoke-Element $resume
@@ -1367,10 +1767,11 @@ try {
 }
 catch {
     $report.error = $_ | Out-String
-    if ($Mode -eq 'game-editor' -and $root) {
+    if (($Mode -eq 'game-editor' -or $Mode -like 'provider-*') -and $root) {
         try {
             foreach ($id in @('ShellStatus', 'GameHeading',
-                'GameTitleFeedback', 'GameSaveError')) {
+                'GameTitleFeedback', 'GameSaveError', 'GameSearchStatus',
+                'ProviderSettingsStatus', 'GameEditorNotice', 'GameAttribution')) {
                 $element = Find-ById $id
                 if ($element) {
                     $report["failure$id"] = [ordered]@{

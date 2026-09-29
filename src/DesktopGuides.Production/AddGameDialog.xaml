@@ -1,0 +1,127 @@
+<ContentDialog
+    x:Class="DesktopGuides.Production.AddGameDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:DesktopGuides.Production"
+    Title="Add game"
+    CloseButtonText="Close"
+    AutomationProperties.AutomationId="AddGameSearchDialog">
+    <Grid Width="480"
+          RowSpacing="{StaticResource DesktopGuidesSpacing12}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="360" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid ColumnSpacing="{StaticResource DesktopGuidesSpacing8}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <AutoSuggestBox x:Name="GameSearchInput"
+                            PlaceholderText="Search IGDB by title"
+                            QueryIcon="Find"
+                            QuerySubmitted="QuerySubmitted"
+                            AutomationProperties.Name="Search for a game"
+                            AutomationProperties.AutomationId="GameSearchInput" />
+            <Button x:Name="GameSearchButton"
+                    Grid.Column="1"
+                    Content="Search"
+                    Click="SearchClicked"
+                    AutomationProperties.AutomationId="GameSearchButton" />
+        </Grid>
+
+        <StackPanel x:Name="GameSearchBusy"
+                    Grid.Row="1"
+                    Orientation="Horizontal"
+                    Spacing="{StaticResource DesktopGuidesSpacing12}"
+                    Visibility="Collapsed">
+            <ProgressRing x:Name="GameSearchProgress"
+                          Width="20"
+                          Height="20"
+                          IsActive="False"
+                          AutomationProperties.AutomationId="GameSearchProgress" />
+            <TextBlock x:Name="GameSearchBusyText"
+                       VerticalAlignment="Center"
+                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                       AutomationProperties.LiveSetting="Polite" />
+            <Button x:Name="GameSearchCancel"
+                    Content="Cancel"
+                    Click="CancelClicked"
+                    Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                    AutomationProperties.AutomationId="GameSearchCancel" />
+        </StackPanel>
+
+        <InfoBar x:Name="GameSearchStatus"
+                 Grid.Row="2"
+                 IsOpen="False"
+                 IsClosable="False"
+                 AutomationProperties.AutomationId="GameSearchStatus">
+            <InfoBar.Content>
+                <StackPanel x:Name="GameSearchActions"
+                            Orientation="Horizontal"
+                            Spacing="{StaticResource DesktopGuidesSpacing8}"
+                            Margin="0,0,0,12">
+                    <Button x:Name="GameSearchRetry"
+                            Content="Retry"
+                            Click="RetryClicked"
+                            AutomationProperties.AutomationId="GameSearchRetry" />
+                    <Button x:Name="GameSearchOpenSettings"
+                            Content="Open Settings"
+                            Click="OpenSettingsClicked"
+                            AutomationProperties.AutomationId="GameSearchOpenSettings" />
+                </StackPanel>
+            </InfoBar.Content>
+        </InfoBar>
+
+        <ListView x:Name="GameSearchResults"
+                  Grid.Row="3"
+                  SelectionMode="None"
+                  IsItemClickEnabled="True"
+                  ItemClick="ResultClicked"
+                  AutomationProperties.Name="Search results"
+                  AutomationProperties.AutomationId="GameSearchResults">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="local:GameSearchItem">
+                    <Grid Padding="0,8"
+                          ColumnSpacing="{StaticResource DesktopGuidesSpacing12}"
+                          AutomationProperties.Name="{x:Bind AccessibleName}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="45" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="45"
+                                Height="60"
+                                CornerRadius="4"
+                                Background="{ThemeResource ControlFillColorSecondaryBrush}">
+                            <Image Source="{x:Bind Thumbnail, Mode=OneWay}"
+                                   Stretch="UniformToFill"
+                                   AutomationProperties.AccessibilityView="Raw" />
+                        </Border>
+                        <StackPanel Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Spacing="{StaticResource DesktopGuidesSpacing4}">
+                            <TextBlock Text="{x:Bind Title}"
+                                       Style="{StaticResource DesktopGuidesBodyStyle}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{x:Bind Summary}"
+                                       Style="{StaticResource DesktopGuidesMetadataStyle}" />
+                            <TextBlock Text="{x:Bind Platforms}"
+                                       Style="{StaticResource DesktopGuidesMetadataStyle}"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <HyperlinkButton x:Name="AddGameManuallyLink"
+                         Grid.Row="4"
+                         Content="Add manually"
+                         Click="AddManuallyClicked"
+                         AutomationProperties.AutomationId="AddGameManuallyLink" />
+    </Grid>
+</ContentDialog>
