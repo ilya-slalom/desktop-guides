@@ -1072,9 +1072,7 @@ public sealed partial class ShellWindow : Window
     }
 
     private Task<ImageSource?> LoadRowArtworkAsync(ArtworkItem item, CancellationToken token) =>
-        item is LibraryGameItem game
-            ? LoadCoverAsync(game.ArtworkRelativePath, RowArtworkDecodeWidth, token)
-            : Task.FromResult<ImageSource?>(null);
+        Task.FromResult<ImageSource?>(null);
 
     private void ShowProviderMetadata(Game game, ImageSource? cover)
     {
