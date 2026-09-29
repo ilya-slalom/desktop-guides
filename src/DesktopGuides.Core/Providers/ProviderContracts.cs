@@ -27,3 +27,10 @@ public interface IGameMetadataProvider
     Task<IReadOnlyList<ProviderSearchResult>> SearchAsync(string query, CancellationToken token);
     Task<ProviderGameRecord> GetAsync(string externalId, CancellationToken token);
 }
+
+public sealed record ArtworkCandidate(Uri Url, string SourceName);
+
+public interface IArtworkSource
+{
+    Task<ArtworkCandidate?> FindAsync(ArtworkHints hints, CancellationToken token);
+}
