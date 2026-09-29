@@ -584,11 +584,14 @@ contract. T07.2 was merged through PR #10 on 27 September 2026, merge
 commit `72f43785fad2b01b3f79b739017f0623d46b6665`. The
 [T04.1 game editor plan](t04-game-editor-plan.md) supplies the manual/offline
 fallback; T04.1 was merged through PR #11 on 28 September 2026, merge commit
-`e18964f1d253746a3e6cdc0d51c659a71a531bc3`. T11.4 implementation and available
-Windows 11 x64 verification are complete on its feature branch. The user
-deferred 200% display-scaling verification to T16.2. After T11.4 merges, T04.4
-selects the external metadata provider and implements search-first game
-addition before catalog and import UI consume the enriched Game model.
+`e18964f1d253746a3e6cdc0d51c659a71a531bc3`. T11.4 was merged through PR #13
+on 29 September 2026, merge commit
+`23e0694faae1938993c8f228116324d61fe5b1e1`. The user deferred 200%
+display-scaling verification to T16.2. The
+[T04.4 provider search design](t04-provider-search-design.md) records the
+provider decision: IGDB metadata with user-supplied Twitch credentials and
+SteamGridDB artwork with a user-supplied key. T04.4 implements search-first
+game addition before catalog and import UI consume the enriched Game model.
 
 ### UI design-language and Gallery adoption sequence
 
