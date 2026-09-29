@@ -1415,25 +1415,26 @@ try {
             throw "GameList realized $endCount rows at the end of a 500-game library."
         }
         # Rows at the end use recycled containers: each shows its own cover
-        # or the placeholder, never a cover left by an earlier item.
+        # or the placeholder, never a cover left by an earlier item. The seed
+        # ends with Catalog Game 479-483, an Arabic title and the last title.
         $endArtwork = [ordered]@{
             last = Wait-RowArtwork (Wait-GameRow $lastTitle) @(0xA0, 0x5F, 0x80) $scale $loaded
-            game498 = Wait-RowArtwork (Wait-GameRow 'Catalog Game 498') @(0x62, 0x9D, 0x80) $scale $loaded
-            game499 = [ordered]@{}
+            game483 = Wait-RowArtwork (Wait-GameRow 'Catalog Game 483') @(0x53, 0xAC, 0x80) $scale $loaded
+            game481 = [ordered]@{}
         }
-        $row499 = Wait-GameRow 'Catalog Game 499'
-        $endArtwork.game499.lastColour = Measure-RowArtwork $row499 @(0xA0, 0x5F, 0x80) $scale
-        $endArtwork.game499.game498Colour = Measure-RowArtwork $row499 @(0x62, 0x9D, 0x80) $scale
+        $row481 = Wait-GameRow 'Catalog Game 481'
+        $endArtwork.game481.lastColour = Measure-RowArtwork $row481 @(0xA0, 0x5F, 0x80) $scale
+        $endArtwork.game481.game483Colour = Measure-RowArtwork $row481 @(0x53, 0xAC, 0x80) $scale
         $report.artworkPixelsAtEnd = $endArtwork
         $failures = @()
-        foreach ($key in 'last', 'game498') {
+        foreach ($key in 'last', 'game483') {
             if ($endArtwork[$key] -lt $loaded) {
                 $failures += "The $key row shows no cover at the end of the list ($($endArtwork[$key]) matching pixels)."
             }
         }
-        foreach ($key in 'lastColour', 'game498Colour') {
-            if ($endArtwork.game499[$key] -ge $absent) {
-                $failures += "Catalog Game 499 has no artwork but shows the $key ($($endArtwork.game499[$key]) pixels)."
+        foreach ($key in 'lastColour', 'game483Colour') {
+            if ($endArtwork.game481[$key] -ge $absent) {
+                $failures += "Catalog Game 481 has no artwork but shows the $key ($($endArtwork.game481[$key]) pixels)."
             }
         }
         if ($failures.Count -gt 0) {
