@@ -149,13 +149,7 @@
                               ItemTemplate="{StaticResource DesktopGuidesArtworkRowTemplate}"
                               SelectionChanged="GameSelected"
                               AutomationProperties.AutomationId="GameList"
-                              AutomationProperties.Name="Games">
-                        <ListView.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel />
-                            </ItemsPanelTemplate>
-                        </ListView.ItemsPanel>
-                    </ListView>
+                              AutomationProperties.Name="Games" />
                 </Grid>
             </Grid>
 
