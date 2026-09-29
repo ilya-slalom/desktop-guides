@@ -1,3 +1,5 @@
+using DesktopGuides.Core.Providers;
+
 namespace DesktopGuides.Core.Library;
 
 public interface ILibraryRepository : IAsyncDisposable
@@ -28,4 +30,10 @@ public interface ILibraryRepository : IAsyncDisposable
     Task<AppSettings> UpdateSettingsAsync(
         Func<AppSettings, AppSettings> update,
         CancellationToken token = default);
+    Task<Game?> FindLinkedGameAsync(
+        string provider, string externalId, CancellationToken token = default);
+    Task<Game> AddLinkedGameAsync(NewLinkedGame game, CancellationToken token = default);
+    Task<Game> UpdateGameMetadataAsync(
+        Guid gameId, GameMetadataSnapshot metadata, DateTimeOffset retrievedUtc,
+        string? artworkRelativePath, CancellationToken token = default);
 }

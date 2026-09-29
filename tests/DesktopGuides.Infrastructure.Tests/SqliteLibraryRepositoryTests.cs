@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Providers;
 using DesktopGuides.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
 using Xunit;
@@ -764,6 +765,126 @@ public sealed class SqliteLibraryRepositoryTests
         Guid id = Guid.NewGuid();
 
         InsertRawGame(connection, id, "igdb", "7", $"artwork/{id:N}/{new string('a', 64)}.png");
+    }
+
+    private static NewLinkedGame Linked(Guid id, string externalId = "70", string? artwork = null) => new(
+        id, "Half-Life", "PC (Microsoft Windows)",
+        new ProviderGameLink(ProviderGameLink.Igdb, externalId, Now),
+        GameMetadataJsonTests.Sample(), artwork);
+
+    [Fact]
+    public async Task AddsFindsAndReopensALinkedGame()
+    {
+        using TestLibrary directory = new();
+        Guid id = Guid.NewGuid();
+        string artwork = $"artwork/{id:N}/{new string('b', 64)}.jpg";
+        await using (SqliteLibraryRepository repository = new(directory.Paths, new FixedTimeProvider(Now)))
+        {
+            await repository.InitializeAsync();
+            Game added = await repository.AddLinkedGameAsync(Linked(id, artwork: artwork));
+            Assert.Equal(id, added.Id);
+            Assert.Equal(new ProviderGameLink("igdb", "70", Now), added.Link);
+        }
+
+        await using SqliteLibraryRepository reopened = new(directory.Paths);
+        await reopened.InitializeAsync();
+        Game found = (await reopened.FindLinkedGameAsync("igdb", "70"))!;
+        Assert.Equal(id, found.Id);
+        Assert.Equal("Half-Life", found.Title);
+        Assert.Equal("A summary.", found.Metadata!.Summary);
+        Assert.Equal(artwork, found.ArtworkRelativePath);
+        Assert.Null(await reopened.FindLinkedGameAsync("igdb", "71"));
+    }
+
+    [Fact]
+    public async Task DuplicateLinkReportsTheExistingGame()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game first = await repository.AddLinkedGameAsync(Linked(Guid.NewGuid()));
+
+        DuplicateProviderLinkException error = await Assert.ThrowsAsync<DuplicateProviderLinkException>(
+            () => repository.AddLinkedGameAsync(Linked(Guid.NewGuid())));
+        Assert.Equal(first.Id, error.ExistingGameId);
+        Assert.Single(await repository.ListGamesAsync());
+    }
+
+    [Fact]
+    public async Task LinkIsFreeAgainAfterGameRowIsDeleted()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game first = await repository.AddLinkedGameAsync(Linked(Guid.NewGuid()));
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        using (SqliteCommand delete = connection.CreateCommand())
+        {
+            delete.CommandText = "DELETE FROM Games WHERE Id = $id";
+            delete.Parameters.AddWithValue("$id", first.Id.ToString("N"));
+            delete.ExecuteNonQuery();
+        }
+
+        Game second = await repository.AddLinkedGameAsync(Linked(Guid.NewGuid()));
+        Assert.NotEqual(first.Id, second.Id);
+    }
+
+    [Fact]
+    public async Task UpdateMetadataKeepsLocalFieldsAndReplacesSnapshotAndArtwork()
+    {
+        using TestLibrary directory = new();
+        AdjustableTimeProvider clock = new(Now);
+        await using SqliteLibraryRepository repository = new(directory.Paths, clock);
+        await repository.InitializeAsync();
+        Guid id = Guid.NewGuid();
+        await repository.AddLinkedGameAsync(Linked(id));
+        await repository.UpdateGameAsync(id, "My title", "Steam Deck", "My notes");
+        clock.Now = Now.AddDays(1);
+        string artwork = $"artwork/{id:N}/{new string('c', 64)}.png";
+
+        Game updated = await repository.UpdateGameMetadataAsync(
+            id, GameMetadataJsonTests.Sample() with { Summary = "New." }, Now.AddDays(1), artwork);
+
+        Assert.Equal(("My title", "Steam Deck", "My notes"), (updated.Title, updated.Platform, updated.Notes));
+        Assert.Equal("New.", updated.Metadata!.Summary);
+        Assert.Equal(Now.AddDays(1), updated.Link!.RetrievedUtc);
+        Assert.Equal(artwork, updated.ArtworkRelativePath);
+        Assert.Equal(Now.AddDays(1), updated.UpdatedUtc);
+    }
+
+    [Fact]
+    public async Task UpdateMetadataRejectsMissingAndUnlinkedGames()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game manual = await repository.AddGameAsync("Manual", null, null);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => repository.UpdateGameMetadataAsync(
+            Guid.NewGuid(), GameMetadataJsonTests.Sample(), Now, null));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.UpdateGameMetadataAsync(
+            manual.Id, GameMetadataJsonTests.Sample(), Now, null));
+    }
+
+    [Fact]
+    public async Task CorruptMetadataJsonLoadsGameWithoutMetadata()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Guid id = Guid.NewGuid();
+        await repository.AddLinkedGameAsync(Linked(id));
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        using (SqliteCommand corrupt = connection.CreateCommand())
+        {
+            corrupt.CommandText = "UPDATE Games SET MetadataJson = '{\"schemaVersion\":9}'";
+            corrupt.ExecuteNonQuery();
+        }
+
+        Game game = Assert.Single(await repository.ListGamesAsync());
+        Assert.Null(game.Metadata);
+        Assert.NotNull(game.Link);
+        Assert.Equal(id, (await repository.GetGameAsync(id))!.Id);
     }
 
     private static void CreatePopulatedVersionTwo(TestLibrary directory, Guid gameId)

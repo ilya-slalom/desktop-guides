@@ -65,3 +65,17 @@ public sealed record AppSettings(
 public sealed record StartupReconciliationReport(
     int ResolvedOperationCount,
     int ReviewOrphanCount);
+
+public sealed record NewLinkedGame(
+    Guid Id,
+    string Title,
+    string? Platform,
+    ProviderGameLink Link,
+    GameMetadataSnapshot Metadata,
+    string? ArtworkRelativePath);
+
+public sealed class DuplicateProviderLinkException(Guid existingGameId)
+    : Exception("This game is already in the library.")
+{
+    public Guid ExistingGameId { get; } = existingGameId;
+}

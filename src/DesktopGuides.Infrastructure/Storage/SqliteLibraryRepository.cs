@@ -1,5 +1,6 @@
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Paths;
+using DesktopGuides.Core.Providers;
 using Microsoft.Data.Sqlite;
 
 namespace DesktopGuides.Infrastructure.Storage;
@@ -12,6 +13,11 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         new(() => LibrarySchema.Migrations.ToDictionary(
             migration => migration.Version,
             migration => BuildExpectedSchema(migration.Version)));
+
+    private const string GameColumns = """
+        Id, Title, Platform, Notes, CreatedUtcMs, UpdatedUtcMs,
+        ProviderName, ProviderGameId, MetadataJson, MetadataRetrievedUtcMs, ArtworkRelativePath
+        """;
 
     private readonly ILibraryPaths paths;
     private readonly TimeProvider clock;
@@ -74,21 +80,8 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         return WriteAsync(() =>
         {
             using SqliteConnection connection = OpenConnection();
-            using SqliteCommand existing = connection.CreateCommand();
-            existing.CommandText = """
-                SELECT Id, Title, Platform, Notes, CreatedUtcMs, UpdatedUtcMs
-                FROM Games WHERE Id = $id
-                """;
-            existing.Parameters.AddWithValue("$id", gameId.ToString("N"));
-            Game game;
-            using (SqliteDataReader reader = existing.ExecuteReader())
-            {
-                if (!reader.Read())
-                {
-                    throw new InvalidOperationException("This game is no longer in the library.");
-                }
-                game = ReadGame(reader);
-            }
+            Game game = GetGame(connection, null, gameId)
+                ?? throw new InvalidOperationException("This game is no longer in the library.");
 
             DateTimeOffset now = clock.GetUtcNow();
             using SqliteCommand update = connection.CreateCommand();
@@ -119,14 +112,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         ReadAsync<Game?>(() =>
         {
             using SqliteConnection connection = OpenConnection();
-            using SqliteCommand command = connection.CreateCommand();
-            command.CommandText = """
-                SELECT Id, Title, Platform, Notes, CreatedUtcMs, UpdatedUtcMs
-                FROM Games WHERE Id = $id
-                """;
-            command.Parameters.AddWithValue("$id", gameId.ToString("N"));
-            using SqliteDataReader reader = command.ExecuteReader();
-            return reader.Read() ? ReadGame(reader) : null;
+            return GetGame(connection, null, gameId);
         }, token);
 
     public Task<IReadOnlyList<Game>> ListGamesAsync(CancellationToken token = default) =>
@@ -134,8 +120,8 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         {
             using SqliteConnection connection = OpenConnection();
             using SqliteCommand command = connection.CreateCommand();
-            command.CommandText = """
-                SELECT Id, Title, Platform, Notes, CreatedUtcMs, UpdatedUtcMs
+            command.CommandText = $"""
+                SELECT {GameColumns}
                 FROM Games ORDER BY Title, Id
                 """;
             using SqliteDataReader reader = command.ExecuteReader();
@@ -146,6 +132,101 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             }
             return games;
         }, token);
+
+    public Task<Game?> FindLinkedGameAsync(
+        string provider, string externalId, CancellationToken token = default) =>
+        ReadAsync<Game?>(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            return FindLinkedGame(connection, null, provider, externalId);
+        }, token);
+
+    public Task<Game> AddLinkedGameAsync(NewLinkedGame game, CancellationToken token = default)
+    {
+        GameDetails details = GameDetails.Create(game.Title, game.Platform, null);
+        string metadataJson = GameMetadataJson.Serialize(game.Metadata);
+        return WriteAsync(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            if (FindLinkedGame(connection, transaction, game.Link.Provider, game.Link.ExternalId)
+                is { } existing)
+            {
+                throw new DuplicateProviderLinkException(existing.Id);
+            }
+            DateTimeOffset now = clock.GetUtcNow();
+            using SqliteCommand command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                INSERT INTO Games (
+                    Id, Title, Platform, Notes, CreatedUtcMs, UpdatedUtcMs,
+                    ProviderName, ProviderGameId, MetadataJson, MetadataRetrievedUtcMs,
+                    ArtworkRelativePath
+                ) VALUES ($id, $title, $platform, NULL, $now, $now,
+                    $provider, $externalId, $json, $retrieved, $artwork)
+                """;
+            command.Parameters.AddWithValue("$id", game.Id.ToString("N"));
+            command.Parameters.AddWithValue("$title", details.Title);
+            command.Parameters.AddWithValue("$platform", (object?)details.Platform ?? DBNull.Value);
+            command.Parameters.AddWithValue("$now", now.ToUnixTimeMilliseconds());
+            command.Parameters.AddWithValue("$provider", game.Link.Provider);
+            command.Parameters.AddWithValue("$externalId", game.Link.ExternalId);
+            command.Parameters.AddWithValue("$json", metadataJson);
+            command.Parameters.AddWithValue("$retrieved", game.Link.RetrievedUtc.ToUnixTimeMilliseconds());
+            command.Parameters.AddWithValue("$artwork", (object?)game.ArtworkRelativePath ?? DBNull.Value);
+            try { command.ExecuteNonQuery(); }
+            catch (SqliteException error) when (error.SqliteExtendedErrorCode == 2067)
+            {
+                transaction.Rollback();
+                Guid existingId = FindLinkedGame(connection, null, game.Link.Provider, game.Link.ExternalId)?.Id
+                    ?? throw new InvalidDataException("The provider link conflicted but no game holds it.", error);
+                throw new DuplicateProviderLinkException(existingId);
+            }
+            transaction.Commit();
+            return new Game(game.Id, details.Title, details.Platform, null, now, now,
+                game.Link, game.Metadata, game.ArtworkRelativePath);
+        }, token);
+    }
+
+    public Task<Game> UpdateGameMetadataAsync(
+        Guid gameId, GameMetadataSnapshot metadata, DateTimeOffset retrievedUtc,
+        string? artworkRelativePath, CancellationToken token = default)
+    {
+        string metadataJson = GameMetadataJson.Serialize(metadata);
+        return WriteAsync(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            Game current = GetGame(connection, transaction, gameId) ??
+                throw new KeyNotFoundException("The game no longer exists.");
+            if (current.Link is null)
+            {
+                throw new InvalidOperationException("Only linked games have provider metadata.");
+            }
+            DateTimeOffset now = clock.GetUtcNow();
+            using SqliteCommand command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                UPDATE Games SET MetadataJson = $json, MetadataRetrievedUtcMs = $retrieved,
+                    ArtworkRelativePath = $artwork, UpdatedUtcMs = $now
+                WHERE Id = $id
+                """;
+            command.Parameters.AddWithValue("$id", gameId.ToString("N"));
+            command.Parameters.AddWithValue("$json", metadataJson);
+            command.Parameters.AddWithValue("$retrieved", retrievedUtc.ToUnixTimeMilliseconds());
+            command.Parameters.AddWithValue("$artwork", (object?)artworkRelativePath ?? DBNull.Value);
+            command.Parameters.AddWithValue("$now", now.ToUnixTimeMilliseconds());
+            command.ExecuteNonQuery();
+            transaction.Commit();
+            return current with
+            {
+                Metadata = metadata,
+                Link = current.Link with { RetrievedUtc = retrievedUtc },
+                ArtworkRelativePath = artworkRelativePath,
+                UpdatedUtc = now
+            };
+        }, token);
+    }
 
     public Task<IReadOnlyList<Guide>> ListGuidesAsync(
         Guid gameId, CancellationToken token = default) =>
@@ -673,14 +754,52 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
     private static DateTimeOffset FromUnixMilliseconds(long value) =>
         DateTimeOffset.FromUnixTimeMilliseconds(value);
 
-    private static Game ReadGame(SqliteDataReader reader) =>
-        new(
+    private static Game? FindLinkedGame(
+        SqliteConnection connection, SqliteTransaction? transaction, string provider, string externalId)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"""
+            SELECT {GameColumns} FROM Games
+            WHERE ProviderName = $provider AND ProviderGameId = $externalId
+            """;
+        command.Parameters.AddWithValue("$provider", provider);
+        command.Parameters.AddWithValue("$externalId", externalId);
+        using SqliteDataReader reader = command.ExecuteReader();
+        return reader.Read() ? ReadGame(reader) : null;
+    }
+
+    private static Game? GetGame(
+        SqliteConnection connection, SqliteTransaction? transaction, Guid gameId)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"SELECT {GameColumns} FROM Games WHERE Id = $id";
+        command.Parameters.AddWithValue("$id", gameId.ToString("N"));
+        using SqliteDataReader reader = command.ExecuteReader();
+        return reader.Read() ? ReadGame(reader) : null;
+    }
+
+    private static Game ReadGame(SqliteDataReader reader)
+    {
+        string? provider = NullableString(reader, 6);
+        ProviderGameLink? link = provider is null
+            ? null
+            : new ProviderGameLink(
+                provider,
+                reader.GetString(7),
+                FromUnixMilliseconds(reader.IsDBNull(9) ? 0 : reader.GetInt64(9)));
+        return new Game(
             Guid.ParseExact(reader.GetString(0), "N"),
             reader.GetString(1),
             NullableString(reader, 2),
             NullableString(reader, 3),
             FromUnixMilliseconds(reader.GetInt64(4)),
-            FromUnixMilliseconds(reader.GetInt64(5)));
+            FromUnixMilliseconds(reader.GetInt64(5)),
+            link,
+            GameMetadataJson.TryParse(NullableString(reader, 8)),
+            NullableString(reader, 10));
+    }
 
     private static Guide ReadGuide(SqliteDataReader reader)
     {
