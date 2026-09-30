@@ -279,7 +279,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             while (reader.Read())
             {
                 summaries.Add(new LibraryGameSummary(
-                    ReadGame(reader), reader.GetInt32(11), FromUnixMilliseconds(reader.GetInt64(12))));
+                    ReadGame(reader), reader.GetInt32(11), FromUnixMilliseconds(reader.GetInt64(12)), []));
             }
             return summaries;
         }, token);

@@ -1124,7 +1124,7 @@ public sealed partial class ShellWindow : Window
                         return false;
                     }
                     gameArtwork.CancelAll();
-                    GameList.ItemsSource = games.Select(summary => new LibraryGameItem(summary)).ToList();
+                    GameList.ItemsSource = games.Select(summary => new LibraryGameItem(new LibrarySearchMatch(summary, null))).ToList();
                     LibraryEmptyState.Visibility =
                         games.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
                     GameList.Visibility =

@@ -34,7 +34,7 @@ public sealed class CatalogPresentationTests
         new(Guid.NewGuid(), null, estimate, opened, completed);
 
     private static string[] GameLabels(string? platform, bool linked, int guides) =>
-        CatalogPresentation.GameFacts(new LibraryGameSummary(GameWith(platform, linked), guides, Now))
+        CatalogPresentation.GameFacts(new LibraryGameSummary(GameWith(platform, linked), guides, Now, []))
             .Select(fact => fact.Label).ToArray();
 
     private static IReadOnlyList<CatalogFact> GuideFacts(
@@ -79,7 +79,7 @@ public sealed class CatalogPresentationTests
     public void GameAccessibleTextJoinsTheLabels()
     {
         IReadOnlyList<CatalogFact> facts = CatalogPresentation.GameFacts(
-            new LibraryGameSummary(GameWith("PC", linked: true), 4, Now));
+            new LibraryGameSummary(GameWith("PC", linked: true), 4, Now, []));
         Assert.Equal("PC, IGDB, 4 guides", CatalogPresentation.AccessibleText(facts));
     }
 
@@ -227,5 +227,24 @@ public sealed class CatalogPresentationTests
         string text = CatalogPresentation.AccessibleText(GuideFacts(
             State(opened: new DateTimeOffset(2026, 9, 30, 5, 5, 0, TimeSpan.Zero)), GuideFormat.Html));
         Assert.Equal("Web page (HTML), In progress, opened today at 14:05", text);
+    }
+
+    [Fact]
+    public void AGuideMatchEndsTheGameFacts()
+    {
+        LibraryGameSummary summary = new(GameWith("PC"), 2, Now, ["Complete Walkthrough", "Maps"]);
+
+        IReadOnlyList<CatalogFact> facts = CatalogPresentation.GameFacts(summary, "Complete Walkthrough");
+
+        Assert.Equal(["PC", "Manual", "2 guides", "Guide: Complete Walkthrough"], Labels(facts));
+        Assert.Equal("PC, Manual, 2 guides, Guide: Complete Walkthrough", CatalogPresentation.AccessibleText(facts));
+    }
+
+    [Fact]
+    public void NoGuideMatchLeavesTheFactsUnchanged()
+    {
+        LibraryGameSummary summary = new(GameWith("PC"), 2, Now, ["Complete Walkthrough", "Maps"]);
+
+        Assert.Equal(["PC", "Manual", "2 guides"], Labels(CatalogPresentation.GameFacts(summary, null)));
     }
 }

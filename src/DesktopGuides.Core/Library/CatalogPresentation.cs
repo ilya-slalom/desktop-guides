@@ -7,7 +7,8 @@ namespace DesktopGuides.Core.Library;
 // parameters so tests can pin them; times are shown in the clock's zone.
 public static class CatalogPresentation
 {
-    public static IReadOnlyList<CatalogFact> GameFacts(LibraryGameSummary summary)
+    public static IReadOnlyList<CatalogFact> GameFacts(
+        LibraryGameSummary summary, string? matchedGuideTitle = null)
     {
         List<string> labels = [];
         if (!string.IsNullOrWhiteSpace(summary.Game.Platform))
@@ -21,6 +22,11 @@ public static class CatalogPresentation
             1 => "1 guide",
             int count => $"{count} guides"
         });
+        // A search that matched only a guide names it, so the row explains itself.
+        if (matchedGuideTitle is not null)
+        {
+            labels.Add($"Guide: {matchedGuideTitle}");
+        }
         return labels.Select(label => new CatalogFact(label, label)).ToList();
     }
 
