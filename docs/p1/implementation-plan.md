@@ -658,6 +658,16 @@ restores the guide, and a failure after it leaves a journaled trash entry
 that startup deletes. CI run 36688055406 passed the installed removal group:
 a dark Cancel and a light removal.
 
+T05.1 is implemented on `feat/p1-t05-1-guide-rows`; see the
+[design and verification record](t05-1-guide-rows-design.md). The Library
+lists games by last activity (creation, import or open, newest first), and
+the Game page lists guides by import or open time. Each row shows its tile,
+title and a `MetadataControl` facts line: platform, source and guide count
+for a game, and format, reading state and last opened for a guide. An
+unread guide reads `Not started`. One SQLite query feeds each list, and
+listing never opens guide files or calls a provider. CI run 36705946660
+passed `catalog-facts` in light and dark.
+
 ### UI design-language and Gallery adoption sequence
 
 The WinUI Gallery is a reference catalog, not a package or shell dependency.

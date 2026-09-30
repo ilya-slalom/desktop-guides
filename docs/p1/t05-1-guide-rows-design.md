@@ -1,6 +1,6 @@
 # T05.1 Library and Game rows design
 
-Status: designed on `feat/p1-t05-1-guide-rows`. Prerequisites T03.2
+Status: implemented on `feat/p1-t05-1-guide-rows`; verified by CI run 36705946660. Prerequisites T03.2
 (PR #4), T04.4 (PR #14), T05.4 (PR #16) and T11.1 (PR #6) are merged.
 
 ## Intent
@@ -257,3 +257,39 @@ The `production-shell-ui` job is the gate.
 
 The PR names T05.1, its merged prerequisites, and the outcome. Its body shows
 the Library and Game page screenshots in light and dark.
+
+## T05.1 verification record
+
+- **Unit tests.** On `pcsx2-win`, Infrastructure 395/395 and Core 235/235
+  passed. The new tests are:
+  - `CatalogPresentationTests`: game facts for blank and padded platforms,
+    linked and manual games and each guide count; reading-state precedence
+    (missing row, opened only, an estimate without an open time, `~0%`,
+    `~100%` without completion, midpoint rounding, completion with an
+    estimate); today, yesterday, older, both sides of local midnight and a
+    future time in UTC+9, in en-US and one other culture; and the spoken
+    forms, which never contain `~` or `·`;
+  - `LibrarySummaryTests`: game order by creation, import and open time;
+    ties by title then ID; guide counts, including after `GuideRemover`
+    removes a guide; guide order by import and open time; each guide's own
+    reading state, or none; and listing after a guide's content directory
+    is deleted.
+- **Installed.** CI run [36705946660](https://github.com/ilya-slalom/desktop-guides/actions/runs/36705946660)
+  passed `production-shell-ui`:
+  - `catalog-facts`, light and dark: the Library listed Zeta Archive Game,
+    Facts Test Game and Empty Test Game in activity order, and the Game
+    page listed the four guides in activity order. Each row's Name was its
+    title and its HelpText its spoken facts;
+  - `catalog`, light and dark: the existing checks passed unchanged, and
+    the long-title row and three recycled rows at the end had their own
+    HelpText;
+  - `long-list`: `GuideList` realized 8 of 99 rows.
+- **Rulings.** Rulings 1–13 in the [plan](t05-1-guide-rows-plan.md#rulings-against-the-spec),
+  plus one made during implementation: the plan's inline PowerShell
+  parser check failed under SSH quoting, so the same `ParseFile` loop ran
+  from a temporary script file, and both scripts parsed.
+- **Evidence.**
+  - [Library, light](evidence/t05-1-guide-rows/library-light.png)
+  - [Library, dark](evidence/t05-1-guide-rows/library-dark.png)
+  - [Game page, light](evidence/t05-1-guide-rows/game-light.png)
+  - [Game page, dark](evidence/t05-1-guide-rows/game-dark.png)
