@@ -611,11 +611,20 @@ PR #15, merge commit `a4bb44c8ef06053cf1b2e5b154641fb95cf5fa1a`. The
 [plan](t05-4-catalog-components-plan.md) extract the artwork row, cover frame,
 facts, empty-state, busy-row and status `InfoBar` patterns into
 `Styles/Catalog.xaml` and move the Library game list onto the shared row.
-T05.4 was implemented and verified on 29 September 2026 in PR #16:
+T05.4 was merged through PR #16, merge commit
+`515440a203843afee8eec6d48bce7f4d9bf8f8ca`, after verification on 29 September 2026:
 CI run 36577997048 passed `core-tests` (including `LibraryGamePresentationTests`
 and `ArtworkLoadTicketsTests`), both package builds and `production-shell-ui`
 with the new catalog scenario in light and dark. The host `-ProviderOnly` run
 passed Add game on the shared template.
+
+The [T06.1 + T06.2 import preview design](t06-1-import-preview-design.md)
+and [plan](t06-1-import-preview-plan.md) add the Import guide button, the
+system file picker, the preview dialog and `GuideImportValidator` for TXT,
+HTML and PDF. They were implemented and verified on 30 September 2026: CI run
+36651770617 passed `core-tests`, both package builds and the installed
+`import-preview` scenario in light and dark. Confirm, copying and
+publication remain T06.3.
 
 ### UI design-language and Gallery adoption sequence
 

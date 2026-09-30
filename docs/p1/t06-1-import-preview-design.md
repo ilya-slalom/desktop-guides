@@ -1,6 +1,7 @@
 # T06.1 import preview and T06.2 validation design
 
-Status: spec approved 29 September 2026; implementation not started.
+Status: implemented and verified 30 September 2026 on `feat/p1-t06-1-import-preview`;
+see the [verification record](#t061--t062-verification-record).
 Prerequisites T05.4 (catalog components, PR #16) and T04.4 (provider-linked
 games) are merged.
 
@@ -329,3 +330,60 @@ drop; multiple files or folders; UTF-16 text; PDF passwords.
 The PR names T06.1 and T06.2 as its targets, T05.4 and T04.4 as merged
 prerequisites, and T06.3 as the next task. It includes light and dark
 screenshots of the preview.
+
+## T06.1 + T06.2 verification record
+
+- **Unit tests.** `core-tests` in CI run 36651770617: 198 Core and 290
+  Infrastructure passes, including `GuideTitleTests`,
+  `ImportPresentationTests`, `GuideImportValidatorTests` and
+  `GuideImportValidatorHtmlPdfTests`.
+- **Installed import scenario.** `production-shell-ui` in the same run, light
+  and dark: `txt-legacy` title, format, file name and both encoding options,
+  CP437 selected with its sample; `html-static` details under a native
+  heading with 3 linked files; `html-hostile` details and warnings in
+  headered groups; the password-protected PDF message; Close and picker
+  Cancel returning focus to Import guide. `describe-import` afterwards: 0
+  guides, 0 file operations, 0 staged and 0 managed entries. The CI runner
+  shows the system Open dialog, so the scenario stays on CI and no
+  `-SkipImport` switch was needed.
+- **Screenshots.** [TXT light](evidence/t06-1-import-preview/import-light.import-txt.png),
+  [warnings light](evidence/t06-1-import-preview/import-light.import-warnings.png),
+  [TXT dark](evidence/t06-1-import-preview/import-dark.import-txt.png),
+  [warnings dark](evidence/t06-1-import-preview/import-dark.import-warnings.png).
+- **Rulings.**
+  - The picker is `Microsoft.Windows.Storage.Pickers.FileOpenPicker(AppWindow.Id)`,
+    so `InitializeWithWindow` isn't needed. Cost if wrong: the picker would
+    need a different owner-window call.
+  - `ResolveTxtEncodingAsync` raises `Changed` when the file's size or
+    last-write time moved; nothing else in this work does. Cost if wrong:
+    one error path in the resolve step.
+  - Windows-1252 decodes every byte on .NET 10, so no extra mapping was added;
+    a test pins 0x81. Cost if wrong: a rare legacy file would fail to resolve.
+  - The smoke opens the picker and the dialog's secondary button with pointer
+    clicks, because a UIA Invoke would not return while the picker is modal.
+    Cost if wrong: none for the app.
+  - Managed UIA sees the Open dialog's Win32 controls as panes without
+    patterns (CI run 36650136288, confirmed by a host probe). The smoke sets
+    the File name box (id `1148`) with `WM_SETTEXT` and posts `WM_COMMAND`
+    `IDOK` or `IDCANCEL` to the dialog, instead of UIA Value and Invoke or
+    Esc. Cost if wrong: the smoke fails at the picker; no product impact.
+  - `html-static` checks native-heading details and `html-hostile` checks the
+    headered groups and warnings, because `html-static` has no warnings. Cost
+    if wrong: none.
+  - `AssetCount` counts linked files without the entry; `TotalBytes` includes
+    the entry. Cost if wrong: an off-by-one in the linked files row.
+  - Infrastructure tests check each source file's hash and last-write time;
+    the installed smoke checks the library with `describe-import`, which
+    counts entries inside the staging and content roots because startup may
+    create the empty roots. Cost if wrong: none.
+  - The warnings list shows at most 20 rows plus "N more warnings", and
+    targets over 80 characters keep their start and end. Cost if wrong: a
+    long list is cut earlier than a reader expects.
+  - The HTML entry size is checked against `Html.MaxEntryBytes` before the
+    scan, with the scanner's `TooLarge` message. Cost if wrong: none.
+  - Encoding samples don't wrap and are clipped by the dialog width. Cost if
+    wrong: a long first line is cut in the preview only.
+  - The smoke checks scrolled details and warnings rows by presence and name,
+    not `IsOffscreen`. Cost if wrong: none.
+  - `FirstLines` trims the newline a final CRLF leaves on the sample. Cost if
+    wrong: a one-character sample difference.

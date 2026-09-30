@@ -1,6 +1,6 @@
 # Project progress
 
-Updated 29 September 2026. This page distinguishes completed P0 evidence
+Updated 30 September 2026. This page distinguishes completed P0 evidence
 from P1 implementation and future verification. Story and task acceptance remains in
 the [work breakdown](work-breakdown.md).
 
@@ -15,7 +15,7 @@ the [work breakdown](work-breakdown.md).
 | P1 T04.4 provider search | Merged through [PR #14](https://github.com/ilya-slalom/desktop-guides/pull/14), merge commit `3e490de93a2733978c9000d754a8d618f0208563`. | IGDB metadata with user-supplied Twitch credentials and SteamGridDB artwork with a user-supplied key; the [installed result](p1/results.md#m2-t044-provider-search--implementation-check-29-september-2026) records the tests and harness phases. |
 | P1 portable build | Merged through [PR #15](https://github.com/ilya-slalom/desktop-guides/pull/15), merge commit `a4bb44c8ef06053cf1b2e5b154641fb95cf5fa1a`. | Releases ship a signed MSIX and a portable self-contained exe; see [Portable build](p1/e2e-testing.md#portable-build). |
 | P1 T05.4 catalog components | Merged through [PR #16](https://github.com/ilya-slalom/desktop-guides/pull/16), merge commit `515440a203843afee8eec6d48bce7f4d9bf8f8ca`. | Shared catalog styles and the artwork row template, adopted by Add game, Game detail, the status surfaces and the Library list. CI `production-shell-ui` passed the catalog scenario in light and dark; see the [verification record](p1/t05-4-catalog-components-design.md#t054-verification-record). |
-| P1 T06.1 + T06.2 import preview | Design in review. | Picker, validated preview and typed import manifest for TXT, HTML and PDF; see the [design](p1/t06-1-import-preview-design.md). |
+| P1 T06.1 + T06.2 import preview | Implemented and verified on `feat/p1-t06-1-import-preview`; PR pending. | Picker, validated preview and typed import manifest for TXT, HTML and PDF. CI run 36651770617 passed the installed `import-preview` scenario in light and dark with no guide, file operation or staged file created; see the [verification record](p1/t06-1-import-preview-design.md#t061--t062-verification-record). T06.3 adds Confirm and publication. |
 | P1 first usable release | M1 and M2 in progress; M3–M6 not started. | [P1 technical design](p1-technical-design.md) and [dependency plan](p1/implementation-plan.md) cover 16 stories and 54 tasks: S03–S17 plus S20. T11.4 now establishes the design language and starts stable Toolkit adoption with `SettingsCard`; mapped later tasks add `MetadataControl`, `HeaderedContentControl`, `Segmented`, `GridSplitter`, and conditional `RichSuggestBox` when their workflows exist. The [installed E2E procedure](p1/e2e-testing.md) uses an interactive scheduled task for the signed MSIX and UI workflows. S20 manual export/restore is in P1 because an uninstall removes package local data. |
 
 The remaining M1 task is T17.1 in the [P1 plan](p1/implementation-plan.md).

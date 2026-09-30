@@ -1,0 +1,20 @@
+﻿{
+    "mode":  "import-preview",
+    "invocationId":  "4ec72deab2c9433794247267729577da",
+    "observedAt":  "2026-09-30T00:55:44.2142237Z",
+    "processId":  10184,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "import-txt",
+                   "import-html",
+                   "import-html-warnings",
+                   "import-pdf-locked",
+                   "import-picker-cancel"
+               ],
+    "importTxtScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\import-light.import-txt.png",
+    "importWarningsScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\import-light.import-warnings.png"
+}
