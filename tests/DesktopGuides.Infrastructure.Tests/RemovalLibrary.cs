@@ -92,6 +92,15 @@ internal sealed class RemovalLibrary : IAsyncDisposable
         return Convert.ToString(command.ExecuteScalar())!;
     }
 
+    public void Execute(string sql)
+    {
+        using SqliteConnection connection = new($"Data Source={Paths.DatabasePath};Pooling=False");
+        connection.Open();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.ExecuteNonQuery();
+    }
+
     public string RowsFor(Guid guideId)
     {
         string id = guideId.ToString("N");

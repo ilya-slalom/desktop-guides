@@ -67,6 +67,55 @@
         <Setter Property="TextBlockStyle" Value="{StaticResource DesktopGuidesSecondaryBodyStyle}" />
     </Style>
 
+    <Style x:Key="DesktopGuidesRowFactsTextStyle"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource DesktopGuidesMetadataStyle}">
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style x:Key="DesktopGuidesRowFactsStyle"
+           TargetType="toolkit:MetadataControl"
+           BasedOn="{StaticResource DesktopGuidesFactsStyle}">
+        <Setter Property="TextBlockStyle" Value="{StaticResource DesktopGuidesRowFactsTextStyle}" />
+    </Style>
+
+    <!-- Library and Game-page rows. One MetadataControl per row, which T05.4
+         avoided; T05.1 asks for it, and each recycled container still holds
+         one fixed tree. The facts reach UIA once, as the row's help text. -->
+    <DataTemplate x:Key="DesktopGuidesCatalogRowTemplate" x:DataType="local:CatalogRowItem">
+        <Grid Padding="0,8"
+              ColumnSpacing="{StaticResource DesktopGuidesSpacing12}"
+              AutomationProperties.Name="{x:Bind AccessibleName}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="45" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border Style="{StaticResource DesktopGuidesArtworkTileStyle}">
+                <Grid>
+                    <FontIcon Glyph="{x:Bind Glyph}"
+                              FontSize="16"
+                              Foreground="{ThemeResource DesktopGuidesSecondaryTextBrush}"
+                              AutomationProperties.AccessibilityView="Raw" />
+                    <Image Source="{x:Bind Thumbnail, Mode=OneWay}"
+                           Stretch="UniformToFill"
+                           AutomationProperties.AccessibilityView="Raw" />
+                </Grid>
+            </Border>
+            <StackPanel Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Spacing="{StaticResource DesktopGuidesSpacing4}">
+                <TextBlock Text="{x:Bind Title}"
+                           Style="{StaticResource DesktopGuidesBodyStyle}"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis" />
+                <toolkit:MetadataControl Items="{x:Bind Facts}"
+                                         Style="{StaticResource DesktopGuidesRowFactsStyle}"
+                                         AutomationProperties.AccessibilityView="Raw" />
+            </StackPanel>
+        </Grid>
+    </DataTemplate>
+
     <Style x:Key="DesktopGuidesEmptyStateStyle"
            TargetType="Border"
            BasedOn="{StaticResource DesktopGuidesElevatedSurfaceStyle}">

@@ -309,10 +309,10 @@ if (args.Length == 2 &&
 
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second" or
-        "seed-design" or "seed-catalog" or "seed-import"))
+        "seed-design" or "seed-catalog" or "seed-facts" or "seed-import"))
 {
     Console.Error.WriteLine(
-        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-import " +
+        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-import " +
         "<app-data-root> " +
         "or seed-linked-game|describe-providers|describe-import <app-data-root> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
@@ -456,6 +456,11 @@ if (args[0] == "seed-catalog")
     await repository.AddGameAsync("كتالوج الألعاب", "PC", null);
     await AddWithArtwork("ゼルダの伝説", "Nintendo Switch", 0xA0);
 
+    // One shared creation time, so activity order is title order and the
+    // catalog smoke's head, tail and keyboard checks still hold.
+    long catalogCreated = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    ExecuteSql(paths, $"UPDATE Games SET CreatedUtcMs = {catalogCreated}, UpdatedUtcMs = {catalogCreated}");
+
     IReadOnlyList<Game> catalog = await repository.ListGamesAsync();
     string[] expectedHead = [longTitle, "Catalog B Short", "Catalog C Corrupt Art", "Catalog C Missing Art 0"];
     if (catalog.Count != 500 ||
@@ -466,7 +471,89 @@ if (args[0] == "seed-catalog")
     {
         throw new InvalidOperationException("The catalog seed did not read back in the expected order.");
     }
+    if (!(await repository.ListGameSummariesAsync()).Select(entry => entry.Game.Title)
+            .SequenceEqual(catalog.Select(seeded => seeded.Title)))
+    {
+        throw new InvalidOperationException("The catalog seed's activity order differs from its title order.");
+    }
     Console.WriteLine("Seeded 500 catalog games.");
+    return 0;
+}
+
+if (args[0] == "seed-facts")
+{
+    if ((await repository.ListGamesAsync()).Count != 0)
+    {
+        throw new InvalidOperationException("The facts seed needs an empty library.");
+    }
+    const long factsDay = 86_400_000;
+    long factsNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    DateTime factsLocalDate = TimeZoneInfo.ConvertTime(
+        DateTimeOffset.FromUnixTimeMilliseconds(factsNow), TimeZoneInfo.Local).Date;
+    long LocalMs(DateTime local) =>
+        new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local)).ToUnixTimeMilliseconds();
+    long openedToday = Math.Max(factsNow - 60_000, LocalMs(factsLocalDate));
+    long openedYesterday = LocalMs(factsLocalDate.AddDays(-1).AddHours(12));
+    static string N(Guid value) => value.ToString("N");
+
+    Guid factsGameId = Guid.NewGuid();
+    await repository.AddLinkedGameAsync(new NewLinkedGame(
+        factsGameId, "Facts Test Game", "PC",
+        new ProviderGameLink(ProviderGameLink.Igdb, "960000", DateTimeOffset.UtcNow),
+        new GameMetadataSnapshot(
+            GameMetadataSnapshot.CurrentSchemaVersion, null, null, [], [], [], [], null,
+            GameTypeTag.MainGame),
+        null), CancellationToken.None);
+    Game zetaGame = await repository.AddGameAsync("Zeta Archive Game", "Windows", null);
+    Game emptyGame = await repository.AddGameAsync("Empty Test Game", null, null);
+
+    Guid checklistId = Guid.NewGuid();
+    Guid storyId = Guid.NewGuid();
+    Guid mapId = Guid.NewGuid();
+    Guid upgradeId = Guid.NewGuid();
+    Guid notesId = Guid.NewGuid();
+    foreach ((Guid guideId, string title) in new[]
+             {
+                 (checklistId, "Achievement Checklist"),
+                 (storyId, "Main Story Walkthrough"),
+                 (mapId, "Collectibles Map"),
+                 (upgradeId, "Weapon Upgrade Guide")
+             })
+    {
+        await InsertGuideAsync(paths, factsGameId, guideId, title, factsNow - 15 * factsDay);
+    }
+    await InsertGuideAsync(paths, zetaGame.Id, notesId, "Recent Notes", factsNow - 30 * factsDay);
+
+    // No writer for reading state exists yet (T12.3, T13.2), so set it here.
+    // Html and Pdf rows keep TXT content: the smoke never opens them.
+    ExecuteSql(paths, $"""
+        UPDATE Games SET CreatedUtcMs = {factsNow - 15 * factsDay}, UpdatedUtcMs = {factsNow - 15 * factsDay}
+            WHERE Id = '{N(factsGameId)}';
+        UPDATE Games SET CreatedUtcMs = {factsNow - 30 * factsDay}, UpdatedUtcMs = {factsNow - 30 * factsDay}
+            WHERE Id = '{N(zetaGame.Id)}';
+        UPDATE Games SET CreatedUtcMs = {factsNow - 5 * factsDay}, UpdatedUtcMs = {factsNow - 5 * factsDay}
+            WHERE Id = '{N(emptyGame.Id)}';
+        UPDATE Guides SET Format = 'Html' WHERE Id = '{N(storyId)}';
+        UPDATE Guides SET Format = 'Pdf' WHERE Id = '{N(mapId)}';
+        UPDATE ReadingStates SET LastOpenedUtcMs = {openedToday} WHERE GuideId = '{N(storyId)}';
+        UPDATE ReadingStates SET EstimatedFraction = 0.45, LastOpenedUtcMs = {openedYesterday}
+            WHERE GuideId = '{N(mapId)}';
+        UPDATE ReadingStates SET EstimatedFraction = 0.8, LastOpenedUtcMs = {factsNow - 10 * factsDay},
+            CompletedUtcMs = {factsNow - 10 * factsDay} WHERE GuideId = '{N(upgradeId)}';
+        UPDATE ReadingStates SET LastOpenedUtcMs = {factsNow} WHERE GuideId = '{N(notesId)}';
+        """);
+
+    string[] factsGames = [.. (await repository.ListGameSummariesAsync()).Select(entry => entry.Game.Title)];
+    string[] factsGuides = [.. (await repository.ListGuideSummariesAsync(factsGameId)).Select(entry => entry.Guide.Title)];
+    if (!factsGames.SequenceEqual(new[] { "Zeta Archive Game", "Facts Test Game", "Empty Test Game" }) ||
+        !factsGuides.SequenceEqual(new[]
+        {
+            "Main Story Walkthrough", "Collectibles Map", "Weapon Upgrade Guide", "Achievement Checklist"
+        }))
+    {
+        throw new InvalidOperationException("The facts seed did not read back in activity order.");
+    }
+    Console.WriteLine($"Seeded facts game {factsGameId:N} with four guides.");
     return 0;
 }
 
@@ -539,6 +626,21 @@ static async Task InsertGuideAsync(
     command.Parameters.AddWithValue("$hash", hash);
     command.Parameters.AddWithValue("$bytes", bytes.LongLength);
     command.Parameters.AddWithValue("$now", now);
+    command.ExecuteNonQuery();
+}
+
+static void ExecuteSql(ManagedPathResolver paths, string sql)
+{
+    using SqliteConnection connection = new(new SqliteConnectionStringBuilder
+    {
+        DataSource = paths.DatabasePath,
+        Mode = SqliteOpenMode.ReadWrite,
+        Pooling = false,
+        ForeignKeys = true
+    }.ToString());
+    connection.Open();
+    using SqliteCommand command = connection.CreateCommand();
+    command.CommandText = sql;
     command.ExecuteNonQuery();
 }
 

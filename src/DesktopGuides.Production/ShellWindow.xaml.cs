@@ -86,6 +86,7 @@ public sealed partial class ShellWindow : Window
             UIElement.TappedEvent, new TappedEventHandler(GuideTapped), true);
         GuideList.AddHandler(
             UIElement.KeyDownEvent, new KeyEventHandler(GuideKeyDown), true);
+        ArtworkListLoader.NameRows(GuideList);
         GuideList.LayoutUpdated += GuideListLayoutUpdated;
         Navigation.RegisterPropertyChangedCallback(
             NavigationView.IsPaneOpenProperty, (_, _) => UpdatePaneStatus());
@@ -421,7 +422,7 @@ public sealed partial class ShellWindow : Window
             return;
         }
         UpdateOpenSelectedGuideAction();
-        if (GuideList.SelectedItem is Guide guide)
+        if (SelectedGuide is Guide guide)
         {
             await OpenGuideFromGameAsync(guide);
         }
@@ -435,6 +436,10 @@ public sealed partial class ShellWindow : Window
         }
     }
 
+    private Guide? SelectedGuide => GuideAt(GuideList.SelectedItem);
+
+    private static Guide? GuideAt(object? item) => (item as GuideRowItem)?.Guide;
+
     private Guide? GuideFromRow(DependencyObject? source)
     {
         while (source is not null && !ReferenceEquals(source, GuideList))
@@ -443,7 +448,7 @@ public sealed partial class ShellWindow : Window
             {
                 return null;
             }
-            if (source is ListViewItem row && row.Content is Guide guide)
+            if (source is ListViewItem row && GuideAt(row.Content) is Guide guide)
             {
                 return guide;
             }
@@ -464,7 +469,7 @@ public sealed partial class ShellWindow : Window
 
     private async void OpenSelectedGuideClicked(object sender, RoutedEventArgs args)
     {
-        if (GuideList.SelectedItem is Guide guide)
+        if (SelectedGuide is Guide guide)
         {
             await OpenGuideFromGameAsync(guide);
         }
@@ -485,7 +490,7 @@ public sealed partial class ShellWindow : Window
     {
         if (GuideList.IsEnabled &&
             navigator.Current is GameRoute game &&
-            GuideList.SelectedItem is Guide guide &&
+            SelectedGuide is Guide guide &&
             guide.GameId == game.GameId)
         {
             AutomationProperties.SetName(
@@ -510,10 +515,10 @@ public sealed partial class ShellWindow : Window
         if (pendingGuideFocus is not Guid guideId ||
             guideFocusRenderGeneration != renderGeneration ||
             navigator.Current is not GameRoute game ||
-            GuideList.SelectedItem is not Guide selected ||
+            SelectedGuide is not Guide selected ||
             selected.Id != guideId ||
             selected.GameId != game.GameId ||
-            GuideList.ContainerFromItem(selected) is not Control container)
+            GuideList.ContainerFromItem(GuideList.SelectedItem) is not Control container)
         {
             return;
         }
@@ -819,7 +824,7 @@ public sealed partial class ShellWindow : Window
     {
         if (removeRequested || closeRequested ||
             navigator.Current is not GameRoute route ||
-            GuideList.SelectedItem is not Guide guide ||
+            SelectedGuide is not Guide guide ||
             guide.GameId != route.GameId)
         {
             return;
@@ -831,8 +836,8 @@ public sealed partial class ShellWindow : Window
         ImportGuideButton.IsEnabled = false;
         // The row that takes the removed row's place, or the previous row.
         int index = GuideList.SelectedIndex;
-        Guide? neighbor = (index + 1 < GuideList.Items.Count ? GuideList.Items[index + 1]
-            : index > 0 ? GuideList.Items[index - 1] : null) as Guide;
+        Guide? neighbor = GuideAt(index + 1 < GuideList.Items.Count ? GuideList.Items[index + 1]
+            : index > 0 ? GuideList.Items[index - 1] : null);
         bool rendered = false;
         try
         {
@@ -1109,7 +1114,7 @@ public sealed partial class ShellWindow : Window
                 case LibraryRoute:
                     LibraryPanel.Visibility = Visibility.Visible;
                     ShowBusyStatus("Loading library…");
-                    IReadOnlyList<Game> games = await library.ListGamesAsync();
+                    IReadOnlyList<LibraryGameSummary> games = await library.ListGameSummariesAsync();
                     AppSettings settings = await library.GetSettingsAsync();
                     Guide? resume = settings.LastActiveGuideId is Guid lastId
                         ? await library.GetGuideAsync(lastId)
@@ -1119,7 +1124,7 @@ public sealed partial class ShellWindow : Window
                         return false;
                     }
                     gameArtwork.CancelAll();
-                    GameList.ItemsSource = games.Select(game => new LibraryGameItem(game)).ToList();
+                    GameList.ItemsSource = games.Select(summary => new LibraryGameItem(summary)).ToList();
                     LibraryEmptyState.Visibility =
                         games.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
                     GameList.Visibility =
@@ -1138,7 +1143,7 @@ public sealed partial class ShellWindow : Window
                     GamePanel.Visibility = Visibility.Visible;
                     ShowBusyStatus("Loading game…");
                     Guid? selectedGuideId = pendingGuideFocus ??
-                        (GuideList.SelectedItem as Guide)?.Id;
+                        SelectedGuide?.Id;
                     GameHeading.Text = "Loading game…";
                     GamePlatform.Text = string.Empty;
                     GameNotes.Text = string.Empty;
@@ -1171,8 +1176,10 @@ public sealed partial class ShellWindow : Window
                         ShowWarningStatus("This game is no longer in your library.");
                         return false;
                     }
-                    IReadOnlyList<Guide> guides =
-                        await library.ListGuidesAsync(gameRoute.GameId);
+                    IReadOnlyList<GuideRowItem> guides =
+                        (await library.ListGuideSummariesAsync(gameRoute.GameId))
+                        .Select(summary => new GuideRowItem(summary, TimeProvider.System, CultureInfo.CurrentCulture))
+                        .ToList();
                     if (generation != renderGeneration)
                     {
                         return false;
@@ -1195,8 +1202,8 @@ public sealed partial class ShellWindow : Window
                             : Visibility.Visible;
                     EditGameButton.IsEnabled = true;
                     ImportGuideButton.IsEnabled = !importRequested;
-                    Guide? selectedGuide = selectedGuideId is Guid id
-                        ? guides.FirstOrDefault(item => item.Id == id)
+                    GuideRowItem? selectedGuide = selectedGuideId is Guid id
+                        ? guides.FirstOrDefault(item => item.Guide.Id == id)
                         : null;
                     settingGuideSelection = true;
                     try

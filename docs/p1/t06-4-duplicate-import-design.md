@@ -1,6 +1,7 @@
 # T06.4 duplicate import design
 
-Status: implemented on `feat/p1-t06-4-duplicate-import`; verified by CI run 36675695341.
+Status: merged through PR #20 on 30 September 2026, merge commit `81e9eb7`;
+verified by CI run 36675695341.
 Prerequisite T06.3 was merged through PR #19 on 30 September 2026, merge
 commit `494cb02`.
 

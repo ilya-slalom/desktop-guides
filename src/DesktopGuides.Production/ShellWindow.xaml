@@ -146,7 +146,7 @@
                     <ListView x:Name="GameList"
                               SelectionMode="Single"
                               Style="{StaticResource DesktopGuidesListStyle}"
-                              ItemTemplate="{StaticResource DesktopGuidesArtworkRowTemplate}"
+                              ItemTemplate="{StaticResource DesktopGuidesCatalogRowTemplate}"
                               SelectionChanged="GameSelected"
                               AutomationProperties.AutomationId="GameList"
                               AutomationProperties.Name="Games" />
@@ -310,9 +310,9 @@
                         </StackPanel>
                     </Border>
                     <ListView x:Name="GuideList"
-                              DisplayMemberPath="Title"
                               SelectionMode="Single"
                               Style="{StaticResource DesktopGuidesListStyle}"
+                              ItemTemplate="{StaticResource DesktopGuidesCatalogRowTemplate}"
                               SelectionChanged="GuideSelected"
                               AutomationProperties.AutomationId="GuideList"
                               AutomationProperties.Name="Guides" />

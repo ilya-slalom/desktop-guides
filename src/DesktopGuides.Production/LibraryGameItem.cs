@@ -2,16 +2,12 @@ using DesktopGuides.Core.Library;
 
 namespace DesktopGuides.Production;
 
-public sealed class LibraryGameItem : ArtworkItem
+public sealed class LibraryGameItem : CatalogRowItem
 {
-    internal LibraryGameItem(Game game)
-        : base(
-            game.Title,
-            LibraryGamePresentation.Summary(game),
-            null,
-            LibraryGamePresentation.AccessibleName(game))
+    internal LibraryGameItem(LibraryGameSummary summary)
+        : base(summary.Game.Title, "\uE7FC", CatalogPresentation.GameFacts(summary))
     {
-        Game = game;
+        Game = summary.Game;
     }
 
     internal Game Game { get; }

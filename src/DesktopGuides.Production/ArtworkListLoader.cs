@@ -45,6 +45,8 @@ internal sealed class ArtworkListLoader
         if (args.Phase == 0)
         {
             AutomationProperties.SetName(container, item.AccessibleName);
+            // Set on every row, so a recycled container never keeps earlier facts.
+            AutomationProperties.SetHelpText(container, (item as CatalogRowItem)?.HelpText ?? string.Empty);
             if (load is not null) args.RegisterUpdateCallback(1, ContainerContentChanging);
             return;
         }
