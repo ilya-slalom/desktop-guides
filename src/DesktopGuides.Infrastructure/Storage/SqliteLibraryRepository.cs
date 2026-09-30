@@ -255,17 +255,22 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         ReadAsync<Guide?>(() =>
         {
             using SqliteConnection connection = OpenConnection();
-            using SqliteCommand command = connection.CreateCommand();
-            command.CommandText = """
-                SELECT Id, GameId, Title, Format, ManagedRelativeRoot,
-                       PrimaryRelativePath, ContentSha256, ContentBytes,
-                       SourceLabel, TextCodePage, ImportedUtcMs, UpdatedUtcMs
-                FROM Guides WHERE Id = $id
-                """;
-            command.Parameters.AddWithValue("$id", guideId.ToString("N"));
-            using SqliteDataReader reader = command.ExecuteReader();
-            return reader.Read() ? ReadGuide(reader) : null;
+            return GetGuide(connection, guideId);
         }, token);
+
+    private static Guide? GetGuide(SqliteConnection connection, Guid guideId)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT Id, GameId, Title, Format, ManagedRelativeRoot,
+                   PrimaryRelativePath, ContentSha256, ContentBytes,
+                   SourceLabel, TextCodePage, ImportedUtcMs, UpdatedUtcMs
+            FROM Guides WHERE Id = $id
+            """;
+        command.Parameters.AddWithValue("$id", guideId.ToString("N"));
+        using SqliteDataReader reader = command.ExecuteReader();
+        return reader.Read() ? ReadGuide(reader) : null;
+    }
 
     private const string FindGuideSql = """
         SELECT Id, GameId, Title, Format, ManagedRelativeRoot,
@@ -822,6 +827,90 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         {
             using SqliteConnection connection = owner.OpenConnection();
             new FileOperationReconciler(owner.paths).RollBackImport(connection, operationId);
+        }
+    }
+
+    /// <summary>
+    /// Runs a deletion under the write gate for its whole duration. The token
+    /// only cancels the wait for the gate: once the work starts, it runs to an
+    /// outcome, so a journal row is never abandoned half-way.
+    /// </summary>
+    internal async Task<T> RunDeletionAsync<T>(Func<IDeletionJournal, T> work, CancellationToken token)
+    {
+        await writeGate.WaitAsync(token);
+        try
+        {
+            return await Task.Run(() => work(new DeletionJournal(this)), CancellationToken.None);
+        }
+        finally
+        {
+            writeGate.Release();
+        }
+    }
+
+    private sealed class DeletionJournal(SqliteLibraryRepository owner) : IDeletionJournal
+    {
+        public Guide? GetGuide(Guid guideId)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            return SqliteLibraryRepository.GetGuide(connection, guideId);
+        }
+
+        public void Prepare(Guid operationId, Guid guideId)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO FileOperations (Id, Kind, Phase, ManifestJson, CreatedUtcMs)
+                VALUES ($id, 'DeleteGuide', 'Prepared', $manifest, $now)
+                """;
+            command.Parameters.AddWithValue("$id", operationId.ToString("N"));
+            command.Parameters.AddWithValue("$manifest",
+                FileOperationManifest.Create(FileOperationKind.DeleteGuide, operationId, [guideId]));
+            command.Parameters.AddWithValue("$now", owner.clock.GetUtcNow().ToUnixTimeMilliseconds());
+            command.ExecuteNonQuery();
+        }
+
+        public void Commit(Guid operationId, Guid guideId, Action beforeCommit)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            int Execute(string sql)
+            {
+                using SqliteCommand command = connection.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText = sql;
+                command.Parameters.AddWithValue("$guide", guideId.ToString("N"));
+                command.Parameters.AddWithValue("$op", operationId.ToString("N"));
+                return command.ExecuteNonQuery();
+            }
+            // Cascaded ReadingStates and ReaderPreferences deletes aren't counted.
+            if (Execute("DELETE FROM Guides WHERE Id = $guide") != 1)
+            {
+                throw new InvalidDataException("The guide to delete is missing.");
+            }
+            Execute("DELETE FROM Settings WHERE Key = 'LastActiveGuideId' AND Value = $guide");
+            if (Execute("""
+                UPDATE FileOperations SET Phase = 'Committed'
+                WHERE Id = $op AND Kind = 'DeleteGuide' AND Phase = 'Prepared'
+                """) != 1)
+            {
+                throw new InvalidDataException("The deletion's file operation is missing.");
+            }
+            beforeCommit();
+            transaction.Commit();
+        }
+
+        public void RollBack(Guid operationId)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            new FileOperationReconciler(owner.paths).RollBackDeletion(connection, operationId);
+        }
+
+        public void Finish(Guid operationId)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            new FileOperationReconciler(owner.paths).FinishDeletion(connection, operationId);
         }
     }
 

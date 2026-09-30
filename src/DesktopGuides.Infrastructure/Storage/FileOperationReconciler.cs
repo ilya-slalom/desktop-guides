@@ -204,6 +204,80 @@ internal sealed class FileOperationReconciler(ILibraryPaths paths)
         RemoveJournalRow(connection, row.Id);
     }
 
+    /// <summary>
+    /// Rolls back one in-process deletion that hasn't committed: every trashed
+    /// guide goes back to content, under the same rules as startup recovery.
+    /// </summary>
+    public void RollBackDeletion(SqliteConnection connection, Guid operationId)
+    {
+        JournalRow row = ReadDeletion(connection, operationId, FileOperationPhase.Prepared);
+        HashSet<Guid> committedGuides = ReadGuideIds(connection);
+        string? operationRoot = null;
+        foreach (Guid guideId in row.Manifest.GuideIds)
+        {
+            if (!committedGuides.Contains(guideId))
+            {
+                throw new InvalidDataException(
+                    "File-operation phase conflicts with committed guide metadata.");
+            }
+            string contentPath = paths.GetGuideRoot(guideId);
+            string trashPath = paths.GetTrashedGuideRoot(row.Id, guideId);
+            operationRoot ??= Path.GetDirectoryName(trashPath)!;
+            RequireDirectoryOrMissing(operationRoot);
+            OwnedGuideTree content = OwnedGuideTree.Capture(contentPath);
+            OwnedGuideTree trash = OwnedGuideTree.Capture(trashPath);
+            if (content.Exists && trash.Exists)
+            {
+                throw new InvalidDataException(
+                    "Prepared deletion has conflicting content and trash directories.");
+            }
+            if (trash.Exists)
+            {
+                Directory.Move(trashPath, contentPath);
+            }
+        }
+        RemoveIfEmpty(operationRoot);
+        RemoveJournalRow(connection, row.Id);
+    }
+
+    /// <summary>Deletes a committed deletion's trash, then its journal row.</summary>
+    public void FinishDeletion(SqliteConnection connection, Guid operationId)
+    {
+        JournalRow row = ReadDeletion(connection, operationId, FileOperationPhase.Committed);
+        HashSet<Guid> committedGuides = ReadGuideIds(connection);
+        string? operationRoot = null;
+        foreach (Guid guideId in row.Manifest.GuideIds)
+        {
+            if (committedGuides.Contains(guideId))
+            {
+                throw new InvalidDataException(
+                    "File-operation phase conflicts with committed guide metadata.");
+            }
+            string trashPath = paths.GetTrashedGuideRoot(row.Id, guideId);
+            operationRoot ??= Path.GetDirectoryName(trashPath)!;
+            RequireDirectoryOrMissing(operationRoot);
+            if (OwnedGuideTree.Capture(paths.GetGuideRoot(guideId)).Exists)
+            {
+                throw new InvalidDataException("Committed deletion still has a content directory.");
+            }
+            OwnedGuideTree.Capture(trashPath).Delete();
+        }
+        RemoveIfEmpty(operationRoot);
+        RemoveJournalRow(connection, row.Id);
+    }
+
+    private static JournalRow ReadDeletion(
+        SqliteConnection connection, Guid operationId, FileOperationPhase phase)
+    {
+        JournalRow row = ReadJournalRows(connection).SingleOrDefault(candidate => candidate.Id == operationId)
+            ?? throw new InvalidDataException("The deletion is not in the file-operation journal.");
+        if (row.Kind == FileOperationKind.Import || row.Phase != phase)
+        {
+            throw new InvalidDataException("The file operation is not a deletion in the expected phase.");
+        }
+        return row;
+    }
+
     private static void RemoveIfEmpty(string? directory)
     {
         if (directory is not null && Directory.Exists(directory) &&
