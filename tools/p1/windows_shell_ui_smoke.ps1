@@ -10,6 +10,7 @@ param(
         'late-guide-after-close', 'waiting-handoff', 'material', 'catalog',
         'provider-none', 'provider-offline', 'provider-settings',
         'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
+        'remove-guide-cancel', 'remove-guide',
         'provider-live', 'provider-remove')]
     [string] $Mode,
 
@@ -456,6 +457,38 @@ try {
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
         throw "Expected keyboard focus on '$expected' after Back."
+    }
+
+    function Wait-FocusedId([string] $id) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+            if ($focused -and $focused.Current.AutomationId -eq $id) { return }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected keyboard focus on '$id'."
+    }
+
+    function Get-GuideRowNames {
+        $list = Find-ById 'GuideList'
+        if (-not $list -or $list.Current.IsOffscreen) {
+            throw 'Expected a visible guide list.'
+        }
+        $condition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+            [System.Windows.Automation.ControlType]::ListItem)
+        $names = @($list.FindAll($scope, $condition) | ForEach-Object { $_.Current.Name })
+        return ,$names
+    }
+
+    function Wait-GuideRowCount([int] $expected) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $names = Get-GuideRowNames
+            if ($names.Count -eq $expected) { return ,$names }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected $expected guide rows, found $($names.Count): $($names -join ', ')."
     }
 
     function Wait-FocusedGameRow([string] $expected) {
@@ -1589,16 +1622,6 @@ try {
             throw "Expected '$id' named '$expected'."
         }
 
-        function Wait-FocusedId([string] $id) {
-            $deadline = (Get-Date).AddSeconds(15)
-            do {
-                $focused = $uia::FocusedElement
-                if ($focused -and $focused.Current.AutomationId -eq $id) { return }
-                Start-Sleep -Milliseconds 200
-            } while ((Get-Date) -lt $deadline)
-            throw "Expected keyboard focus on '$id'."
-        }
-
         if ($Mode -eq 'import-preview') {
             Select-Element 'Import Test Game'
             [void](Wait-Name 'GameHeading' 'Import Test Game')
@@ -1721,6 +1744,58 @@ try {
                     $report.phases += 'import-open-existing'
                 }
             }
+        }
+    }
+    elseif ($Mode -like 'remove-*') {
+        if (-not $ExpectedGuideTitle) {
+            throw "$Mode needs -ExpectedGuideTitle."
+        }
+        $title = $ExpectedGuideTitle
+        Select-Element 'Import Test Game'
+        [void](Wait-Name 'GameHeading' 'Import Test Game')
+        [void](Wait-Status 'Game ready.')
+
+        # Selecting a guide opens it (Ruling 1), so come back to the game
+        # with it selected before removing it.
+        Open-GuideFromGame $title
+        [void](Wait-Name 'ReaderHeading' $title)
+        [void](Wait-Status 'Guide details ready.')
+        Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
+        [void](Wait-Name 'GameHeading' 'Import Test Game')
+        [void](Wait-Status 'Game ready.')
+        [void](Wait-SelectedGuide $title)
+        [void](Wait-GuideRowCount 2)
+
+        Invoke-Element (Wait-Name 'RemoveSelectedGuide' "Remove $title")
+        [void](Wait-VisibleById 'RemoveGuideDialog')
+        [void](Wait-Name 'RemoveGuideMessage' ("This removes the guide, its reading progress, and its 1 managed file " +
+            "from Desktop Guides. The original file you imported isn't affected."))
+        [void](Wait-Name 'PrimaryButton' 'Remove')
+        [void](Wait-Name 'CloseButton' 'Cancel')
+        $report.removeConfirmScreenshot = Save-WindowScreenshot 'remove-confirm'
+        $report.phases += 'remove-confirm'
+
+        if ($Mode -eq 'remove-guide-cancel') {
+            Invoke-Element (Wait-EnabledById 'CloseButton')
+            [void](Wait-HiddenById 'RemoveGuideDialog')
+            Wait-FocusedId 'RemoveSelectedGuide'
+            [void](Wait-GuideRowCount 2)
+            [void](Wait-SelectedGuide $title)
+            $report.phases += 'remove-cancelled'
+        }
+        else {
+            Invoke-Element (Wait-EnabledById 'PrimaryButton')
+            [void](Wait-HiddenById 'RemoveGuideDialog')
+            [void](Wait-Status "Removed $title.")
+            $remaining = Wait-GuideRowCount 1
+            if ($remaining[0] -eq $title) {
+                throw "The removed guide '$title' is still listed."
+            }
+            [void](Wait-SelectedGuide $remaining[0])
+            Wait-FocusedGuide $remaining[0]
+            $report.remainingTitle = $remaining[0]
+            $report.removedScreenshot = Save-WindowScreenshot 'removed'
+            $report.phases += 'removed'
         }
     }
     elseif ($Mode -eq 'long-list') {
@@ -2267,13 +2342,14 @@ try {
 }
 catch {
     $report.error = $_ | Out-String
-    if (($Mode -eq 'game-editor' -or $Mode -eq 'catalog' -or $Mode -like 'import-*' -or
+    if (($Mode -eq 'game-editor' -or $Mode -eq 'catalog' -or $Mode -like 'import-*' -or $Mode -like 'remove-*' -or
         $Mode -like 'provider-*') -and $root) {
         try {
             foreach ($id in @('ShellStatus', 'GameHeading',
                 'GameTitleFeedback', 'GameSaveError', 'GameSearchStatus',
                 'ProviderSettingsStatus', 'GameEditorNotice', 'GameAttribution',
-                'ImportStatus', 'ImportGuideDialog', 'ImportBusyText')) {
+                'ImportStatus', 'ImportGuideDialog', 'ImportBusyText',
+                'RemoveGuideDialog', 'RemoveGuideMessage', 'RemoveSelectedGuide')) {
                 $element = Find-ById $id
                 if ($element) {
                     $report["failure$id"] = [ordered]@{

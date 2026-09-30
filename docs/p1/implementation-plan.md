@@ -646,6 +646,16 @@ with `Changed` when the copied bytes differ from the preview. CI run
 36675695341 passed the installed import group: light publish, a dark copy
 and a light Open existing.
 
+T15.3 is implemented on `feat/p1-t15-3-guide-deletion`; see the
+[design and verification record](t15-3-guide-deletion-design.md). The Game
+page's **Remove guide** confirms with the guide's title and managed-file
+count. `GuideRemover` journals a `DeleteGuide` operation, moves
+`content/<id>` to `.trash/<op>/<id>`, deletes the guide row with its state
+and preferences, then deletes the trash. A failure before the commit
+restores the guide, and a failure after it leaves a journaled trash entry
+that startup deletes. CI run 36688055406 passed the installed removal group:
+a dark Cancel and a light removal.
+
 ### UI design-language and Gallery adoption sequence
 
 The WinUI Gallery is a reference catalog, not a package or shell dependency.

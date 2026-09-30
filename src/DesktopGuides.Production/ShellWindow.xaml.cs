@@ -57,6 +57,9 @@ public sealed partial class ShellWindow : Window
     private GuideImportPublisher? guidePublisher;
     private bool importRequested;
     private ImportGuideDialog? activeImportDialog;
+    private GuideRemover? guideRemover;
+    private bool removeRequested;
+    private ContentDialog? activeRemoveDialog;
     private CancellationTokenSource? refreshCancel;
     private Task refreshTask = Task.CompletedTask;
 
@@ -224,6 +227,7 @@ public sealed partial class ShellWindow : Window
             artwork = new ManagedArtworkStore(paths);
             await repository.InitializeAsync();
             guidePublisher = new GuideImportPublisher(repository, paths);
+            guideRemover = new GuideRemover(repository, paths);
             providers = new ProviderServices(dataRoot);
             await ProviderSettings.InitializeAsync(providers);
             importer = providers.CreateImporter(repository, artwork);
@@ -272,6 +276,7 @@ public sealed partial class ShellWindow : Window
         activeGameEditor?.Hide();
         activeAddGameDialog?.Hide();
         activeImportDialog?.Hide();
+        activeRemoveDialog?.Hide();
         refreshCancel?.Cancel();
         ProviderSettings.Cancel();
         leaseWait.Cancel();
@@ -485,11 +490,15 @@ public sealed partial class ShellWindow : Window
         {
             AutomationProperties.SetName(
                 OpenSelectedGuideButton, $"Open {guide.Title}");
+            AutomationProperties.SetName(
+                RemoveSelectedGuideButton, $"Remove {guide.Title}");
             OpenSelectedGuideButton.Visibility = Visibility.Visible;
+            RemoveSelectedGuideButton.Visibility = Visibility.Visible;
         }
         else
         {
             OpenSelectedGuideButton.Visibility = Visibility.Collapsed;
+            RemoveSelectedGuideButton.Visibility = Visibility.Collapsed;
         }
     }
 
@@ -806,6 +815,127 @@ public sealed partial class ShellWindow : Window
         }
     }
 
+    private async void RemoveSelectedGuideClicked(object sender, RoutedEventArgs args)
+    {
+        if (removeRequested || closeRequested ||
+            navigator.Current is not GameRoute route ||
+            GuideList.SelectedItem is not Guide guide ||
+            guide.GameId != route.GameId)
+        {
+            return;
+        }
+        removeRequested = true;
+        GuideList.IsEnabled = false;
+        OpenSelectedGuideButton.IsEnabled = false;
+        RemoveSelectedGuideButton.IsEnabled = false;
+        ImportGuideButton.IsEnabled = false;
+        // The row that takes the removed row's place, or the previous row.
+        int index = GuideList.SelectedIndex;
+        Guide? neighbor = (index + 1 < GuideList.Items.Count ? GuideList.Items[index + 1]
+            : index > 0 ? GuideList.Items[index - 1] : null) as Guide;
+        bool rendered = false;
+        try
+        {
+            await RunNavigationAsync(async () =>
+            {
+                if (closeRequested ||
+                    navigator.Current is not GameRoute current ||
+                    current.GameId != route.GameId)
+                {
+                    return;
+                }
+                GuideRemover remover = guideRemover
+                    ?? throw new InvalidOperationException("The library is not ready.");
+                GuideRemovalPreview? preview;
+                try
+                {
+                    preview = await remover.DescribeAsync(guide.Id);
+                }
+                catch (Exception error)
+                {
+                    ShowRemovalError(error, guide.Title);
+                    return;
+                }
+                if (closeRequested)
+                {
+                    return;
+                }
+                if (preview is null)
+                {
+                    rendered = true;
+                    pendingGuideFocus = neighbor?.Id;
+                    await RenderCurrentAsync();
+                    ShowTransientStatus(GuideRemovalPresentation.AlreadyRemoved(guide.Title));
+                    return;
+                }
+                ContentDialog dialog = RemoveGuideDialog.Create(preview, Navigation.XamlRoot);
+                DialogSurface.Apply(dialog, EffectiveMaterial);
+                activeRemoveDialog = dialog;
+                ContentDialogResult choice;
+                try
+                {
+                    choice = await dialog.ShowAsync();
+                }
+                finally
+                {
+                    activeRemoveDialog = null;
+                }
+                if (choice != ContentDialogResult.Primary || closeRequested)
+                {
+                    return;
+                }
+                GuideRemovalResult result;
+                try
+                {
+                    result = await remover.RemoveAsync(guide.Id);
+                }
+                catch (Exception error)
+                {
+                    ShowRemovalError(error, guide.Title);
+                    return;
+                }
+                if (!closeRequested && navigator.Current is GameRoute shown && shown.GameId == route.GameId)
+                {
+                    rendered = true;
+                    pendingGuideFocus = neighbor?.Id;
+                    await RenderCurrentAsync();
+                }
+                ShowTransientStatus(result.Outcome == GuideRemovalOutcome.NotFound
+                    ? GuideRemovalPresentation.AlreadyRemoved(guide.Title)
+                    : GuideRemovalPresentation.Removed(guide.Title, result.CleanupPending));
+            });
+        }
+        finally
+        {
+            removeRequested = false;
+            OpenSelectedGuideButton.IsEnabled = true;
+            RemoveSelectedGuideButton.IsEnabled = true;
+            if (!closeRequested && navigator.Current is GameRoute shown && shown.GameId == route.GameId)
+            {
+                if (!rendered)
+                {
+                    GuideList.IsEnabled = true;
+                    ImportGuideButton.IsEnabled = !importRequested;
+                    UpdateOpenSelectedGuideAction();
+                    RemoveSelectedGuideButton.Focus(FocusState.Programmatic);
+                }
+                else if (GuideList.Items.Count == 0)
+                {
+                    ImportGuideButton.Focus(FocusState.Programmatic);
+                }
+            }
+        }
+    }
+
+    private void ShowRemovalError(Exception error, string title)
+    {
+        if (!closeRequested)
+        {
+            ShowErrorStatus(GuideRemovalPresentation.Error(
+                error is GuideRemovalException removal ? removal.Issue : GuideRemovalIssue.Failed, title));
+        }
+    }
+
     private async Task<string?> PickGuideFileAsync()
     {
         FileOpenPicker picker = new(AppWindow.Id);
@@ -961,6 +1091,7 @@ public sealed partial class ShellWindow : Window
         ReaderPanel.Visibility = Visibility.Collapsed;
         SettingsPanel.Visibility = Visibility.Collapsed;
         OpenSelectedGuideButton.Visibility = Visibility.Collapsed;
+        RemoveSelectedGuideButton.Visibility = Visibility.Collapsed;
         AppTitleBar.IsBackButtonEnabled = navigator.CanGoBack;
         Navigation.SelectedItem = navigator.Current is SettingsRoute
             ? Navigation.SettingsItem

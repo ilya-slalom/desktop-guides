@@ -269,6 +269,7 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="Guides"
                                Style="{StaticResource DesktopGuidesSectionTitleStyle}" />
@@ -279,8 +280,15 @@
                             Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
                             Click="OpenSelectedGuideClicked"
                             AutomationProperties.AutomationId="OpenSelectedGuide" />
-                    <Button x:Name="ImportGuideButton"
+                    <Button x:Name="RemoveSelectedGuideButton"
                             Grid.Column="2"
+                            Content="Remove guide"
+                            Visibility="Collapsed"
+                            Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                            Click="RemoveSelectedGuideClicked"
+                            AutomationProperties.AutomationId="RemoveSelectedGuide" />
+                    <Button x:Name="ImportGuideButton"
+                            Grid.Column="3"
                             Content="Import guide"
                             IsEnabled="False"
                             Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"

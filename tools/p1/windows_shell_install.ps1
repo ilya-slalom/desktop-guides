@@ -851,6 +851,49 @@ function Run-ImportScenarios {
     }
 }
 
+function Assert-RemovalState([string] $label, $expected) {
+    $state = Invoke-ShellSeed @('describe-import', $dataRoot) | ConvertFrom-Json
+    foreach ($name in $expected.Keys) {
+        if ($state.$name -ne $expected[$name]) {
+            throw "$label, $name was $($state.$name); expected $($expected[$name])."
+        }
+    }
+    return $state
+}
+
+function Run-RemovalScenarios {
+    $title = $report.importPublishLight.importedTitle
+    if (-not $title) {
+        throw 'Guide removal needs the title from the light import-publish run.'
+    }
+    $originalTheme = Get-AppThemePreference
+    try {
+        Set-AppThemePreference $false
+        Start-InstalledShell
+        $report.removeCancelDark = Run-ShellSmoke 'remove-guide-cancel' `
+            -ResultName 'remove-cancel-dark' -ExpectedGuideTitle $title
+        Close-InstalledShell
+
+        $report.removeCancelState = Assert-RemovalState 'After Cancel' ([ordered]@{
+            Guides = 2; FileOperations = 0; StagingEntries = 0; ContentEntries = 2
+            TrashEntries = 0; ReadingStates = 2; ReaderPreferences = 2; LegacyTextGuides = 2
+        })
+
+        Set-AppThemePreference $true
+        Start-InstalledShell
+        $report.removeLight = Run-ShellSmoke 'remove-guide' `
+            -ResultName 'remove-light' -ExpectedGuideTitle $title
+        Close-InstalledShell
+    }
+    finally {
+        Restore-AppThemePreference $originalTheme
+    }
+    $report.removeState = Assert-RemovalState 'After removal' ([ordered]@{
+        Guides = 1; FileOperations = 0; StagingEntries = 0; ContentEntries = 1
+        TrashEntries = 0; ReadingStates = 1; ReaderPreferences = 1; LegacyTextGuides = 1
+    })
+}
+
 function Set-StoredMaterial([string] $material) {
     dotnet run --project $seedProject -c Release --no-restore -- `
         set-material $dataRoot $material
@@ -1184,6 +1227,7 @@ try {
 
     if ($ImportOnly) {
         Run-ImportScenarios
+        Run-RemovalScenarios
         $report.success = $true
         return
     }
@@ -1249,6 +1293,7 @@ try {
 
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-ImportScenarios
+    Run-RemovalScenarios
 
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-ProviderScenarios

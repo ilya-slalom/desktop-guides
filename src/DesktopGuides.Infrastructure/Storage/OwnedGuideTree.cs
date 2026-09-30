@@ -13,6 +13,8 @@ internal sealed class OwnedGuideTree
 
     public bool Exists => directories.Count != 0;
 
+    public int FileCount => files.Count;
+
     public static OwnedGuideTree Capture(string root)
     {
         FileAttributes attributes;
