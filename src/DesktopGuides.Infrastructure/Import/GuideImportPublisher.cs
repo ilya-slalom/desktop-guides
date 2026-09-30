@@ -137,18 +137,36 @@ public sealed class GuideImportPublisher
 
     private sealed record PlannedFile(string RelativePath, long ByteCount, string? Sha256);
 
-    private sealed record ImportPlan(IReadOnlyList<PlannedFile> Files, string PrimaryRelativePath)
+    private sealed record ImportPlan(
+        IReadOnlyList<PlannedFile> Files, string PrimaryRelativePath, StaticHtmlImportPreview? Html = null)
     {
         public long TotalBytes => Files.Sum(file => file.ByteCount);
     }
 
-    private Task<ImportPlan> PlanAsync(ImportManifest manifest, CancellationToken token) =>
-        Task.FromResult(manifest switch
+    private async Task<ImportPlan> PlanAsync(ImportManifest manifest, CancellationToken token)
+    {
+        switch (manifest)
         {
-            TxtImportManifest => Single("guide.txt", manifest.Source),
-            PdfImportManifest => Single("guide.pdf", manifest.Source),
-            _ => throw new ArgumentException("Unsupported import manifest.", nameof(manifest)),
-        });
+            case TxtImportManifest:
+                return Single("guide.txt", manifest.Source);
+            case PdfImportManifest:
+                return Single("guide.pdf", manifest.Source);
+            case HtmlImportManifest html:
+                // The manifest carries only counts, so scan again for the file list.
+                StaticHtmlImportPreview preview = await validator.PreviewHtmlAsync(html.Source, token);
+                IReadOnlyList<StaticAsset> assets = preview.Manifest.Assets;
+                if (GuideFingerprint.OfHtml(assets.Select(asset => (asset.RelativePath, asset.Sha256))) != html.Fingerprint)
+                {
+                    throw Changed();
+                }
+                return new ImportPlan(
+                    assets.Select(asset => new PlannedFile(asset.RelativePath, asset.ByteCount, asset.Sha256)).ToArray(),
+                    preview.EntryRelativePath,
+                    preview);
+            default:
+                throw new ArgumentException("Unsupported import manifest.", nameof(manifest));
+        }
+    }
 
     private static ImportPlan Single(string name, ImportSource source) =>
         new([new PlannedFile(name, source.ByteCount, null)], name);
@@ -202,12 +220,30 @@ public sealed class GuideImportPublisher
             }
             hashes.Add((file.RelativePath, sha));
         }
-        return hashes.Single().Sha256;
+        return plan.Html is null ? hashes.Single().Sha256 : GuideFingerprint.OfHtml(hashes);
     }
 
-    private Task<Stream> OpenSourceAsync(
-        ImportPlan plan, PlannedFile file, ImportSource source, CancellationToken token) =>
-        Task.FromResult(OpenSource(source));
+    private static async Task<Stream> OpenSourceAsync(
+        ImportPlan plan, PlannedFile file, ImportSource source, CancellationToken token)
+    {
+        if (plan.Html is null)
+        {
+            return OpenSource(source);
+        }
+        try
+        {
+            // Maps the managed name back to the source file, including a renamed entry.
+            return await plan.Html.CreateSource().OpenReadAsync(file.RelativePath, token) ?? throw Changed();
+        }
+        catch (Exception error) when (error is StaticHtmlValidationException or FileNotFoundException or DirectoryNotFoundException)
+        {
+            throw Changed();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            throw GuideImportValidator.Unreadable(source.FileName);
+        }
+    }
 
     private static Stream OpenSource(ImportSource source)
     {
@@ -226,7 +262,7 @@ public sealed class GuideImportPublisher
         }
     }
 
-    private Task VerifyAsync(ImportManifest manifest, ImportPlan plan, string staged, CancellationToken token)
+    private async Task VerifyAsync(ImportManifest manifest, ImportPlan plan, string staged, CancellationToken token)
     {
         string primary = Path.Combine(staged, plan.PrimaryRelativePath);
         switch (manifest)
@@ -237,8 +273,18 @@ public sealed class GuideImportPublisher
             case PdfImportManifest pdf:
                 VerifyPdf(primary, pdf, token);
                 break;
+            case HtmlImportManifest:
+                try
+                {
+                    // Re-hashes every source asset and every staged file.
+                    await validator.Html.VerifyStagedAsync(plan.Html!, staged, token);
+                }
+                catch (StaticHtmlValidationException)
+                {
+                    throw Changed();
+                }
+                break;
         }
-        return Task.CompletedTask;
     }
 
     private static void VerifyText(string path, int? codePage)

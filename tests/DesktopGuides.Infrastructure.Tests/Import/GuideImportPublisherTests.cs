@@ -347,6 +347,101 @@ public sealed class GuideImportPublisherTests
         Assert.Equal("{\"one\":1}", (await harness.Repository.GetReadingStateAsync(earlier))!.LocatorJson);
     }
 
+    private const string HtmlStaticFingerprint = "743c87a4c5222c99cb5de3f4ee931a63b994a54be3dc9ec5855c855dafcd3f21";
+
+    [Fact]
+    public async Task PublishesStaticHtmlGuide()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        string entry = CopyHtmlStatic(harness, "guide.html");
+        IReadOnlyList<FileFingerprint> original = FileFingerprint.Of(harness.Sources.Root);
+
+        Guid id = await harness.PublishAsync(harness.Publisher(), await harness.InspectAsync(entry));
+
+        Guide guide = (await harness.Repository.GetGuideAsync(id))!;
+        Assert.Equal(
+            (GuideFormat.Html, "guide.html", HtmlStaticFingerprint, 722L, "guide.html"),
+            (guide.Format, guide.PrimaryRelativePath, guide.ContentSha256, guide.ContentBytes, guide.SourceLabel));
+        foreach (string file in new[] { "guide.html", "images/map.png", "styles/main.css", "styles/palette.css" })
+        {
+            Assert.Equal(
+                File.ReadAllBytes(P0Fixtures.Resolve("html-static/" + file)),
+                File.ReadAllBytes(harness.Paths.ResolveExistingGuideFile(id, file)));
+        }
+        Assert.Equal(0, harness.Count("FileOperations"));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(harness.Paths.StagingRoot));
+        Assert.Equal(original, FileFingerprint.Of(harness.Sources.Root));
+    }
+
+    [Fact]
+    public async Task PercentNamedEntryPublishesAsGuideHtml()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        string entry = CopyHtmlStatic(harness, "100% Walkthrough.html");
+
+        Guid id = await harness.PublishAsync(harness.Publisher(), await harness.InspectAsync(entry));
+
+        Guide guide = (await harness.Repository.GetGuideAsync(id))!;
+        Assert.Equal(
+            ("guide.html", "100% Walkthrough.html", HtmlStaticFingerprint),
+            (guide.PrimaryRelativePath, guide.SourceLabel, guide.ContentSha256));
+        Assert.True(File.Exists(harness.Paths.ResolveExistingGuideFile(id, "guide.html")));
+    }
+
+    [Fact]
+    public async Task OnlyScannedFilesAreCopied()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        string entry = CopyHtmlStatic(harness, "guide.html");
+        harness.Sources.Write("notes.txt", "not referenced");
+
+        Guid id = await harness.PublishAsync(harness.Publisher(), await harness.InspectAsync(entry));
+
+        Assert.Equal(4, Directory.EnumerateFiles(harness.Paths.GetGuideRoot(id), "*", SearchOption.AllDirectories).Count());
+    }
+
+    [Fact]
+    public async Task AssetEditedAfterPreviewIsChanged()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        string entry = CopyHtmlStatic(harness, "guide.html");
+        ImportManifest manifest = await harness.InspectAsync(entry);
+        harness.Sources.Write("styles/main.css", "body { color: red; }");
+
+        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(
+            () => harness.PublishAsync(harness.Publisher(), manifest));
+
+        Assert.Equal(ImportIssue.Changed, error.Issue);
+        harness.AssertNothingLeft();
+    }
+
+    [Fact]
+    public async Task AssetEditedDuringCopyIsChanged()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        string entry = CopyHtmlStatic(harness, "guide.html");
+        ImportManifest manifest = await harness.InspectAsync(entry);
+        GuideImportPublisher publisher = harness.Publisher(checkpoint: point =>
+        {
+            if (point == ImportCheckpoint.Copied) harness.Sources.Write("images/map.png", [1, 2, 3]);
+        });
+
+        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(
+            () => harness.PublishAsync(publisher, manifest));
+
+        Assert.Equal(ImportIssue.Changed, error.Issue);
+        harness.AssertNothingLeft();
+    }
+
+    private static string CopyHtmlStatic(PublisherHarness harness, string entryName)
+    {
+        foreach (string file in new[] { "images/map.png", "styles/main.css", "styles/palette.css" })
+        {
+            harness.Sources.Copy("html-static/" + file, file);
+        }
+        return harness.Sources.Copy("html-static/guide.html", entryName);
+    }
+
     private sealed class SyncProgress(Action<ImportProgress> report) : IProgress<ImportProgress>
     {
         public void Report(ImportProgress value) => report(value);
