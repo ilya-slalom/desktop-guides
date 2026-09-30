@@ -1,6 +1,7 @@
 # T15.3 guide deletion design
 
-Status: implemented on `feat/p1-t15-3-guide-deletion`; verified by CI run 36688055406.
+Status: merged through PR #22 on 30 September 2026, merge commit `1d36a26`;
+verified by CI run 36688055406.
 Prerequisites T06.3
 (PR #19, merge commit `494cb02`) and T15.2 (PR #5) are merged.
 

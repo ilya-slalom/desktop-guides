@@ -637,7 +637,8 @@ They were implemented and verified on 30 September 2026. CI run [36669062806](ht
 `core-tests`, both package builds and the installed `import-publish`
 scenario in light and dark. Duplicate handling remains T06.4.
 
-T06.4 is implemented on `feat/p1-t06-4-duplicate-import`; see the
+T06.4 was merged through PR #20 on 30 September 2026, merge commit
+`81e9eb7`; see the
 [design and verification record](t06-4-duplicate-import-design.md). The
 preview fingerprints every format and looks up the same game, format and
 hash. A match offers **Open existing** or **Import another copy**. The
@@ -646,7 +647,8 @@ with `Changed` when the copied bytes differ from the preview. CI run
 36675695341 passed the installed import group: light publish, a dark copy
 and a light Open existing.
 
-T15.3 is implemented on `feat/p1-t15-3-guide-deletion`; see the
+T15.3 was merged through PR #22 on 30 September 2026, merge commit
+`1d36a26`; see the
 [design and verification record](t15-3-guide-deletion-design.md). The Game
 page's **Remove guide** confirms with the guide's title and managed-file
 count. `GuideRemover` journals a `DeleteGuide` operation, moves
