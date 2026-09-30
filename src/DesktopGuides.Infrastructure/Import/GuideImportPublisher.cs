@@ -303,7 +303,7 @@ public sealed class GuideImportPublisher
     private static void VerifyPdf(string path, PdfImportManifest pdf, CancellationToken token)
     {
         using FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        ImportInspection staged = GuideImportValidator.ReadPdf(stream, pdf.Source, pdf.SuggestedTitle, token);
+        ImportInspection staged = GuideImportValidator.ReadPdf(stream, pdf.Source, pdf.SuggestedTitle, pdf.Fingerprint, token);
         if (staged is not ImportReady { Manifest: PdfImportManifest copy } || copy.PageCount != pdf.PageCount)
         {
             throw GuideImportValidator.NotPdf();

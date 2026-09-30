@@ -91,7 +91,7 @@ public sealed class GuideImportValidator : IGuideImportValidator
             byte[] bytes = await ReadAllAsync(source, token);
             // Both code pages decode every byte, so this can't ask for another encoding.
             TextGuideDocument.Decode(bytes, codePage);
-            return new TxtImportManifest(source, inspection.SuggestedTitle, codePage);
+            return new TxtImportManifest(source, inspection.SuggestedTitle, codePage, GuideFingerprint.OfBytes(bytes));
         }, token).ConfigureAwait(false);
     }
 
@@ -109,7 +109,7 @@ public sealed class GuideImportValidator : IGuideImportValidator
         try
         {
             TextGuideDocument.Decode(bytes);
-            return new ImportReady(new TxtImportManifest(source, title, null));
+            return new ImportReady(new TxtImportManifest(source, title, null, GuideFingerprint.OfBytes(bytes)));
         }
         catch (EncodingSelectionRequiredException)
         {
@@ -183,11 +183,21 @@ public sealed class GuideImportValidator : IGuideImportValidator
         Task.Run<ImportInspection>(() =>
         {
             using FileStream stream = OpenSource(source.FullPath, source.FileName, asyncIo: false);
-            return ReadPdf(stream, source, title, token);
+            string fingerprint;
+            try
+            {
+                fingerprint = GuideFingerprint.OfStream(stream, token);
+            }
+            catch (IOException)
+            {
+                throw Unreadable(source.FileName);
+            }
+            stream.Position = 0;
+            return ReadPdf(stream, source, title, fingerprint, token);
         }, token);
 
     internal static ImportInspection ReadPdf(
-        Stream stream, ImportSource source, string title, CancellationToken token)
+        Stream stream, ImportSource source, string title, string fingerprint, CancellationToken token)
     {
         try
         {
@@ -209,7 +219,7 @@ public sealed class GuideImportValidator : IGuideImportValidator
                 token.ThrowIfCancellationRequested();
                 hasText = document.GetPage(number).Text.Any(char.IsLetter);
             }
-            return new ImportReady(new PdfImportManifest(source, title, pages, hasText));
+            return new ImportReady(new PdfImportManifest(source, title, pages, hasText, fingerprint));
         }
         catch (PdfDocumentEncryptedException)
         {
