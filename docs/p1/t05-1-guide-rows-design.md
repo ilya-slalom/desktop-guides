@@ -5,9 +5,10 @@ Status: designed on `feat/p1-t05-1-guide-rows`. Prerequisites T03.2
 
 ## Intent
 
-The Library lists games most recently used first. Each row shows the game's
+The Library lists games most recently used first, and the Game page lists
+guides the same way. Each row shows the game's
 artwork, title and a short facts line: platform, source, and guide count.
-The Game page lists its guides as rows with a format tile and a facts line:
+Each guide row has a format tile and a facts line:
 format, reading state, and when the guide was last opened. An unread guide
 says `Not started`, never `0%`.
 
@@ -25,9 +26,13 @@ Decisions made during brainstorming:
 - **Game order.** A game's last activity is the latest of its creation time,
   any of its guides' import times, and any of its guides' last-opened times.
   Games sort by last activity (newest first), then title, then Game ID.
-- **Guide order.** Guides keep title order, then Guide ID. The T15.3
-  neighbour selection and the `long-list` smoke rely on it, and T05.3 owns
-  any later change.
+- **Guide order.** A guide's last activity is the later of its import time
+  and its last-opened time. Guides sort by last activity (newest first),
+  then title, then Guide ID. Until T12.3 records opens, this is newest
+  import first. The T15.3 neighbour selection reads the displayed order, and
+  Back and Resume match by Guide ID, so neither depends on title order. A
+  guide that was just read moves to the top when the user returns to the
+  Game page; T05.3 owns selection and focus after list changes.
 - **Row facts.** Compact: game rows show platform · source · guide count;
   guide rows show format · reading state · last opened. Times are absolute
   and local, with only the time shown for today.
@@ -107,9 +112,19 @@ ORDER BY LastActivityUtcMs DESC, g.Title, g.Id
 ```
 
 It reuses the existing game-row mapping. `ListGuideSummariesAsync` is a
-`LEFT JOIN` of `Guides` to `ReadingStates` for one game, `ORDER BY Title,
-Id`, reusing the existing guide and reading-state mappings. Both run through
-the existing `ReadAsync` path.
+`LEFT JOIN` of `Guides` to `ReadingStates` for one game, reusing the
+existing guide and reading-state mappings:
+
+```sql
+SELECT gu.<guide columns>, rs.<reading-state columns>
+FROM Guides gu
+LEFT JOIN ReadingStates rs ON rs.GuideId = gu.Id
+WHERE gu.GameId = $gameId
+ORDER BY MAX(gu.ImportedUtcMs, COALESCE(rs.LastOpenedUtcMs, 0)) DESC,
+         gu.Title, gu.Id
+```
+
+Both run through the existing `ReadAsync` path.
 
 ### Rows (Production)
 
@@ -176,7 +191,9 @@ the existing `ReadAsync` path.
 - Guide counts, and removing a guide (through `GuideRemover`) updates both
   the count and the order.
 - Guide summaries join each guide's own state, exclude other games' guides,
-  keep title order, and return a null state when no row exists.
+  and return a null state when no row exists.
+- Guide order: a newer import sorts first, a newer open beats a newer
+  import, and equal activity sorts by title, then ID.
 - Both lists still return after the guide's `content/<id>` directory is
   deleted: listing never touches guide files.
 
@@ -193,14 +210,22 @@ The `production-shell-ui` job is the gate.
   - ~45% opened yesterday;
   - completed with an estimate.
 
-  It also adds an older game whose guide was opened most recently. The smoke
-  checks:
+  The open times are chosen so that activity order differs from title
+  order. It also adds an older game whose guide was opened most recently.
+  The smoke checks:
   - that older game is the first Library row;
+  - the guide rows appear in activity order;
   - each game row's Name and HelpText;
   - each guide row's Name and HelpText;
   - screenshots of the Library and the Game page, in light and dark.
 - **`long-list`** gains the realized-row check for `GuideList` (97 guides),
   using the same `ListItem` count the `catalog` smoke uses for `GameList`.
+  The smoke needs only that "ZZZ Focus Target Guide" is out of view before
+  scrolling. Its seed gives all 97 guides one shared import time, newer than
+  the base seed's guides, so the title tie-break puts it last among the
+  long-list guides, still far below the fold. The seed must keep a shared
+  timestamp. Once T12.3 records opens, the Resume step will move it to the
+  top on return; that change owns the smoke update.
 - The plan audits every other smoke for assumptions about game order,
   because a game's creation time now affects its position.
 
@@ -208,7 +233,7 @@ The `production-shell-ui` job is the gate.
 
 | Requirement | Evidence |
 | --- | --- |
-| T05.1 sorted list and rows with facts | `LibrarySummaryTests` order; `catalog-facts` |
+| T05.1 sorted lists and rows with facts | `LibrarySummaryTests` game and guide order; `catalog-facts` |
 | TR05.2 `Not started` for unread guides | `CatalogPresentationTests`; `catalog-facts` |
 | TR05.3 virtualized, missing artwork, long and localized text, no provider request | `catalog` (unchanged checks) and `long-list` realized rows |
 | TR04.3 cached display offline | `catalog` no-provider-traffic phase |
