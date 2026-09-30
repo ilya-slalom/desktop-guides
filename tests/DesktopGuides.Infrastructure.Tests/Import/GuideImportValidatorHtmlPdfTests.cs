@@ -25,6 +25,17 @@ public sealed class GuideImportValidatorHtmlPdfTests
         Assert.IsType<T>(Assert.IsType<ImportReady>(await Inspect(path, limits)).Manifest);
 
     [Fact]
+    public async Task HtmlManifestCarriesTheContentFingerprint()
+    {
+        HtmlImportManifest html = await Manifest<HtmlImportManifest>(
+            P0Fixtures.Resolve("html-static/guide.html"));
+
+        Assert.Equal(
+            "743c87a4c5222c99cb5de3f4ee931a63b994a54be3dc9ec5855c855dafcd3f21",
+            html.Fingerprint);
+    }
+
+    [Fact]
     public async Task StaticHtmlMapsEntryAssetsAndSize()
     {
         string root = P0Fixtures.Resolve("html-static");

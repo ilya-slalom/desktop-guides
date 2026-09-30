@@ -14,7 +14,8 @@ public sealed record TxtImportManifest(
 
 public sealed record HtmlImportManifest(
     ImportSource Source, string SuggestedTitle, string EntryRelativePath,
-    int AssetCount, long TotalBytes, IReadOnlyList<ImportWarning> Warnings)
+    int AssetCount, long TotalBytes, IReadOnlyList<ImportWarning> Warnings,
+    string Fingerprint)
     : ImportManifest(Source, GuideFormat.Html, SuggestedTitle);
 
 public sealed record PdfImportManifest(
@@ -36,8 +37,11 @@ public sealed record ImportNeedsTxtEncoding(
 public enum ImportIssue
 {
     Missing, Unsupported, Empty, TooLarge, Unreadable, Encrypted,
-    UnsupportedEncoding, Changed,
+    UnsupportedEncoding, Changed, NotEnoughSpace, SaveFailed,
 }
+
+/// <summary>Copy progress from 0 to 1; Publishing is set once cancellation no longer applies.</summary>
+public readonly record struct ImportProgress(double Fraction, bool Publishing);
 
 public sealed class GuideImportException(ImportIssue issue, string detail)
     : Exception(detail)
