@@ -138,6 +138,35 @@ if (args.Length == 2 && args[0] == "describe-providers")
     return 0;
 }
 
+if (args.Length == 2 && args[0] == "describe-import")
+{
+    ManagedPathResolver importPaths = new(args[1]);
+    using SqliteConnection importConnection = new(new SqliteConnectionStringBuilder
+    {
+        DataSource = importPaths.DatabasePath,
+        Mode = SqliteOpenMode.ReadOnly,
+        Pooling = false
+    }.ToString());
+    importConnection.Open();
+    long CountRows(string table)
+    {
+        using SqliteCommand command = importConnection.CreateCommand();
+        command.CommandText = $"SELECT COUNT(*) FROM {table}";
+        return (long)command.ExecuteScalar()!;
+    }
+    int CountEntries(string root) => Directory.Exists(root)
+        ? Directory.EnumerateFileSystemEntries(root).Count()
+        : 0;
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        Guides = CountRows("Guides"),
+        FileOperations = CountRows("FileOperations"),
+        StagingEntries = CountEntries(importPaths.StagingRoot),
+        ContentEntries = CountEntries(importPaths.ContentRoot),
+    }));
+    return 0;
+}
+
 if (args.Length == 3 && args[0] == "check-igdb-fields")
 {
     Dictionary<string, string> labelled = File.ReadLines(args[1])
@@ -276,12 +305,12 @@ if (args.Length == 2 &&
 
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second" or
-        "seed-design" or "seed-catalog"))
+        "seed-design" or "seed-catalog" or "seed-import"))
 {
     Console.Error.WriteLine(
-        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog " +
+        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-import " +
         "<app-data-root> " +
-        "or seed-linked-game|describe-providers <app-data-root> " +
+        "or seed-linked-game|describe-providers|describe-import <app-data-root> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
         "or invalidate-blocked-guide <app-data-root> " +
         "or corrupt-reader-guide|restore-reader-guide <app-data-root> " +
@@ -434,6 +463,17 @@ if (args[0] == "seed-catalog")
         throw new InvalidOperationException("The catalog seed did not read back in the expected order.");
     }
     Console.WriteLine("Seeded 500 catalog games.");
+    return 0;
+}
+
+if (args[0] == "seed-import")
+{
+    if ((await repository.ListGamesAsync()).Count != 0)
+    {
+        throw new InvalidOperationException("The import seed needs an empty library.");
+    }
+    Game importGame = await repository.AddGameAsync("Import Test Game", "PC", null);
+    Console.WriteLine($"Seeded import game {importGame.Id:N}.");
     return 0;
 }
 

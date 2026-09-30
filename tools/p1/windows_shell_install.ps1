@@ -13,6 +13,7 @@ param(
     [switch] $ProviderOnly,
 
     [switch] $CatalogOnly,
+    [switch] $ImportOnly,
 
     # Paths only. The values are read in memory and never passed on.
     [string] $IgdbCredentialFile = 'E:\work\igdb_credentials.txt',
@@ -699,7 +700,7 @@ function Run-ShellSmoke(
         -Principal $principal -Force | Out-Null
     Start-ScheduledTask -TaskName $smokeTask
     $timeoutSeconds = if ($mode -like 'provider-*') { 240 }
-        elseif ($mode -eq 'catalog') { 120 }
+        elseif ($mode -eq 'catalog' -or $mode -eq 'import-preview') { 120 }
         else { 60 }
     $deadline = (Get-Date).AddSeconds($timeoutSeconds)
     do {
@@ -788,6 +789,32 @@ function Run-CatalogScenarios {
         throw "Expected 10 catalog games with missing artwork, found $($missing.Count)."
     }
     $report.catalogGames = @($state.Games).Count
+}
+
+function Run-ImportScenarios {
+    Invoke-ShellSeed @('seed-import', $dataRoot) | Out-Null
+    $originalTheme = Get-AppThemePreference
+    try {
+        Set-AppThemePreference $true
+        Start-InstalledShell
+        $report.importLight = Run-ShellSmoke 'import-preview' -ResultName 'import-light'
+        Close-InstalledShell
+
+        Set-AppThemePreference $false
+        Start-InstalledShell
+        $report.importDark = Run-ShellSmoke 'import-preview' -ResultName 'import-dark'
+        Close-InstalledShell
+    }
+    finally {
+        Restore-AppThemePreference $originalTheme
+    }
+    $state = Invoke-ShellSeed @('describe-import', $dataRoot) | ConvertFrom-Json
+    $report.importState = $state
+    foreach ($name in @('Guides', 'FileOperations', 'StagingEntries', 'ContentEntries')) {
+        if ($state.$name -ne 0) {
+            throw "The import preview left $($state.$name) $name; expected none."
+        }
+    }
 }
 
 function Set-StoredMaterial([string] $material) {
@@ -1121,6 +1148,12 @@ try {
         return
     }
 
+    if ($ImportOnly) {
+        Run-ImportScenarios
+        $report.success = $true
+        return
+    }
+
     Start-InstalledShell
     $report.empty = Run-ShellSmoke 'empty' -ExitDelayMilliseconds 2000
     $report.emptyAfterDelayedTask = Run-ShellSmoke 'empty'
@@ -1179,6 +1212,9 @@ try {
 
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-CatalogScenarios
+
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    Run-ImportScenarios
 
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-ProviderScenarios

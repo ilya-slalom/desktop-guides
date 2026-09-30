@@ -1,0 +1,20 @@
+﻿{
+    "mode":  "import-preview",
+    "invocationId":  "5b1797fdbdc344179b60bca1e5d215fc",
+    "observedAt":  "2026-09-30T02:21:07.8767201Z",
+    "processId":  8788,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "import-txt",
+                   "import-html",
+                   "import-html-warnings",
+                   "import-pdf-locked",
+                   "import-picker-cancel"
+               ],
+    "importTxtScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\import-dark.import-txt.png",
+    "importWarningsScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\import-dark.import-warnings.png"
+}

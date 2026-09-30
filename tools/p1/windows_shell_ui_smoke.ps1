@@ -9,7 +9,7 @@ param(
         'reader-render-error-observed', 'reader-render-error-result',
         'late-guide-after-close', 'waiting-handoff', 'material', 'catalog',
         'provider-none', 'provider-offline', 'provider-settings',
-        'provider-live', 'provider-remove')]
+        'import-preview', 'provider-live', 'provider-remove')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -1473,6 +1473,187 @@ try {
         $report.phases += 'catalog-no-provider-traffic'
         $report.catalogSeconds = [Math]::Round(((Get-Date) - $catalogStarted).TotalSeconds, 1)
     }
+    elseif ($Mode -eq 'import-preview') {
+        $fixtureRoot = (Resolve-Path -LiteralPath (
+            Join-Path $PSScriptRoot '..\..\tests\fixtures\p0')).Path
+        $uia = [System.Windows.Automation.AutomationElement]
+
+        function Wait-FilePicker {
+            # The picker runs in the app's process as a #32770 window. Look
+            # among top-level windows first, then under the shell window.
+            $condition = [System.Windows.Automation.AndCondition]::new(
+                [System.Windows.Automation.PropertyCondition]::new(
+                    $uia::ClassNameProperty, '#32770'),
+                [System.Windows.Automation.PropertyCondition]::new(
+                    $uia::ProcessIdProperty, $process.Id))
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $picker = $uia::RootElement.FindFirst(
+                    [System.Windows.Automation.TreeScope]::Children, $condition)
+                if (-not $picker) {
+                    $picker = $root.FindFirst(
+                        [System.Windows.Automation.TreeScope]::Children, $condition)
+                }
+                if ($picker) { return $picker }
+                Start-Sleep -Milliseconds 200
+            } while ((Get-Date) -lt $deadline)
+            throw 'The system Open dialog did not appear.'
+        }
+
+        # Managed UIA sees the dialog's Win32 controls as panes without
+        # patterns, so match them by control id and window class and drive
+        # them through their window handles.
+        function Find-InPicker($picker, [string] $id, [string] $className) {
+            $condition = [System.Windows.Automation.AndCondition]::new(
+                [System.Windows.Automation.PropertyCondition]::new(
+                    $uia::AutomationIdProperty, $id),
+                [System.Windows.Automation.PropertyCondition]::new(
+                    $uia::ClassNameProperty, $className))
+            $element = $picker.FindFirst($scope, $condition)
+            if (-not $element) { throw "The Open dialog has no '$id' $className." }
+            return [IntPtr]$element.Current.NativeWindowHandle
+        }
+
+        function Send-PickerCommand($picker, [int] $buttonId) {
+            [DesktopGuidesForegroundProbe]::Command(
+                [IntPtr]$picker.Current.NativeWindowHandle, $buttonId,
+                (Find-InPicker $picker ([string]$buttonId) 'Button'))
+        }
+
+        function Wait-PickerClosed($picker) {
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                try {
+                    if ($picker.Current.ProcessId -ne $process.Id) { return }
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                    return
+                }
+                Start-Sleep -Milliseconds 200
+            } while ((Get-Date) -lt $deadline)
+            throw 'The system Open dialog did not close.'
+        }
+
+        function Choose-PickerFile([string] $relativePath) {
+            $picker = Wait-FilePicker
+            $path = Join-Path $fixtureRoot $relativePath
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+                # The dialog answers a missing path with its own message box,
+                # which would block cleanup, so close it before failing.
+                Send-PickerCommand $picker 2
+                Wait-PickerClosed $picker
+                throw "The fixture '$relativePath' does not exist."
+            }
+            [DesktopGuidesForegroundProbe]::SetText((Find-InPicker $picker '1148' 'Edit'), $path)
+            Send-PickerCommand $picker 1
+            Wait-PickerClosed $picker
+        }
+
+        function Cancel-Picker {
+            $picker = Wait-FilePicker
+            Send-PickerCommand $picker 2
+            Wait-PickerClosed $picker
+        }
+
+        function Select-ById([string] $id) {
+            $element = Wait-VisibleById $id
+            $element.GetCurrentPattern(
+                [System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+            return $element
+        }
+
+        # The dialog content scrolls, so rows below the fold report
+        # IsOffscreen. Collapsed elements leave the UIA tree, so presence
+        # alone shows the app made them visible.
+        function Wait-PresentById([string] $id) {
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $element = Find-ById $id
+                if ($element) { return $element }
+                Start-Sleep -Milliseconds 200
+            } while ((Get-Date) -lt $deadline)
+            throw "Expected '$id' to be shown."
+        }
+
+        function Wait-Text([string] $id, [string] $expected) {
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $element = Find-ById $id
+                if ($element -and $element.Current.Name -eq $expected) { return $element }
+                Start-Sleep -Milliseconds 200
+            } while ((Get-Date) -lt $deadline)
+            throw "Expected '$id' named '$expected'."
+        }
+
+        function Wait-FocusedId([string] $id) {
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $focused = $uia::FocusedElement
+                if ($focused -and $focused.Current.AutomationId -eq $id) { return }
+                Start-Sleep -Milliseconds 200
+            } while ((Get-Date) -lt $deadline)
+            throw "Expected keyboard focus on '$id'."
+        }
+
+        Select-Element 'Import Test Game'
+        [void](Wait-Name 'GameHeading' 'Import Test Game')
+        [void](Wait-Status 'Game ready.')
+        Click-Element (Wait-EnabledById 'ImportGuideButton')
+        Choose-PickerFile 'txt-legacy.txt'
+        [void](Wait-VisibleById 'ImportGuideDialog')
+        [void](Wait-Text 'ImportFileName' 'txt-legacy.txt')
+        [void](Wait-Text 'ImportFormat' 'Text (TXT)')
+        $title = (Wait-VisibleById 'GuideTitleInput').GetCurrentPattern(
+            [System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+        if ($title -ne 'txt-legacy') { throw "Expected the suggested title 'txt-legacy', got '$title'." }
+        [void](Wait-PresentById 'ImportEncodingWindows1252')
+        $sample = (Wait-VisibleById 'ImportEncodingCp437Sample').Current.Name
+        if ($sample -notlike '*Guide*') { throw "The CP437 sample was '$sample'." }
+        $cp437 = Select-ById 'ImportEncodingCp437'
+        [void](Wait-Text 'ImportEncodingValue' 'DOS (CP437)')
+        if (-not $cp437.GetCurrentPattern(
+                [System.Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected) {
+            throw 'CP437 was not selected.'
+        }
+        $report.importTxtScreenshot = Save-WindowScreenshot 'import-txt'
+        $report.phases += 'import-txt'
+
+        Click-Element (Wait-EnabledById 'SecondaryButton')
+        Choose-PickerFile 'html-static\guide.html'
+        [void](Wait-Text 'ImportFormat' 'Web page (HTML)')
+        [void](Wait-VisibleById 'ImportDetailsHeading')
+        $assets = (Wait-PresentById 'ImportAssets').Current.Name
+        if ($assets -notlike '3 linked files, * in total') { throw "The linked files row was '$assets'." }
+        foreach ($id in @('ImportDetailsGroup', 'ImportWarningsGroup', 'ImportEncodingCp437')) {
+            if (Find-ById $id) { throw "'$id' was shown for a web page without warnings." }
+        }
+        $report.phases += 'import-html'
+
+        Click-Element (Wait-EnabledById 'SecondaryButton')
+        Choose-PickerFile 'html-hostile\guide.html'
+        [void](Wait-VisibleById 'ImportDetailsGroup')
+        [void](Wait-PresentById 'ImportWarningsGroup')
+        [void](Wait-PresentById 'ImportWarning0')
+        if (Find-ById 'ImportDetailsHeading') { throw 'The native details heading was shown with groups.' }
+        $report.importWarningsScreenshot = Save-WindowScreenshot 'import-warnings'
+        $report.phases += 'import-html-warnings'
+
+        Click-Element (Wait-EnabledById 'SecondaryButton')
+        Choose-PickerFile 'pdf-locked.pdf'
+        [void](Wait-Name 'ImportStatus' "Password-protected PDFs aren't supported. Remove the password and import again.")
+        Assert-Absent 'ImportPreview'
+        $report.phases += 'import-pdf-locked'
+
+        Invoke-Element (Wait-EnabledById 'CloseButton')
+        [void](Wait-HiddenById 'ImportGuideDialog')
+        Wait-FocusedId 'ImportGuideButton'
+        Click-Element (Wait-EnabledById 'ImportGuideButton')
+        Cancel-Picker
+        [void](Wait-EnabledById 'ImportGuideButton')
+        Assert-Absent 'ImportGuideDialog'
+        Wait-FocusedId 'ImportGuideButton'
+        $report.phases += 'import-picker-cancel'
+    }
     elseif ($Mode -eq 'long-list') {
         $target = 'ZZZ Focus Target Guide'
         Select-Element 'Route Test Game'
@@ -2017,11 +2198,13 @@ try {
 }
 catch {
     $report.error = $_ | Out-String
-    if (($Mode -eq 'game-editor' -or $Mode -eq 'catalog' -or $Mode -like 'provider-*') -and $root) {
+    if (($Mode -eq 'game-editor' -or $Mode -eq 'catalog' -or $Mode -eq 'import-preview' -or
+        $Mode -like 'provider-*') -and $root) {
         try {
             foreach ($id in @('ShellStatus', 'GameHeading',
                 'GameTitleFeedback', 'GameSaveError', 'GameSearchStatus',
-                'ProviderSettingsStatus', 'GameEditorNotice', 'GameAttribution')) {
+                'ProviderSettingsStatus', 'GameEditorNotice', 'GameAttribution',
+                'ImportStatus', 'ImportGuideDialog', 'ImportBusyText')) {
                 $element = Find-ById $id
                 if ($element) {
                     $report["failure$id"] = [ordered]@{
