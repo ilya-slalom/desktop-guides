@@ -148,10 +148,10 @@ if (args.Length == 2 && args[0] == "describe-import")
         Pooling = false
     }.ToString());
     importConnection.Open();
-    long CountRows(string table)
+    long Scalar(string sql)
     {
         using SqliteCommand command = importConnection.CreateCommand();
-        command.CommandText = $"SELECT COUNT(*) FROM {table}";
+        command.CommandText = sql;
         return (long)command.ExecuteScalar()!;
     }
     int CountEntries(string root) => Directory.Exists(root)
@@ -159,10 +159,11 @@ if (args.Length == 2 && args[0] == "describe-import")
         : 0;
     Console.WriteLine(JsonSerializer.Serialize(new
     {
-        Guides = CountRows("Guides"),
-        FileOperations = CountRows("FileOperations"),
+        Guides = Scalar("SELECT COUNT(*) FROM Guides"),
+        FileOperations = Scalar("SELECT COUNT(*) FROM FileOperations"),
         StagingEntries = CountEntries(importPaths.StagingRoot),
         ContentEntries = CountEntries(importPaths.ContentRoot),
+        LegacyTextGuides = Scalar("SELECT COUNT(*) FROM Guides WHERE Format = 'Txt' AND TextCodePage = 437"),
     }));
     return 0;
 }
