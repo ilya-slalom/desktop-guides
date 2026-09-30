@@ -755,10 +755,13 @@ public sealed partial class ShellWindow : Window
                 }
                 GuideImportPublisher publisher = guidePublisher
                     ?? throw new InvalidOperationException("The library is not ready.");
+                SqliteLibraryRepository library = RequireRepository();
                 ImportGuideDialog dialog = new(
                     game.Title, path, importValidator, PickGuideFileAsync,
-                    (manifest, title, progress, token) =>
-                        publisher.PublishAsync(manifest, game.Id, title, progress, token))
+                    (manifest, token) => library.FindGuideByFingerprintAsync(
+                        game.Id, manifest.Format, manifest.Fingerprint, token),
+                    (manifest, title, allowDuplicate, progress, token) =>
+                        publisher.PublishAsync(manifest, game.Id, title, allowDuplicate, progress, token))
                 {
                     XamlRoot = Navigation.XamlRoot
                 };
@@ -772,13 +775,20 @@ public sealed partial class ShellWindow : Window
                 {
                     activeImportDialog = null;
                 }
-                // An import that reached publication is kept even if the dialog was closed.
-                if (dialog.ImportedGuideId is Guid guideId && !closeRequested &&
-                    navigator.Current is GameRoute shown && shown.GameId == route.GameId)
+                if (!closeRequested && navigator.Current is GameRoute shown && shown.GameId == route.GameId)
                 {
-                    imported = true;
-                    pendingGuideFocus = guideId;
-                    await RenderCurrentAsync();
+                    // An import that reached publication is kept even if the dialog was closed.
+                    if (dialog.ImportedGuideId is Guid guideId)
+                    {
+                        imported = true;
+                        pendingGuideFocus = guideId;
+                        await RenderCurrentAsync();
+                    }
+                    else if (dialog.OpenGuideId is Guid existingId)
+                    {
+                        // Already inside the navigation queue, so open directly.
+                        await OpenGuideAsync(existingId, route.GameId);
+                    }
                 }
             });
         }
