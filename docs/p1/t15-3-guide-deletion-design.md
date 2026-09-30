@@ -1,6 +1,7 @@
 # T15.3 guide deletion design
 
-Status: designed on `feat/p1-t15-3-guide-deletion`. Prerequisites T06.3
+Status: implemented on `feat/p1-t15-3-guide-deletion`; verified by CI run 36688055406.
+Prerequisites T06.3
 (PR #19, merge commit `494cb02`) and T15.2 (PR #5) are merged.
 
 ## Intent
@@ -244,7 +245,7 @@ guides in the seeded game.
 | Run | Mode | Checks |
 | --- | --- | --- |
 | Dark | `remove-guide-cancel` | Select the first guide and invoke `RemoveSelectedGuide`. `RemoveGuideDialog` names the title and "1 managed file". Screenshot `remove-confirm-dark`. Cancel: the list still has 2 guides and focus is on `RemoveSelectedGuide`. |
-| Light | `remove-guide` | Select the first guide, invoke `RemoveSelectedGuide`, screenshot `remove-confirm-light`, and press **Remove**. The list has 1 guide, selected and focused, and the status reads "Removed {title}.". Screenshot `removed-light`. |
+| Light | `remove-guide` | Select the imported guide (the last row), invoke `RemoveSelectedGuide`, screenshot `remove-confirm-light`, and press **Remove**. The list has 1 guide, selected and focused, and the status reads "Removed {title}.". Screenshot `removed-light`. |
 
 `describe-import` in the shell seed tool also reports `TrashEntries`,
 `ReadingStates` and `ReaderPreferences`. After the cancel run the state is
@@ -279,3 +280,48 @@ When T15.3 is implemented, update these:
   preferences and managed files, and every failure leaves the guide intact or
   a journaled trash entry that startup finishes. The PR includes the dark
   and light confirmation screenshots and the light result.
+
+## T15.3 verification record
+
+- **Unit tests.** On `pcsx2-win`, Infrastructure 383/383 and Core 210/210
+  passed. The new tests are:
+  - `GuideRemovalPresentationTests`: the dialog title and body, and every
+    outcome and issue message;
+  - `OwnedGuideTreeTests`: `FileCount` for a nested tree and a missing root;
+  - `DeletionJournalTests`: GetGuide, Prepare, Commit (including the cascade and the
+    matching `LastActiveGuideId`), the Commit guards, RollBack, Finish, the
+    write gate and a cancelled gate wait;
+  - `GuideRemoverTests`: Describe, the happy path, the broken and unknown
+    guides, a link, faults at `Prepared`, `Moved` and `InCommit`, a held
+    content file, a failed restore and a failed cleanup (both finished by
+    startup recovery after a restart), a second removal after a
+    failed restore (refused with `RestoreFailed` until startup restores the
+    guide), and cancellation.
+- **Installed.** CI run [36688055406](https://github.com/ilya-slalom/desktop-guides/actions/runs/36688055406)
+  passed `production-shell-ui`. After the import group:
+  - the dark `remove-guide-cancel` run showed the dialog naming the
+    imported guide and 1 managed file, and Cancel returned focus to
+    **Remove guide** with the library unchanged;
+  - the light `remove-guide` run removed that guide. The status read
+    "Removed {title}." and the remaining guide was selected and focused.
+
+  The final state was 1 guide, 0 file operations, 0 staging entries, 1
+  content directory, 0 trash entries, 1 reading state and 1 preferences row.
+  The same run's `native-arm64-ui` job failed on the P0 reader's `pdf-short`
+  fixture ("Probe status is unavailable"). The same intermittent failure is
+  recorded in the [T11.3 results](results.md). That job doesn't run any code
+  this change touches.
+- **Rulings.** Rulings 1–12 in the [plan](t15-3-guide-deletion-plan.md#rulings-against-the-spec),
+  plus these made during implementation:
+  - the script parse check ran through `powershell -EncodedCommand`, because
+    the plan's nested quoting doesn't survive ssh to cmd;
+  - the final review ran before the push, so its fix rode the same CI run;
+  - the final review's one Important finding was fixed: removing a guide
+    again after `RestoreFailed` stranded the first `Prepared` row, and
+    startup then refused to open the library. Removal now refuses a guide
+    that an unfinished file operation claims;
+  - the progress row links PR #22 directly instead of a follow-up commit.
+- **Evidence.**
+  - [Confirmation, dark](evidence/t15-3-guide-deletion/remove-confirm-dark.png)
+  - [Confirmation, light](evidence/t15-3-guide-deletion/remove-confirm-light.png)
+  - [Removed, light](evidence/t15-3-guide-deletion/removed-light.png)
