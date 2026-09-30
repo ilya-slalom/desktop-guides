@@ -1500,15 +1500,24 @@ try {
             throw 'The system Open dialog did not appear.'
         }
 
-        function Find-InPicker($picker, [string] $id, $controlType) {
+        # Managed UIA sees the dialog's Win32 controls as panes without
+        # patterns, so match them by control id and window class and drive
+        # them through their window handles.
+        function Find-InPicker($picker, [string] $id, [string] $className) {
             $condition = [System.Windows.Automation.AndCondition]::new(
                 [System.Windows.Automation.PropertyCondition]::new(
                     $uia::AutomationIdProperty, $id),
                 [System.Windows.Automation.PropertyCondition]::new(
-                    $uia::ControlTypeProperty, $controlType))
+                    $uia::ClassNameProperty, $className))
             $element = $picker.FindFirst($scope, $condition)
-            if (-not $element) { throw "The Open dialog has no '$id' $($controlType.ProgrammaticName)." }
-            return $element
+            if (-not $element) { throw "The Open dialog has no '$id' $className." }
+            return [IntPtr]$element.Current.NativeWindowHandle
+        }
+
+        function Send-PickerCommand($picker, [int] $buttonId) {
+            [DesktopGuidesForegroundProbe]::Command(
+                [IntPtr]$picker.Current.NativeWindowHandle, $buttonId,
+                (Find-InPicker $picker ([string]$buttonId) 'Button'))
         }
 
         function Wait-PickerClosed($picker) {
@@ -1527,17 +1536,15 @@ try {
 
         function Choose-PickerFile([string] $relativePath) {
             $picker = Wait-FilePicker
-            $fileName = Find-InPicker $picker '1148' ([System.Windows.Automation.ControlType]::Edit)
-            $fileName.GetCurrentPattern(
-                [System.Windows.Automation.ValuePattern]::Pattern).SetValue(
-                (Join-Path $fixtureRoot $relativePath))
-            Invoke-Element (Find-InPicker $picker '1' ([System.Windows.Automation.ControlType]::Button))
+            [DesktopGuidesForegroundProbe]::SetText(
+                (Find-InPicker $picker '1148' 'Edit'), (Join-Path $fixtureRoot $relativePath))
+            Send-PickerCommand $picker 1
             Wait-PickerClosed $picker
         }
 
         function Cancel-Picker {
             $picker = Wait-FilePicker
-            Invoke-Element (Find-InPicker $picker '2' ([System.Windows.Automation.ControlType]::Button))
+            Send-PickerCommand $picker 2
             Wait-PickerClosed $picker
         }
 
