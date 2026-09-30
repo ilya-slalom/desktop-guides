@@ -267,6 +267,37 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             return reader.Read() ? ReadGuide(reader) : null;
         }, token);
 
+    private const string FindGuideSql = """
+        SELECT Id, GameId, Title, Format, ManagedRelativeRoot,
+               PrimaryRelativePath, ContentSha256, ContentBytes,
+               SourceLabel, TextCodePage, ImportedUtcMs, UpdatedUtcMs
+        FROM Guides
+        WHERE GameId = $gameId AND Format = $format AND ContentSha256 = $sha
+        ORDER BY ImportedUtcMs, Id
+        LIMIT 1
+        """;
+
+    /// <summary>The oldest guide in the game with this format and content hash, or null.</summary>
+    public Task<Guide?> FindGuideByFingerprintAsync(
+        Guid gameId, GuideFormat format, string contentSha256, CancellationToken token = default) =>
+        ReadAsync<Guide?>(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            return FindGuide(connection, gameId, format, contentSha256);
+        }, token);
+
+    private static Guide? FindGuide(
+        SqliteConnection connection, Guid gameId, GuideFormat format, string contentSha256)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = FindGuideSql;
+        command.Parameters.AddWithValue("$gameId", gameId.ToString("N"));
+        command.Parameters.AddWithValue("$format", format.ToString());
+        command.Parameters.AddWithValue("$sha", contentSha256);
+        using SqliteDataReader reader = command.ExecuteReader();
+        return reader.Read() ? ReadGuide(reader) : null;
+    }
+
     public Task<ReadingState?> GetReadingStateAsync(
         Guid guideId, CancellationToken token = default) =>
         ReadAsync<ReadingState?>(() =>
@@ -720,6 +751,12 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
 
     private sealed class ImportJournal(SqliteLibraryRepository owner) : IImportJournal
     {
+        public Guid? FindGuide(Guid gameId, GuideFormat format, string contentSha256)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            return SqliteLibraryRepository.FindGuide(connection, gameId, format, contentSha256)?.Id;
+        }
+
         public void Prepare(Guid operationId, Guid guideId)
         {
             using SqliteConnection connection = owner.OpenConnection();

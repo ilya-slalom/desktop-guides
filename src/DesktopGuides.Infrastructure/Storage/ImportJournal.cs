@@ -13,6 +13,9 @@ internal interface IImportJournal
 
     /// <summary>Removes the import's owned directories, then its row.</summary>
     void RollBack(Guid operationId);
+
+    /// <summary>The oldest guide in the game with this format and content hash, or null.</summary>
+    Guid? FindGuide(Guid gameId, GuideFormat format, string contentSha256);
 }
 
 internal sealed record NewImportedGuide(
