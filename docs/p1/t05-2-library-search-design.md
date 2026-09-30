@@ -277,6 +277,13 @@ Its body shows the results and no-results views in light and dark.
   - `catalog`, light and dark: the keyboard checks tabbed through the
     search box to the first game row;
   - every mode that waits for `Library ready.` found the loading view gone.
+  - after the final review, CI run [36730472882](https://github.com/ilya-slalom/desktop-guides/actions/runs/36730472882)
+    passed `library-search` again, in light and dark. This time the smoke
+    focuses Clear search and presses Space, and focus lands in the search
+    box. The earlier check invoked Clear while focus was already in the box,
+    so it could not fail. `native-arm64-ui` failed on the P0 `pdf-short`
+    fixture ("Probe status is unavailable"). The same failure hit the T15.3
+    and T06.3 branches, and this branch does not touch P0 code.
 - **Rulings.** Rulings 1–11 in the
   [plan](t05-2-library-search-plan.md#rulings-against-the-spec), plus two
   made during implementation:
