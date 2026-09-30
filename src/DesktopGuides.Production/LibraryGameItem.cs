@@ -4,10 +4,11 @@ namespace DesktopGuides.Production;
 
 public sealed class LibraryGameItem : CatalogRowItem
 {
-    internal LibraryGameItem(LibraryGameSummary summary)
-        : base(summary.Game.Title, "\uE7FC", CatalogPresentation.GameFacts(summary))
+    internal LibraryGameItem(LibrarySearchMatch match)
+        : base(match.Summary.Game.Title, "\uE7FC",
+            CatalogPresentation.GameFacts(match.Summary, match.MatchedGuideTitle))
     {
-        Game = summary.Game;
+        Game = match.Summary.Game;
     }
 
     internal Game Game { get; }

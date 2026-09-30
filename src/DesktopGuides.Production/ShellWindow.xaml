@@ -93,6 +93,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
@@ -125,9 +126,62 @@
                         Click="ResumeClicked"
                         AutomationProperties.AutomationId="ResumeGuide" />
 
-                <Grid Grid.Row="3">
+                <Grid Grid.Row="3" ColumnSpacing="{StaticResource DesktopGuidesSpacing8}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <AutoSuggestBox x:Name="LibrarySearchInput"
+                                    PlaceholderText="Search games and guides"
+                                    QueryIcon="Find"
+                                    IsEnabled="False"
+                                    TextChanged="LibrarySearchTextChanged"
+                                    QuerySubmitted="LibrarySearchSubmitted"
+                                    AutomationProperties.Name="Search library"
+                                    AutomationProperties.AutomationId="LibrarySearchInput" />
+                    <Button x:Name="LibrarySearchClear"
+                            Grid.Column="1"
+                            Content="Clear search"
+                            Visibility="Collapsed"
+                            Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                            Click="LibrarySearchClearClicked"
+                            AutomationProperties.AutomationId="LibrarySearchClear" />
+                </Grid>
+
+                <Grid Grid.Row="4">
+                    <StackPanel x:Name="LibraryLoadingState"
+                                Style="{StaticResource DesktopGuidesBusyRowStyle}"
+                                VerticalAlignment="Top"
+                                Visibility="Collapsed">
+                        <ProgressRing x:Name="LibraryProgress"
+                                      Width="20"
+                                      Height="20"
+                                      IsActive="False"
+                                      AutomationProperties.AccessibilityView="Raw" />
+                        <TextBlock Text="Loading library…"
+                                   VerticalAlignment="Center"
+                                   AutomationProperties.AutomationId="LibraryLoading" />
+                    </StackPanel>
+                    <Border x:Name="LibraryNoResultsState"
+                            Style="{StaticResource DesktopGuidesEmptyStateStyle}"
+                            Visibility="Collapsed">
+                        <StackPanel Spacing="{StaticResource DesktopGuidesSpacing8}">
+                            <FontIcon Glyph="&#xE721;"
+                                      FontSize="24"
+                                      HorizontalAlignment="Left"
+                                      Foreground="{ThemeResource DesktopGuidesAccentBrush}"
+                                      AutomationProperties.AccessibilityView="Raw" />
+                            <TextBlock x:Name="LibraryNoResults"
+                                       Style="{StaticResource DesktopGuidesEmptyTitleStyle}"
+                                       TextWrapping="Wrap"
+                                       AutomationProperties.AutomationId="LibraryNoResults" />
+                            <TextBlock Text="Check the spelling or clear the search."
+                                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}" />
+                        </StackPanel>
+                    </Border>
                     <Border x:Name="LibraryEmptyState"
                             Style="{StaticResource DesktopGuidesEmptyStateStyle}"
+                            Visibility="Collapsed"
                             AutomationProperties.AutomationId="LibraryEmptyState">
                         <StackPanel Spacing="{StaticResource DesktopGuidesSpacing8}">
                             <FontIcon Glyph="&#xE82D;"
@@ -144,6 +198,7 @@
                         </StackPanel>
                     </Border>
                     <ListView x:Name="GameList"
+                              Visibility="Collapsed"
                               SelectionMode="Single"
                               Style="{StaticResource DesktopGuidesListStyle}"
                               ItemTemplate="{StaticResource DesktopGuidesCatalogRowTemplate}"

@@ -7,7 +7,7 @@ param(
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
         'reader-render-error-observed', 'reader-render-error-result',
-        'late-guide-after-close', 'waiting-handoff', 'material', 'catalog', 'catalog-facts',
+        'late-guide-after-close', 'waiting-handoff', 'material', 'catalog', 'catalog-facts', 'library-search',
         'provider-none', 'provider-offline', 'provider-settings',
         'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
@@ -176,6 +176,7 @@ try {
             }
             if ($message -in $expected -and
                 $sequence -gt $script:lastStatusSequence) {
+                if ($message -eq 'Library ready.') { Assert-Absent 'LibraryLoading' }
                 if ($transient -or $AllowHidden) {
                     $script:lastStatusSequence = $sequence
                     return $probe
@@ -467,6 +468,21 @@ try {
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
         throw "Expected keyboard focus on '$id'."
+    }
+
+    # Focus in an AutoSuggestBox lands on its inner edit box.
+    function Wait-FocusWithin([string] $id) {
+        $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $element = [System.Windows.Automation.AutomationElement]::FocusedElement
+            while ($element) {
+                if ($element.Current.AutomationId -eq $id) { return }
+                $element = $walker.GetParent($element)
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected keyboard focus inside '$id'."
     }
 
     function Get-GuideRowNames {
@@ -897,6 +913,16 @@ try {
         }
     }
 
+    function Assert-NoRemoteConnections([string] $view) {
+        $loopback = @('127.0.0.1', '::1', '0.0.0.0', '::')
+        $remote = @(Get-NetTCPConnection -OwningProcess $ProcessId -ErrorAction SilentlyContinue |
+            Where-Object { $_.State -ne 'Listen' -and $_.RemoteAddress -notin $loopback })
+        $report.remoteConnections = $remote.Count
+        if ($remote.Count -gt 0) {
+            throw "The $view opened $($remote.Count) non-loopback connection(s)."
+        }
+    }
+
     function Open-AddGameSearch {
         Invoke-Element (Wait-EnabledById 'AddGameButton')
         [void](Wait-VisibleById 'GameSearchInput')
@@ -904,20 +930,39 @@ try {
     }
 
     # The AutoSuggestBox exposes its text through its inner edit box.
-    function Set-SearchQuery([string] $query) {
-        $box = Wait-VisibleById 'GameSearchInput'
+    function Get-SearchEdit([string] $id) {
+        $box = Wait-VisibleById $id
+        $edit = $box.FindFirst($scope,
+            [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::Edit))
+        if (-not $edit) { throw "The search box '$id' has no editable text." }
+        return $edit
+    }
+
+    function Get-SearchPattern([string] $id) {
+        $box = Wait-VisibleById $id
         $pattern = $null
         if (-not $box.TryGetCurrentPattern(
             [System.Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) {
-            $edit = $box.FindFirst($scope,
-                [System.Windows.Automation.PropertyCondition]::new(
-                    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
-                    [System.Windows.Automation.ControlType]::Edit))
-            if (-not $edit) { throw 'The search box has no editable text.' }
-            $pattern = $edit.GetCurrentPattern(
+            $pattern = (Get-SearchEdit $id).GetCurrentPattern(
                 [System.Windows.Automation.ValuePattern]::Pattern)
         }
-        $pattern.SetValue($query)
+        return $pattern
+    }
+
+    function Set-SearchQuery([string] $query, [string] $id = 'GameSearchInput') {
+        (Get-SearchPattern $id).SetValue($query)
+    }
+
+    function Get-SearchText([string] $id) {
+        return (Get-SearchPattern $id).Current.Value
+    }
+
+    function Search-Library([string] $query, [string] $status, $rows) {
+        Set-SearchQuery $query 'LibrarySearchInput'
+        [void](Wait-Status $status -AllowHidden)
+        [void](Assert-RowFacts 'GameList' $rows)
     }
 
     function Get-SearchResults {
@@ -1065,6 +1110,11 @@ try {
         if ($resume -and -not $resume.Current.IsOffscreen) {
             throw 'An empty library exposed Resume.'
         }
+        $search = Find-ById 'LibrarySearchInput'
+        if (-not $search -or $search.Current.IsEnabled) {
+            throw 'An empty library left search enabled.'
+        }
+        Assert-Absent 'LibrarySearchClear'
         $report.phases += 'empty-library'
     }
     elseif ($Mode -eq 'design-language') {
@@ -1394,6 +1444,86 @@ try {
         [void](Wait-Name 'LibraryHeading' 'Library')
         [void](Wait-Status 'Library ready.')
     }
+    elseif ($Mode -eq 'library-search') {
+        # Built from code points: Windows PowerShell 5.1 reads this file as ANSI.
+        $zeta = 'Zeta Archive Game'
+        $pokemon = 'Pok' + [char]0x00E9 + 'mon Crystal'
+        $okami = [string][char]0x014C + 'kami HD'
+        $dragonPrefix = [string]::new([char[]]@(0x30C9, 0x30E9, 0x30B4, 0x30F3))
+        $dragon = $dragonPrefix + [string]::new([char[]]@(0x30AF, 0x30A8, 0x30B9, 0x30C8)) + 'XI'
+        $fullwidthXi = [string]::new([char[]]@(0xFF38, 0xFF29))
+        $zetaRow = @($zeta, 'Manual, 1 guide')
+        $zetaMatch = @($zeta, 'Manual, 1 guide, Guide: Complete Walkthrough')
+        $pokemonRow = @($pokemon, 'Manual, No guides')
+        $okamiRow = @($okami, 'Manual, No guides')
+        $dragonRow = @($dragon, 'Manual, No guides')
+        $allRows = @($zetaRow, $pokemonRow, $okamiRow, $dragonRow)
+
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        $report.libraryRows = Assert-RowFacts 'GameList' $allRows
+        Assert-Absent 'LibrarySearchClear'
+
+        # Real keystrokes for the ASCII query; ValuePattern for the rest (Ruling 10).
+        # The AutoSuggestBox itself is not focusable; its inner edit box is.
+        [void](Wait-EnabledById 'LibrarySearchInput')
+        (Get-SearchEdit 'LibrarySearchInput').SetFocus()
+        [void](Wait-FocusWithin 'LibrarySearchInput')
+        [System.Windows.Forms.SendKeys]::SendWait('POKEMON')
+        [void](Wait-Status '1 of 4 games match.' -AllowHidden)
+        [void](Assert-RowFacts 'GameList' @(,$pokemonRow))
+        [void](Wait-VisibleById 'LibrarySearchClear')
+        $report.phases += 'search-case-accent'
+
+        Search-Library 'okami' '1 of 4 games match.' @(,$okamiRow)
+        Search-Library $dragonPrefix '1 of 4 games match.' @(,$dragonRow)
+        Search-Library $fullwidthXi '1 of 4 games match.' @(,$dragonRow)
+        $report.phases += 'search-non-ascii'
+
+        Search-Library 'walkthrough' '1 of 4 games match.' @(,$zetaMatch)
+        $report.phases += 'search-guide-title'
+        [void](Wait-HiddenById 'ShellStatus')
+        Save-WindowScreenshot 'search-results'
+
+        Set-SearchQuery 'zzzz' 'LibrarySearchInput'
+        [void](Wait-Status 'No games match.' -AllowHidden)
+        [void](Wait-Name 'LibraryNoResults' 'No games or guides match "zzzz".')
+        Wait-HiddenById 'GameList'
+        [void](Wait-VisibleById 'LibrarySearchClear')
+        $report.phases += 'search-no-results'
+        [void](Wait-HiddenById 'ShellStatus')
+        Save-WindowScreenshot 'no-results'
+
+        # Press Clear from the keyboard, so focus starts on the button it hides.
+        [void](Wait-VisibleById 'LibrarySearchClear')
+        Focus-And-Verify 'LibrarySearchClear'
+        [System.Windows.Forms.SendKeys]::SendWait(' ')
+        [void](Assert-RowFacts 'GameList' $allRows)
+        [void](Wait-FocusWithin 'LibrarySearchInput')
+        Wait-HiddenById 'LibrarySearchClear'
+        if ((Get-SearchText 'LibrarySearchInput') -ne '') {
+            throw 'Clear search left text in the box.'
+        }
+        $report.phases += 'search-clear'
+
+        Search-Library 'walkthrough' '1 of 4 games match.' @(,$zetaMatch)
+        Select-Element $zeta
+        [void](Wait-Name 'GameHeading' $zeta)
+        [void](Wait-Status 'Game ready.')
+        [void](Assert-RowFacts 'GuideList' @(,@('Complete Walkthrough', 'Text (TXT), Not started')))
+        $report.phases += 'search-not-started'
+
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Status 'Library ready.')
+        if ((Get-SearchText 'LibrarySearchInput') -ne 'walkthrough') {
+            throw 'Back to the Library dropped the search query.'
+        }
+        [void](Assert-RowFacts 'GameList' @(,$zetaMatch))
+        $report.phases += 'search-kept-after-back'
+
+        Assert-NoRemoteConnections 'library search'
+        $report.phases += 'search-no-provider-traffic'
+    }
     elseif ($Mode -eq 'catalog') {
         $catalogStarted = Get-Date
         $longTitle = 'Catalog A ' + ('W' * 150)
@@ -1475,6 +1605,8 @@ try {
 
         Focus-And-Verify 'AddGameButton'
         [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
+        [void](Wait-FocusWithin 'LibrarySearchInput')
+        [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
         [void](Wait-FocusedGameRow $longTitle)
         Start-Sleep -Milliseconds 500
         [void](Wait-Name 'LibraryHeading' 'Library')
@@ -1488,6 +1620,8 @@ try {
         [void](Wait-Name 'LibraryHeading' 'Library')
         [void](Wait-Status 'Library ready.')
         Focus-And-Verify 'AddGameButton'
+        [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
+        [void](Wait-FocusWithin 'LibrarySearchInput')
         [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
         [void](Wait-FocusedGameRow '')
         [System.Windows.Forms.SendKeys]::SendWait('{END}')
@@ -1571,13 +1705,7 @@ try {
         if ($status -and -not $status.Current.IsOffscreen) {
             throw "The catalog showed a status: '$($status.Current.Name)'."
         }
-        $loopback = @('127.0.0.1', '::1', '0.0.0.0', '::')
-        $remote = @(Get-NetTCPConnection -OwningProcess $ProcessId -ErrorAction SilentlyContinue |
-            Where-Object { $_.State -ne 'Listen' -and $_.RemoteAddress -notin $loopback })
-        $report.remoteConnections = $remote.Count
-        if ($remote.Count -gt 0) {
-            throw "The catalog opened $($remote.Count) non-loopback connection(s)."
-        }
+        Assert-NoRemoteConnections 'catalog'
         $report.phases += 'catalog-no-provider-traffic'
         $report.catalogSeconds = [Math]::Round(((Get-Date) - $catalogStarted).TotalSeconds, 1)
     }

@@ -30,6 +30,9 @@ public sealed partial class ShellWindow : Window
     private readonly NavigationActionQueue navigationQueue = new();
     private readonly CancellationTokenSource leaseWait = new();
     private readonly DispatcherQueueTimer statusDismissTimer;
+    private readonly DispatcherQueueTimer librarySearchTimer;
+    private IReadOnlyList<LibraryGameSummary>? librarySummaries;
+    private string appliedLibraryQuery = string.Empty;
     private Task initializationTask = Task.CompletedTask;
     private LibrarySessionLease? libraryLease;
     private SqliteLibraryRepository? repository;
@@ -75,6 +78,16 @@ public sealed partial class ShellWindow : Window
         statusDismissTimer.Interval = TimeSpan.FromSeconds(3);
         statusDismissTimer.IsRepeating = false;
         statusDismissTimer.Tick += (_, _) => ShellStatusInfoBar.IsOpen = false;
+        librarySearchTimer = DispatcherQueue.CreateTimer();
+        librarySearchTimer.Interval = TimeSpan.FromMilliseconds(200);
+        librarySearchTimer.IsRepeating = false;
+        librarySearchTimer.Tick += (_, _) =>
+        {
+            if (navigator.Current is LibraryRoute)
+            {
+                ApplyLibrarySearch(announce: true);
+            }
+        };
         ApplyWindowMaterial(WindowMaterial.Mica);
         Navigation.SelectedItem = LibraryItem;
         gameArtwork = ArtworkListLoader.Attach(GameList, LoadRowArtworkAsync);
@@ -1113,6 +1126,11 @@ public sealed partial class ShellWindow : Window
             {
                 case LibraryRoute:
                     LibraryPanel.Visibility = Visibility.Visible;
+                    librarySearchTimer.Stop();
+                    if (librarySummaries is null)
+                    {
+                        ShowLibraryView(LibraryView.Loading);
+                    }
                     ShowBusyStatus("Loading library…");
                     IReadOnlyList<LibraryGameSummary> games = await library.ListGameSummariesAsync();
                     AppSettings settings = await library.GetSettingsAsync();
@@ -1123,12 +1141,8 @@ public sealed partial class ShellWindow : Window
                     {
                         return false;
                     }
-                    gameArtwork.CancelAll();
-                    GameList.ItemsSource = games.Select(summary => new LibraryGameItem(summary)).ToList();
-                    LibraryEmptyState.Visibility =
-                        games.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-                    GameList.Visibility =
-                        games.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+                    librarySummaries = games;
+                    ApplyLibrarySearch(announce: false);
                     resumeGuideId = resume?.Id;
                     ResumeButton.Visibility =
                         resume is null ? Visibility.Collapsed : Visibility.Visible;
@@ -1290,10 +1304,76 @@ public sealed partial class ShellWindow : Window
         {
             if (generation == renderGeneration)
             {
+                LibraryLoadingState.Visibility = Visibility.Collapsed;
+                LibraryProgress.IsActive = false;
                 ShowErrorStatus($"Could not load this view: {error.Message}");
             }
             return false;
         }
+    }
+
+    private enum LibraryView { Loading, Empty, NoResults, List }
+
+    // Exactly one Library view is visible. Search is usable only when there
+    // are games to search.
+    private void ShowLibraryView(LibraryView view)
+    {
+        LibraryLoadingState.Visibility = view == LibraryView.Loading ? Visibility.Visible : Visibility.Collapsed;
+        LibraryProgress.IsActive = view == LibraryView.Loading;
+        LibraryEmptyState.Visibility = view == LibraryView.Empty ? Visibility.Visible : Visibility.Collapsed;
+        LibraryNoResultsState.Visibility = view == LibraryView.NoResults ? Visibility.Visible : Visibility.Collapsed;
+        GameList.Visibility = view == LibraryView.List ? Visibility.Visible : Visibility.Collapsed;
+        bool searchable = view is LibraryView.NoResults or LibraryView.List;
+        LibrarySearchInput.IsEnabled = searchable;
+        LibrarySearchClear.Visibility = searchable && appliedLibraryQuery.Length > 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    // Filters the cached summaries in memory; never reads SQLite or guide files.
+    private void ApplyLibrarySearch(bool announce)
+    {
+        librarySearchTimer.Stop();
+        if (librarySummaries is null)
+        {
+            return;
+        }
+
+        appliedLibraryQuery = LibrarySearchInput.Text.Trim();
+        IReadOnlyList<LibrarySearchMatch> matches = LibrarySearch.Filter(librarySummaries, appliedLibraryQuery);
+        gameArtwork.CancelAll();
+        GameList.ItemsSource = matches.Select(match => new LibraryGameItem(match)).ToList();
+        LibraryNoResults.Text = $"No games or guides match \"{appliedLibraryQuery}\".";
+        ShowLibraryView(
+            librarySummaries.Count == 0 ? LibraryView.Empty
+            : matches.Count == 0 ? LibraryView.NoResults
+            : LibraryView.List);
+        if (announce && appliedLibraryQuery.Length > 0)
+        {
+            ShowTransientStatus(matches.Count == 0
+                ? "No games match."
+                : $"{matches.Count} of {librarySummaries.Count} games match.");
+        }
+    }
+
+    // Every change restarts the debounce; an unchanged query is skipped.
+    private void LibrarySearchTextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+    {
+        librarySearchTimer.Stop();
+        if (sender.Text.Trim() != appliedLibraryQuery)
+        {
+            librarySearchTimer.Start();
+        }
+    }
+
+    private void LibrarySearchSubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args) =>
+        ApplyLibrarySearch(announce: true);
+
+    private void LibrarySearchClearClicked(object sender, RoutedEventArgs e)
+    {
+        LibrarySearchInput.Text = string.Empty;
+        ApplyLibrarySearch(announce: true);
+        LibrarySearchInput.Focus(FocusState.Programmatic);
     }
 
     private void ClearProviderMetadata()

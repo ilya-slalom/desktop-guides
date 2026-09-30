@@ -309,10 +309,10 @@ if (args.Length == 2 &&
 
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second" or
-        "seed-design" or "seed-catalog" or "seed-facts" or "seed-import"))
+        "seed-design" or "seed-catalog" or "seed-facts" or "seed-search" or "seed-import"))
 {
     Console.Error.WriteLine(
-        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-import " +
+        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-search|seed-import " +
         "<app-data-root> " +
         "or seed-linked-game|describe-providers|describe-import <app-data-root> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
@@ -554,6 +554,47 @@ if (args[0] == "seed-facts")
         throw new InvalidOperationException("The facts seed did not read back in activity order.");
     }
     Console.WriteLine($"Seeded facts game {factsGameId:N} with four guides.");
+    return 0;
+}
+
+if (args[0] == "seed-search")
+{
+    if ((await repository.ListGamesAsync()).Count != 0)
+    {
+        throw new InvalidOperationException("The search seed needs an empty library.");
+    }
+    const long searchDay = 86_400_000;
+    long searchNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    // Titles exercise case, accent, width and non-Latin matching. Created
+    // times fix the Library order: Zeta (its guide, -1 day), then the rest.
+    (string Title, int DaysAgo)[] searchTitles =
+    [
+        ("Zeta Archive Game", 5),
+        ("Pok\u00e9mon Crystal", 2),
+        ("\u014ckami HD", 3),
+        ("\u30c9\u30e9\u30b4\u30f3\u30af\u30a8\u30b9\u30c8XI", 4)
+    ];
+    List<string> searchSql = [];
+    Guid zetaSearchId = Guid.Empty;
+    foreach ((string title, int daysAgo) in searchTitles)
+    {
+        Game searchGame = await repository.AddGameAsync(title, null, null);
+        long created = searchNow - daysAgo * searchDay;
+        searchSql.Add($"UPDATE Games SET CreatedUtcMs = {created}, UpdatedUtcMs = {created} WHERE Id = '{searchGame.Id:N}';");
+        if (zetaSearchId == Guid.Empty)
+        {
+            zetaSearchId = searchGame.Id;
+        }
+    }
+    await InsertGuideAsync(paths, zetaSearchId, Guid.NewGuid(), "Complete Walkthrough", searchNow - searchDay);
+    ExecuteSql(paths, string.Join('\n', searchSql));
+
+    string[] searchOrder = [.. (await repository.ListGameSummariesAsync()).Select(entry => entry.Game.Title)];
+    if (!searchOrder.SequenceEqual(searchTitles.Select(entry => entry.Title)))
+    {
+        throw new InvalidOperationException("The search seed did not read back in activity order.");
+    }
+    Console.WriteLine("Seeded four search games.");
     return 0;
 }
 

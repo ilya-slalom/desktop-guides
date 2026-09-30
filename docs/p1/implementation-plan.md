@@ -668,6 +668,16 @@ unread guide reads `Not started`. One SQLite query feeds each list, and
 listing never opens guide files or calls a provider. CI run 36705946660
 passed `catalog-facts` in light and dark.
 
+T05.2 is implemented on `feat/p1-t05-2-library-search`; see the
+[design and verification record](t05-2-library-search-design.md). The
+Library search box filters games whose title, or one of whose guide
+titles, contains the query, ignoring case, accents and width. A guide-only
+match names the guide in the row's facts. The Library shows exactly one of
+loading, empty, no-results and list views, with a visible Clear search.
+Search filters the loaded summaries in memory; it never opens guide files
+or calls a provider. CI run 36726600007 passed `library-search` in light and
+dark.
+
 ### UI design-language and Gallery adoption sequence
 
 The WinUI Gallery is a reference catalog, not a package or shell dependency.
