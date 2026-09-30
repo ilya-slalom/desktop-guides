@@ -9,7 +9,7 @@ param(
         'reader-render-error-observed', 'reader-render-error-result',
         'late-guide-after-close', 'waiting-handoff', 'material', 'catalog',
         'provider-none', 'provider-offline', 'provider-settings',
-        'import-preview', 'provider-live', 'provider-remove')]
+        'import-preview', 'import-publish', 'provider-live', 'provider-remove')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -1473,7 +1473,7 @@ try {
         $report.phases += 'catalog-no-provider-traffic'
         $report.catalogSeconds = [Math]::Round(((Get-Date) - $catalogStarted).TotalSeconds, 1)
     }
-    elseif ($Mode -eq 'import-preview') {
+    elseif ($Mode -like 'import-*') {
         $fixtureRoot = (Resolve-Path -LiteralPath (
             Join-Path $PSScriptRoot '..\..\tests\fixtures\p0')).Path
         $uia = [System.Windows.Automation.AutomationElement]
@@ -1595,64 +1595,93 @@ try {
             throw "Expected keyboard focus on '$id'."
         }
 
-        Select-Element 'Import Test Game'
-        [void](Wait-Name 'GameHeading' 'Import Test Game')
-        [void](Wait-Status 'Game ready.')
-        Click-Element (Wait-EnabledById 'ImportGuideButton')
-        Choose-PickerFile 'txt-legacy.txt'
-        [void](Wait-VisibleById 'ImportGuideDialog')
-        [void](Wait-Text 'ImportFileName' 'txt-legacy.txt')
-        [void](Wait-Text 'ImportFormat' 'Text (TXT)')
-        $title = (Wait-VisibleById 'GuideTitleInput').GetCurrentPattern(
-            [System.Windows.Automation.ValuePattern]::Pattern).Current.Value
-        if ($title -ne 'txt-legacy') { throw "Expected the suggested title 'txt-legacy', got '$title'." }
-        [void](Wait-PresentById 'ImportEncodingWindows1252')
-        $sample = (Wait-VisibleById 'ImportEncodingCp437Sample').Current.Name
-        if ($sample -notlike '*Guide*') { throw "The CP437 sample was '$sample'." }
-        $cp437 = Select-ById 'ImportEncodingCp437'
-        [void](Wait-Text 'ImportEncodingValue' 'DOS (CP437)')
-        if (-not $cp437.GetCurrentPattern(
-                [System.Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected) {
-            throw 'CP437 was not selected.'
+        if ($Mode -eq 'import-preview') {
+            Select-Element 'Import Test Game'
+            [void](Wait-Name 'GameHeading' 'Import Test Game')
+            [void](Wait-Status 'Game ready.')
+            Click-Element (Wait-EnabledById 'ImportGuideButton')
+            Choose-PickerFile 'txt-legacy.txt'
+            [void](Wait-VisibleById 'ImportGuideDialog')
+            [void](Wait-Text 'ImportFileName' 'txt-legacy.txt')
+            [void](Wait-Text 'ImportFormat' 'Text (TXT)')
+            $title = (Wait-VisibleById 'GuideTitleInput').GetCurrentPattern(
+                [System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+            if ($title -ne 'txt-legacy') { throw "Expected the suggested title 'txt-legacy', got '$title'." }
+            [void](Wait-PresentById 'ImportEncodingWindows1252')
+            $sample = (Wait-VisibleById 'ImportEncodingCp437Sample').Current.Name
+            if ($sample -notlike '*Guide*') { throw "The CP437 sample was '$sample'." }
+            $cp437 = Select-ById 'ImportEncodingCp437'
+            [void](Wait-Text 'ImportEncodingValue' 'DOS (CP437)')
+            if (-not $cp437.GetCurrentPattern(
+                    [System.Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected) {
+                throw 'CP437 was not selected.'
+            }
+            $report.importTxtScreenshot = Save-WindowScreenshot 'import-txt'
+            $report.phases += 'import-txt'
+
+            Click-Element (Wait-EnabledById 'SecondaryButton')
+            Choose-PickerFile 'html-static\guide.html'
+            [void](Wait-Text 'ImportFormat' 'Web page (HTML)')
+            [void](Wait-VisibleById 'ImportDetailsHeading')
+            $assets = (Wait-PresentById 'ImportAssets').Current.Name
+            if ($assets -notlike '3 linked files, * in total') { throw "The linked files row was '$assets'." }
+            foreach ($id in @('ImportDetailsGroup', 'ImportWarningsGroup', 'ImportEncodingCp437')) {
+                if (Find-ById $id) { throw "'$id' was shown for a web page without warnings." }
+            }
+            $report.phases += 'import-html'
+
+            Click-Element (Wait-EnabledById 'SecondaryButton')
+            Choose-PickerFile 'html-hostile\guide.html'
+            [void](Wait-VisibleById 'ImportDetailsGroup')
+            [void](Wait-PresentById 'ImportWarningsGroup')
+            [void](Wait-PresentById 'ImportWarning0')
+            if (Find-ById 'ImportDetailsHeading') { throw 'The native details heading was shown with groups.' }
+            $report.importWarningsScreenshot = Save-WindowScreenshot 'import-warnings'
+            $report.phases += 'import-html-warnings'
+
+            Click-Element (Wait-EnabledById 'SecondaryButton')
+            Choose-PickerFile 'pdf-locked.pdf'
+            [void](Wait-Name 'ImportStatus' "Password-protected PDFs aren't supported. Remove the password and import again.")
+            Assert-Absent 'ImportPreview'
+            $report.phases += 'import-pdf-locked'
+
+            Invoke-Element (Wait-EnabledById 'CloseButton')
+            [void](Wait-HiddenById 'ImportGuideDialog')
+            Wait-FocusedId 'ImportGuideButton'
+            Click-Element (Wait-EnabledById 'ImportGuideButton')
+            Cancel-Picker
+            [void](Wait-EnabledById 'ImportGuideButton')
+            Assert-Absent 'ImportGuideDialog'
+            Wait-FocusedId 'ImportGuideButton'
+            $report.phases += 'import-picker-cancel'
         }
-        $report.importTxtScreenshot = Save-WindowScreenshot 'import-txt'
-        $report.phases += 'import-txt'
+        else {
+            $importTitle = 'Imported Guide ' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+            Select-Element 'Import Test Game'
+            [void](Wait-Name 'GameHeading' 'Import Test Game')
+            [void](Wait-Status 'Game ready.')
+            Click-Element (Wait-EnabledById 'ImportGuideButton')
+            Choose-PickerFile 'txt-legacy.txt'
+            [void](Wait-VisibleById 'ImportGuideDialog')
+            [void](Wait-PresentById 'ImportEncodingCp437')
+            if ((Wait-VisibleById 'PrimaryButton').Current.IsEnabled) {
+                throw 'Import was enabled before an encoding was chosen.'
+            }
+            [void](Select-ById 'ImportEncodingCp437')
+            [void](Wait-Text 'ImportEncodingValue' 'DOS (CP437)')
+            Set-Text 'GuideTitleInput' $importTitle
+            [void](Wait-EnabledById 'PrimaryButton')
+            $report.importReadyScreenshot = Save-WindowScreenshot 'import-ready'
+            $report.phases += 'import-ready'
 
-        Click-Element (Wait-EnabledById 'SecondaryButton')
-        Choose-PickerFile 'html-static\guide.html'
-        [void](Wait-Text 'ImportFormat' 'Web page (HTML)')
-        [void](Wait-VisibleById 'ImportDetailsHeading')
-        $assets = (Wait-PresentById 'ImportAssets').Current.Name
-        if ($assets -notlike '3 linked files, * in total') { throw "The linked files row was '$assets'." }
-        foreach ($id in @('ImportDetailsGroup', 'ImportWarningsGroup', 'ImportEncodingCp437')) {
-            if (Find-ById $id) { throw "'$id' was shown for a web page without warnings." }
+            Invoke-Element (Wait-EnabledById 'PrimaryButton')
+            [void](Wait-HiddenById 'ImportGuideDialog')
+            [void](Wait-SelectedGuide $importTitle)
+            Wait-FocusedGuide $importTitle
+            $report.importedTitle = $importTitle
+            $report.importPublishedScreenshot = Save-WindowScreenshot 'import-published'
+            $report.phases += 'import-published'
         }
-        $report.phases += 'import-html'
-
-        Click-Element (Wait-EnabledById 'SecondaryButton')
-        Choose-PickerFile 'html-hostile\guide.html'
-        [void](Wait-VisibleById 'ImportDetailsGroup')
-        [void](Wait-PresentById 'ImportWarningsGroup')
-        [void](Wait-PresentById 'ImportWarning0')
-        if (Find-ById 'ImportDetailsHeading') { throw 'The native details heading was shown with groups.' }
-        $report.importWarningsScreenshot = Save-WindowScreenshot 'import-warnings'
-        $report.phases += 'import-html-warnings'
-
-        Click-Element (Wait-EnabledById 'SecondaryButton')
-        Choose-PickerFile 'pdf-locked.pdf'
-        [void](Wait-Name 'ImportStatus' "Password-protected PDFs aren't supported. Remove the password and import again.")
-        Assert-Absent 'ImportPreview'
-        $report.phases += 'import-pdf-locked'
-
-        Invoke-Element (Wait-EnabledById 'CloseButton')
-        [void](Wait-HiddenById 'ImportGuideDialog')
-        Wait-FocusedId 'ImportGuideButton'
-        Click-Element (Wait-EnabledById 'ImportGuideButton')
-        Cancel-Picker
-        [void](Wait-EnabledById 'ImportGuideButton')
-        Assert-Absent 'ImportGuideDialog'
-        Wait-FocusedId 'ImportGuideButton'
-        $report.phases += 'import-picker-cancel'
     }
     elseif ($Mode -eq 'long-list') {
         $target = 'ZZZ Focus Target Guide'
@@ -2198,7 +2227,7 @@ try {
 }
 catch {
     $report.error = $_ | Out-String
-    if (($Mode -eq 'game-editor' -or $Mode -eq 'catalog' -or $Mode -eq 'import-preview' -or
+    if (($Mode -eq 'game-editor' -or $Mode -eq 'catalog' -or $Mode -like 'import-*' -or
         $Mode -like 'provider-*') -and $root) {
         try {
             foreach ($id in @('ShellStatus', 'GameHeading',

@@ -700,7 +700,7 @@ function Run-ShellSmoke(
         -Principal $principal -Force | Out-Null
     Start-ScheduledTask -TaskName $smokeTask
     $timeoutSeconds = if ($mode -like 'provider-*') { 240 }
-        elseif ($mode -eq 'catalog' -or $mode -eq 'import-preview') { 120 }
+        elseif ($mode -eq 'catalog' -or $mode -like 'import-*') { 120 }
         else { 60 }
     $deadline = (Get-Date).AddSeconds($timeoutSeconds)
     do {
@@ -804,15 +804,36 @@ function Run-ImportScenarios {
         Start-InstalledShell
         $report.importDark = Run-ShellSmoke 'import-preview' -ResultName 'import-dark'
         Close-InstalledShell
+
+        $state = Invoke-ShellSeed @('describe-import', $dataRoot) | ConvertFrom-Json
+        $report.importPreviewState = $state
+        foreach ($name in @('Guides', 'FileOperations', 'StagingEntries', 'ContentEntries')) {
+            if ($state.$name -ne 0) {
+                throw "The import preview left $($state.$name) $name; expected none."
+            }
+        }
+
+        Set-AppThemePreference $true
+        Start-InstalledShell
+        $report.importPublishLight = Run-ShellSmoke 'import-publish' -ResultName 'import-publish-light'
+        Close-InstalledShell
+
+        Set-AppThemePreference $false
+        Start-InstalledShell
+        $report.importPublishDark = Run-ShellSmoke 'import-publish' -ResultName 'import-publish-dark'
+        Close-InstalledShell
     }
     finally {
         Restore-AppThemePreference $originalTheme
     }
     $state = Invoke-ShellSeed @('describe-import', $dataRoot) | ConvertFrom-Json
     $report.importState = $state
-    foreach ($name in @('Guides', 'FileOperations', 'StagingEntries', 'ContentEntries')) {
-        if ($state.$name -ne 0) {
-            throw "The import preview left $($state.$name) $name; expected none."
+    $expected = [ordered]@{
+        Guides = 2; FileOperations = 0; StagingEntries = 0; ContentEntries = 2; LegacyTextGuides = 2
+    }
+    foreach ($name in $expected.Keys) {
+        if ($state.$name -ne $expected[$name]) {
+            throw "After two imports, $name was $($state.$name); expected $($expected[$name])."
         }
     }
 }

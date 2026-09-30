@@ -700,6 +700,94 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         return check.ExecuteScalar() is null;
     }
 
+    /// <summary>
+    /// Runs an import under the write gate for its whole duration, so no other
+    /// write sees a half-published guide.
+    /// </summary>
+    internal async Task<T> RunImportAsync<T>(
+        Func<IImportJournal, CancellationToken, Task<T>> work, CancellationToken token)
+    {
+        await writeGate.WaitAsync(token);
+        try
+        {
+            return await Task.Run(() => work(new ImportJournal(this), token), token);
+        }
+        finally
+        {
+            writeGate.Release();
+        }
+    }
+
+    private sealed class ImportJournal(SqliteLibraryRepository owner) : IImportJournal
+    {
+        public void Prepare(Guid operationId, Guid guideId)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO FileOperations (Id, Kind, Phase, ManifestJson, CreatedUtcMs)
+                VALUES ($id, 'Import', 'Prepared', $manifest, $now)
+                """;
+            command.Parameters.AddWithValue("$id", operationId.ToString("N"));
+            command.Parameters.AddWithValue("$manifest",
+                FileOperationManifest.Create(FileOperationKind.Import, operationId, [guideId]));
+            command.Parameters.AddWithValue("$now", owner.clock.GetUtcNow().ToUnixTimeMilliseconds());
+            command.ExecuteNonQuery();
+        }
+
+        public void Publish(NewImportedGuide guide, Action beforeCommit)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            using SqliteCommand insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT INTO Guides (
+                    Id, GameId, Title, Format, ManagedRelativeRoot, PrimaryRelativePath,
+                    ContentSha256, ContentBytes, SourceLabel, TextCodePage,
+                    ImportedUtcMs, UpdatedUtcMs
+                ) VALUES (
+                    $id, $game, $title, $format, $root, $primary,
+                    $sha, $bytes, $label, $codePage, $now, $now
+                );
+                INSERT INTO ReadingStates (GuideId) VALUES ($id);
+                INSERT INTO ReaderPreferences (GuideId) VALUES ($id);
+                """;
+            string id = guide.Id.ToString("N");
+            insert.Parameters.AddWithValue("$id", id);
+            insert.Parameters.AddWithValue("$game", guide.GameId.ToString("N"));
+            insert.Parameters.AddWithValue("$title", guide.Title);
+            insert.Parameters.AddWithValue("$format", guide.Format.ToString());
+            insert.Parameters.AddWithValue("$root", "content/" + id);
+            insert.Parameters.AddWithValue("$primary", guide.PrimaryRelativePath);
+            insert.Parameters.AddWithValue("$sha", guide.ContentSha256);
+            insert.Parameters.AddWithValue("$bytes", guide.ContentBytes);
+            insert.Parameters.AddWithValue("$label", (object?)guide.SourceLabel ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$codePage", (object?)guide.TextCodePage ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$now", owner.clock.GetUtcNow().ToUnixTimeMilliseconds());
+            insert.ExecuteNonQuery();
+            using SqliteCommand remove = connection.CreateCommand();
+            remove.Transaction = transaction;
+            remove.CommandText = """
+                DELETE FROM FileOperations
+                WHERE Id = $op AND Kind = 'Import' AND Phase = 'Prepared'
+                """;
+            remove.Parameters.AddWithValue("$op", guide.OperationId.ToString("N"));
+            if (remove.ExecuteNonQuery() != 1)
+            {
+                throw new InvalidDataException("The import's file operation is missing.");
+            }
+            beforeCommit();
+            transaction.Commit();
+        }
+
+        public void RollBack(Guid operationId)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            new FileOperationReconciler(owner.paths).RollBackImport(connection, operationId);
+        }
+    }
+
     private SqliteConnection OpenConnection(bool create = false)
     {
         paths.ValidateDatabasePath();

@@ -29,6 +29,8 @@ public sealed class GuideImportValidator : IGuideImportValidator
         html = new StaticHtmlImportValidator(this.limits.HtmlLimits);
     }
 
+    internal StaticHtmlImportValidator Html => html;
+
     public async Task<ImportInspection> InspectAsync(string fullPath, CancellationToken token)
     {
         if (string.IsNullOrWhiteSpace(fullPath) || !Path.IsPathFullyQualified(fullPath))
@@ -118,6 +120,18 @@ public sealed class GuideImportValidator : IGuideImportValidator
     private async Task<ImportInspection> InspectHtmlAsync(
         ImportSource source, string title, CancellationToken token)
     {
+        StaticHtmlImportPreview preview = await PreviewHtmlAsync(source, token);
+        ImportWarning[] warnings = preview.Warnings
+            .Select(warning => new ImportWarning(warning.RelativePath ?? warning.RawTarget, warning.Message))
+            .ToArray();
+        return new ImportReady(new HtmlImportManifest(
+            source, title, preview.EntryRelativePath,
+            preview.Manifest.Assets.Count - 1, preview.Manifest.TotalBytes, warnings,
+            GuideFingerprint.OfHtml(preview.Manifest.Assets.Select(asset => (asset.RelativePath, asset.Sha256)))));
+    }
+
+    internal async Task<StaticHtmlImportPreview> PreviewHtmlAsync(ImportSource source, CancellationToken token)
+    {
         // Report a locked entry as the picked file, before the scanner reads it.
         using (OpenSource(source.FullPath, source.FileName))
         {
@@ -161,12 +175,7 @@ public sealed class GuideImportValidator : IGuideImportValidator
             throw new GuideImportException(ImportIssue.Unreadable,
                 $"{source.FileName} or one of its linked files can't be opened.");
         }
-        ImportWarning[] warnings = preview.Warnings
-            .Select(warning => new ImportWarning(warning.RelativePath ?? warning.RawTarget, warning.Message))
-            .ToArray();
-        return new ImportReady(new HtmlImportManifest(
-            source, title, preview.EntryRelativePath,
-            preview.Manifest.Assets.Count - 1, preview.Manifest.TotalBytes, warnings));
+        return preview;
     }
 
     private static Task<ImportInspection> InspectPdfAsync(
@@ -284,7 +293,7 @@ public sealed class GuideImportValidator : IGuideImportValidator
         return head.AsSpan(0, read).IndexOf(PdfMarker) >= 0;
     }
 
-    private static GuideImportException NotPdf() =>
+    internal static GuideImportException NotPdf() =>
         new(ImportIssue.Unreadable, "This file isn't a readable PDF.");
 
     private static TxtEncodingSample[] Samples(byte[] bytes)
@@ -380,7 +389,7 @@ public sealed class GuideImportValidator : IGuideImportValidator
     private static GuideImportException Missing(string name) =>
         new(ImportIssue.Missing, $"{name} can't be found. It may have been moved or deleted.");
 
-    private static GuideImportException Unreadable(string name) =>
+    internal static GuideImportException Unreadable(string name) =>
         new(ImportIssue.Unreadable,
             $"{name} can't be opened. Close any app that's using it, make sure it's available offline, then try again.");
 }
