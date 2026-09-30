@@ -15,6 +15,11 @@ public interface ILibraryRepository : IAsyncDisposable
     Task<Game?> GetGameAsync(Guid gameId, CancellationToken token = default);
     Task<IReadOnlyList<Guide>> ListGuidesAsync(
         Guid gameId, CancellationToken token = default);
+    // Newest activity first, then title, then ID. Reads only SQLite.
+    Task<IReadOnlyList<LibraryGameSummary>> ListGameSummariesAsync(
+        CancellationToken token = default);
+    Task<IReadOnlyList<GuideSummary>> ListGuideSummariesAsync(
+        Guid gameId, CancellationToken token = default);
     Task<Guide?> GetGuideAsync(Guid guideId, CancellationToken token = default);
     Task<ReadingState?> GetReadingStateAsync(
         Guid guideId, CancellationToken token = default);

@@ -251,6 +251,68 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             return guides;
         }, token);
 
+    // A game's last activity is the latest of its creation, any guide import
+    // and any guide open. ReadingStates is keyed by GuideId, so the second
+    // join adds at most one row per guide and COUNT stays exact.
+    public Task<IReadOnlyList<LibraryGameSummary>> ListGameSummariesAsync(
+        CancellationToken token = default) =>
+        ReadAsync<IReadOnlyList<LibraryGameSummary>>(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT g.Id, g.Title, g.Platform, g.Notes, g.CreatedUtcMs, g.UpdatedUtcMs,
+                       g.ProviderName, g.ProviderGameId, g.MetadataJson,
+                       g.MetadataRetrievedUtcMs, g.ArtworkRelativePath,
+                       COUNT(gu.Id),
+                       MAX(g.CreatedUtcMs,
+                           COALESCE(MAX(gu.ImportedUtcMs), 0),
+                           COALESCE(MAX(rs.LastOpenedUtcMs), 0)) AS LastActivityUtcMs
+                FROM Games g
+                LEFT JOIN Guides gu ON gu.GameId = g.Id
+                LEFT JOIN ReadingStates rs ON rs.GuideId = gu.Id
+                GROUP BY g.Id
+                ORDER BY LastActivityUtcMs DESC, g.Title, g.Id
+                """;
+            using SqliteDataReader reader = command.ExecuteReader();
+            List<LibraryGameSummary> summaries = [];
+            while (reader.Read())
+            {
+                summaries.Add(new LibraryGameSummary(
+                    ReadGame(reader), reader.GetInt32(11), FromUnixMilliseconds(reader.GetInt64(12))));
+            }
+            return summaries;
+        }, token);
+
+    public Task<IReadOnlyList<GuideSummary>> ListGuideSummariesAsync(
+        Guid gameId, CancellationToken token = default) =>
+        ReadAsync<IReadOnlyList<GuideSummary>>(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT gu.Id, gu.GameId, gu.Title, gu.Format, gu.ManagedRelativeRoot,
+                       gu.PrimaryRelativePath, gu.ContentSha256, gu.ContentBytes,
+                       gu.SourceLabel, gu.TextCodePage, gu.ImportedUtcMs, gu.UpdatedUtcMs,
+                       rs.GuideId, rs.LocatorJson, rs.EstimatedFraction,
+                       rs.LastOpenedUtcMs, rs.CompletedUtcMs
+                FROM Guides gu
+                LEFT JOIN ReadingStates rs ON rs.GuideId = gu.Id
+                WHERE gu.GameId = $gameId
+                ORDER BY MAX(gu.ImportedUtcMs, COALESCE(rs.LastOpenedUtcMs, 0)) DESC,
+                         gu.Title, gu.Id
+                """;
+            command.Parameters.AddWithValue("$gameId", gameId.ToString("N"));
+            using SqliteDataReader reader = command.ExecuteReader();
+            List<GuideSummary> summaries = [];
+            while (reader.Read())
+            {
+                summaries.Add(new GuideSummary(
+                    ReadGuide(reader), reader.IsDBNull(12) ? null : ReadReadingState(reader, 12)));
+            }
+            return summaries;
+        }, token);
+
     public Task<Guide?> GetGuideAsync(Guid guideId, CancellationToken token = default) =>
         ReadAsync<Guide?>(() =>
         {
@@ -316,14 +378,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                 """;
             command.Parameters.AddWithValue("$id", guideId.ToString("N"));
             using SqliteDataReader reader = command.ExecuteReader();
-            return reader.Read()
-                ? new ReadingState(
-                    Guid.ParseExact(reader.GetString(0), "N"),
-                    NullableString(reader, 1),
-                    reader.IsDBNull(2) ? null : reader.GetDouble(2),
-                    reader.IsDBNull(3) ? null : FromUnixMilliseconds(reader.GetInt64(3)),
-                    reader.IsDBNull(4) ? null : FromUnixMilliseconds(reader.GetInt64(4)))
-                : null;
+            return reader.Read() ? ReadReadingState(reader, 0) : null;
         }, token);
 
     public Task SaveReadingLocationAsync(
@@ -1033,6 +1088,13 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             GameMetadataJson.TryParse(NullableString(reader, 8)),
             NullableString(reader, 10));
     }
+
+    private static ReadingState ReadReadingState(SqliteDataReader reader, int first) => new(
+        Guid.ParseExact(reader.GetString(first), "N"),
+        NullableString(reader, first + 1),
+        reader.IsDBNull(first + 2) ? null : reader.GetDouble(first + 2),
+        reader.IsDBNull(first + 3) ? null : FromUnixMilliseconds(reader.GetInt64(first + 3)),
+        reader.IsDBNull(first + 4) ? null : FromUnixMilliseconds(reader.GetInt64(first + 4)));
 
     private static Guide ReadGuide(SqliteDataReader reader)
     {
