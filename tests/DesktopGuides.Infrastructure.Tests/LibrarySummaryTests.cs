@@ -130,6 +130,7 @@ public sealed class LibrarySummaryTests : IAsyncLifetime
         Assert.Equal(GuideRemovalOutcome.Removed, result.Outcome);
         IReadOnlyList<LibraryGameSummary> summaries = await library.Repository.ListGameSummariesAsync();
         Assert.Equal([("Newer", 0), ("Older", 1)], summaries.Select(summary => (summary.Game.Title, summary.GuideCount)));
+        Assert.Equal(["Kept"], summaries.Single(summary => summary.Game.Title == "Older").GuideTitles);
     }
 
     [Fact]
@@ -205,7 +206,28 @@ public sealed class LibrarySummaryTests : IAsyncLifetime
         RemovalLibrary.WriteFile(library.Paths.GetGuideRoot(guide), "guide.txt", "x");
         Directory.Delete(library.Paths.GetGuideRoot(guide), true);
 
-        Assert.Equal(1, Assert.Single(await library.Repository.ListGameSummariesAsync()).GuideCount);
+        LibraryGameSummary summary = Assert.Single(await library.Repository.ListGameSummariesAsync());
+        Assert.Equal(1, summary.GuideCount);
+        Assert.Equal(["Guide"], summary.GuideTitles);
         Assert.Equal(guide, Assert.Single(await library.Repository.ListGuideSummariesAsync(game)).Guide.Id);
+    }
+
+    [Fact]
+    public async Task GuideTitlesAreEachGamesOwnInTitleOrder()
+    {
+        Guid a = await GameAt("A", Base + 2 * Day);
+        Guid b = await GameAt("B", Base + Day);
+        await GameAt("C", Base);
+        await GuideAt(a, "Walkthrough", Base);
+        await GuideAt(a, "Achievements", Base);
+        await GuideAt(a, "Maps", Base);
+        await GuideAt(b, "Other", Base);
+
+        IReadOnlyList<LibraryGameSummary> summaries = await library.Repository.ListGameSummariesAsync();
+
+        Assert.Equal(["A", "B", "C"], summaries.Select(summary => summary.Game.Title));
+        Assert.Equal(["Achievements", "Maps", "Walkthrough"], summaries[0].GuideTitles);
+        Assert.Equal(["Other"], summaries[1].GuideTitles);
+        Assert.Empty(summaries[2].GuideTitles);
     }
 }

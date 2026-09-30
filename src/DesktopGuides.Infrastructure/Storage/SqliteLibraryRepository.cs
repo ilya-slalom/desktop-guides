@@ -253,35 +253,62 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
 
     // A game's last activity is the latest of its creation, any guide import
     // and any guide open. ReadingStates is keyed by GuideId, so the second
-    // join adds at most one row per guide and COUNT stays exact.
+    // join adds at most one row per guide and COUNT stays exact. Guide titles
+    // come from a second statement in the same read transaction, so they
+    // match the counts.
     public Task<IReadOnlyList<LibraryGameSummary>> ListGameSummariesAsync(
         CancellationToken token = default) =>
         ReadAsync<IReadOnlyList<LibraryGameSummary>>(() =>
         {
             using SqliteConnection connection = OpenConnection();
-            using SqliteCommand command = connection.CreateCommand();
-            command.CommandText = """
-                SELECT g.Id, g.Title, g.Platform, g.Notes, g.CreatedUtcMs, g.UpdatedUtcMs,
-                       g.ProviderName, g.ProviderGameId, g.MetadataJson,
-                       g.MetadataRetrievedUtcMs, g.ArtworkRelativePath,
-                       COUNT(gu.Id),
-                       MAX(g.CreatedUtcMs,
-                           COALESCE(MAX(gu.ImportedUtcMs), 0),
-                           COALESCE(MAX(rs.LastOpenedUtcMs), 0)) AS LastActivityUtcMs
-                FROM Games g
-                LEFT JOIN Guides gu ON gu.GameId = g.Id
-                LEFT JOIN ReadingStates rs ON rs.GuideId = gu.Id
-                GROUP BY g.Id
-                ORDER BY LastActivityUtcMs DESC, g.Title, g.Id
-                """;
-            using SqliteDataReader reader = command.ExecuteReader();
-            List<LibraryGameSummary> summaries = [];
-            while (reader.Read())
+            using SqliteTransaction transaction = connection.BeginTransaction(deferred: true);
+            List<(Game Game, int Count, DateTimeOffset Activity)> rows = [];
+            using (SqliteCommand command = connection.CreateCommand())
             {
-                summaries.Add(new LibraryGameSummary(
-                    ReadGame(reader), reader.GetInt32(11), FromUnixMilliseconds(reader.GetInt64(12)), []));
+                command.Transaction = transaction;
+                command.CommandText = """
+                    SELECT g.Id, g.Title, g.Platform, g.Notes, g.CreatedUtcMs, g.UpdatedUtcMs,
+                           g.ProviderName, g.ProviderGameId, g.MetadataJson,
+                           g.MetadataRetrievedUtcMs, g.ArtworkRelativePath,
+                           COUNT(gu.Id),
+                           MAX(g.CreatedUtcMs,
+                               COALESCE(MAX(gu.ImportedUtcMs), 0),
+                               COALESCE(MAX(rs.LastOpenedUtcMs), 0)) AS LastActivityUtcMs
+                    FROM Games g
+                    LEFT JOIN Guides gu ON gu.GameId = g.Id
+                    LEFT JOIN ReadingStates rs ON rs.GuideId = gu.Id
+                    GROUP BY g.Id
+                    ORDER BY LastActivityUtcMs DESC, g.Title, g.Id
+                    """;
+                using SqliteDataReader reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    rows.Add((ReadGame(reader), reader.GetInt32(11), FromUnixMilliseconds(reader.GetInt64(12))));
+                }
             }
-            return summaries;
+
+            Dictionary<Guid, List<string>> titles = [];
+            using (SqliteCommand command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = "SELECT GameId, Title FROM Guides ORDER BY GameId, Title, Id";
+                using SqliteDataReader reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    Guid gameId = Guid.ParseExact(reader.GetString(0), "N");
+                    if (!titles.TryGetValue(gameId, out List<string>? list))
+                    {
+                        titles[gameId] = list = [];
+                    }
+                    list.Add(reader.GetString(1));
+                }
+            }
+
+            transaction.Commit();
+            return rows.Select(row => new LibraryGameSummary(
+                    row.Game, row.Count, row.Activity,
+                    titles.TryGetValue(row.Game.Id, out List<string>? list) ? list : []))
+                .ToList();
         }, token);
 
     public Task<IReadOnlyList<GuideSummary>> ListGuideSummariesAsync(
