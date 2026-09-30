@@ -1,6 +1,7 @@
 # T06.3 import publication design
 
-Status: design approved 30 September 2026 on `feat/p1-t06-3-import-publication`.
+Status: implemented and verified 30 September 2026 on `feat/p1-t06-3-import-publication`;
+see the [verification record](#t063-verification-record).
 Prerequisites T03.2, T03.3, T15.2 (M0 and M1, PRs #3–#5) and T06.2 (PR #17)
 are merged.
 
@@ -275,3 +276,51 @@ and states the outcome: pressing **Import** publishes a TXT, HTML or PDF
 guide that survives removal of the original, with no partial guide after
 cancellation, failure or crash. It includes light and dark screenshots of
 the dialog's Import state and the Game page after import.
+
+## T06.3 verification record
+
+- **Unit tests.** `core-tests` in CI run [36669062806](https://github.com/ilya-slalom/desktop-guides/actions/runs/36669062806): 198 Core and 333
+  Infrastructure passes. They include:
+  - `GuideImportPublisherTests`: TXT, PDF and HTML publication, source
+    changes, cancellation, injected faults, crash points, rollback failure
+    and the write gate.
+  - `ImportJournalTests`.
+  - `GuideFingerprintTests`.
+
+  The same suites pass on `pcsx2-win`.
+- **Installed import scenario.** `production-shell-ui` in the same run,
+  light and dark:
+  - Import is disabled until CP437 is chosen for `txt-legacy`.
+  - Import closes the dialog.
+  - The Game page lists the new guide selected and focused.
+
+  The preview runs still end with no guide or file operation. After both
+  publish runs, `importState` shows 2 guides, 0 file operations, 0 staging
+  entries, 2 content directories and 2 guides with code page 437.
+- **Rulings.** From the plan, with the details in its Rulings section:
+  - `PublishAsync` is public and takes a `string` title.
+  - Progress is `IProgress<ImportProgress>`.
+  - The journal is synchronous, and `RollBack` replaces `AbandonAsync`.
+  - In-process rollback keeps a content directory the import doesn't own.
+  - The `Copied` checkpoint replaces `MidCopy`.
+  - The source is re-checked before format verification.
+  - The dialog reports success through `ImportedGuideId`.
+  - There is no logging.
+  - The smoke publishes two guides.
+  - `SourceLabel` isn't truncated.
+  - The smoke shares its helpers by branching.
+
+  From the execution ledger:
+  - The fingerprint test uses the file's `Manifest<T>` helper.
+  - Theory tests take checkpoint names as strings, because the enum is internal.
+  - The publisher deletes the empty `.staging/<op>` folder after the move.
+  - TXT and PDF re-checks use size and last-write time, not a re-hash.
+- **Open follow-ups.** From the final review, all minor:
+  - The smoke doesn't edit the title during an import. That case (Review Focus 1) was checked by code review only.
+  - A failed delete of the empty `.staging/<op>` folder rolls back an import that otherwise succeeded.
+  - A read error before `Prepare` shows the generic message.
+  - The dialog's validation handlers have no `importing` guard.
+- **Evidence.** [import-ready (light)](evidence/t06-3-import-publication/import-ready-light.png),
+  [import-published (light)](evidence/t06-3-import-publication/import-published-light.png),
+  [import-ready (dark)](evidence/t06-3-import-publication/import-ready-dark.png)
+  and [import-published (dark)](evidence/t06-3-import-publication/import-published-dark.png).

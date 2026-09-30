@@ -626,6 +626,17 @@ HTML and PDF. They were implemented and verified on 30 September 2026: CI run
 `import-preview` scenario in light and dark. Confirm, copying and
 publication remain T06.3.
 
+The [T06.3 import publication design](t06-3-import-publication-design.md)
+and [plan](t06-3-import-publication-plan.md) add three pieces:
+- the Import button;
+- `GuideImportPublisher`;
+- the prepared-journal sequence for TXT, HTML and PDF: copy, verify, rename
+  and publish.
+
+They were implemented and verified on 30 September 2026. CI run [36669062806](https://github.com/ilya-slalom/desktop-guides/actions/runs/36669062806) passed
+`core-tests`, both package builds and the installed `import-publish`
+scenario in light and dark. Duplicate handling remains T06.4.
+
 ### UI design-language and Gallery adoption sequence
 
 The WinUI Gallery is a reference catalog, not a package or shell dependency.
