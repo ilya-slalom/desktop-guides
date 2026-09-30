@@ -930,17 +930,22 @@ try {
     }
 
     # The AutoSuggestBox exposes its text through its inner edit box.
+    function Get-SearchEdit([string] $id) {
+        $box = Wait-VisibleById $id
+        $edit = $box.FindFirst($scope,
+            [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::Edit))
+        if (-not $edit) { throw "The search box '$id' has no editable text." }
+        return $edit
+    }
+
     function Get-SearchPattern([string] $id) {
         $box = Wait-VisibleById $id
         $pattern = $null
         if (-not $box.TryGetCurrentPattern(
             [System.Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) {
-            $edit = $box.FindFirst($scope,
-                [System.Windows.Automation.PropertyCondition]::new(
-                    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
-                    [System.Windows.Automation.ControlType]::Edit))
-            if (-not $edit) { throw "The search box '$id' has no editable text." }
-            $pattern = $edit.GetCurrentPattern(
+            $pattern = (Get-SearchEdit $id).GetCurrentPattern(
                 [System.Windows.Automation.ValuePattern]::Pattern)
         }
         return $pattern
@@ -1459,8 +1464,9 @@ try {
         Assert-Absent 'LibrarySearchClear'
 
         # Real keystrokes for the ASCII query; ValuePattern for the rest (Ruling 10).
-        $box = Wait-EnabledById 'LibrarySearchInput'
-        $box.SetFocus()
+        # The AutoSuggestBox itself is not focusable; its inner edit box is.
+        [void](Wait-EnabledById 'LibrarySearchInput')
+        (Get-SearchEdit 'LibrarySearchInput').SetFocus()
         [void](Wait-FocusWithin 'LibrarySearchInput')
         [System.Windows.Forms.SendKeys]::SendWait('POKEMON')
         [void](Wait-Status '1 of 4 games match.' -AllowHidden)
