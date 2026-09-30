@@ -408,4 +408,5 @@ screenshots of the preview.
     relaxes an untrusted-path check and needs its own design and a host
     check; TXT and PDF are unaffected. Cost if wrong: HTML guides saved to a
     OneDrive-backed Desktop or Documents folder can't be imported until the
-    follow-up lands.
+    follow-up lands. Tracked in
+    [#18](https://github.com/ilya-slalom/desktop-guides/issues/18).
