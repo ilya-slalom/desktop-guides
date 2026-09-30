@@ -42,14 +42,18 @@ Decisions made during brainstorming:
 ### `GuideImportPublisher` (Infrastructure/Import)
 
 ```csharp
-internal Task<Guid> PublishAsync(
-    ImportManifest manifest, Guid gameId, GuideTitle title,
-    IProgress<double> progress, CancellationToken token);
+public Task<Guid> PublishAsync(
+    ImportManifest manifest, Guid gameId, string title,
+    IProgress<ImportProgress>? progress, CancellationToken token);
 ```
 
 Returns the new Guide ID or throws `GuideImportException` with a typed
-`ImportIssue`, or `OperationCanceledException`. Its internal constructor
-takes the test seams listed under [Testing](#testing).
+`ImportIssue`, or `OperationCanceledException`. The publisher is public
+because Production can't see Infrastructure internals. The title is checked
+with `GuideTitle.Create`. `ImportProgress(double Fraction, bool Publishing)`
+is a Core record; `Publishing` tells the dialog that cancellation no longer
+applies. An internal constructor takes the test seams listed under
+[Testing](#testing).
 
 ### Repository entry point
 
@@ -63,26 +67,28 @@ internal Task<T> RunImportAsync<T>(
     CancellationToken token);
 ```
 
-`IImportJournal` runs SQL only and never takes the gate itself:
+`IImportJournal` is synchronous, since the whole import already runs on the
+thread pool under the gate. It never takes the gate itself:
 
-- `PrepareAsync(Guid operationId, Guid guideId)` commits a `Prepared`
+- `Prepare(Guid operationId, Guid guideId)` commits a `Prepared`
   Import row whose manifest comes from `FileOperationManifest.Create`.
-- `PublishAsync(NewImportedGuide guide)` inserts `Guides`, an empty
-  `ReadingStates` row and an empty `ReaderPreferences` row, and deletes the
-  operation row, in one transaction.
-- `AbandonAsync(Guid operationId)` deletes the operation row after its
-  owned files are gone.
+- `Publish(NewImportedGuide guide, Action beforeCommit)` inserts `Guides`,
+  an empty `ReadingStates` row and an empty `ReaderPreferences` row, and
+  deletes the operation row, in one transaction.
+- `RollBack(Guid operationId)` removes the import's owned directories, then
+  its row.
 
 All SQL stays in the repository, so `ValidateDatabase` and the existing
 transaction pattern (`AddLinkedGameAsync`) cover it.
 
 ### Rollback
 
-The reconciler's per-operation rollback for Import is exposed internally
-and reused: delete the staged tree and the content tree through
-`OwnedGuideTree`, remove the empty `.staging/<op>` parent, then delete the
-row. An in-process failure and a crash followed by startup therefore take
-the same path.
+`FileOperationReconciler.RollBackImport` handles an in-process failure. It
+deletes the staged tree through `OwnedGuideTree` when it exists, and
+otherwise deletes `content/<guide>`. `Directory.Move` is atomic, so while
+the stage exists, `content/<guide>` isn't this import's, and a pre-created
+content directory survives. It then removes an empty `.staging/<op>` parent
+and deletes the row. A crash is resolved by the unchanged startup `Run`.
 
 ## Flow
 
@@ -99,16 +105,17 @@ Everything below runs inside `RunImportAsync`.
    staged file is created with `FileMode.CreateNew` and flushed with
    `Flush(flushToDisk: true)`. Progress reports bytes copied over the total.
 4. **Validate the staged copy.**
+   - The source is re-checked first, as in step 1, which catches a change
+     made during the copy and reports it as `Changed` rather than a decode
+     error.
    - TXT decodes strictly with the chosen code page, or strict UTF-8 when
      it is null.
    - PDF re-opens with `ReadPdf` and has the preview's page count.
    - HTML runs `VerifyStagedAsync` against the staged root.
-   - The source is re-checked as in step 1, which catches a change made
-     during the copy.
 5. **Rename** `.staging/<op>/<guide>` to `content/<guide>` with
    `Directory.Move`. Both are under `LibraryRoot`; an existing destination
-   is an error.
-6. **Publish** with `IImportJournal.PublishAsync`.
+   is an error. The now-empty `.staging/<op>` folder is then deleted.
+6. **Publish** with `IImportJournal.Publish`.
 
 Any exception from step 2 up to the end of step 6 runs the rollback and
 rethrows the mapped issue. The source is only ever opened with
@@ -156,7 +163,7 @@ is ignored. The original file name is recorded only as `SourceLabel`.
 | `PrimaryRelativePath` | `guide.txt`, `guide.pdf` or the HTML entry |
 | `ContentSha256` | The fingerprint |
 | `ContentBytes` | Total bytes copied |
-| `SourceLabel` | Original file name, truncated to 255 characters |
+| `SourceLabel` | The original file name, not truncated (NTFS caps names at 255 UTF-16 units) |
 | `TextCodePage` | 437 or 1252 for a legacy TXT choice; NULL for UTF-8 and other formats |
 | `ImportedUtcMs`, `UpdatedUtcMs` | The repository clock |
 
@@ -175,8 +182,9 @@ The source path, any PDF password and the preview warnings are not stored.
 | `ERROR_DISK_FULL` or `ERROR_HANDLE_DISK_FULL` | `NotEnoughSpace` | "There isn't enough free space to import this guide." |
 | Any other managed write, rename or commit failure, including a foreign-key failure if the game is gone | `SaveFailed` | "The guide couldn't be saved to your library. Nothing was changed." |
 
-Messages never include the source path or the underlying exception. Logs
-carry only the issue and the operation ID. If the rollback itself fails,
+Messages never include the source path or the underlying exception. The
+app has no logging; any future logging carries only the issue and the
+operation ID. If the rollback itself fails,
 the original issue still surfaces and the `Prepared` row stays for the
 startup reconciler.
 
@@ -194,8 +202,8 @@ startup reconciler.
   keeps the preview.
 - Closing the window cancels the import and waits for it to stop, through
   the existing closing deferral.
-- On success the dialog closes with `ContentDialogResult.Primary`.
-  `ShellWindow` sets `pendingGuideFocus` to the new ID and calls
+- On success the dialog sets `ImportedGuideId` and hides. `Hide()` makes
+  `ShowAsync` return `None`, so `ShellWindow` checks the ID, then sets `pendingGuideFocus` to the new ID and calls
   `RenderCurrentAsync`.
 
 ## Testing
@@ -205,7 +213,8 @@ Test seams, internal and injected through the publisher's constructor:
 - `Func<Guid>` allocates IDs, so a test knows the paths in advance.
 - `Func<string, Stream>` creates staged files, so a test can inject a
   disk-full stream.
-- `Action<ImportCheckpoint>` fires at `Prepared`, `MidCopy`, `Verified`,
+- `Action<ImportCheckpoint>` fires at `Prepared`, `Copied` (after every file is copied, before
+  verification), `Verified`,
   `Renamed` and `InCommit` (inside the transaction, before `Commit()`).
 - The rollback delegate defaults to the reconciler's rollback.
 
@@ -219,7 +228,7 @@ Test seams, internal and injected through the publisher's constructor:
    `ResolveExistingGuideFile` finds the managed file and its bytes hash to
    `ContentSha256`.
 3. **Source changes:** removed before copy is `Missing`; grown between
-   preview and Confirm is `Changed`; rewritten at `MidCopy` is `Changed`;
+   preview and Confirm is `Changed`; rewritten at `Copied` is `Changed`;
    an HTML asset edited after the preview is `Changed`; a source locked
    with `FileShare.None` is `Unreadable`.
 4. **Cancellation** at each checkpoint before `InCommit`:
@@ -236,7 +245,7 @@ Test seams, internal and injected through the publisher's constructor:
 7. **Rollback failure:** a failing rollback still surfaces the original
    issue and leaves the row for startup.
 8. **Write gate:** `SaveReadingLocationAsync` issued while an import is
-   paused at `MidCopy` completes only after the import releases the gate.
+   paused at `Copied` completes only after the import releases the gate.
 
 ### Installed smoke mode `import-publish`
 
