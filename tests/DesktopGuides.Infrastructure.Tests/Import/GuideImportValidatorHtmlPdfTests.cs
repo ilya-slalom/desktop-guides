@@ -301,6 +301,59 @@ public sealed class GuideImportValidatorHtmlPdfTests
     }
 
     [Fact]
+    public void CancellingStopsPdfReadingBeforeTheDocumentIsParsed()
+    {
+        // Cancel as the header check rewinds, so PdfPig starts parsing
+        // with a cancelled token. It ignores the token itself, so only the
+        // stream can stop it.
+        string path = P0Fixtures.Resolve("pdf-short.pdf");
+        using CancellationTokenSource cancel = new();
+        using CancelOnRewindStream stream = new(File.ReadAllBytes(path), cancel);
+        ImportSource source = new(path, "pdf-short.pdf", stream.Length, DateTimeOffset.UnixEpoch);
+
+        Assert.ThrowsAny<OperationCanceledException>(() =>
+            GuideImportValidator.ReadPdf(stream, source, "pdf-short", cancel.Token));
+        Assert.Equal(0, stream.ReadsAfterCancel);
+    }
+
+    private sealed class CancelOnRewindStream(byte[] bytes, CancellationTokenSource cancel)
+        : MemoryStream(bytes, writable: false)
+    {
+        public int ReadsAfterCancel { get; private set; }
+
+        public override long Position
+        {
+            get => base.Position;
+            set
+            {
+                if (value == 0 && base.Position > 0)
+                {
+                    cancel.Cancel();
+                }
+                base.Position = value;
+            }
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (cancel.IsCancellationRequested) ReadsAfterCancel++;
+            return base.Read(buffer, offset, count);
+        }
+
+        public override int Read(Span<byte> buffer)
+        {
+            if (cancel.IsCancellationRequested) ReadsAfterCancel++;
+            return base.Read(buffer);
+        }
+
+        public override int ReadByte()
+        {
+            if (cancel.IsCancellationRequested) ReadsAfterCancel++;
+            return base.ReadByte();
+        }
+    }
+
+    [Fact]
     public async Task InspectingLeavesHtmlAndPdfFixturesUnchanged()
     {
         string[] sources = ["html-static", "html-hostile", "pdf-short.pdf", "pdf-scan.pdf", "pdf-access.pdf", "pdf-locked.pdf"];

@@ -156,40 +156,97 @@ public sealed class GuideImportValidator : IGuideImportValidator
         Task.Run<ImportInspection>(() =>
         {
             using FileStream stream = OpenSource(source.FullPath, source.FileName, asyncIo: false);
-            try
-            {
-                if (!StartsLikePdf(stream))
-                {
-                    throw NotPdf();
-                }
-                stream.Position = 0;
-                using PdfDocument document = PdfDocument.Open(stream);
-                int pages = document.NumberOfPages;
-                if (pages == 0)
-                {
-                    throw NotPdf();
-                }
-                bool hasText = false;
-                for (int number = 1; number <= Math.Min(pages, TextSamplePages) && !hasText; number++)
-                {
-                    token.ThrowIfCancellationRequested();
-                    hasText = document.GetPage(number).Text.Any(char.IsLetter);
-                }
-                return new ImportReady(new PdfImportManifest(source, title, pages, hasText));
-            }
-            catch (PdfDocumentEncryptedException)
-            {
-                throw new GuideImportException(ImportIssue.Encrypted,
-                    "Password-protected PDFs aren't supported. Remove the password and import again.");
-            }
-            catch (Exception error) when (error is not (GuideImportException or OperationCanceledException))
-            {
-                // PdfPig reports malformed files with several exception types.
-                throw NotPdf();
-            }
+            return ReadPdf(stream, source, title, token);
         }, token);
 
-    private static bool StartsLikePdf(FileStream stream)
+    internal static ImportInspection ReadPdf(
+        Stream stream, ImportSource source, string title, CancellationToken token)
+    {
+        try
+        {
+            if (!StartsLikePdf(stream))
+            {
+                throw NotPdf();
+            }
+            stream.Position = 0;
+            // PdfPig ignores the token, so the stream checks it on each read.
+            using PdfDocument document = PdfDocument.Open(new CancellableReadStream(stream, token));
+            int pages = document.NumberOfPages;
+            if (pages == 0)
+            {
+                throw NotPdf();
+            }
+            bool hasText = false;
+            for (int number = 1; number <= Math.Min(pages, TextSamplePages) && !hasText; number++)
+            {
+                token.ThrowIfCancellationRequested();
+                hasText = document.GetPage(number).Text.Any(char.IsLetter);
+            }
+            return new ImportReady(new PdfImportManifest(source, title, pages, hasText));
+        }
+        catch (PdfDocumentEncryptedException)
+        {
+            throw new GuideImportException(ImportIssue.Encrypted,
+                "Password-protected PDFs aren't supported. Remove the password and import again.");
+        }
+        catch (Exception error) when (error is not (GuideImportException or OperationCanceledException))
+        {
+            // PdfPig reports malformed files with several exception types.
+            throw NotPdf();
+        }
+    }
+
+    private sealed class CancellableReadStream(Stream inner, CancellationToken token) : Stream
+    {
+        public override bool CanRead => inner.CanRead;
+        public override bool CanSeek => inner.CanSeek;
+        public override bool CanWrite => false;
+        public override long Length => inner.Length;
+
+        public override long Position
+        {
+            get => inner.Position;
+            set
+            {
+                token.ThrowIfCancellationRequested();
+                inner.Position = value;
+            }
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            token.ThrowIfCancellationRequested();
+            return inner.Read(buffer, offset, count);
+        }
+
+        public override int Read(Span<byte> buffer)
+        {
+            token.ThrowIfCancellationRequested();
+            return inner.Read(buffer);
+        }
+
+        public override int ReadByte()
+        {
+            token.ThrowIfCancellationRequested();
+            return inner.ReadByte();
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            token.ThrowIfCancellationRequested();
+            return inner.Seek(offset, origin);
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    private static bool StartsLikePdf(Stream stream)
     {
         byte[] head = new byte[1024];
         int read = stream.ReadAtLeast(head, head.Length, throwOnEndOfStream: false);
