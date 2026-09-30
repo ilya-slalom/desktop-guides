@@ -814,6 +814,25 @@ function Run-CatalogFactsScenarios {
     }
 }
 
+function Run-LibrarySearchScenarios {
+    Invoke-ShellSeed @('seed-search', $dataRoot) | Out-Null
+    $originalTheme = Get-AppThemePreference
+    try {
+        Set-AppThemePreference $true
+        Start-InstalledShell
+        $report.librarySearchLight = Run-ShellSmoke 'library-search' -ResultName 'library-search-light'
+        Close-InstalledShell
+
+        Set-AppThemePreference $false
+        Start-InstalledShell
+        $report.librarySearchDark = Run-ShellSmoke 'library-search' -ResultName 'library-search-dark'
+        Close-InstalledShell
+    }
+    finally {
+        Restore-AppThemePreference $originalTheme
+    }
+}
+
 function Run-ImportScenarios {
     Invoke-ShellSeed @('seed-import', $dataRoot) | Out-Null
     $originalTheme = Get-AppThemePreference
@@ -1240,8 +1259,10 @@ try {
 
     if ($CatalogOnly) {
         Run-CatalogScenarios
-    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
-    Run-CatalogFactsScenarios
+        Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+        Run-CatalogFactsScenarios
+        Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+        Run-LibrarySearchScenarios
         $report.success = $true
         return
     }
@@ -1313,6 +1334,8 @@ try {
     Run-CatalogScenarios
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-CatalogFactsScenarios
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    Run-LibrarySearchScenarios
 
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-ImportScenarios
