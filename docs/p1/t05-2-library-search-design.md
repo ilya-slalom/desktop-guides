@@ -1,7 +1,7 @@
 # T05.2 Library search design
 
-Status: design approved; not yet implemented. Prerequisite T05.1 (PR #23) is
-merged.
+Status: implemented on `feat/p1-t05-2-library-search`; verified by CI run
+36726600007. Prerequisite T05.1 (PR #23) is merged.
 
 ## Intent
 
@@ -252,3 +252,41 @@ In light and dark, the smoke checks:
 
 The PR names T05.2, its merged prerequisite T05.1 (PR #23), and the outcome.
 Its body shows the results and no-results views in light and dark.
+
+## T05.2 verification record
+
+- **Unit tests.** On `pcsx2-win`, Infrastructure 396/396 and Core 258/258
+  passed. The new tests are:
+  - `LibrarySearchTests`: mixed case; accents both ways; width both ways;
+    Japanese and Cyrillic titles; padded, blank and null queries;
+    non-matches; game-title and guide-only matches, with the first matching
+    guide title named; input order; and an empty input;
+  - `CatalogPresentationTests`: `Guide: {title}` ends both the visible facts
+    and the spoken text, and is absent when the game's own title matched;
+  - `LibrarySummaryTests`: each game's own guide titles in title-then-ID
+    order, none for a game without guides, a removed guide dropping out,
+    and listing after a guide's content directory is deleted.
+- **Installed.** CI run [36726600007](https://github.com/ilya-slalom/desktop-guides/actions/runs/36726600007)
+  passed all nine jobs, including `production-shell-ui`:
+  - `library-search`, light and dark: phases `search-case-accent`,
+    `search-non-ascii`, `search-guide-title`, `search-no-results`,
+    `search-clear`, `search-not-started`, `search-kept-after-back` and
+    `search-no-provider-traffic` passed, with zero non-loopback
+    connections;
+  - `empty`: the search box was disabled and Clear search absent;
+  - `catalog`, light and dark: the keyboard checks tabbed through the
+    search box to the first game row;
+  - every mode that waits for `Library ready.` found the loading view gone.
+- **Rulings.** Rulings 1–11 in the
+  [plan](t05-2-library-search-plan.md#rulings-against-the-spec), plus two
+  made during implementation:
+  - the plan's seed loop variable `game` clashed with a top-level local in
+    `Program.cs`, so it was renamed `searchGame`;
+  - CI run [36722381641](https://github.com/ilya-slalom/desktop-guides/actions/runs/36722381641)
+    failed because the AutoSuggestBox's own UIA element cannot take focus.
+    The smoke now focuses its inner edit box, which is where Tab lands.
+- **Evidence.**
+  - [Results, light](evidence/t05-2-library-search/results-light.png)
+  - [Results, dark](evidence/t05-2-library-search/results-dark.png)
+  - [No results, light](evidence/t05-2-library-search/no-results-light.png)
+  - [No results, dark](evidence/t05-2-library-search/no-results-dark.png)
