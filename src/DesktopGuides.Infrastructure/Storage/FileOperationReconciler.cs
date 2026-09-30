@@ -170,10 +170,46 @@ internal sealed class FileOperationReconciler(ILibraryPaths paths)
             }
         }
 
-        if (Directory.Exists(plan.SideOperationRoot) &&
-            !Directory.EnumerateFileSystemEntries(plan.SideOperationRoot).Any())
+        RemoveIfEmpty(plan.SideOperationRoot);
+    }
+
+    /// <summary>
+    /// Rolls back one in-process import. The rename is atomic, so while the
+    /// stage exists, content/&lt;guide&gt; isn't this import's and is kept.
+    /// </summary>
+    public void RollBackImport(SqliteConnection connection, Guid operationId)
+    {
+        JournalRow row = ReadJournalRows(connection).SingleOrDefault(candidate => candidate.Id == operationId)
+            ?? throw new InvalidDataException("The import is not in the file-operation journal.");
+        if (row.Kind != FileOperationKind.Import)
         {
-            Directory.Delete(plan.SideOperationRoot);
+            throw new InvalidDataException("The file operation is not an import.");
+        }
+        HashSet<Guid> committedGuides = ReadGuideIds(connection);
+        string? operationRoot = null;
+        foreach (Guid guideId in row.Manifest.GuideIds)
+        {
+            if (committedGuides.Contains(guideId))
+            {
+                throw new InvalidDataException(
+                    "File-operation phase conflicts with committed guide metadata.");
+            }
+            string stagedPath = paths.GetStagedGuideRoot(row.Id, guideId);
+            operationRoot ??= Path.GetDirectoryName(stagedPath)!;
+            RequireDirectoryOrMissing(operationRoot);
+            OwnedGuideTree staged = OwnedGuideTree.Capture(stagedPath);
+            (staged.Exists ? staged : OwnedGuideTree.Capture(paths.GetGuideRoot(guideId))).Delete();
+        }
+        RemoveIfEmpty(operationRoot);
+        RemoveJournalRow(connection, row.Id);
+    }
+
+    private static void RemoveIfEmpty(string? directory)
+    {
+        if (directory is not null && Directory.Exists(directory) &&
+            !Directory.EnumerateFileSystemEntries(directory).Any())
+        {
+            Directory.Delete(directory);
         }
     }
 
