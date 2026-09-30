@@ -154,6 +154,46 @@ public sealed class GuideImportValidatorTests
         });
     }
 
+    [Fact]
+    public async Task TextWorkRunsOffTheCallersThread()
+    {
+        // The dialog calls in on the UI thread; decoding a large file there
+        // would freeze Cancel. A cached read can complete synchronously, so
+        // the call must return before the work is done and never post back.
+        using ImportTestDirectory files = new();
+        string path = files.Write("big.txt", Encoding.UTF8.GetBytes(new string('a', 4 * 1024 * 1024)));
+        GuideImportValidator validator = new();
+        PostCountingContext context = new();
+        SynchronizationContext? previous = SynchronizationContext.Current;
+        Task<ImportInspection> inspecting;
+        SynchronizationContext.SetSynchronizationContext(context);
+        try
+        {
+            inspecting = validator.InspectAsync(path, CancellationToken.None);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+
+        Assert.False(inspecting.IsCompleted);
+        Assert.IsType<ImportReady>(await inspecting);
+        Assert.Equal(0, context.Posts);
+    }
+
+    private sealed class PostCountingContext : SynchronizationContext
+    {
+        private int posts;
+
+        public int Posts => Volatile.Read(ref posts);
+
+        public override void Post(SendOrPostCallback callback, object? state)
+        {
+            Interlocked.Increment(ref posts);
+            base.Post(callback, state);
+        }
+    }
+
     [Theory]
     [InlineData("WALKTHRU.TXT")]
     [InlineData("Walkthru.Txt")]

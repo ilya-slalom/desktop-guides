@@ -1536,8 +1536,15 @@ try {
 
         function Choose-PickerFile([string] $relativePath) {
             $picker = Wait-FilePicker
-            [DesktopGuidesForegroundProbe]::SetText(
-                (Find-InPicker $picker '1148' 'Edit'), (Join-Path $fixtureRoot $relativePath))
+            $path = Join-Path $fixtureRoot $relativePath
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+                # The dialog answers a missing path with its own message box,
+                # which would block cleanup, so close it before failing.
+                Send-PickerCommand $picker 2
+                Wait-PickerClosed $picker
+                throw "The fixture '$relativePath' does not exist."
+            }
+            [DesktopGuidesForegroundProbe]::SetText((Find-InPicker $picker '1148' 'Edit'), $path)
             Send-PickerCommand $picker 1
             Wait-PickerClosed $picker
         }

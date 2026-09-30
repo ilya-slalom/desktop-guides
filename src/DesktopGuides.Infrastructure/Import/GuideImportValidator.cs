@@ -1,6 +1,7 @@
 using System.Text;
 using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Paths;
 using DesktopGuides.Core.Text;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Exceptions;
@@ -52,11 +53,13 @@ public sealed class GuideImportValidator : IGuideImportValidator
             file.FullName, name, file.Length,
             new DateTimeOffset(file.LastWriteTimeUtc, TimeSpan.Zero));
         string title = GuideTitle.Suggest(name);
+        // Callers include the UI thread, and cached reads can complete
+        // synchronously, so the work runs on the thread pool.
         return format switch
         {
-            GuideFormat.Txt => await InspectTxtAsync(source, title, token),
-            GuideFormat.Html => await InspectHtmlAsync(source, title, token),
-            _ => await InspectPdfAsync(source, title, token),
+            GuideFormat.Txt => await Task.Run(() => InspectTxtAsync(source, title, token), token).ConfigureAwait(false),
+            GuideFormat.Html => await Task.Run(() => InspectHtmlAsync(source, title, token), token).ConfigureAwait(false),
+            _ => await InspectPdfAsync(source, title, token).ConfigureAwait(false),
         };
     }
 
@@ -81,10 +84,13 @@ public sealed class GuideImportValidator : IGuideImportValidator
             throw new GuideImportException(ImportIssue.Changed,
                 $"{source.FileName} changed after it was checked. Choose it again.");
         }
-        byte[] bytes = await ReadAllAsync(source, token);
-        // Both code pages decode every byte, so this can't ask for another encoding.
-        TextGuideDocument.Decode(bytes, codePage);
-        return new TxtImportManifest(source, inspection.SuggestedTitle, codePage);
+        return await Task.Run(async () =>
+        {
+            byte[] bytes = await ReadAllAsync(source, token);
+            // Both code pages decode every byte, so this can't ask for another encoding.
+            TextGuideDocument.Decode(bytes, codePage);
+            return new TxtImportManifest(source, inspection.SuggestedTitle, codePage);
+        }, token).ConfigureAwait(false);
     }
 
     private async Task<ImportInspection> InspectTxtAsync(
@@ -116,6 +122,13 @@ public sealed class GuideImportValidator : IGuideImportValidator
         using (OpenSource(source.FullPath, source.FileName))
         {
         }
+        // The scanner renames an entry with '%' to guide.html; any other entry
+        // name must already be a safe managed path.
+        if (!source.FileName.Contains('%') && !IsSafeEntryName(source.FileName))
+        {
+            throw new GuideImportException(ImportIssue.Unreadable,
+                $"{source.FileName} can't be used as a guide file name. Rename it and import again.");
+        }
         StaticHtmlImportPreview preview;
         try
         {
@@ -133,6 +146,11 @@ public sealed class GuideImportValidator : IGuideImportValidator
         {
             throw new GuideImportException(ImportIssue.Unreadable,
                 "The guide's folder has files whose names differ only by case.");
+        }
+        catch (InvalidDataException)
+        {
+            // With the entry name checked, only a style sheet's encoding is left.
+            throw new GuideImportException(ImportIssue.Unreadable, "One of the guide's style sheets can't be read.");
         }
         catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
         {
@@ -244,6 +262,19 @@ public sealed class GuideImportValidator : IGuideImportValidator
         public override void SetLength(long value) => throw new NotSupportedException();
 
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    private static bool IsSafeEntryName(string name)
+    {
+        try
+        {
+            ManagedRelativePath.Parse(name);
+            return true;
+        }
+        catch (InvalidDataException)
+        {
+            return false;
+        }
     }
 
     private static bool StartsLikePdf(Stream stream)

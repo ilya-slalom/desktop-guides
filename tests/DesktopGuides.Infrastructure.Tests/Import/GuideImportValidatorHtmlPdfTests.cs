@@ -185,6 +185,32 @@ public sealed class GuideImportValidatorHtmlPdfTests
     }
 
     [Fact]
+    public async Task HtmlNameEndingInASpaceBeforeTheExtensionIsExplained()
+    {
+        using ImportTestDirectory files = new();
+        string entry = files.Write("Sonic .html", "<p>Route</p>");
+
+        GuideImportException error = await Rejected(entry);
+
+        Assert.Equal(ImportIssue.Unreadable, error.Issue);
+        Assert.Equal("Sonic .html can't be used as a guide file name. Rename it and import again.", error.Message);
+    }
+
+    [Fact]
+    public async Task UndecodableStyleSheetIsExplained()
+    {
+        using ImportTestDirectory files = new();
+        string entry = files.Write("guide.html", "<link rel=\"stylesheet\" href=\"main.css\"><p>Route</p>");
+        // Declares UTF-8 but holds a Windows-1252 "©" (0xA9).
+        files.Write("main.css", [.. "@charset \"utf-8\"; /* "u8, 0xA9, .. " */ p { }"u8]);
+
+        GuideImportException error = await Rejected(entry);
+
+        Assert.Equal(ImportIssue.Unreadable, error.Issue);
+        Assert.Equal("One of the guide's style sheets can't be read.", error.Message);
+    }
+
+    [Fact]
     public async Task ExclusivelyLockedHtmlIsUnreadable()
     {
         if (!OperatingSystem.IsWindows()) return;

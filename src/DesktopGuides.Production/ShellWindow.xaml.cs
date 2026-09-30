@@ -741,7 +741,7 @@ public sealed partial class ShellWindow : Window
                 {
                     path = await PickGuideFileAsync();
                 }
-                catch (COMException)
+                catch (Exception)
                 {
                     ShowWarningStatus(ImportGuideDialog.PickerFailedMessage);
                     return;

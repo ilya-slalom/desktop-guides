@@ -8,6 +8,14 @@
     CloseButtonText="Close"
     DefaultButton="None"
     AutomationProperties.AutomationId="ImportGuideDialog">
+    <ContentDialog.Resources>
+        <!-- Group headers match the native File details heading. -->
+        <DataTemplate x:Key="ImportGroupHeaderTemplate">
+            <TextBlock Text="{Binding}"
+                       Margin="0,0,0,8"
+                       Style="{StaticResource DesktopGuidesDialogHeadingStyle}" />
+        </DataTemplate>
+    </ContentDialog.Resources>
     <ScrollViewer MaxHeight="520"
                   VerticalScrollBarVisibility="Auto">
         <StackPanel Width="480"
@@ -174,14 +182,16 @@
                                        AutomationProperties.Name="File details"
                                        AutomationProperties.AutomationId="ImportDetailsGroup">
                     <toolkit:HeaderedContentControl x:Name="ImportDetailsHeadered"
-                                                    Header="File details" />
+                                                    Header="File details"
+                                                    HeaderTemplate="{StaticResource ImportGroupHeaderTemplate}" />
                 </local:AutomationGroup>
 
                 <local:AutomationGroup x:Name="ImportWarningsGroup"
                                        Visibility="Collapsed"
                                        AutomationProperties.Name="Warnings"
                                        AutomationProperties.AutomationId="ImportWarningsGroup">
-                    <toolkit:HeaderedContentControl Header="Warnings">
+                    <toolkit:HeaderedContentControl Header="Warnings"
+                                                    HeaderTemplate="{StaticResource ImportGroupHeaderTemplate}">
                         <StackPanel x:Name="ImportWarningList"
                                     Spacing="{StaticResource DesktopGuidesSpacing4}" />
                     </toolkit:HeaderedContentControl>
