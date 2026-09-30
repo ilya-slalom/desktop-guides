@@ -311,4 +311,24 @@ public sealed class GuideImportValidatorTests
         var after = fixtures.Select(f => FileFingerprint.Of(P0Fixtures.Resolve(f))).ToArray();
         Assert.Equal(before.SelectMany(x => x), after.SelectMany(x => x));
     }
+
+    [Fact]
+    public async Task Utf8TextManifestCarriesTheFileHash()
+    {
+        ImportReady ready = Assert.IsType<ImportReady>(await Inspect(P0Fixtures.Resolve("txt-utf8.txt")));
+
+        Assert.Equal("e21e7137eca4d996fced2143d7111220ea5051dc40708103cc6b7c490354b779", ready.Manifest.Fingerprint);
+    }
+
+    [Fact]
+    public async Task ResolvedTextManifestCarriesTheFileHash()
+    {
+        GuideImportValidator validator = new();
+        ImportNeedsTxtEncoding needs = Assert.IsType<ImportNeedsTxtEncoding>(
+            await validator.InspectAsync(P0Fixtures.Resolve("txt-legacy.txt"), CancellationToken.None));
+
+        TxtImportManifest manifest = await validator.ResolveTxtEncodingAsync(needs, 437, CancellationToken.None);
+
+        Assert.Equal("f105c9c5952018b15edc617ecced30a4e2bccd3e8fa252ce7792f1a1ac723d26", manifest.Fingerprint);
+    }
 }

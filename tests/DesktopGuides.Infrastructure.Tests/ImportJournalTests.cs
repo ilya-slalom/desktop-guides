@@ -128,9 +128,76 @@ public sealed class ImportJournalTests : IAsyncLifetime
         Assert.Equal("Renamed", (await repository.GetGameAsync(game.Id))!.Title);
     }
 
+    private static readonly string Hash = new('b', 64);
+
+    [Fact]
+    public async Task FingerprintLookupFindsTheGuideInTheSameGame()
+    {
+        Guid id = await PublishGuide(game.Id, GuideFormat.Txt, Hash);
+
+        Guide? found = await repository.FindGuideByFingerprintAsync(game.Id, GuideFormat.Txt, Hash);
+
+        Assert.Equal(id, found?.Id);
+    }
+
+    [Fact]
+    public async Task FingerprintLookupIgnoresOtherGamesFormatsAndHashes()
+    {
+        Game other = await repository.AddGameAsync("Other Game", null, null);
+        await PublishGuide(other.Id, GuideFormat.Txt, Hash);
+        await PublishGuide(game.Id, GuideFormat.Pdf, Hash);
+        await PublishGuide(game.Id, GuideFormat.Txt, new string('c', 64));
+
+        Assert.Null(await repository.FindGuideByFingerprintAsync(game.Id, GuideFormat.Txt, Hash));
+    }
+
+    [Fact]
+    public async Task FingerprintLookupReturnsTheOldestMatch()
+    {
+        await PublishGuide(game.Id, GuideFormat.Txt, Hash);
+        Guid older = await PublishGuide(game.Id, GuideFormat.Txt, Hash);
+        Scalar($"UPDATE Guides SET ImportedUtcMs = 1 WHERE Id = '{older:N}'");
+
+        Guide? found = await repository.FindGuideByFingerprintAsync(game.Id, GuideFormat.Txt, Hash);
+
+        Assert.Equal(older, found?.Id);
+    }
+
+    [Fact]
+    public async Task JournalLookupUsesTheSameMatch()
+    {
+        Guid id = await PublishGuide(game.Id, GuideFormat.Txt, Hash);
+        Guid? found = null;
+        Guid? otherFormat = Guid.Empty;
+
+        await Run(journal =>
+        {
+            found = journal.FindGuide(game.Id, GuideFormat.Txt, Hash);
+            otherFormat = journal.FindGuide(game.Id, GuideFormat.Pdf, Hash);
+        });
+
+        Assert.Equal(id, found);
+        Assert.Null(otherFormat);
+    }
+
     private NewImportedGuide Guide() => new(
         operationId, guideId, game.Id, "Imported", GuideFormat.Txt, "guide.txt",
         new string('a', 64), 20, "notes.txt", 437);
+
+    private async Task<Guid> PublishGuide(Guid gameId, GuideFormat format, string sha)
+    {
+        Guid operation = Guid.NewGuid();
+        Guid id = Guid.NewGuid();
+        string primary = format == GuideFormat.Pdf ? "guide.pdf" : "guide.txt";
+        await Run(journal =>
+        {
+            journal.Prepare(operation, id);
+            journal.Publish(
+                new NewImportedGuide(operation, id, gameId, "Imported", format, primary, sha, 20, "notes", null),
+                () => { });
+        });
+        return id;
+    }
 
     private Task Run(Action<IImportJournal> work) =>
         repository.RunImportAsync<bool>((journal, _) =>

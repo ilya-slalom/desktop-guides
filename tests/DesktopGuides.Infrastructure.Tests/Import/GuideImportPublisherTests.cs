@@ -127,6 +127,102 @@ public sealed class GuideImportPublisherTests
         harness.AssertNothingLeft();
     }
 
+    private const string DuplicateMessage = "This file is already a guide for this game.";
+
+    [Fact]
+    public async Task SecondImportOfTheSameFileIsDuplicate()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        string source = harness.Sources.Copy("txt-utf8.txt", "notes.txt");
+        ImportManifest manifest = await harness.InspectAsync(source);
+        await harness.PublishAsync(harness.Publisher(), manifest);
+
+        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(
+            () => harness.PublishAsync(harness.Publisher(), manifest));
+
+        Assert.Equal((ImportIssue.Duplicate, DuplicateMessage), (error.Issue, error.Message));
+        Assert.Equal(1, harness.Count("Guides"));
+        Assert.Equal(0, harness.Count("FileOperations"));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(harness.Paths.StagingRoot));
+        Assert.Single(Directory.EnumerateFileSystemEntries(harness.Paths.ContentRoot));
+    }
+
+    [Fact]
+    public async Task DuplicateCheckIgnoresTheEncodingChoice()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        string source = harness.Sources.Copy("txt-legacy.txt", "legacy.txt");
+        await harness.PublishAsync(harness.Publisher(), await harness.InspectAsync(source, 437));
+        ImportManifest other = await harness.InspectAsync(source, 1252);
+
+        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(
+            () => harness.PublishAsync(harness.Publisher(), other));
+
+        Assert.Equal(ImportIssue.Duplicate, error.Issue);
+    }
+
+    [Fact]
+    public async Task AllowDuplicatePublishesAnIndependentCopy()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        string source = harness.Sources.Copy("txt-utf8.txt", "notes.txt");
+        ImportManifest manifest = await harness.InspectAsync(source);
+        Guid first = await harness.PublishAsync(harness.Publisher(), manifest);
+        await harness.Repository.SaveReadingLocationAsync(first, "{\"one\":1}", 0.25);
+        string firstFile = harness.Paths.ResolveExistingGuideFile(first, "guide.txt");
+        byte[] firstBytes = File.ReadAllBytes(firstFile);
+
+        Guid copy = await harness.PublishAsync(harness.Publisher(), manifest, allowDuplicate: true);
+
+        Assert.NotEqual(first, copy);
+        Assert.Equal(2, harness.Count("Guides"));
+        Assert.Equal(2, Directory.EnumerateDirectories(harness.Paths.ContentRoot).Count());
+        Assert.Equal(manifest.Fingerprint, (await harness.Repository.GetGuideAsync(copy))!.ContentSha256);
+        Assert.Null((await harness.Repository.GetReadingStateAsync(copy))!.LocatorJson);
+        Assert.Equal("{\"one\":1}", (await harness.Repository.GetReadingStateAsync(first))!.LocatorJson);
+        Assert.Equal(firstBytes, File.ReadAllBytes(firstFile));
+    }
+
+    [Fact]
+    public async Task SameFileInAnotherGameIsNotADuplicate()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        string source = harness.Sources.Copy("txt-utf8.txt", "notes.txt");
+        ImportManifest manifest = await harness.InspectAsync(source);
+        await harness.PublishAsync(harness.Publisher(), manifest);
+        Game other = await harness.Repository.AddGameAsync("Other Game", "PC", null);
+
+        Guid id = await harness.Publisher().PublishAsync(
+            manifest, other.Id, "Imported Guide", false, null, CancellationToken.None);
+
+        Assert.Equal(other.Id, (await harness.Repository.GetGuideAsync(id))!.GameId);
+    }
+
+    [Theory]
+    [InlineData("txt-utf8.txt", "notes.txt")]
+    [InlineData("pdf-short.pdf", "short.pdf")]
+    public async Task SameLengthRewriteBeforeCopyIsChanged(string fixture, string name)
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        string source = harness.Sources.Copy(fixture, name);
+        ImportManifest manifest = await harness.InspectAsync(source);
+        GuideImportPublisher publisher = harness.Publisher(checkpoint: point =>
+        {
+            if (point != ImportCheckpoint.Prepared) return;
+            // Same length and same write time: only the bytes tell the change.
+            byte[] bytes = File.ReadAllBytes(source);
+            bytes[^1] ^= 0x01;
+            File.WriteAllBytes(source, bytes);
+            File.SetLastWriteTimeUtc(source, manifest.Source.LastWriteUtc.UtcDateTime);
+        });
+
+        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(
+            () => harness.PublishAsync(publisher, manifest));
+
+        Assert.Equal(ImportIssue.Changed, error.Issue);
+        harness.AssertNothingLeft();
+    }
+
     [Fact]
     public async Task LockedSourceIsUnreadable()
     {
@@ -334,7 +430,7 @@ public sealed class GuideImportPublisherTests
             paused.Set();
             resume.Wait();
         });
-        Task<Guid> import = harness.PublishAsync(publisher, manifest);
+        Task<Guid> import = harness.PublishAsync(publisher, manifest, allowDuplicate: true);
         Assert.True(paused.Wait(TimeSpan.FromSeconds(10)));
 
         Task save = harness.Repository.SaveReadingLocationAsync(earlier, "{\"one\":1}", 0.25);

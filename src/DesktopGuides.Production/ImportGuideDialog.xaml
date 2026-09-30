@@ -61,6 +61,19 @@
                         Visibility="Collapsed"
                         Spacing="{StaticResource DesktopGuidesSpacing12}"
                         AutomationProperties.AutomationId="ImportPreview">
+                <InfoBar x:Name="ImportDuplicate"
+                         Style="{StaticResource DesktopGuidesStatusInfoBarStyle}"
+                         Severity="Informational"
+                         IsOpen="False"
+                         IsClosable="False"
+                         AutomationProperties.AutomationId="ImportDuplicate">
+                    <InfoBar.ActionButton>
+                        <Button x:Name="ImportOpenExisting"
+                                Content="Open existing"
+                                Click="OpenExistingClicked"
+                                AutomationProperties.AutomationId="ImportOpenExisting" />
+                    </InfoBar.ActionButton>
+                </InfoBar>
                 <StackPanel Spacing="{StaticResource DesktopGuidesSpacing4}">
                     <TextBox x:Name="GuideTitleInput"
                              Header="Title"

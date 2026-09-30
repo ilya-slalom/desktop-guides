@@ -13,13 +13,15 @@ internal enum ImportCheckpoint { Prepared, Copied, Verified, Renamed, InCommit }
 /// <summary>
 /// Copies a previewed guide into managed storage and publishes it. The whole
 /// import holds the library write gate; any failure before the commit rolls
-/// back, and a crash is rolled back by the startup reconciler.
+/// back, and a crash is rolled back by the startup reconciler. A duplicate of
+/// a guide in the same game is refused unless the caller allows it.
 /// </summary>
 public sealed class GuideImportPublisher
 {
     private const string MissingMessage = "The file is no longer there. Choose it again.";
     private const string ChangedMessage =
         "The file changed after it was checked. Choose it again to see the new version.";
+    private const string DuplicateMessage = "This file is already a guide for this game.";
     private const string NoSpaceMessage = "There isn't enough free space to import this guide.";
     private const string SaveFailedMessage =
         "The guide couldn't be saved to your library. Nothing was changed.";
@@ -58,24 +60,31 @@ public sealed class GuideImportPublisher
 
     /// <summary>
     /// Returns the new guide's ID. Throws <see cref="GuideImportException"/>,
-    /// or <see cref="OperationCanceledException"/> before publication starts.
+    /// with <see cref="ImportIssue.Duplicate"/> when the game already has this
+    /// content and <paramref name="allowDuplicate"/> is false, or
+    /// <see cref="OperationCanceledException"/> before publication starts.
     /// </summary>
     public Task<Guid> PublishAsync(
-        ImportManifest manifest, Guid gameId, string title,
+        ImportManifest manifest, Guid gameId, string title, bool allowDuplicate,
         IProgress<ImportProgress>? progress, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(manifest);
         string validTitle = GuideTitle.Create(title);
         return repository.RunImportAsync(
-            (journal, gateToken) => PublishLockedAsync(journal, manifest, gameId, validTitle, progress, gateToken),
+            (journal, gateToken) => PublishLockedAsync(
+                journal, manifest, gameId, validTitle, allowDuplicate, progress, gateToken),
             token);
     }
 
     private async Task<Guid> PublishLockedAsync(
-        IImportJournal journal, ImportManifest manifest, Guid gameId, string title,
+        IImportJournal journal, ImportManifest manifest, Guid gameId, string title, bool allowDuplicate,
         IProgress<ImportProgress>? progress, CancellationToken token)
     {
         CheckSource(manifest.Source);
+        if (!allowDuplicate)
+        {
+            CheckNotDuplicate(journal, manifest, gameId);
+        }
         ImportPlan plan = await PlanAsync(manifest, token);
         token.ThrowIfCancellationRequested();
         Guid operationId = newId();
@@ -93,6 +102,11 @@ public sealed class GuideImportPublisher
             Pass(ImportCheckpoint.Prepared, token);
             string staged = paths.GetStagedGuideRoot(operationId, guideId);
             string fingerprint = await CopyAsync(plan, manifest.Source, guideId, staged, progress, token);
+            // Size and write time can survive an in-place rewrite; the bytes can't.
+            if (!string.Equals(fingerprint, manifest.Fingerprint, StringComparison.Ordinal))
+            {
+                throw Changed();
+            }
             Pass(ImportCheckpoint.Copied, token);
             CheckSource(manifest.Source);
             await VerifyAsync(manifest, plan, staged, token);
@@ -133,6 +147,23 @@ public sealed class GuideImportPublisher
     {
         checkpoint(point);
         token.ThrowIfCancellationRequested();
+    }
+
+    private static void CheckNotDuplicate(IImportJournal journal, ImportManifest manifest, Guid gameId)
+    {
+        Guid? existing;
+        try
+        {
+            existing = journal.FindGuide(gameId, manifest.Format, manifest.Fingerprint);
+        }
+        catch (SqliteException)
+        {
+            throw new GuideImportException(ImportIssue.SaveFailed, SaveFailedMessage);
+        }
+        if (existing is not null)
+        {
+            throw new GuideImportException(ImportIssue.Duplicate, DuplicateMessage);
+        }
     }
 
     private sealed record PlannedFile(string RelativePath, long ByteCount, string? Sha256);
@@ -303,7 +334,7 @@ public sealed class GuideImportPublisher
     private static void VerifyPdf(string path, PdfImportManifest pdf, CancellationToken token)
     {
         using FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        ImportInspection staged = GuideImportValidator.ReadPdf(stream, pdf.Source, pdf.SuggestedTitle, token);
+        ImportInspection staged = GuideImportValidator.ReadPdf(stream, pdf.Source, pdf.SuggestedTitle, pdf.Fingerprint, token);
         if (staged is not ImportReady { Manifest: PdfImportManifest copy } || copy.PageCount != pdf.PageCount)
         {
             throw GuideImportValidator.NotPdf();

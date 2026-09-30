@@ -349,7 +349,7 @@ public sealed class GuideImportValidatorHtmlPdfTests
         ImportSource source = new(path, "pdf-short.pdf", stream.Length, DateTimeOffset.UnixEpoch);
 
         Assert.ThrowsAny<OperationCanceledException>(() =>
-            GuideImportValidator.ReadPdf(stream, source, "pdf-short", cancel.Token));
+            GuideImportValidator.ReadPdf(stream, source, "pdf-short", "", cancel.Token));
         Assert.Equal(0, stream.ReadsAfterCancel);
     }
 
@@ -410,5 +410,31 @@ public sealed class GuideImportValidatorHtmlPdfTests
         }
 
         Assert.Equal(before, sources.SelectMany(s => FileFingerprint.Of(P0Fixtures.Resolve(s))).ToArray());
+    }
+
+    [Fact]
+    public async Task PdfManifestCarriesTheFileHash()
+    {
+        PdfImportManifest pdf = await Manifest<PdfImportManifest>(P0Fixtures.Resolve("pdf-short.pdf"));
+
+        Assert.Equal("b67dd6f52454ead4b99571b5a66e8be6a63c3a34a522db5b4670d57cc0f0006f", pdf.Fingerprint);
+    }
+
+    [Fact]
+    public async Task TypedIssuesStayDistinct()
+    {
+        using ImportTestDirectory files = new();
+        GuideImportException[] errors =
+        [
+            await Rejected(Path.Combine(files.Root, "gone.txt")),
+            await Rejected(files.Write("notes.doc", "text")),
+            await Rejected(P0Fixtures.Resolve("pdf-locked.pdf")),
+            await Rejected(files.Copy("txt-ascii.txt", "notes.pdf")),
+        ];
+
+        Assert.Equal(
+            [ImportIssue.Missing, ImportIssue.Unsupported, ImportIssue.Encrypted, ImportIssue.Unreadable],
+            errors.Select(error => error.Issue));
+        Assert.Equal(errors.Length, errors.Select(error => error.Message).Distinct().Count());
     }
 }

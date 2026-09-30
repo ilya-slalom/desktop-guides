@@ -12,9 +12,14 @@ public sealed partial class ImportGuideDialog : ContentDialog
     private const string FailedMessage = "This file couldn't be checked. Choose another file.";
     internal const string PickerFailedMessage = "The file picker couldn't open. Try again.";
     private const string ImportFailedMessage = "The guide couldn't be imported. Try again.";
+    private const string ImportLabel = "Import";
+    private const string ImportCopyLabel = "Import another copy";
+    private readonly string gameTitle;
     private readonly IGuideImportValidator validator;
     private readonly Func<Task<string?>> pickFile;
-    private readonly Func<ImportManifest, string, IProgress<ImportProgress>, CancellationToken, Task<Guid>> import;
+    private readonly Func<ImportManifest, CancellationToken, Task<Guide?>> findDuplicate;
+    private readonly Func<ImportManifest, string, bool, IProgress<ImportProgress>, CancellationToken, Task<Guid>> import;
+    private Guide? duplicate;
     private ImportManifest? manifest;
     private string? firstPath;
     private CancellationTokenSource? check;
@@ -28,12 +33,15 @@ public sealed partial class ImportGuideDialog : ContentDialog
 
     internal ImportGuideDialog(
         string gameTitle, string path, IGuideImportValidator validator, Func<Task<string?>> pickFile,
-        Func<ImportManifest, string, IProgress<ImportProgress>, CancellationToken, Task<Guid>> import)
+        Func<ImportManifest, CancellationToken, Task<Guide?>> findDuplicate,
+        Func<ImportManifest, string, bool, IProgress<ImportProgress>, CancellationToken, Task<Guid>> import)
     {
         InitializeComponent();
         Title = $"Import guide for {gameTitle}";
+        this.gameTitle = gameTitle;
         this.validator = validator;
         this.pickFile = pickFile;
+        this.findDuplicate = findDuplicate;
         this.import = import;
         firstPath = path;
         Opened += DialogOpened;
@@ -55,6 +63,9 @@ public sealed partial class ImportGuideDialog : ContentDialog
 
     /// <summary>The published guide. Hide() makes ShowAsync return None, so the shell checks this.</summary>
     internal Guid? ImportedGuideId { get; private set; }
+
+    /// <summary>The existing guide chosen with Open existing. Never set together with ImportedGuideId.</summary>
+    internal Guid? OpenGuideId { get; private set; }
 
     private void DialogOpened(ContentDialog sender, ContentDialogOpenedEventArgs args)
     {
@@ -87,6 +98,16 @@ public sealed partial class ImportGuideDialog : ContentDialog
 
     private void CancelClicked(object sender, RoutedEventArgs args) => check?.Cancel();
 
+    private void OpenExistingClicked(object sender, RoutedEventArgs args)
+    {
+        if (importing || closing || duplicate is not { } existing)
+        {
+            return;
+        }
+        OpenGuideId = existing.Id;
+        Hide();
+    }
+
     private void ChooseAnotherClicked(ContentDialog sender, ContentDialogButtonClickEventArgs args)
     {
         args.Cancel = true;
@@ -101,17 +122,17 @@ public sealed partial class ImportGuideDialog : ContentDialog
         {
             return;
         }
-        Track(ImportAsync(ready, title));
+        Track(ImportAsync(ready, title, allowDuplicate: duplicate is not null));
     }
 
-    private async Task ImportAsync(ImportManifest ready, string title)
+    private async Task ImportAsync(ImportManifest ready, string title, bool allowDuplicate)
     {
         using CancellationTokenSource cancel = new();
         check = cancel;
         ShowImporting(ready.Source.FileName);
         try
         {
-            ImportedGuideId = await import(ready, title, new Progress<ImportProgress>(ShowImportProgress), cancel.Token);
+            ImportedGuideId = await import(ready, title, allowDuplicate, new Progress<ImportProgress>(ShowImportProgress), cancel.Token);
             if (!closing)
             {
                 Hide();
@@ -152,6 +173,7 @@ public sealed partial class ImportGuideDialog : ContentDialog
     {
         importing = true;
         ImportStatus.IsOpen = false;
+        ImportDuplicate.IsOpen = false;
         GuideTitleInput.IsEnabled = false;
         EncodingOptions.IsEnabled = false;
         IsSecondaryButtonEnabled = false;
@@ -173,6 +195,7 @@ public sealed partial class ImportGuideDialog : ContentDialog
         ImportCancel.IsEnabled = true;
         GuideTitleInput.IsEnabled = true;
         EncodingOptions.IsEnabled = true;
+        ImportDuplicate.IsOpen = duplicate is not null;
         IsSecondaryButtonEnabled = !picking;
         UpdateImportButton();
     }
@@ -239,6 +262,7 @@ public sealed partial class ImportGuideDialog : ContentDialog
         string name = Path.GetFileName(path);
         Manifest = null;
         needsEncoding = null;
+        ShowDuplicate(null);
         ImportPreview.Visibility = Visibility.Collapsed;
         Track(RunAsync($"Checking {name}…", async (current, token) =>
         {
@@ -250,8 +274,14 @@ public sealed partial class ImportGuideDialog : ContentDialog
             switch (inspection)
             {
                 case ImportReady ready:
+                    Guide? existing = await findDuplicate(ready.Manifest, token);
+                    if (current != generation || closing)
+                    {
+                        return;
+                    }
                     ShowPreview(ready.Manifest.Source, ready.Manifest.SuggestedTitle, ready.Manifest.Format);
                     ShowManifest(ready.Manifest);
+                    ShowDuplicate(existing);
                     break;
                 case ImportNeedsTxtEncoding needs:
                     ShowPreview(needs.Source, needs.SuggestedTitle, GuideFormat.Txt);
@@ -270,6 +300,7 @@ public sealed partial class ImportGuideDialog : ContentDialog
         }
         int codePage = EncodingOptions.SelectedIndex == 0 ? 437 : 1252;
         Manifest = null;
+        ShowDuplicate(null);
         ImportEncodingRow.Visibility = Visibility.Collapsed;
         Track(RunAsync($"Checking {needs.Source.FileName}…", async (current, token) =>
         {
@@ -278,7 +309,13 @@ public sealed partial class ImportGuideDialog : ContentDialog
             {
                 return;
             }
+            Guide? existing = await findDuplicate(manifest, token);
+            if (current != generation || closing)
+            {
+                return;
+            }
             ShowManifest(manifest);
+            ShowDuplicate(existing);
         }, keepPreview: true));
     }
 
@@ -356,6 +393,7 @@ public sealed partial class ImportGuideDialog : ContentDialog
     {
         Manifest = null;
         needsEncoding = null;
+        ShowDuplicate(null);
         ImportPreview.Visibility = Visibility.Collapsed;
         ShowMessage(severity, message);
     }
@@ -366,6 +404,19 @@ public sealed partial class ImportGuideDialog : ContentDialog
         ImportStatus.Message = message;
         AutomationProperties.SetName(ImportStatus, message);
         ImportStatus.IsOpen = true;
+    }
+
+    private void ShowDuplicate(Guide? existing)
+    {
+        duplicate = existing;
+        PrimaryButtonText = existing is null ? ImportLabel : ImportCopyLabel;
+        if (existing is not null)
+        {
+            string message = $"This file is already in {gameTitle} as \"{existing.Title}\".";
+            ImportDuplicate.Message = message;
+            AutomationProperties.SetName(ImportDuplicate, message);
+        }
+        ImportDuplicate.IsOpen = existing is not null;
     }
 
     private void ShowPreview(ImportSource source, string title, GuideFormat format)
