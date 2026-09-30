@@ -1493,7 +1493,10 @@ try {
         [void](Wait-HiddenById 'ShellStatus')
         Save-WindowScreenshot 'no-results'
 
-        Invoke-Element (Wait-VisibleById 'LibrarySearchClear')
+        # Press Clear from the keyboard, so focus starts on the button it hides.
+        [void](Wait-VisibleById 'LibrarySearchClear')
+        Focus-And-Verify 'LibrarySearchClear'
+        [System.Windows.Forms.SendKeys]::SendWait(' ')
         [void](Assert-RowFacts 'GameList' $allRows)
         [void](Wait-FocusWithin 'LibrarySearchInput')
         Wait-HiddenById 'LibrarySearchClear'
