@@ -61,8 +61,9 @@ internal sealed class PublisherHarness : IAsyncDisposable
 
     public Task<Guid> PublishAsync(
         GuideImportPublisher publisher, ImportManifest manifest,
-        IProgress<ImportProgress>? progress = null, CancellationToken token = default) =>
-        publisher.PublishAsync(manifest, Game.Id, "Imported Guide", progress, token);
+        IProgress<ImportProgress>? progress = null, CancellationToken token = default,
+        bool allowDuplicate = false) =>
+        publisher.PublishAsync(manifest, Game.Id, "Imported Guide", allowDuplicate, progress, token);
 
     public long Count(string table)
     {
