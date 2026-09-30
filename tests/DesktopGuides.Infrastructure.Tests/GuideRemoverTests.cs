@@ -240,6 +240,38 @@ public sealed class GuideRemoverTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task RemoveAfterAFailedRestoreLeavesTheGuideToStartup()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        FileStream? held = null;
+        try
+        {
+            await Assert.ThrowsAsync<GuideRemovalException>(() => Remover(reached =>
+            {
+                if (reached != RemovalCheckpoint.Moved) return;
+                string trashed = Directory.EnumerateFiles(library.Paths.TrashRoot, "map.png", SearchOption.AllDirectories).Single();
+                held = new FileStream(trashed, FileMode.Open, FileAccess.Read, FileShare.Read);
+                throw new InvalidOperationException("fault");
+            }).RemoveAsync(guideId));
+        }
+        finally
+        {
+            held?.Dispose();
+        }
+
+        GuideRemovalException error = await Assert.ThrowsAsync<GuideRemovalException>(
+            () => Remover().RemoveAsync(guideId));
+
+        Assert.Equal(GuideRemovalIssue.RestoreFailed, error.Issue);
+        Assert.Equal("DeleteGuide|Prepared", library.Scalar("SELECT Kind || '|' || Phase FROM FileOperations"));
+        Assert.Equal("1|1|1", library.RowsFor(guideId));
+
+        await library.RestartAsync();
+
+        AssertGuideIntact();
+    }
+
+    [Fact]
     public async Task AFailedCleanupStillRemovesTheGuide()
     {
         if (!OperatingSystem.IsWindows()) return;

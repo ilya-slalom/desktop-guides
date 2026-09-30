@@ -7,6 +7,9 @@ internal interface IDeletionJournal
 {
     Guide? GetGuide(Guid guideId);
 
+    /// <summary>True when an unfinished file operation already claims the guide.</summary>
+    bool IsPending(Guid guideId);
+
     /// <summary>Commits a Prepared DeleteGuide row owning content/&lt;guide&gt; and .trash/&lt;op&gt;/&lt;guide&gt;.</summary>
     void Prepare(Guid operationId, Guid guideId);
 

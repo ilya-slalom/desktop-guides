@@ -55,6 +55,12 @@ public sealed class GuideRemover
         {
             return new GuideRemovalResult(GuideRemovalOutcome.NotFound, false);
         }
+        if (journal.IsPending(guideId))
+        {
+            // A second deletion would strand the first one's row, and startup
+            // would then refuse to open the library.
+            throw new GuideRemovalException(GuideRemovalIssue.RestoreFailed);
+        }
         string contentPath = paths.GetGuideRoot(guideId);
         OwnedGuideTree content = Capture(contentPath);
         Guid operationId = Guid.NewGuid();

@@ -266,6 +266,9 @@ internal sealed class FileOperationReconciler(ILibraryPaths paths)
         RemoveJournalRow(connection, row.Id);
     }
 
+    public static bool ClaimsGuide(SqliteConnection connection, Guid guideId) =>
+        ReadJournalRows(connection).Any(row => row.Manifest.GuideIds.Contains(guideId));
+
     private static JournalRow ReadDeletion(
         SqliteConnection connection, Guid operationId, FileOperationPhase phase)
     {
