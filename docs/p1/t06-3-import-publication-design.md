@@ -30,8 +30,8 @@ Decisions made during brainstorming:
   while the import dialog is modal; revisit it if imports move to the
   background or T12.2 measures a missed five-second save.
 - **Cancellation** is honoured until the publish transaction starts.
-- **Duplicates** import as a second copy until T06.4 adds the
-  `Open existing` / `Import another copy` choice.
+- **Duplicates** are handled by T06.4; see
+  [t06-4-duplicate-import-design.md](t06-4-duplicate-import-design.md).
 - **No schema change.** `Guides.ContentSha256` is the fingerprint; the
   schema stays at version 3.
 - **Out of scope:** duplicate detection (T06.4), cloud reparse tags

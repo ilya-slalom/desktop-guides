@@ -1,6 +1,6 @@
 # T06.4 duplicate import design
 
-Status: design approved 30 September 2026 on `feat/p1-t06-4-duplicate-import`.
+Status: implemented on `feat/p1-t06-4-duplicate-import`; verified by CI run 36675695341.
 Prerequisite T06.3 was merged through PR #19 on 30 September 2026, merge
 commit `494cb02`.
 
@@ -184,7 +184,8 @@ passing unchanged. Core has no behavior change beyond the moved
 - TXT (UTF-8), TXT after `ResolveTxtEncodingAsync`, and PDF manifests carry
   the SHA-256 of the file's bytes, pinned for the fixtures.
 - The HTML fingerprint is unchanged (`HtmlStaticFingerprint`).
-- Cancelling during the PDF hash stops the inspection.
+- Cancelling during a stream hash stops after the current read
+  (`GuideFingerprint.OfStream`).
 
 **Repository**
 - `FindGuideByFingerprintAsync` finds a match in the same game.
@@ -199,7 +200,7 @@ passing unchanged. Core has no behavior change beyond the moved
 - The same import with `allowDuplicate: true` publishes a second guide. The
   copy has a new ID, its own `ReadingStates` row and its own content
   directory, and the first guide is unchanged.
-- A source rewritten during the copy (at the `Copied` checkpoint) with the
+- A source rewritten during the copy (at the `Prepared` checkpoint, before the copy reads it) with the
   same length and restored last-write time fails with `Changed`, for both TXT
   and PDF. T06.3 missed this case.
 - Existing publisher tests pass `allowDuplicate` and still pass.
@@ -247,3 +248,38 @@ When T06.4 is implemented, update these:
 - **Outcome:** importing a file that's already in the game offers **Open
   existing** or **Import another copy**. The PR includes light and dark
   screenshots of the duplicate preview and of each outcome.
+
+## T06.4 verification record
+
+- **Unit tests.** On `pcsx2-win`, Infrastructure 349/349 and Core 198/198
+  passed. The new tests are:
+  - `GuideFingerprintTests`: the stream hash across buffers and on
+    cancellation;
+  - `GuideImportValidatorTests`: the UTF-8, resolved TXT and PDF manifest
+    fingerprints, and the typed issues staying distinct;
+  - `ImportJournalTests`: the fingerprint lookup's same-game match, the
+    other game, format and hash cases, the oldest match, and the
+    journal's `FindGuide`;
+  - `GuideImportPublisherTests`: `Duplicate`, the ignored encoding,
+    `allowDuplicate`, another game, and the same-length rewrite for TXT
+    and PDF.
+- **Installed.** CI run [36675695341](https://github.com/ilya-slalom/desktop-guides/actions/runs/36675695341)
+  passed `production-shell-ui`. In the import group:
+  - the light `import-publish` run imported `txt-legacy`;
+  - the dark `import-duplicate-copy` run showed the duplicate InfoBar
+    naming that guide and imported a copy through **Import another copy**;
+  - the light `import-duplicate-open` run opened the first guide through
+    **Open existing**.
+
+  The final state was 2 guides, 0 file operations, 0 staging entries, 2
+  content directories and 2 CP437 guides.
+- **Rulings.** The 11 rulings in the [plan](t06-4-duplicate-import-plan.md#rulings-against-the-spec),
+  plus one made during implementation: the cancellation test's stream
+  overrides only `Read(byte[], int, int)`, because a derived `MemoryStream`
+  routes its span `Read` through that overload and overriding both
+  recursed.
+- **Evidence.**
+  - [Duplicate preview, light](evidence/t06-4-duplicate-import/duplicate-light.png)
+  - [Duplicate preview, dark](evidence/t06-4-duplicate-import/duplicate-dark.png)
+  - [Copy imported, dark](evidence/t06-4-duplicate-import/copied-dark.png)
+  - [Open existing, light](evidence/t06-4-duplicate-import/open-existing-light.png)

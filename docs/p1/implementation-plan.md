@@ -637,6 +637,15 @@ They were implemented and verified on 30 September 2026. CI run [36669062806](ht
 `core-tests`, both package builds and the installed `import-publish`
 scenario in light and dark. Duplicate handling remains T06.4.
 
+T06.4 is implemented on `feat/p1-t06-4-duplicate-import`; see the
+[design and verification record](t06-4-duplicate-import-design.md). The
+preview fingerprints every format and looks up the same game, format and
+hash. A match offers **Open existing** or **Import another copy**. The
+publisher refuses a duplicate unless the caller allows it, and it fails
+with `Changed` when the copied bytes differ from the preview. CI run
+36675695341 passed the installed import group: light publish, a dark copy
+and a light Open existing.
+
 ### UI design-language and Gallery adoption sequence
 
 The WinUI Gallery is a reference catalog, not a package or shell dependency.
