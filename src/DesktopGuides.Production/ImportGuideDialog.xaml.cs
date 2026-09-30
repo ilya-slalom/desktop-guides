@@ -11,8 +11,11 @@ public sealed partial class ImportGuideDialog : ContentDialog
     private const string StoppedMessage = "Checking stopped. Choose another file to try again.";
     private const string FailedMessage = "This file couldn't be checked. Choose another file.";
     internal const string PickerFailedMessage = "The file picker couldn't open. Try again.";
+    private const string ImportFailedMessage = "The guide couldn't be imported. Try again.";
     private readonly IGuideImportValidator validator;
     private readonly Func<Task<string?>> pickFile;
+    private readonly Func<ImportManifest, string, IProgress<ImportProgress>, CancellationToken, Task<Guid>> import;
+    private ImportManifest? manifest;
     private string? firstPath;
     private CancellationTokenSource? check;
     private Task running = Task.CompletedTask;
@@ -21,22 +24,37 @@ public sealed partial class ImportGuideDialog : ContentDialog
     private bool closing;
     private bool picking;
     private bool settingEncoding;
+    private bool importing;
 
     internal ImportGuideDialog(
-        string gameTitle, string path, IGuideImportValidator validator, Func<Task<string?>> pickFile)
+        string gameTitle, string path, IGuideImportValidator validator, Func<Task<string?>> pickFile,
+        Func<ImportManifest, string, IProgress<ImportProgress>, CancellationToken, Task<Guid>> import)
     {
         InitializeComponent();
         Title = $"Import guide for {gameTitle}";
         this.validator = validator;
         this.pickFile = pickFile;
+        this.import = import;
         firstPath = path;
         Opened += DialogOpened;
         Closing += DialogClosing;
+        PrimaryButtonClick += ImportClicked;
         SecondaryButtonClick += ChooseAnotherClicked;
     }
 
-    /// <summary>The checked file, once the preview is complete. T06.3 imports it.</summary>
-    internal ImportManifest? Manifest { get; private set; }
+    /// <summary>The checked file, once the preview is complete.</summary>
+    internal ImportManifest? Manifest
+    {
+        get => manifest;
+        private set
+        {
+            manifest = value;
+            UpdateImportButton();
+        }
+    }
+
+    /// <summary>The published guide. Hide() makes ShowAsync return None, so the shell checks this.</summary>
+    internal Guid? ImportedGuideId { get; private set; }
 
     private void DialogOpened(ContentDialog sender, ContentDialogOpenedEventArgs args)
     {
@@ -75,9 +93,112 @@ public sealed partial class ImportGuideDialog : ContentDialog
         _ = ChooseAnotherAsync();
     }
 
+    private void ImportClicked(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+    {
+        args.Cancel = true;
+        if (importing || closing || Manifest is not { } ready ||
+            !GuideTitle.TryCreate(GuideTitleInput.Text, out string title))
+        {
+            return;
+        }
+        Track(ImportAsync(ready, title));
+    }
+
+    private async Task ImportAsync(ImportManifest ready, string title)
+    {
+        using CancellationTokenSource cancel = new();
+        check = cancel;
+        ShowImporting(ready.Source.FileName);
+        try
+        {
+            ImportedGuideId = await import(ready, title, new Progress<ImportProgress>(ShowImportProgress), cancel.Token);
+            if (!closing)
+            {
+                Hide();
+            }
+        }
+        catch (OperationCanceledException) when (cancel.IsCancellationRequested)
+        {
+            // Back to the preview, with the title and encoding unchanged.
+        }
+        catch (GuideImportException error)
+        {
+            if (!closing)
+            {
+                ShowMessage(InfoBarSeverity.Error, error.Message);
+            }
+        }
+        catch (Exception)
+        {
+            if (!closing)
+            {
+                ShowMessage(InfoBarSeverity.Error, ImportFailedMessage);
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(check, cancel))
+            {
+                check = null;
+            }
+            if (!closing && ImportedGuideId is null)
+            {
+                HideImporting();
+            }
+        }
+    }
+
+    private void ShowImporting(string name)
+    {
+        importing = true;
+        ImportStatus.IsOpen = false;
+        GuideTitleInput.IsEnabled = false;
+        EncodingOptions.IsEnabled = false;
+        IsSecondaryButtonEnabled = false;
+        ImportCancel.IsEnabled = true;
+        ImportBusyText.Text = $"Importing {name}…";
+        ImportProgress.Visibility = Visibility.Collapsed;
+        ImportCopyProgress.Value = 0;
+        ImportCopyProgress.Visibility = Visibility.Visible;
+        ImportBusy.Visibility = Visibility.Visible;
+        UpdateImportButton();
+    }
+
+    private void HideImporting()
+    {
+        importing = false;
+        ImportBusy.Visibility = Visibility.Collapsed;
+        ImportCopyProgress.Visibility = Visibility.Collapsed;
+        ImportProgress.Visibility = Visibility.Visible;
+        ImportCancel.IsEnabled = true;
+        GuideTitleInput.IsEnabled = true;
+        EncodingOptions.IsEnabled = true;
+        IsSecondaryButtonEnabled = !picking;
+        UpdateImportButton();
+    }
+
+    private void ShowImportProgress(ImportProgress value)
+    {
+        // Progress posts to the UI thread, so a late report can arrive after the import ends.
+        if (!importing)
+        {
+            return;
+        }
+        ImportCopyProgress.Value = value.Fraction;
+        if (value.Publishing)
+        {
+            ImportCancel.IsEnabled = false;
+            ImportBusyText.Text = "Saving to your library…";
+        }
+    }
+
+    private void UpdateImportButton() =>
+        IsPrimaryButtonEnabled = !importing && manifest is not null &&
+            GuideTitle.TryCreate(GuideTitleInput.Text, out _);
+
     private async Task ChooseAnotherAsync()
     {
-        if (picking || closing)
+        if (picking || closing || importing)
         {
             return;
         }
@@ -106,7 +227,7 @@ public sealed partial class ImportGuideDialog : ContentDialog
         finally
         {
             picking = false;
-            if (!closing)
+            if (!closing && !importing)
             {
                 IsSecondaryButtonEnabled = true;
             }
@@ -236,6 +357,11 @@ public sealed partial class ImportGuideDialog : ContentDialog
         Manifest = null;
         needsEncoding = null;
         ImportPreview.Visibility = Visibility.Collapsed;
+        ShowMessage(severity, message);
+    }
+
+    private void ShowMessage(InfoBarSeverity severity, string message)
+    {
         ImportStatus.Severity = severity;
         ImportStatus.Message = message;
         AutomationProperties.SetName(ImportStatus, message);
@@ -353,5 +479,6 @@ public sealed partial class ImportGuideDialog : ContentDialog
         bool valid = GuideTitle.TryCreate(GuideTitleInput.Text, out _);
         GuideTitleFeedback.Text = valid ? string.Empty : $"Enter a title of 1–{GuideTitle.TitleLimit} characters.";
         GuideTitleFeedback.Visibility = valid ? Visibility.Collapsed : Visibility.Visible;
+        UpdateImportButton();
     }
 }

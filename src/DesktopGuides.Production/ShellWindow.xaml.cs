@@ -54,6 +54,7 @@ public sealed partial class ShellWindow : Window
     private GameEditorDialog? activeGameEditor;
     private AddGameDialog? activeAddGameDialog;
     private readonly GuideImportValidator importValidator = new();
+    private GuideImportPublisher? guidePublisher;
     private bool importRequested;
     private ImportGuideDialog? activeImportDialog;
     private CancellationTokenSource? refreshCancel;
@@ -222,6 +223,7 @@ public sealed partial class ShellWindow : Window
             repository = new SqliteLibraryRepository(paths);
             artwork = new ManagedArtworkStore(paths);
             await repository.InitializeAsync();
+            guidePublisher = new GuideImportPublisher(repository, paths);
             providers = new ProviderServices(dataRoot);
             await ProviderSettings.InitializeAsync(providers);
             importer = providers.CreateImporter(repository, artwork);
@@ -716,6 +718,7 @@ public sealed partial class ShellWindow : Window
         }
         importRequested = true;
         ImportGuideButton.IsEnabled = false;
+        bool imported = false;
         try
         {
             await RunNavigationAsync(async () =>
@@ -750,7 +753,12 @@ public sealed partial class ShellWindow : Window
                 {
                     return;
                 }
-                ImportGuideDialog dialog = new(game.Title, path, importValidator, PickGuideFileAsync)
+                GuideImportPublisher publisher = guidePublisher
+                    ?? throw new InvalidOperationException("The library is not ready.");
+                ImportGuideDialog dialog = new(
+                    game.Title, path, importValidator, PickGuideFileAsync,
+                    (manifest, title, progress, token) =>
+                        publisher.PublishAsync(manifest, game.Id, title, progress, token))
                 {
                     XamlRoot = Navigation.XamlRoot
                 };
@@ -764,6 +772,14 @@ public sealed partial class ShellWindow : Window
                 {
                     activeImportDialog = null;
                 }
+                // An import that reached publication is kept even if the dialog was closed.
+                if (dialog.ImportedGuideId is Guid guideId && !closeRequested &&
+                    navigator.Current is GameRoute shown && shown.GameId == route.GameId)
+                {
+                    imported = true;
+                    pendingGuideFocus = guideId;
+                    await RenderCurrentAsync();
+                }
             });
         }
         finally
@@ -772,7 +788,10 @@ public sealed partial class ShellWindow : Window
             if (!closeRequested && navigator.Current is GameRoute)
             {
                 ImportGuideButton.IsEnabled = true;
-                ImportGuideButton.Focus(FocusState.Programmatic);
+                if (!imported)
+                {
+                    ImportGuideButton.Focus(FocusState.Programmatic);
+                }
             }
         }
     }

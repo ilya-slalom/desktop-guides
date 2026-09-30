@@ -4,9 +4,11 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:DesktopGuides.Production"
     xmlns:toolkit="using:CommunityToolkit.WinUI.Controls"
+    PrimaryButtonText="Import"
+    IsPrimaryButtonEnabled="False"
     SecondaryButtonText="Choose another file"
     CloseButtonText="Close"
-    DefaultButton="None"
+    DefaultButton="Primary"
     AutomationProperties.AutomationId="ImportGuideDialog">
     <ContentDialog.Resources>
         <!-- Group headers match the native File details heading. -->
@@ -34,6 +36,14 @@
                            Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
                            AutomationProperties.LiveSetting="Polite"
                            AutomationProperties.AutomationId="ImportBusyText" />
+                <ProgressBar x:Name="ImportCopyProgress"
+                             Width="120"
+                             Minimum="0"
+                             Maximum="1"
+                             Visibility="Collapsed"
+                             VerticalAlignment="Center"
+                             AutomationProperties.Name="Import progress"
+                             AutomationProperties.AutomationId="ImportCopyProgress" />
                 <Button x:Name="ImportCancel"
                         Content="Cancel"
                         Click="CancelClicked"
