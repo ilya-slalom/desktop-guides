@@ -622,7 +622,7 @@ The [T06.1 + T06.2 import preview design](t06-1-import-preview-design.md)
 and [plan](t06-1-import-preview-plan.md) add the Import guide button, the
 system file picker, the preview dialog and `GuideImportValidator` for TXT,
 HTML and PDF. They were implemented and verified on 30 September 2026: CI run
-36651770617 passed `core-tests`, both package builds and the installed
+36658419215 passed `core-tests`, both package builds and the installed
 `import-preview` scenario in light and dark. Confirm, copying and
 publication remain T06.3.
 

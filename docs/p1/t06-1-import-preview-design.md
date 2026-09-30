@@ -333,7 +333,7 @@ screenshots of the preview.
 
 ## T06.1 + T06.2 verification record
 
-- **Unit tests.** `core-tests` in CI run 36651770617: 198 Core and 290
+- **Unit tests.** `core-tests` in CI run 36658419215: 198 Core and 294
   Infrastructure passes, including `GuideTitleTests`,
   `ImportPresentationTests`, `GuideImportValidatorTests` and
   `GuideImportValidatorHtmlPdfTests`.
@@ -387,3 +387,25 @@ screenshots of the preview.
     not `IsOffscreen`. Cost if wrong: none.
   - `FirstLines` trims the newline a final CRLF leaves on the sample. Cost if
     wrong: a one-character sample difference.
+- **Final review.** A whole-branch review found no Critical issues. Its fixes
+  are in CI run 36658419215:
+  - PDF inspection stops on Cancel or Close: PdfPig ignores the token, so
+    the validator reads through a stream that checks it on every read and
+    seek.
+  - TXT and HTML inspection and the encoding choice run on the thread pool,
+    because cached reads complete synchronously and large files decoded on
+    the UI thread.
+  - HTML entry names the library can't store, such as `Sonic .html`, and
+    style sheets whose declared encoding doesn't match their bytes get their
+    own messages. The name is checked before the scan, so any other scanner
+    `InvalidDataException` reads as a style-sheet error. Cost if wrong: a
+    future scanner error of that type is described as a style-sheet problem.
+  - The first picker catches any failure, and the group headers use the
+    dialog heading style.
+  - Not fixed here: the P0 scanner rejects every reparse point, so an HTML
+    guide in a OneDrive or other cloud-synced folder is likely refused as
+    "refers to a file outside its folder". Accepting cloud reparse tags
+    relaxes an untrusted-path check and needs its own design and a host
+    check; TXT and PDF are unaffected. Cost if wrong: HTML guides saved to a
+    OneDrive-backed Desktop or Documents folder can't be imported until the
+    follow-up lands.
