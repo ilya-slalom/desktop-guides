@@ -163,6 +163,9 @@ if (args.Length == 2 && args[0] == "describe-import")
         FileOperations = Scalar("SELECT COUNT(*) FROM FileOperations"),
         StagingEntries = CountEntries(importPaths.StagingRoot),
         ContentEntries = CountEntries(importPaths.ContentRoot),
+        TrashEntries = CountEntries(importPaths.TrashRoot),
+        ReadingStates = Scalar("SELECT COUNT(*) FROM ReadingStates"),
+        ReaderPreferences = Scalar("SELECT COUNT(*) FROM ReaderPreferences"),
         LegacyTextGuides = Scalar("SELECT COUNT(*) FROM Guides WHERE Format = 'Txt' AND TextCodePage = 437"),
     }));
     return 0;
