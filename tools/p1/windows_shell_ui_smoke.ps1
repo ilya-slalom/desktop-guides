@@ -7,7 +7,7 @@ param(
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
         'reader-render-error-observed', 'reader-render-error-result',
-        'late-guide-after-close', 'waiting-handoff', 'material', 'catalog',
+        'late-guide-after-close', 'waiting-handoff', 'material', 'catalog', 'catalog-facts',
         'provider-none', 'provider-offline', 'provider-settings',
         'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
@@ -524,6 +524,34 @@ try {
 
     function Get-RealizedGameRows {
         return @(Get-GameListItems | Where-Object { Test-RealizedGameRow $_ })
+    }
+
+    # Realized, named ListItems of a list, in display order.
+    function Get-ListRows([string] $id) {
+        $list = Wait-VisibleById $id
+        $condition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+            [System.Windows.Automation.ControlType]::ListItem)
+        return @($list.FindAll($scope, $condition) | Where-Object { Test-RealizedGameRow $_ })
+    }
+
+    # $expected holds @(name, help-text pattern) pairs, in display order.
+    # Names must match exactly; help text is matched with -like.
+    function Assert-RowFacts([string] $id, $expected) {
+        $deadline = (Get-Date).AddSeconds(10)
+        do {
+            $actual = @(Get-ListRows $id | ForEach-Object {
+                [ordered]@{ Name = $_.Current.Name; HelpText = $_.Current.HelpText } })
+            $matched = $actual.Count -eq $expected.Count
+            for ($i = 0; $matched -and $i -lt $expected.Count; $i++) {
+                $matched = $actual[$i].Name -eq $expected[$i][0] -and
+                    $actual[$i].HelpText -like $expected[$i][1]
+            }
+            if ($matched) { return $actual }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        $shown = ($actual | ForEach-Object { "$($_.Name) [$($_.HelpText)]" }) -join '; '
+        throw "$id rows were: $shown"
     }
 
     # Counts screen pixels within 24 per channel of $rgb in the artwork column
@@ -1339,6 +1367,33 @@ try {
         }
         $report.phases += 'stale-resume-hidden'
     }
+    elseif ($Mode -eq 'catalog-facts') {
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        $report.libraryRows = Assert-RowFacts 'GameList' @(
+            @('Zeta Archive Game', 'Windows, Manual, 1 guide'),
+            @('Facts Test Game', 'PC, IGDB, 4 guides'),
+            @('Empty Test Game', 'Manual, No guides'))
+        $report.phases += 'library-facts'
+        [void](Wait-HiddenById 'ShellStatus')
+        Save-WindowScreenshot 'library-facts'
+
+        Select-Element 'Facts Test Game'
+        [void](Wait-Name 'GameHeading' 'Facts Test Game')
+        [void](Wait-Status 'Game ready.')
+        # The host's culture sets the exact time and date (Ruling 9).
+        $report.guideRows = Assert-RowFacts 'GuideList' @(
+            @('Main Story Walkthrough', 'Web page (HTML), In progress, opened today at *'),
+            @('Collectibles Map', 'PDF, about 45 percent, opened yesterday'),
+            @('Weapon Upgrade Guide', 'Text (TXT), Completed, opened on *'),
+            @('Achievement Checklist', 'Text (TXT), Not started'))
+        $report.phases += 'guide-facts'
+        [void](Wait-HiddenById 'ShellStatus')
+        Save-WindowScreenshot 'game-facts'
+
+        Go-Back
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Status 'Library ready.')
+    }
     elseif ($Mode -eq 'catalog') {
         $catalogStarted = Get-Date
         $longTitle = 'Catalog A ' + ('W' * 150)
@@ -1361,6 +1416,10 @@ try {
         [void](Wait-HiddenById 'ShellStatus')
         $longRow = Wait-GameRow $longTitle
         $shortRow = Wait-GameRow $shortTitle
+        if ($longRow.Current.HelpText -ne 'PC, IGDB, No guides') {
+            throw "The long-title row's help text was '$($longRow.Current.HelpText)'."
+        }
+        $report.phases += 'catalog-row-facts'
         [void](Wait-GameRow 'Catalog C Corrupt Art')
         [void](Wait-GameRow 'Catalog C Missing Art 0')
         $longHeight = $longRow.Current.BoundingRectangle.Height
@@ -1446,6 +1505,18 @@ try {
         $scroll.SetScrollPercent(
             [System.Windows.Automation.ScrollPattern]::NoScroll, 100)
         [void](Wait-GameRow $lastTitle)
+        $endFacts = [ordered]@{
+            $lastTitle = 'Nintendo Switch, IGDB, No guides'
+            'Catalog Game 483' = 'IGDB, No guides'
+            'Catalog Game 481' = 'Manual, No guides'
+        }
+        foreach ($title in $endFacts.Keys) {
+            $help = (Wait-GameRow $title).Current.HelpText
+            if ($help -ne $endFacts[$title]) {
+                throw "Row '$title' had help text '$help' at the end of the list."
+            }
+        }
+        $report.phases += 'catalog-end-row-facts'
         $endCount = (Get-RealizedGameRows).Count
         $report.realizedRowsAtEnd = $endCount
         if ($endCount -ge $realizedLimit) {
@@ -1803,6 +1874,11 @@ try {
         Select-Element 'Route Test Game'
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Status 'Game ready.')
+        $guideRows = @(Get-ListRows 'GuideList').Count
+        $report.realizedGuideRows = $guideRows
+        if ($guideRows -lt 1 -or $guideRows -ge 60) {
+            throw "GuideList realized $guideRows rows for a 99-guide game."
+        }
         $list = Find-ById 'GuideList'
         $condition = [System.Windows.Automation.PropertyCondition]::new(
             [System.Windows.Automation.AutomationElement]::NameProperty, $target)

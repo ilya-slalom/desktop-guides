@@ -704,7 +704,7 @@ function Run-ShellSmoke(
         -Principal $principal -Force | Out-Null
     Start-ScheduledTask -TaskName $smokeTask
     $timeoutSeconds = if ($mode -like 'provider-*') { 240 }
-        elseif ($mode -eq 'catalog' -or $mode -like 'import-*') { 120 }
+        elseif ($mode -like 'catalog*' -or $mode -like 'import-*') { 120 }
         else { 60 }
     $deadline = (Get-Date).AddSeconds($timeoutSeconds)
     do {
@@ -793,6 +793,25 @@ function Run-CatalogScenarios {
         throw "Expected 10 catalog games with missing artwork, found $($missing.Count)."
     }
     $report.catalogGames = @($state.Games).Count
+}
+
+function Run-CatalogFactsScenarios {
+    Invoke-ShellSeed @('seed-facts', $dataRoot) | Out-Null
+    $originalTheme = Get-AppThemePreference
+    try {
+        Set-AppThemePreference $true
+        Start-InstalledShell
+        $report.catalogFactsLight = Run-ShellSmoke 'catalog-facts' -ResultName 'catalog-facts-light'
+        Close-InstalledShell
+
+        Set-AppThemePreference $false
+        Start-InstalledShell
+        $report.catalogFactsDark = Run-ShellSmoke 'catalog-facts' -ResultName 'catalog-facts-dark'
+        Close-InstalledShell
+    }
+    finally {
+        Restore-AppThemePreference $originalTheme
+    }
 }
 
 function Run-ImportScenarios {
@@ -1221,6 +1240,8 @@ try {
 
     if ($CatalogOnly) {
         Run-CatalogScenarios
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    Run-CatalogFactsScenarios
         $report.success = $true
         return
     }
@@ -1290,6 +1311,8 @@ try {
 
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-CatalogScenarios
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    Run-CatalogFactsScenarios
 
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-ImportScenarios
