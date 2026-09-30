@@ -9,7 +9,8 @@ param(
         'reader-render-error-observed', 'reader-render-error-result',
         'late-guide-after-close', 'waiting-handoff', 'material', 'catalog',
         'provider-none', 'provider-offline', 'provider-settings',
-        'import-preview', 'import-publish', 'provider-live', 'provider-remove')]
+        'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
+        'provider-live', 'provider-remove')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -46,6 +47,9 @@ param(
     [string] $IgdbCredentialFile = '',
 
     [string] $SteamGridDbCredentialFile = '',
+
+    # The existing guide a duplicate preview must name.
+    [string] $ExpectedGuideTitle = '',
 
     # The provider failure Refresh and search should report: no saved
     # credentials, or credentials saved while the network is blocked.
@@ -1656,7 +1660,9 @@ try {
             $report.phases += 'import-picker-cancel'
         }
         else {
-            $importTitle = 'Imported Guide ' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+            if ($Mode -ne 'import-publish' -and -not $ExpectedGuideTitle) {
+                throw "$Mode needs -ExpectedGuideTitle."
+            }
             Select-Element 'Import Test Game'
             [void](Wait-Name 'GameHeading' 'Import Test Game')
             [void](Wait-Status 'Game ready.')
@@ -1669,18 +1675,52 @@ try {
             }
             [void](Select-ById 'ImportEncodingCp437')
             [void](Wait-Text 'ImportEncodingValue' 'DOS (CP437)')
-            Set-Text 'GuideTitleInput' $importTitle
-            [void](Wait-EnabledById 'PrimaryButton')
-            $report.importReadyScreenshot = Save-WindowScreenshot 'import-ready'
-            $report.phases += 'import-ready'
 
-            Invoke-Element (Wait-EnabledById 'PrimaryButton')
-            [void](Wait-HiddenById 'ImportGuideDialog')
-            [void](Wait-SelectedGuide $importTitle)
-            Wait-FocusedGuide $importTitle
-            $report.importedTitle = $importTitle
-            $report.importPublishedScreenshot = Save-WindowScreenshot 'import-published'
-            $report.phases += 'import-published'
+            if ($Mode -eq 'import-publish') {
+                $importTitle = 'Imported Guide ' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+                [void](Wait-Name 'PrimaryButton' 'Import')
+                Assert-Absent 'ImportDuplicate'
+                Set-Text 'GuideTitleInput' $importTitle
+                [void](Wait-EnabledById 'PrimaryButton')
+                $report.importReadyScreenshot = Save-WindowScreenshot 'import-ready'
+                $report.phases += 'import-ready'
+
+                Invoke-Element (Wait-EnabledById 'PrimaryButton')
+                [void](Wait-HiddenById 'ImportGuideDialog')
+                [void](Wait-SelectedGuide $importTitle)
+                Wait-FocusedGuide $importTitle
+                $report.importedTitle = $importTitle
+                $report.importPublishedScreenshot = Save-WindowScreenshot 'import-published'
+                $report.phases += 'import-published'
+            }
+            else {
+                $duplicateMessage = 'This file is already in Import Test Game as "' + $ExpectedGuideTitle + '".'
+                [void](Wait-Name 'ImportDuplicate' $duplicateMessage)
+                [void](Wait-Name 'PrimaryButton' 'Import another copy')
+                [void](Wait-EnabledById 'ImportOpenExisting')
+                $report.importDuplicateScreenshot = Save-WindowScreenshot 'import-duplicate'
+                $report.phases += 'import-duplicate'
+
+                if ($Mode -eq 'import-duplicate-copy') {
+                    $copyTitle = 'Copied Guide ' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+                    Set-Text 'GuideTitleInput' $copyTitle
+                    Invoke-Element (Wait-EnabledById 'PrimaryButton')
+                    [void](Wait-HiddenById 'ImportGuideDialog')
+                    [void](Wait-SelectedGuide $copyTitle)
+                    Wait-FocusedGuide $copyTitle
+                    $report.importedTitle = $copyTitle
+                    $report.importCopiedScreenshot = Save-WindowScreenshot 'import-copied'
+                    $report.phases += 'import-copied'
+                }
+                else {
+                    Invoke-Element (Wait-EnabledById 'ImportOpenExisting')
+                    [void](Wait-HiddenById 'ImportGuideDialog')
+                    [void](Wait-Name 'ReaderHeading' $ExpectedGuideTitle)
+                    [void](Wait-Status 'Guide details ready.')
+                    $report.importOpenExistingScreenshot = Save-WindowScreenshot 'import-open-existing'
+                    $report.phases += 'import-open-existing'
+                }
+            }
         }
     }
     elseif ($Mode -eq 'long-list') {

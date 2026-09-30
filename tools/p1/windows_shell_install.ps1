@@ -664,7 +664,8 @@ function Run-ShellSmoke(
     [string] $SwitchToMaterial = '',
     [string] $IgdbCredentialFile = '',
     [string] $SteamGridDbCredentialFile = '',
-    [string] $ExpectedProviderFailure = '') {
+    [string] $ExpectedProviderFailure = '',
+    [string] $ExpectedGuideTitle = '') {
     $resultPath = Join-Path $ResultDirectory "$ResultName.json"
     Clear-ShellSmokeResult $resultPath
     $invocationId = [Guid]::NewGuid().ToString('N')
@@ -693,6 +694,9 @@ function Run-ShellSmoke(
     }
     if ($ExpectedProviderFailure) {
         $arguments += ' -ExpectedProviderFailure ' + $ExpectedProviderFailure
+    }
+    if ($ExpectedGuideTitle) {
+        $arguments += ' -ExpectedGuideTitle "' + $ExpectedGuideTitle + '"'
     }
     $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
         -Argument $arguments -WorkingDirectory $PSScriptRoot
@@ -818,9 +822,18 @@ function Run-ImportScenarios {
         $report.importPublishLight = Run-ShellSmoke 'import-publish' -ResultName 'import-publish-light'
         Close-InstalledShell
 
+        $existingTitle = $report.importPublishLight.importedTitle
+
         Set-AppThemePreference $false
         Start-InstalledShell
-        $report.importPublishDark = Run-ShellSmoke 'import-publish' -ResultName 'import-publish-dark'
+        $report.importDuplicateDark = Run-ShellSmoke 'import-duplicate-copy' `
+            -ResultName 'import-duplicate-dark' -ExpectedGuideTitle $existingTitle
+        Close-InstalledShell
+
+        Set-AppThemePreference $true
+        Start-InstalledShell
+        $report.importOpenLight = Run-ShellSmoke 'import-duplicate-open' `
+            -ResultName 'import-open-light' -ExpectedGuideTitle $existingTitle
         Close-InstalledShell
     }
     finally {
@@ -833,7 +846,7 @@ function Run-ImportScenarios {
     }
     foreach ($name in $expected.Keys) {
         if ($state.$name -ne $expected[$name]) {
-            throw "After two imports, $name was $($state.$name); expected $($expected[$name])."
+            throw "After an import, a copy and Open existing, $name was $($state.$name); expected $($expected[$name])."
         }
     }
 }
