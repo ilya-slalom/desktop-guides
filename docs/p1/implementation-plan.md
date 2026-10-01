@@ -658,7 +658,8 @@ restores the guide, and a failure after it leaves a journaled trash entry
 that startup deletes. CI run 36688055406 passed the installed removal group:
 a dark Cancel and a light removal.
 
-T05.1 is implemented on `feat/p1-t05-1-guide-rows`; see the
+T05.1 was merged through PR #23 on 30 September 2026, merge commit
+`d94df92`; see the
 [design and verification record](t05-1-guide-rows-design.md). The Library
 lists games by last activity (creation, import or open, newest first), and
 the Game page lists guides by import or open time. Each row shows its tile,
@@ -668,7 +669,8 @@ unread guide reads `Not started`. One SQLite query feeds each list, and
 listing never opens guide files or calls a provider. CI run 36705946660
 passed `catalog-facts` in light and dark.
 
-T05.2 is implemented on `feat/p1-t05-2-library-search`; see the
+T05.2 was merged through PR #24 on 1 October 2026, merge commit
+`b774fd4`; see the
 [design and verification record](t05-2-library-search-design.md). The
 Library search box filters games whose title, or one of whose guide
 titles, contains the query, ignoring case, accents and width. A guide-only
@@ -677,6 +679,18 @@ loading, empty, no-results and list views, with a visible Clear search.
 Search filters the loaded summaries in memory; it never opens guide files
 or calls a provider. CI run 36726600007 passed `library-search` in light and
 dark.
+
+T04.2 is implemented on `feat/p1-t04-2-game-actions`; see the
+[design and verification record](t04-2-game-actions-design.md). Renaming a
+game through Edit game keeps its Game ID, provider link and snapshot,
+artwork, Guide IDs, reading state, Resume and selected guide, after a
+refresh and after a restart. Remove game removes only a game without
+guides; for a game with guides it is disabled, with the visible hint
+`Remove this game's guides first.`. The confirmation defaults to Cancel.
+After a removal the Library is shown with an empty back stack, and the
+artwork is deleted best effort, with the startup sweep removing anything
+left. CI run 36827722176 passed `game-actions` in light and dark and
+`game-actions-persisted`.
 
 ### UI design-language and Gallery adoption sequence
 

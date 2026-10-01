@@ -109,6 +109,53 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         }, token);
     }
 
+    public Task<EmptyGameRemoval> RemoveEmptyGameAsync(
+        Guid gameId, CancellationToken token = default)
+    {
+        if (gameId == Guid.Empty)
+        {
+            throw new ArgumentException("A game ID is required.", nameof(gameId));
+        }
+        return WriteAsync(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            string? artwork;
+            using (SqliteCommand read = connection.CreateCommand())
+            {
+                read.Transaction = transaction;
+                read.CommandText = """
+                    SELECT ArtworkRelativePath,
+                           (SELECT COUNT(*) FROM Guides WHERE GameId = $id)
+                    FROM Games WHERE Id = $id
+                    """;
+                read.Parameters.AddWithValue("$id", gameId.ToString("N"));
+                using SqliteDataReader reader = read.ExecuteReader();
+                if (!reader.Read())
+                {
+                    return new EmptyGameRemoval(EmptyGameRemovalOutcome.NotFound, null);
+                }
+                if (reader.GetInt64(1) > 0)
+                {
+                    return new EmptyGameRemoval(EmptyGameRemovalOutcome.HasGuides, null);
+                }
+                artwork = NullableString(reader, 0);
+            }
+
+            // Guides cascade on delete; the guard keeps them out of reach.
+            using SqliteCommand delete = connection.CreateCommand();
+            delete.Transaction = transaction;
+            delete.CommandText = """
+                DELETE FROM Games
+                WHERE Id = $id AND NOT EXISTS (SELECT 1 FROM Guides WHERE GameId = $id)
+                """;
+            delete.Parameters.AddWithValue("$id", gameId.ToString("N"));
+            RequireUpdated(delete.ExecuteNonQuery(), "game");
+            transaction.Commit();
+            return new EmptyGameRemoval(EmptyGameRemovalOutcome.Removed, artwork);
+        }, token);
+    }
+
     public Task<Game?> GetGameAsync(Guid gameId, CancellationToken token = default) =>
         ReadAsync<Game?>(() =>
         {

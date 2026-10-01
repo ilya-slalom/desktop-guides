@@ -1,7 +1,7 @@
 # T05.2 Library search design
 
-Status: implemented on `feat/p1-t05-2-library-search`; verified by CI run
-36726600007. Prerequisite T05.1 (PR #23) is merged.
+Status: merged through PR #24 on 1 October 2026, merge commit `b774fd4`;
+verified by CI run 36726600007. Prerequisite T05.1 (PR #23) is merged.
 
 ## Intent
 

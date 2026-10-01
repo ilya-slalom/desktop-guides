@@ -14,6 +14,7 @@ param(
 
     [switch] $CatalogOnly,
     [switch] $ImportOnly,
+    [switch] $GameActionsOnly,
 
     # Paths only. The values are read in memory and never passed on.
     [string] $IgdbCredentialFile = 'E:\work\igdb_credentials.txt',
@@ -704,7 +705,7 @@ function Run-ShellSmoke(
         -Principal $principal -Force | Out-Null
     Start-ScheduledTask -TaskName $smokeTask
     $timeoutSeconds = if ($mode -like 'provider-*') { 240 }
-        elseif ($mode -like 'catalog*' -or $mode -like 'import-*') { 120 }
+        elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*') { 120 }
         else { 60 }
     $deadline = (Get-Date).AddSeconds($timeoutSeconds)
     do {
@@ -930,6 +931,63 @@ function Run-RemovalScenarios {
         Guides = 1; FileOperations = 0; StagingEntries = 0; ContentEntries = 1
         TrashEntries = 0; ReadingStates = 1; ReaderPreferences = 1; LegacyTextGuides = 1
     })
+}
+
+function Assert-GameActionsState([string] $label, $seed) {
+    $state = Invoke-ShellSeed @('describe-actions', $dataRoot) | ConvertFrom-Json
+    if ($state.GameCount -ne 1) {
+        throw "$label, the library had $($state.GameCount) games; expected 1."
+    }
+    $game = @($state.Games)[0]
+    if ($game.Id -ne $seed.RenameGameId -or $game.Title -ne 'Renamed Linked Game' -or
+        $game.ExternalId -ne '900100' -or -not $game.ArtworkExists) {
+        throw "$label, the remaining game was $($game | ConvertTo-Json -Compress)."
+    }
+    if (@($state.ArtworkFolders) -contains $seed.EmptyGameId) {
+        throw "$label, the removed game's artwork folder remains."
+    }
+    $guides = @(@($game.GuideIds) | Sort-Object)
+    $expected = @(@($seed.AlphaGuideId, $seed.BetaGuideId) | Sort-Object)
+    if (($guides -join ',') -ne ($expected -join ',')) {
+        throw "$label, the guide IDs were $($guides -join ', ')."
+    }
+    $alpha = @($state.ReadingStates | Where-Object { $_.GuideId -eq $seed.AlphaGuideId })
+    if ($alpha.Count -ne 1 -or $alpha[0].EstimatedFraction -ne 0.45 -or
+        $alpha[0].LastOpenedUtcMs -ne $seed.AlphaLastOpenedUtcMs) {
+        throw "$label, Alpha Route Guide's reading state was $($alpha | ConvertTo-Json -Compress)."
+    }
+    if ($state.LastActiveGuideId -ne $seed.BetaGuideId) {
+        throw "$label, the Resume guide was $($state.LastActiveGuideId)."
+    }
+    return $state
+}
+
+function Run-GameActionsScenarios {
+    $originalTheme = Get-AppThemePreference
+    try {
+        $seed = Invoke-ShellSeed @('seed-actions', $dataRoot) | ConvertFrom-Json
+        Set-AppThemePreference $true
+        Start-InstalledShell
+        $report.gameActionsLight = Run-ShellSmoke 'game-actions' -ResultName 'game-actions-light'
+        Close-InstalledShell
+        $report.gameActionsLightState = Assert-GameActionsState 'After the light run' $seed
+
+        Start-InstalledShell
+        $report.gameActionsPersisted = Run-ShellSmoke 'game-actions-persisted'
+        Close-InstalledShell
+        $report.gameActionsPersistedState = Assert-GameActionsState 'After the relaunch' $seed
+
+        Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+        $seed = Invoke-ShellSeed @('seed-actions', $dataRoot) | ConvertFrom-Json
+        Set-AppThemePreference $false
+        Start-InstalledShell
+        $report.gameActionsDark = Run-ShellSmoke 'game-actions' -ResultName 'game-actions-dark'
+        Close-InstalledShell
+        $report.gameActionsDarkState = Assert-GameActionsState 'After the dark run' $seed
+    }
+    finally {
+        Restore-AppThemePreference $originalTheme
+    }
 }
 
 function Set-StoredMaterial([string] $material) {
@@ -1274,6 +1332,12 @@ try {
         return
     }
 
+    if ($GameActionsOnly) {
+        Run-GameActionsScenarios
+        $report.success = $true
+        return
+    }
+
     Start-InstalledShell
     $report.empty = Run-ShellSmoke 'empty' -ExitDelayMilliseconds 2000
     $report.emptyAfterDelayedTask = Run-ShellSmoke 'empty'
@@ -1340,6 +1404,9 @@ try {
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-ImportScenarios
     Run-RemovalScenarios
+
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    Run-GameActionsScenarios
 
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-ProviderScenarios

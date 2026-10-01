@@ -1,6 +1,7 @@
 # T05.1 Library and Game rows design
 
-Status: implemented on `feat/p1-t05-1-guide-rows`; verified by CI run 36705946660. Prerequisites T03.2
+Status: merged through PR #23 on 30 September 2026, merge commit `d94df92`;
+verified by CI run 36705946660. Prerequisites T03.2
 (PR #4), T04.4 (PR #14), T05.4 (PR #16) and T11.1 (PR #6) are merged.
 
 ## Intent
