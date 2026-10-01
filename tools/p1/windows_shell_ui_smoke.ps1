@@ -11,7 +11,7 @@ param(
         'provider-none', 'provider-offline', 'provider-settings',
         'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
-        'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted')]
+        'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted', 'txt-reader')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -77,6 +77,7 @@ try {
     Add-Type -AssemblyName UIAutomationTypes
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -Path (Join-Path $PSScriptRoot 'windows_shell_foreground_probe.cs')
+    Add-Type -Path (Join-Path $PSScriptRoot 'windows_shell_response_monitor.cs')
     . (Join-Path $PSScriptRoot 'windows_provider_credentials.ps1')
     $deadline = (Get-Date).AddSeconds(30)
     do {
@@ -1164,6 +1165,199 @@ try {
         'reader-render-error-observed', 'reader-render-error-result',
         'switch-game-loading', 'switch-game')) {
         # These modes continue a shell left on Reader, Game, or Library.
+    }
+    elseif ($Mode -eq 'txt-reader') {
+        $textGame = 'Text Reader Game'
+        $missingMessage = "This guide's file is missing from the library."
+        $listItem = New-Object System.Windows.Automation.PropertyCondition(
+            [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+            [System.Windows.Automation.ControlType]::ListItem)
+        $fixtureRoot = Join-Path $PSScriptRoot '..\..\tests\fixtures'
+        # The reader names a blank or whitespace-only row "Blank line" and
+        # shows no row for the empty line after a final newline.
+        $asciiText = [System.IO.File]::ReadAllText((Join-Path $fixtureRoot 'p0\txt-ascii.txt'))
+        if ($asciiText.EndsWith("`n")) { $asciiText = $asciiText.Substring(0, $asciiText.Length - 1) }
+        $asciiNames = @(
+            $asciiText -split "`n" |
+                ForEach-Object { if ([string]::IsNullOrWhiteSpace($_)) { 'Blank line' } else { $_ } })
+        if ($asciiNames.Count -ne 7) {
+            throw "Expected 7 txt-ascii lines; read $($asciiNames.Count)."
+        }
+
+        function Get-TextRows {
+            $lines = Find-ById 'ReaderTextLines'
+            if (-not $lines -or $lines.Current.IsOffscreen) { return @() }
+            return @($lines.FindAll($scope, $listItem))
+        }
+
+        function Wait-FirstTextRow {
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $lines = Find-ById 'ReaderTextLines'
+                if ($lines -and -not $lines.Current.IsOffscreen -and
+                    $lines.FindFirst($scope, $listItem)) {
+                    return
+                }
+                Start-Sleep -Milliseconds 50
+            } while ((Get-Date) -lt $deadline)
+            throw 'The TXT reader showed no lines.'
+        }
+
+        function Assert-RowNames([string] $guide, [string[]] $expected) {
+            Wait-FirstTextRow
+            $names = @(Get-TextRows | ForEach-Object { $_.Current.Name })
+            if ($names.Count -ne $expected.Count) {
+                throw "$guide showed $($names.Count) rows; expected $($expected.Count)."
+            }
+            for ($index = 0; $index -lt $expected.Count; $index++) {
+                if ($names[$index] -ne $expected[$index]) {
+                    throw "$guide row $index was '$($names[$index])'; expected '$($expected[$index])'."
+                }
+            }
+        }
+
+        function Assert-NoReaderCommands([string] $guide) {
+            $commands = Find-ById 'ReaderCommands'
+            if ($commands -and -not $commands.Current.IsOffscreen) {
+                throw "$guide exposed reader commands."
+            }
+        }
+
+        function Open-TextGuide([string] $guide) {
+            Open-GuideFromGame $guide
+            [void](Wait-Name 'ReaderHeading' $guide)
+        }
+
+        function Back-ToTextGame {
+            Go-Back
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+        }
+
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        Select-Element $textGame
+        [void](Wait-Name 'GameHeading' $textGame)
+        [void](Wait-Status 'Game ready.')
+
+        # txt-ascii: exact lines, whitespace kept, a 2048-column line scrolls sideways.
+        Open-TextGuide 'ASCII Map Guide'
+        [void](Wait-Status 'Guide ready.')
+        Assert-RowNames 'ASCII Map Guide' $asciiNames
+        [void](Wait-Name 'ReaderTextLines' 'Guide text')
+        $scroll = (Find-ById 'ReaderTextLines').GetCurrentPattern(
+            [System.Windows.Automation.ScrollPattern]::Pattern)
+        if (-not $scroll.Current.HorizontallyScrollable) {
+            throw 'The long txt-ascii line did not make the reader scroll sideways.'
+        }
+        Assert-Absent 'ReaderPlaceholder'
+        Assert-Absent 'ReaderLoadError'
+        Assert-NoReaderCommands 'ASCII Map Guide'
+        $report.txtReaderScreenshot = Save-WindowScreenshot 'txt-reader'
+        $report.phases += 'txt-ascii'
+
+        # txt-tabs: 8-column tab stops; a form feed shows as a space.
+        Back-ToTextGame
+        Open-TextGuide 'Tab Table Guide'
+        Assert-RowNames 'Tab Table Guide' @(
+            'Item    Cost    Where',
+            'Potion  50      Item shop',
+            'Elixir  1500    Secret room',
+            ' Chapter 2')
+        $report.phases += 'txt-tabs'
+
+        # A guide saved with code page 437 shows its decoded characters.
+        Back-ToTextGame
+        Open-TextGuide 'Legacy Code Page Guide'
+        Assert-RowNames 'Legacy Code Page Guide' @("Guide $([char]0x00E9)", 'Item list')
+        $report.phases += 'txt-legacy'
+
+        # txt-long: the P0 measures, gated at the P0 thresholds.
+        Back-ToTextGame
+        $clock = [System.Diagnostics.Stopwatch]::StartNew()
+        Open-GuideFromGame 'Long Text Guide'
+        Wait-FirstTextRow
+        $clock.Stop()
+        [void](Wait-Status 'Guide ready.')
+        $realizedAfterOpen = @(Get-TextRows).Count
+        $scroll = (Find-ById 'ReaderTextLines').GetCurrentPattern(
+            [System.Windows.Automation.ScrollPattern]::Pattern)
+        $monitor = [WindowResponseMonitor]::new($process.MainWindowHandle)
+        $monitor.Start()
+        try {
+            for ($step = 0; $step -lt 8; $step++) {
+                $scroll.Scroll([System.Windows.Automation.ScrollAmount]::NoAmount,
+                    [System.Windows.Automation.ScrollAmount]::LargeIncrement)
+            }
+            Start-Sleep -Milliseconds 500
+        }
+        finally {
+            $monitor.Stop()
+        }
+        $realizedAfterScroll = @(Get-TextRows).Count
+        $report.txtLong = [ordered]@{
+            firstTextMilliseconds = $clock.ElapsedMilliseconds
+            realizedAfterOpen = $realizedAfterOpen
+            realizedAfterScroll = $realizedAfterScroll
+            verticalScrollPercent = $scroll.Current.VerticalScrollPercent
+            responseSamples = $monitor.Samples
+            responseMaximumMilliseconds = $monitor.MaximumMilliseconds
+            responseSlowSamples = $monitor.SlowSamples
+            responseTimeouts = $monitor.Timeouts
+        }
+        if ($clock.ElapsedMilliseconds -gt 3000) {
+            throw "txt-long first text took $($clock.ElapsedMilliseconds) ms; the limit is 3000 ms."
+        }
+        if ($realizedAfterOpen -gt 300 -or $realizedAfterScroll -gt 300) {
+            throw "txt-long realized $realizedAfterOpen then $realizedAfterScroll rows; the limit is 300."
+        }
+        if ($scroll.Current.VerticalScrollPercent -le 0) {
+            throw 'txt-long did not scroll.'
+        }
+        if ($monitor.Samples -lt 5) {
+            throw "The response monitor took only $($monitor.Samples) samples."
+        }
+        if ($monitor.SlowSamples -ge 2 -or $monitor.Timeouts -gt 0) {
+            throw "txt-long had $($monitor.SlowSamples) responses over 500 ms and $($monitor.Timeouts) timeouts."
+        }
+        $report.phases += 'txt-long'
+
+        # Back while txt-long loads leaves a clean Game page and no late status.
+        Back-ToTextGame
+        Open-TextGuide 'Long Text Guide'
+        $report.txtBackDuringLoadTextShown = [bool](Find-ById 'ReaderTextLines')
+        Back-ToTextGame
+        Start-Sleep -Seconds 3
+        Assert-Absent 'ReaderTextLines'
+        Assert-NoReaderCommands 'Game page after Back'
+        $status = (Find-RawById 'ShellContent').Current.ItemStatus
+        if ($status -eq 'Guide ready.') {
+            throw 'A cancelled TXT load reported Guide ready. after Back.'
+        }
+        $report.phases += 'txt-back-during-load'
+
+        # A missing managed file shows one sentence and no text or commands.
+        Open-TextGuide 'Missing File Guide'
+        [void](Wait-Status $missingMessage)
+        [void](Wait-Name 'ReaderLoadError' $missingMessage)
+        Assert-Absent 'ReaderTextLines'
+        Assert-Absent 'ReaderPlaceholder'
+        Assert-NoReaderCommands 'Missing File Guide'
+        $report.phases += 'txt-missing'
+
+        # A non-TXT guide after TXT guides shows the placeholder again.
+        Back-ToTextGame
+        Open-TextGuide 'Web Page Guide'
+        [void](Wait-Status 'Guide ready.')
+        [void](Wait-Name 'ReaderPlaceholder' 'Reading this guide is unavailable in this preview.')
+        Assert-Absent 'ReaderTextLines'
+        Assert-Absent 'ReaderLoadError'
+        $report.phases += 'html-placeholder'
+
+        # Reopening reads the file again.
+        Back-ToTextGame
+        Open-TextGuide 'ASCII Map Guide'
+        Assert-RowNames 'ASCII Map Guide (reopened)' $asciiNames
+        $report.phases += 'txt-reopen'
     }
     else {
         [void](Wait-Status 'Library ready.')
