@@ -11,7 +11,7 @@ param(
         'provider-none', 'provider-offline', 'provider-settings',
         'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
-        'provider-live', 'provider-remove')]
+        'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -1169,6 +1169,8 @@ try {
         Assert-HeadingLevel 'GameHeading' 1
         Assert-InsideWindow 'GameHeading'
         Assert-InsideWindow 'EditGameButton'
+        Assert-InsideWindow 'RemoveGameButton'
+        Assert-InsideWindow 'RemoveGameHint'
         Assert-ReachesWindowRightEdge 'ShellContent'
         $report.gameWideScreenshot = Save-WindowScreenshot 'game-wide'
         $report.phases += 'game-wide-full-width-metadata'
@@ -1176,6 +1178,8 @@ try {
         Resize-ShellWindow $narrowWidth $windowHeight
         Assert-InsideWindow 'GameHeading'
         Assert-InsideWindow 'EditGameButton'
+        Assert-InsideWindow 'RemoveGameButton'
+        Assert-InsideWindow 'RemoveGameHint'
         Assert-InsideWindow 'GameNotesScroll'
         Assert-NoOverlap 'PART_PaneToggleButton' 'GameHeading'
         Assert-NoOverlap 'PART_PaneToggleButton' 'EditGameButton'
@@ -1997,6 +2001,174 @@ try {
             $report.phases += 'removed'
         }
     }
+    elseif ($Mode -like 'game-actions*') {
+        $renameTitle = 'Linked Rename Game'
+        $renamed = 'Renamed Linked Game'
+        $emptyTitle = 'Empty Linked Game'
+        $hint = "Remove this game's guides first."
+        $summary = 'A seeded summary for the game actions check.'
+
+        # The title-bar Back button stays visible on the Library, disabled.
+        function Test-BackEnabled {
+            $back = Find-ById 'PART_BackButton'
+            return [bool]($back -and -not $back.Current.IsOffscreen -and $back.Current.IsEnabled)
+        }
+
+        # Finds the dialog title whether UIA names the dialog or its title text.
+        function Wait-VisibleName([string] $name) {
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $element = Find-ByName $name
+                if ($element -and -not $element.Current.IsOffscreen) {
+                    return $element
+                }
+                Start-Sleep -Milliseconds 200
+            } while ((Get-Date) -lt $deadline)
+            throw "Expected a visible element named '$name'."
+        }
+
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Status 'Library ready.')
+        if ($Mode -eq 'game-actions') {
+            $before = (Wait-GameRow $renameTitle).Current.HelpText
+            Select-Element $renameTitle
+            [void](Wait-Name 'GameHeading' $renameTitle)
+            [void](Wait-Status 'Game ready.')
+            $remove = Wait-VisibleById 'RemoveGameButton'
+            if ($remove.Current.IsEnabled) {
+                throw 'Remove game was enabled for a game with guides.'
+            }
+            if ($remove.Current.HelpText -ne $hint) {
+                throw "Remove game's HelpText was '$($remove.Current.HelpText)'."
+            }
+            [void](Wait-Name 'RemoveGameHint' $hint)
+            $report.hintScreenshot = Save-WindowScreenshot 'remove-game-hint'
+            $report.phases += 'remove-disabled-with-guides'
+
+            # Selecting a guide opens it (ruling 5), so come back to the game
+            # with it selected before renaming.
+            Open-GuideFromGame 'Beta Route Guide'
+            [void](Wait-Name 'ReaderHeading' 'Beta Route Guide')
+            [void](Wait-Status 'Guide details ready.')
+            Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
+            [void](Wait-Name 'GameHeading' $renameTitle)
+            [void](Wait-Status 'Game ready.')
+            [void](Wait-SelectedGuide 'Beta Route Guide')
+            Wait-FocusedGuide 'Beta Route Guide'
+            Invoke-Element (Wait-EnabledById 'EditGameButton')
+            Set-Text 'GameTitleInput' $renamed
+            Press-Enter (Wait-VisibleById 'GameTitleInput')
+            [void](Wait-Name 'GameHeading' $renamed)
+            [void](Wait-Status 'Game ready.')
+            [void](Wait-SelectedGuide 'Beta Route Guide')
+            Wait-FocusedId 'EditGameButton'
+            [void](Wait-Name 'GameSummary' $summary)
+            $report.phases += 'rename-keeps-selection'
+
+            Go-Back
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            [void](Wait-Status 'Library ready.')
+            $after = (Wait-GameRow $renamed).Current.HelpText
+            if ($after -ne $before) {
+                throw "The renamed row's facts were '$after'; before the rename they were '$before'."
+            }
+            if ((Count-GameRows $renameTitle) -ne 0) {
+                throw "A row still had the old title '$renameTitle'."
+            }
+            $report.phases += 'rename-library-row'
+
+            # A query that only the empty game matches; the Library must
+            # reapply it after the removal (Review Focus 4).
+            Set-SearchQuery 'Empty' 'LibrarySearchInput'
+            [void](Wait-Status '1 of 2 games match.' -AllowHidden)
+            [void](Wait-GameRow $emptyTitle)
+            if ((Count-GameRows $renamed) -ne 0) {
+                throw "The query 'Empty' still listed '$renamed'."
+            }
+            Select-Element $emptyTitle
+            [void](Wait-Name 'GameHeading' $emptyTitle)
+            [void](Wait-Status 'Game ready.')
+            $remove = Wait-EnabledById 'RemoveGameButton'
+            if ($remove.Current.HelpText) {
+                throw "Remove game's HelpText was '$($remove.Current.HelpText)' for a game without guides."
+            }
+            Assert-Absent 'RemoveGameHint'
+            if (-not (Test-BackEnabled)) {
+                throw 'Back was unavailable on the Game page before the removal.'
+            }
+            Invoke-Element $remove
+            [void](Wait-VisibleById 'RemoveGameDialog')
+            [void](Wait-VisibleName "Remove $emptyTitle?")
+            [void](Wait-Name 'RemoveGameMessage' 'This removes the game and its details from Desktop Guides.')
+            [void](Wait-Name 'PrimaryButton' 'Remove')
+            [void](Wait-Name 'CloseButton' 'Cancel')
+            $report.dialogScreenshot = Save-WindowScreenshot 'remove-game-confirm'
+            $report.phases += 'remove-confirm'
+
+            [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+            [void](Wait-HiddenById 'RemoveGameDialog')
+            Wait-FocusedId 'RemoveGameButton'
+            [void](Wait-Name 'GameHeading' $emptyTitle)
+            $report.phases += 'remove-escape-cancels'
+
+            # Cancel is the default button (ruling 11), so Enter cancels too.
+            Invoke-Element (Wait-EnabledById 'RemoveGameButton')
+            [void](Wait-VisibleById 'RemoveGameDialog')
+            Wait-FocusedId 'CloseButton'
+            [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+            [void](Wait-HiddenById 'RemoveGameDialog')
+            Wait-FocusedId 'RemoveGameButton'
+            [void](Wait-Name 'GameHeading' $emptyTitle)
+            $report.phases += 'remove-enter-cancels'
+
+            Invoke-Element (Wait-EnabledById 'RemoveGameButton')
+            [void](Wait-VisibleById 'RemoveGameDialog')
+            Invoke-Element (Wait-EnabledById 'PrimaryButton')
+            [void](Wait-HiddenById 'RemoveGameDialog')
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            [void](Wait-Status "Removed $emptyTitle.")
+            if ((Get-SearchText 'LibrarySearchInput') -ne 'Empty') {
+                throw "The Library query was '$(Get-SearchText 'LibrarySearchInput')' after the removal."
+            }
+            [void](Wait-Name 'LibraryNoResults' 'No games or guides match "Empty".')
+            [void](Wait-HiddenById 'GameList')
+            Wait-FocusedId 'AddGameButton'
+            if (Test-BackEnabled) {
+                throw 'Back was available after the removal.'
+            }
+            Set-SearchQuery '' 'LibrarySearchInput'
+            [void](Wait-GameRow $renamed)
+            if ((Count-GameRows $emptyTitle) -ne 0) {
+                throw "The removed game '$emptyTitle' is still listed."
+            }
+            $report.phases += 'removed'
+        }
+        else {
+            [void](Wait-GameRow $renamed)
+            Invoke-Element (Wait-Name 'ResumeGuide' 'Resume Beta Route Guide')
+            [void](Wait-Name 'ReaderHeading' 'Beta Route Guide')
+            [void](Wait-Name 'ReaderGameName' $renamed)
+            [void](Wait-Status 'Guide details ready.')
+            $report.phases += 'persisted-resume'
+
+            Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
+            [void](Wait-Name 'GameHeading' $renamed)
+            [void](Wait-Status 'Game ready.')
+            [void](Wait-SelectedGuide 'Beta Route Guide')
+            $report.phases += 'persisted-selection'
+
+            $alpha = (Wait-GuideRow 'Alpha Route Guide').Current.HelpText
+            if ($alpha -notlike '*about 45 percent*') {
+                throw "Alpha Route Guide's facts were '$alpha'."
+            }
+            [void](Wait-Name 'GameSummary' $summary)
+            [void](Wait-VisibleById 'GameCover')
+            $report.phases += 'persisted-facts'
+
+            Assert-NoRemoteConnections 'game page'
+            $report.phases += 'persisted-no-provider-traffic'
+        }
+    }
     elseif ($Mode -eq 'long-list') {
         $target = 'ZZZ Focus Target Guide'
         Select-Element 'Route Test Game'
@@ -2547,13 +2719,14 @@ try {
 catch {
     $report.error = $_ | Out-String
     if (($Mode -eq 'game-editor' -or $Mode -eq 'catalog' -or $Mode -like 'import-*' -or $Mode -like 'remove-*' -or
-        $Mode -like 'provider-*') -and $root) {
+        $Mode -like 'provider-*' -or $Mode -like 'game-actions*') -and $root) {
         try {
             foreach ($id in @('ShellStatus', 'GameHeading',
                 'GameTitleFeedback', 'GameSaveError', 'GameSearchStatus',
                 'ProviderSettingsStatus', 'GameEditorNotice', 'GameAttribution',
                 'ImportStatus', 'ImportGuideDialog', 'ImportBusyText',
-                'RemoveGuideDialog', 'RemoveGuideMessage', 'RemoveSelectedGuide')) {
+                'RemoveGuideDialog', 'RemoveGuideMessage', 'RemoveSelectedGuide',
+                'RemoveGameButton', 'RemoveGameHint', 'RemoveGameDialog', 'RemoveGameMessage')) {
                 $element = Find-ById $id
                 if ($element) {
                     $report["failure$id"] = [ordered]@{

@@ -171,6 +171,74 @@ if (args.Length == 2 && args[0] == "describe-import")
     return 0;
 }
 
+if (args.Length == 2 && args[0] == "describe-actions")
+{
+    // Read-only, without InitializeAsync: its artwork sweep would hide a
+    // removed game's leftover artwork folder (ruling 20).
+    ManagedPathResolver actionsPaths = new(args[1]);
+    using SqliteConnection actionsConnection = new(new SqliteConnectionStringBuilder
+    {
+        DataSource = actionsPaths.DatabasePath,
+        Mode = SqliteOpenMode.ReadOnly,
+        Pooling = false
+    }.ToString());
+    actionsConnection.Open();
+    List<T> Rows<T>(string sql, Func<SqliteDataReader, T> read)
+    {
+        using SqliteCommand command = actionsConnection.CreateCommand();
+        command.CommandText = sql;
+        using SqliteDataReader reader = command.ExecuteReader();
+        List<T> rows = [];
+        while (reader.Read())
+        {
+            rows.Add(read(reader));
+        }
+        return rows;
+    }
+    var actionsGames = Rows(
+        "SELECT Id, Title, ProviderGameId, ArtworkRelativePath FROM Games ORDER BY Title",
+        reader => new
+        {
+            Id = reader.GetString(0),
+            Title = reader.GetString(1),
+            ExternalId = reader.IsDBNull(2) ? null : reader.GetString(2),
+            ArtworkRelativePath = reader.IsDBNull(3) ? null : reader.GetString(3),
+        });
+    var actionsGuides = Rows(
+        "SELECT GameId, Id FROM Guides",
+        reader => (GameId: reader.GetString(0), GuideId: reader.GetString(1)));
+    ManagedArtworkStore actionsStore = new(actionsPaths);
+    string[] artworkFolders = Directory.Exists(actionsPaths.ArtworkRoot)
+        ? [.. Directory.EnumerateDirectories(actionsPaths.ArtworkRoot).Select(folder => Path.GetFileName(folder))]
+        : [];
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        GameCount = actionsGames.Count,
+        Games = actionsGames.Select(row => new
+        {
+            row.Id,
+            row.Title,
+            row.ExternalId,
+            row.ArtworkRelativePath,
+            ArtworkExists = row.ArtworkRelativePath is { } path && actionsStore.ResolveFile(path) is not null,
+            GuideIds = actionsGuides.Where(guide => guide.GameId == row.Id).Select(guide => guide.GuideId),
+        }),
+        ArtworkFolders = artworkFolders,
+        ReadingStates = Rows(
+            "SELECT GuideId, EstimatedFraction, LastOpenedUtcMs FROM ReadingStates",
+            reader => new
+            {
+                GuideId = reader.GetString(0),
+                EstimatedFraction = reader.IsDBNull(1) ? (double?)null : reader.GetDouble(1),
+                LastOpenedUtcMs = reader.IsDBNull(2) ? (long?)null : reader.GetInt64(2),
+            }),
+        LastActiveGuideId = Rows(
+            "SELECT Value FROM Settings WHERE Key = 'LastActiveGuideId'",
+            reader => reader.GetString(0)).FirstOrDefault(),
+    }));
+    return 0;
+}
+
 if (args.Length == 3 && args[0] == "check-igdb-fields")
 {
     Dictionary<string, string> labelled = File.ReadLines(args[1])
@@ -309,12 +377,13 @@ if (args.Length == 2 &&
 
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second" or
-        "seed-design" or "seed-catalog" or "seed-facts" or "seed-search" or "seed-import"))
+        "seed-design" or "seed-catalog" or "seed-facts" or "seed-search" or "seed-import" or
+        "seed-actions"))
 {
     Console.Error.WriteLine(
-        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-search|seed-import " +
+        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-search|seed-import|seed-actions " +
         "<app-data-root> " +
-        "or seed-linked-game|describe-providers|describe-import <app-data-root> " +
+        "or seed-linked-game|describe-providers|describe-import|describe-actions <app-data-root> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
         "or invalidate-blocked-guide <app-data-root> " +
         "or corrupt-reader-guide|restore-reader-guide <app-data-root> " +
@@ -595,6 +664,59 @@ if (args[0] == "seed-search")
         throw new InvalidOperationException("The search seed did not read back in activity order.");
     }
     Console.WriteLine("Seeded four search games.");
+    return 0;
+}
+
+if (args[0] == "seed-actions")
+{
+    if ((await repository.ListGamesAsync()).Count != 0)
+    {
+        throw new InvalidOperationException("The game actions seed needs an empty library.");
+    }
+    long actionsNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    DateTime actionsYesterday = TimeZoneInfo.ConvertTime(
+        DateTimeOffset.FromUnixTimeMilliseconds(actionsNow), TimeZoneInfo.Local).Date.AddDays(-1).AddHours(12);
+    long alphaOpened = new DateTimeOffset(
+        actionsYesterday, TimeZoneInfo.Local.GetUtcOffset(actionsYesterday)).ToUnixTimeMilliseconds();
+    ManagedArtworkStore actionsArtwork = new(paths);
+    async Task<Guid> AddActionsGameAsync(string title, string externalId, byte[] cover)
+    {
+        Guid id = Guid.NewGuid();
+        StoredArtwork stored = await actionsArtwork.StoreAsync(id, cover, CancellationToken.None);
+        await repository.AddLinkedGameAsync(new NewLinkedGame(
+            id, title, "PC",
+            new ProviderGameLink(ProviderGameLink.Igdb, externalId, DateTimeOffset.UtcNow),
+            new GameMetadataSnapshot(
+                GameMetadataSnapshot.CurrentSchemaVersion,
+                "A seeded summary for the game actions check.",
+                null, [], [], [], [], null, GameTypeTag.MainGame),
+            stored.RelativePath), CancellationToken.None);
+        return id;
+    }
+
+    Guid renameGameId = await AddActionsGameAsync(
+        "Linked Rename Game", "900100", SolidPng(60, 90, 0x2E, 0x5E, 0x8C));
+    Guid emptyGameId = await AddActionsGameAsync(
+        "Empty Linked Game", "900101", SolidPng(60, 90, 0x8C, 0x4A, 0x2E));
+    Guid alphaId = Guid.NewGuid();
+    Guid betaId = Guid.NewGuid();
+    await InsertGuideAsync(paths, renameGameId, alphaId, "Alpha Route Guide", actionsNow);
+    await InsertGuideAsync(paths, renameGameId, betaId, "Beta Route Guide", actionsNow);
+    // No writer for reading state exists yet (T12.3, T13.2), so set it here.
+    ExecuteSql(paths, $"""
+        UPDATE ReadingStates SET EstimatedFraction = 0.45, LastOpenedUtcMs = {alphaOpened}
+            WHERE GuideId = '{alphaId:N}';
+        """);
+    AppSettings actionsSettings = await repository.GetSettingsAsync();
+    await repository.SaveSettingsAsync(actionsSettings with { LastActiveGuideId = betaId });
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        RenameGameId = renameGameId.ToString("N"),
+        EmptyGameId = emptyGameId.ToString("N"),
+        AlphaGuideId = alphaId.ToString("N"),
+        BetaGuideId = betaId.ToString("N"),
+        AlphaLastOpenedUtcMs = alphaOpened,
+    }));
     return 0;
 }
 
