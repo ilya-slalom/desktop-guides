@@ -257,12 +257,6 @@
                                 Click="RemoveGameClicked"
                                 AutomationProperties.AutomationId="RemoveGameButton" />
                     </Grid>
-                    <TextBlock x:Name="RemoveGameHint"
-                               Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
-                               HorizontalAlignment="Right"
-                               TextWrapping="Wrap"
-                               Visibility="Collapsed"
-                               AutomationProperties.AutomationId="RemoveGameHint" />
                 </StackPanel>
 
                 <Border x:Name="GameMetadataSurface"
