@@ -1,7 +1,7 @@
 # T04.2 Game rename and remove actions design
 
 Status: implemented on `feat/p1-t04-2-game-actions`; verified by CI run
-[36818691348](https://github.com/ilya-slalom/desktop-guides/actions/runs/36818691348). Prerequisites T04.1 (PR #11), T04.4 (PR #14), T05.4 (PR #16) and
+[36827722176](https://github.com/ilya-slalom/desktop-guides/actions/runs/36827722176). Prerequisites T04.1 (PR #11), T04.4 (PR #14), T05.4 (PR #16) and
 T11.1 (PR #6) are merged.
 
 ## Intent
@@ -286,7 +286,7 @@ the Game page with the hint and the removal dialog, in light and dark.
     state intact, `NotFound`, `Guid.Empty`, other games untouched, the
     artwork file and folder deleted, a locked artwork file swept at the
     next start, and a publication into a removed game leaving nothing.
-- **Installed.** CI run [36818691348](https://github.com/ilya-slalom/desktop-guides/actions/runs/36818691348)
+- **Installed.** CI run [36827722176](https://github.com/ilya-slalom/desktop-guides/actions/runs/36827722176)
   passed `production-shell-ui`:
   - `game-actions`, light and dark: phases `remove-disabled-with-guides`,
     `guide-list-keeps-a-row`, `rename-keeps-selection`,
