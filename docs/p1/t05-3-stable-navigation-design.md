@@ -2,7 +2,10 @@
 
 Status: design approved in brainstorming on 1 October 2026;
 implementation planned in
-[t05-3-stable-navigation-plan.md](t05-3-stable-navigation-plan.md).
+[t05-3-stable-navigation-plan.md](t05-3-stable-navigation-plan.md) and
+verified in CI run
+[36857845252](https://github.com/ilya-slalom/desktop-guides/actions/runs/36857845252)
+(see the [verification record](#t053-verification-record)).
 Prerequisites T04.2 (PR #25), T05.2 (PR #24), T06.3 (PR #19) and T15.3
 (PR #22) are merged.
 
@@ -236,3 +239,46 @@ Back and list changes keep the person's place by ID: Back to Library
 focuses the opened game with the query intact, Back to a Game restores its
 selected guide, removals select the nearest survivor, and late async work
 can't move focus or selection to a stale row.
+
+## T05.3 verification record
+
+- **Unit tests.** On `pcsx2-win`, Core 301/301 and Infrastructure 429/429
+  passed. The new tests are:
+  - `ListAnchorTests`: the anchor kept, including after a reorder; the next
+    row, the previous row, and the nearest further survivor when the
+    anchor is removed; `null` for an empty list, a `null` anchor, or an
+    anchor that wasn't in the previous list; null lists rejected;
+  - `ShellNavigatorTests`: `OpenGame` and `OpenReader` set the anchors
+    `GoBack` returns; Resume from the Library anchors the Game entry on the
+    guide and the Library entry on the game; `SetAnchor` replaces the
+    anchor and throws on Reader and Settings; `ResetToLibrary` clears every
+    anchor; reopening the current route keeps its anchor; route equality
+    stays ID-only.
+- **Installed.** CI run
+  [36857845252](https://github.com/ilya-slalom/desktop-guides/actions/runs/36857845252)
+  on `7c1f467` passed every job, `production-shell-ui` included:
+  - `stable-navigation`, light and dark, against each exit criterion:
+    - Back to Library restores its query and the opened row:
+      `resume-back-keeps-query-and-row` and `back-focuses-opened-row`;
+    - Reader → Game keeps guide selection and focus:
+      `reader-back-keeps-guide`, plus `settings-back-keeps-guide` and
+      `other-game-back-keeps-guide`;
+    - ID-based selection after removal: `remove-selects-next-guide`,
+      `remove-last-selects-previous-guide` and `remove-keeps-query`;
+    - after rename: `rename-keeps-query-and-falls-back`;
+    - `navigation-no-provider-traffic`.
+  - after import: `import-publish` (light) phase `query-kept-after-import`;
+  - `catalog` (`catalog-keyboard`) and `library-search`
+    (`search-kept-after-back`), light and dark, now assert the opened row
+    has focus after Back.
+- **Stale refresh.** No smoke phase: CI has no provider keys, so a refresh
+  fails at once and can't be ordered against a navigation. The route check
+  in the queued refresh action and the generation checks were covered in
+  the final review.
+- **Evidence.** Back to Library with the query kept and the opened row
+  focused, not selected:
+  [light](evidence/t05-3-stable-navigation/library-focus-restored-light.png)
+  and [dark](evidence/t05-3-stable-navigation/library-focus-restored-dark.png).
+- **Rulings.** Planning rulings 1–7 in the
+  [plan](t05-3-stable-navigation-plan.md#rulings-carried-from-planning); the final review found no
+  functional defects, and its two smoke races were fixed in `7c1f467`.
