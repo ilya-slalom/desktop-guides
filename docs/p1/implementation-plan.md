@@ -688,17 +688,19 @@ artwork, Guide IDs, reading state, Resume and selected guide, after a
 refresh and after a restart. Remove game removes only a game without
 guides; for a game with guides it is disabled, with the visible hint
 `Remove this game's guides first.`. The confirmation defaults to Cancel.
+After a removal the Library is shown with an empty back stack, and the
+artwork is deleted best effort, with the startup sweep removing anything
+left. CI run 36827722176 passed `game-actions` in light and dark and
+`game-actions-persisted`.
 
 T04.3 is implemented on `feat/p1-t04-3-game-removal` (PR #26). Remove game
 works for every game: the confirmation states the guide and managed-file
 counts, and one Remove deletes the game, its guides, state, preferences,
 provider link, artwork and content through the T15.3 deletion journal as a
 `DeleteGame` operation. A changed count shows the dialog again rather than
-deleting. See the [design and verification record](t04-3-game-removal-design.md).
-After a removal the Library is shown with an empty back stack, and the
-artwork is deleted best effort, with the startup sweep removing anything
-left. CI run 36827722176 passed `game-actions` in light and dark and
-`game-actions-persisted`.
+deleting. CI run 36841135926 passed `game-actions` in light and dark and
+`game-actions-persisted`. See the
+[design and verification record](t04-3-game-removal-design.md).
 
 ### UI design-language and Gallery adoption sequence
 
