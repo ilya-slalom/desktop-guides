@@ -702,6 +702,16 @@ deleting. CI run 36841135926 passed `game-actions` in light and dark and
 `game-actions-persisted`. See the
 [design and verification record](t04-3-game-removal-design.md).
 
+T05.3 was merged through PR #27 on 1 October 2026, merge commit `8dd9cd5`;
+see the [design and verification record](t05-3-stable-navigation-design.md).
+Each back-stack entry keeps an anchor ID: Back to Library focuses the opened
+game row without selecting it and keeps the query, and Back to a Game
+restores its selected guide. Guide removal selects the nearest surviving
+guide through `ListAnchor.Resolve`. A metadata refresh re-renders only while
+its game is current, and every focus or selection restore checks the render
+generation and route. CI run 36857845252 passed `stable-navigation` in light
+and dark.
+
 ### UI design-language and Gallery adoption sequence
 
 The WinUI Gallery is a reference catalog, not a package or shell dependency.
