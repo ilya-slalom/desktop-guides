@@ -45,6 +45,9 @@ public sealed partial class ShellWindow : Window
     private Guid? resumeGuideId;
     private Guid? pendingGuideFocus;
     private int guideFocusRenderGeneration = -1;
+    // Set by Back to the Library; the next Library render focuses the anchored row.
+    private bool libraryFocusPending;
+    private int libraryFocusGeneration = -1;
     private int renderGeneration;
     private long gameGuideIntentVersion;
     private long statusSequence;
@@ -402,6 +405,7 @@ public sealed partial class ShellWindow : Window
         {
             pendingGuideFocus = reader.GuideId;
         }
+        libraryFocusPending = navigator.Current is LibraryRoute;
         await RenderCurrentAsync();
     }
 
@@ -571,6 +575,49 @@ public sealed partial class ShellWindow : Window
         else
         {
             guideFocusRenderGeneration = renderGeneration;
+        }
+    }
+
+    private void RestoreLibraryFocus(int generation)
+    {
+        libraryFocusGeneration = generation;
+        GameList.UpdateLayout();
+        TryRestoreLibraryFocus();
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (libraryFocusGeneration == generation)
+            {
+                GameList.UpdateLayout();
+                TryRestoreLibraryFocus();
+            }
+        });
+    }
+
+    // Focuses the anchored row, or the first row when the query hides it.
+    // Never sets SelectedItem: selecting a Library row opens the game.
+    private void TryRestoreLibraryFocus()
+    {
+        if (libraryFocusGeneration != renderGeneration || navigator.Current is not LibraryRoute)
+        {
+            return;
+        }
+        List<LibraryGameItem> rows = [.. GameList.Items.OfType<LibraryGameItem>()];
+        if (rows.Count == 0)
+        {
+            libraryFocusGeneration = -1;
+            Control fallback = LibrarySearchInput.IsEnabled ? LibrarySearchInput : AddGameButton;
+            fallback.Focus(FocusState.Programmatic);
+            return;
+        }
+        LibraryGameItem target = rows.FirstOrDefault(row => row.Game.Id == navigator.CurrentAnchor) ?? rows[0];
+        GameList.ScrollIntoView(target);
+        GameList.UpdateLayout();
+        // Focus can cause another layout pass. Suspend the callback while it runs.
+        libraryFocusGeneration = -1;
+        if (GameList.ContainerFromItem(target) is not Control container ||
+            !container.Focus(FocusState.Programmatic))
+        {
+            libraryFocusGeneration = renderGeneration;
         }
     }
 
@@ -1286,6 +1333,9 @@ public sealed partial class ShellWindow : Window
     {
         int generation = ++renderGeneration;
         guideFocusRenderGeneration = -1;
+        bool restoreLibraryFocus = libraryFocusPending;
+        libraryFocusPending = false;
+        libraryFocusGeneration = -1;
         if (navigator.Current is not GameRoute)
         {
             pendingGuideFocus = null;
@@ -1337,6 +1387,10 @@ public sealed partial class ShellWindow : Window
                     if (resume is not null)
                     {
                         ResumeButton.Content = $"Resume {resume.Title}";
+                    }
+                    if (restoreLibraryFocus)
+                    {
+                        RestoreLibraryFocus(generation);
                     }
                     ShowTransientStatus("Library ready.");
                     break;
