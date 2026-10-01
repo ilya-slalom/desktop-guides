@@ -31,23 +31,27 @@ public sealed class TextGuideDocument
     public string EncodingName { get; }
     public IReadOnlyList<int> LineStarts { get; }
 
+    public static bool HasUtf8Bom(ReadOnlySpan<byte> bytes) =>
+        bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
+
     public static TextGuideDocument Decode(byte[] bytes, int? codePage = null)
     {
         ArgumentNullException.ThrowIfNull(bytes);
 
-        bool hasUtf8Bom = bytes.Length >= 3 &&
-            bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
+        bool hasUtf8Bom = HasUtf8Bom(bytes);
         ReadOnlySpan<byte> contents = hasUtf8Bom ? bytes.AsSpan(3) : bytes;
+        // A BOM means UTF-8, whatever code page was stored or passed.
+        bool strictUtf8 = hasUtf8Bom || codePage is null;
         Encoding encoding;
-        if (codePage is int selectedCodePage)
+        if (strictUtf8)
         {
-            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            encoding = Encoding.GetEncoding(
-                selectedCodePage, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback);
+            encoding = new UTF8Encoding(false, true);
         }
         else
         {
-            encoding = new UTF8Encoding(false, true);
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            encoding = Encoding.GetEncoding(
+                codePage!.Value, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback);
         }
 
         string decoded;
@@ -55,7 +59,7 @@ public sealed class TextGuideDocument
         {
             decoded = encoding.GetString(contents);
         }
-        catch (DecoderFallbackException exception) when (codePage is null)
+        catch (DecoderFallbackException exception) when (strictUtf8)
         {
             throw new EncodingSelectionRequiredException(exception);
         }
