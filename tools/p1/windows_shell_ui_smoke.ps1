@@ -1683,6 +1683,7 @@ try {
         # Library -> another game -> Back, Back returns to Atlas's guide.
         Press-Enter (Wait-VisibleById 'LibraryNavigation')
         [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Status 'Library ready.')
         Assert-QueryKept 'The Library navigation item'
         Select-Element $beacon
         [void](Wait-Name 'GameHeading' $beacon)
@@ -2101,6 +2102,7 @@ try {
             }
             if ($Mode -eq 'import-publish') {
                 Set-SearchQuery 'Import Test' 'LibrarySearchInput'
+                [void](Wait-Status '1 of 1 games match.' -AllowHidden)
                 [void](Wait-GameRow 'Import Test Game')
             }
             Select-Element 'Import Test Game'
