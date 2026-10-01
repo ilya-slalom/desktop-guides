@@ -1,11 +1,5 @@
 namespace DesktopGuides.Core.Library;
 
-public enum EmptyGameRemovalOutcome { Removed, NotFound, HasGuides }
-
-/// <summary>The artwork path is set only for Removed, and only when the game had artwork.</summary>
-public sealed record EmptyGameRemoval(
-    EmptyGameRemovalOutcome Outcome, string? ArtworkRelativePath);
-
 /// <summary>What the confirmation states: the game, its guide count and its managed-file count.</summary>
 public sealed record GameRemovalPreview(Guid GameId, string Title, int GuideCount, int FileCount);
 

@@ -3,7 +3,7 @@ using DesktopGuides.Core.Paths;
 
 namespace DesktopGuides.Infrastructure.Storage;
 
-internal enum RemovalCheckpoint { Prepared, Moved, InCommit, Committed }
+internal enum RemovalCheckpoint { Prepared, MovedGuide, Moved, InCommit, Committed }
 
 /// <summary>
 /// Removes a guide and its owned files. The removal holds the library write
