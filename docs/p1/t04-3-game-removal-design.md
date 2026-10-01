@@ -1,6 +1,6 @@
 # T04.3 Game removal design
 
-Status: designed on `feat/p1-t04-3-game-removal` on 1 October 2026.
+Status: implemented on `feat/p1-t04-3-game-removal`; verified by CI run 36841135926 on 1 October 2026.
 Prerequisites T04.2 (PR #25), T04.4 (PR #14) and T15.3 (PR #22) are merged.
 
 ## Intent
@@ -394,3 +394,19 @@ Game hasn't come back.
 
 The PR names T04.3, its merged prerequisites, and the outcome. Its body shows
 the counted removal dialog in light and dark.
+
+## T04.3 verification record
+
+- Core tests: 280 passed on `pcsx2-win` (Release, x64).
+- Infrastructure tests: 429 passed on `pcsx2-win`, including the
+  31 `GameRemovalTests`.
+- CI run [36841135926](https://github.com/ilya-slalom/desktop-guides/actions/runs/36841135926):
+  every job passed. `production-shell-ui` ran `remove-with-guides-cancel`,
+  `remove-with-guides` and `remove-enabled-with-guides` in light and dark,
+  and `describe-actions` found no Guided Remove Game rows, content, artwork,
+  trash entries or file operations after each run and after the relaunch.
+- Screenshots: [light](evidence/t04-3-game-removal/remove-game-with-guides-confirm-light.png)
+  and [dark](evidence/t04-3-game-removal/remove-game-with-guides-confirm-dark.png).
+- Not exercised in the installed smoke: the changed-count re-prompt
+  (ruling 2), a failed restore and a pending cleanup. Infrastructure tests
+  cover them.
