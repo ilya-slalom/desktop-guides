@@ -658,7 +658,8 @@ restores the guide, and a failure after it leaves a journaled trash entry
 that startup deletes. CI run 36688055406 passed the installed removal group:
 a dark Cancel and a light removal.
 
-T05.1 is implemented on `feat/p1-t05-1-guide-rows`; see the
+T05.1 was merged through PR #23 on 30 September 2026, merge commit
+`d94df92`; see the
 [design and verification record](t05-1-guide-rows-design.md). The Library
 lists games by last activity (creation, import or open, newest first), and
 the Game page lists guides by import or open time. Each row shows its tile,
@@ -668,7 +669,8 @@ unread guide reads `Not started`. One SQLite query feeds each list, and
 listing never opens guide files or calls a provider. CI run 36705946660
 passed `catalog-facts` in light and dark.
 
-T05.2 is implemented on `feat/p1-t05-2-library-search`; see the
+T05.2 was merged through PR #24 on 1 October 2026, merge commit
+`b774fd4`; see the
 [design and verification record](t05-2-library-search-design.md). The
 Library search box filters games whose title, or one of whose guide
 titles, contains the query, ignoring case, accents and width. A guide-only
