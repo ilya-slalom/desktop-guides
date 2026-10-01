@@ -834,6 +834,29 @@ function Run-LibrarySearchScenarios {
     }
 }
 
+function Run-StableNavigationScenarios {
+    # The smoke renames and removes, so each theme gets a fresh seed.
+    $originalTheme = Get-AppThemePreference
+    try {
+        Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+        Invoke-ShellSeed @('seed-navigation', $dataRoot) | Out-Null
+        Set-AppThemePreference $true
+        Start-InstalledShell
+        $report.stableNavigationLight = Run-ShellSmoke 'stable-navigation' -ResultName 'stable-navigation-light'
+        Close-InstalledShell
+
+        Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+        Invoke-ShellSeed @('seed-navigation', $dataRoot) | Out-Null
+        Set-AppThemePreference $false
+        Start-InstalledShell
+        $report.stableNavigationDark = Run-ShellSmoke 'stable-navigation' -ResultName 'stable-navigation-dark'
+        Close-InstalledShell
+    }
+    finally {
+        Restore-AppThemePreference $originalTheme
+    }
+}
+
 function Run-ImportScenarios {
     Invoke-ShellSeed @('seed-import', $dataRoot) | Out-Null
     $originalTheme = Get-AppThemePreference
@@ -1341,6 +1364,7 @@ try {
         Run-CatalogFactsScenarios
         Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
         Run-LibrarySearchScenarios
+        Run-StableNavigationScenarios
         $report.success = $true
         return
     }
@@ -1420,6 +1444,7 @@ try {
     Run-CatalogFactsScenarios
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-LibrarySearchScenarios
+    Run-StableNavigationScenarios
 
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-ImportScenarios
