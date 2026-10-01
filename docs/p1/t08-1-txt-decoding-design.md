@@ -2,8 +2,9 @@
 
 Status: design approved in brainstorming on 1 October 2026;
 implementation planned in
-[t08-1-txt-decoding-plan.md](t08-1-txt-decoding-plan.md) and verified in
-host unit runs (see the [verification record](#t081-verification-record)).
+[t08-1-txt-decoding-plan.md](t08-1-txt-decoding-plan.md) and verified in CI run
+[36865349872](https://github.com/ilya-slalom/desktop-guides/actions/runs/36865349872)
+(see the [verification record](#t081-verification-record)).
 Prerequisites T06.3 (PR #19) and T11.2 (M0, PR #3) are merged.
 
 ## Intent
@@ -239,6 +240,10 @@ changed copy still opens and is flagged.
     deleted guide folder and an escaping path; TooLarge at 64 MiB + 1;
     Unreadable while locked; InvalidMetadata without reading; cancellation
     throws).
-- **CI.** Pending the PR run.
+- **CI.** Run
+  [36865349872](https://github.com/ilya-slalom/desktop-guides/actions/runs/36865349872)
+  on `599b283` passed every job, including `core-tests` and
+  `native-arm64-core`, which run the Core and Infrastructure tests on x64
+  and arm64.
 - **Rulings.** Planning rulings 1–6 in the
   [plan](t08-1-txt-decoding-plan.md#rulings-carried-from-planning).
