@@ -7,7 +7,7 @@ param(
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
         'reader-render-error-observed', 'reader-render-error-result',
-        'late-guide-after-close', 'waiting-handoff', 'material', 'catalog', 'catalog-facts', 'library-search',
+        'late-guide-after-close', 'waiting-handoff', 'material', 'catalog', 'catalog-facts', 'library-search', 'stable-navigation',
         'provider-none', 'provider-offline', 'provider-settings',
         'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
@@ -1592,10 +1592,155 @@ try {
             throw 'Back to the Library dropped the search query.'
         }
         [void](Assert-RowFacts 'GameList' @(,$zetaMatch))
+        [void](Wait-FocusedGameRow $zeta)
         $report.phases += 'search-kept-after-back'
 
         Assert-NoRemoteConnections 'library search'
         $report.phases += 'search-no-provider-traffic'
+    }
+    elseif ($Mode -eq 'stable-navigation') {
+        $atlas = 'Atlas Navigation Game'
+        $beacon = 'Beacon Navigation Game'
+        $cobalt = 'Cobalt Other Game'
+        $renamedBeacon = 'Beacon Renamed Game'
+        $query = 'navigation'
+
+        function Assert-QueryKept([string] $where) {
+            if ((Get-SearchText 'LibrarySearchInput') -ne $query) {
+                throw "$where dropped the Library search query."
+            }
+        }
+
+        function Assert-NavigationRows {
+            [void](Wait-GameRow $atlas)
+            [void](Wait-GameRow $beacon)
+            if ((Count-GameRows $cobalt) -ne 0) {
+                throw "The '$query' query showed $cobalt."
+            }
+        }
+
+        function Back-ToLibrary([string] $where) {
+            Go-Back
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            [void](Wait-Status 'Library ready.')
+            Assert-QueryKept $where
+        }
+
+        function Open-AtlasGame {
+            Select-Element $atlas
+            [void](Wait-Name 'GameHeading' $atlas)
+            [void](Wait-Status 'Game ready.')
+        }
+
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-EnabledById 'LibrarySearchInput')
+        Set-SearchQuery $query 'LibrarySearchInput'
+        [void](Wait-Status '2 of 3 games match.' -AllowHidden)
+        Assert-NavigationRows
+
+        # Resume pushes Library -> Game -> Reader; Back walks the same entries.
+        Invoke-Element (Wait-Name 'ResumeGuide' 'Resume Beacon Guide')
+        [void](Wait-Name 'ReaderHeading' 'Beacon Guide')
+        [void](Wait-Status 'Guide details ready.')
+        Go-Back
+        [void](Wait-Name 'GameHeading' $beacon)
+        [void](Wait-Status 'Game ready.')
+        [void](Wait-SelectedGuide 'Beacon Guide')
+        [void](Wait-FocusedGuide 'Beacon Guide')
+        Back-ToLibrary 'Back after Resume'
+        Assert-NavigationRows
+        [void](Wait-FocusedGameRow $beacon)
+        $report.phases += 'resume-back-keeps-query-and-row'
+
+        # Focus returns to the opened row without selecting (opening) it.
+        Open-AtlasGame
+        Back-ToLibrary 'Back from a game'
+        [void](Wait-FocusedGameRow $atlas)
+        Start-Sleep -Milliseconds 500
+        [void](Wait-HiddenById 'GameHeading')
+        [void](Wait-HiddenById 'ShellStatus')
+        $report.libraryFocusScreenshot = Save-WindowScreenshot 'library-focus-restored'
+        $report.phases += 'back-focuses-opened-row'
+
+        Open-AtlasGame
+        Open-GuideFromGame 'Atlas Second Guide'
+        [void](Wait-Name 'ReaderHeading' 'Atlas Second Guide')
+        [void](Wait-Status 'Guide details ready.')
+        Go-Back
+        [void](Wait-Name 'GameHeading' $atlas)
+        [void](Wait-SelectedGuide 'Atlas Second Guide')
+        [void](Wait-FocusedGuide 'Atlas Second Guide')
+        $report.phases += 'reader-back-keeps-guide'
+
+        Select-Element 'Settings'
+        [void](Wait-Name 'SettingsHeading' 'Settings')
+        Go-Back
+        [void](Wait-Name 'GameHeading' $atlas)
+        [void](Wait-Status 'Game ready.')
+        [void](Wait-SelectedGuide 'Atlas Second Guide')
+        $report.phases += 'settings-back-keeps-guide'
+
+        # Library -> another game -> Back, Back returns to Atlas's guide.
+        Press-Enter (Wait-VisibleById 'LibraryNavigation')
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        [void](Wait-Status 'Library ready.')
+        Assert-QueryKept 'The Library navigation item'
+        Select-Element $beacon
+        [void](Wait-Name 'GameHeading' $beacon)
+        [void](Wait-Status 'Game ready.')
+        Back-ToLibrary 'Back from another game'
+        [void](Wait-FocusedGameRow $beacon)
+        Go-Back
+        [void](Wait-Name 'GameHeading' $atlas)
+        [void](Wait-Status 'Game ready.')
+        [void](Wait-SelectedGuide 'Atlas Second Guide')
+        $report.phases += 'other-game-back-keeps-guide'
+
+        # Removal selects the next row, then the previous one at the end.
+        Invoke-Element (Wait-Name 'RemoveSelectedGuide' 'Remove Atlas Second Guide')
+        [void](Wait-VisibleById 'RemoveGuideDialog')
+        Invoke-Element (Wait-EnabledById 'PrimaryButton')
+        [void](Wait-HiddenById 'RemoveGuideDialog')
+        [void](Wait-Status 'Removed Atlas Second Guide.')
+        [void](Wait-GuideRowCount 2)
+        [void](Wait-SelectedGuide 'Atlas First Guide')
+        [void](Wait-FocusedGuide 'Atlas First Guide')
+        $report.phases += 'remove-selects-next-guide'
+
+        Invoke-Element (Wait-Name 'RemoveSelectedGuide' 'Remove Atlas First Guide')
+        [void](Wait-VisibleById 'RemoveGuideDialog')
+        Invoke-Element (Wait-EnabledById 'PrimaryButton')
+        [void](Wait-HiddenById 'RemoveGuideDialog')
+        [void](Wait-Status 'Removed Atlas First Guide.')
+        [void](Wait-GuideRowCount 1)
+        [void](Wait-SelectedGuide 'Atlas Third Guide')
+        [void](Wait-FocusedGuide 'Atlas Third Guide')
+        $report.phases += 'remove-last-selects-previous-guide'
+
+        # This Library entry is the one Atlas was opened from.
+        Back-ToLibrary 'Back after guide removal'
+        [void](Wait-FocusedGameRow $atlas)
+        $report.phases += 'remove-keeps-query'
+
+        # A rename that leaves the query hides the row; focus takes the first row.
+        Select-Element $beacon
+        [void](Wait-Name 'GameHeading' $beacon)
+        [void](Wait-Status 'Game ready.')
+        Invoke-Element (Wait-EnabledById 'EditGameButton')
+        Set-Text 'GameTitleInput' $renamedBeacon
+        Press-Enter (Wait-VisibleById 'GameTitleInput')
+        [void](Wait-Name 'GameHeading' $renamedBeacon)
+        [void](Wait-Status 'Game ready.')
+        Back-ToLibrary 'Back after rename'
+        [void](Wait-GameRow $atlas)
+        if ((Count-GameRows $renamedBeacon) -ne 0) {
+            throw "The '$query' query showed the renamed game."
+        }
+        [void](Wait-FocusedGameRow $atlas)
+        $report.phases += 'rename-keeps-query-and-falls-back'
+
+        Assert-NoRemoteConnections 'stable navigation'
+        $report.phases += 'navigation-no-provider-traffic'
     }
     elseif ($Mode -eq 'catalog') {
         $catalogStarted = Get-Date
@@ -1692,17 +1837,14 @@ try {
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
         [void](Wait-Status 'Library ready.')
-        Focus-And-Verify 'AddGameButton'
-        [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
-        [void](Wait-FocusWithin 'LibrarySearchInput')
-        [System.Windows.Forms.SendKeys]::SendWait('{TAB}')
-        [void](Wait-FocusedGameRow '')
+        [void](Wait-FocusedGameRow $shortTitle)
         [System.Windows.Forms.SendKeys]::SendWait('{END}')
         [void](Wait-Name 'GameHeading' $lastTitle)
         [void](Wait-Status 'Game ready.')
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
         [void](Wait-Status 'Library ready.')
+        [void](Wait-FocusedGameRow $lastTitle)
         $report.phases += 'catalog-keyboard'
 
         [void](Wait-HiddenById 'ShellStatus')
@@ -1958,6 +2100,11 @@ try {
             if ($Mode -ne 'import-publish' -and -not $ExpectedGuideTitle) {
                 throw "$Mode needs -ExpectedGuideTitle."
             }
+            if ($Mode -eq 'import-publish') {
+                Set-SearchQuery 'Import Test' 'LibrarySearchInput'
+                [void](Wait-Status '1 of 1 games match.' -AllowHidden)
+                [void](Wait-GameRow 'Import Test Game')
+            }
             Select-Element 'Import Test Game'
             [void](Wait-Name 'GameHeading' 'Import Test Game')
             [void](Wait-Status 'Game ready.')
@@ -1987,6 +2134,14 @@ try {
                 $report.importedTitle = $importTitle
                 $report.importPublishedScreenshot = Save-WindowScreenshot 'import-published'
                 $report.phases += 'import-published'
+                Go-Back
+                [void](Wait-Name 'LibraryHeading' 'Library')
+                [void](Wait-Status 'Library ready.')
+                if ((Get-SearchText 'LibrarySearchInput') -ne 'Import Test') {
+                    throw 'Back after an import dropped the Library search query.'
+                }
+                [void](Wait-FocusedGameRow 'Import Test Game')
+                $report.phases += 'query-kept-after-import'
             }
             else {
                 $duplicateMessage = 'This file is already in Import Test Game as "' + $ExpectedGuideTitle + '".'

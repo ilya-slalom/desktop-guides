@@ -45,6 +45,9 @@ public sealed partial class ShellWindow : Window
     private Guid? resumeGuideId;
     private Guid? pendingGuideFocus;
     private int guideFocusRenderGeneration = -1;
+    // Set by Back to the Library; the next Library render focuses the anchored row.
+    private bool libraryFocusPending;
+    private int libraryFocusGeneration = -1;
     private int renderGeneration;
     private long gameGuideIntentVersion;
     private long statusSequence;
@@ -272,7 +275,8 @@ public sealed partial class ShellWindow : Window
             ApplyWindowMaterial(requestedMaterial);
             WindowMaterialSelector.IsEnabled = true;
             ready = true;
-            await RenderCurrentAsync();
+            // Queued like every other render, so a quick first click can't be overwritten.
+            await RunNavigationAsync(() => RenderCurrentAsync());
             if (EffectiveMaterial != requestedMaterial)
             {
                 ShowWarningStatus(MaterialFallbackMessage(requestedMaterial));
@@ -401,6 +405,7 @@ public sealed partial class ShellWindow : Window
         {
             pendingGuideFocus = reader.GuideId;
         }
+        libraryFocusPending = navigator.Current is LibraryRoute;
         await RenderCurrentAsync();
     }
 
@@ -448,6 +453,10 @@ public sealed partial class ShellWindow : Window
         if (settingGuideSelection)
         {
             return;
+        }
+        if (navigator.Current is GameRoute)
+        {
+            navigator.SetAnchor(SelectedGuide?.Id);
         }
         UpdateOpenSelectedGuideAction();
         if (SelectedGuide is Guide guide)
@@ -567,6 +576,67 @@ public sealed partial class ShellWindow : Window
         {
             guideFocusRenderGeneration = renderGeneration;
         }
+    }
+
+    private void RestoreLibraryFocus(int generation)
+    {
+        libraryFocusGeneration = generation;
+        GameList.UpdateLayout();
+        TryRestoreLibraryFocus();
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (libraryFocusGeneration == generation)
+            {
+                GameList.UpdateLayout();
+                TryRestoreLibraryFocus();
+            }
+        });
+    }
+
+    // Focuses the anchored row, or the first row when the query hides it.
+    // Never sets SelectedItem: selecting a Library row opens the game.
+    private void TryRestoreLibraryFocus()
+    {
+        if (libraryFocusGeneration != renderGeneration || navigator.Current is not LibraryRoute)
+        {
+            return;
+        }
+        List<LibraryGameItem> rows = [.. GameList.Items.OfType<LibraryGameItem>()];
+        if (rows.Count == 0)
+        {
+            libraryFocusGeneration = -1;
+            Control fallback = LibrarySearchInput.IsEnabled ? LibrarySearchInput : AddGameButton;
+            fallback.Focus(FocusState.Programmatic);
+            return;
+        }
+        LibraryGameItem target = rows.FirstOrDefault(row => row.Game.Id == navigator.CurrentAnchor) ?? rows[0];
+        GameList.ScrollIntoView(target);
+        GameList.UpdateLayout();
+        // Focus can cause another layout pass. Suspend the callback while it runs.
+        libraryFocusGeneration = -1;
+        if (GameList.ContainerFromItem(target) is not Control container ||
+            !container.Focus(FocusState.Programmatic))
+        {
+            libraryFocusGeneration = renderGeneration;
+        }
+    }
+
+    private static bool FocusIsWithin(UIElement container)
+    {
+        if (container.XamlRoot is null)
+        {
+            return false;
+        }
+        for (DependencyObject? element = FocusManager.GetFocusedElement(container.XamlRoot) as DependencyObject;
+            element is not null;
+            element = VisualTreeHelper.GetParent(element))
+        {
+            if (ReferenceEquals(element, container))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private async void ResumeClicked(object sender, RoutedEventArgs args)
@@ -882,10 +952,6 @@ public sealed partial class ShellWindow : Window
         OpenSelectedGuideButton.IsEnabled = false;
         RemoveSelectedGuideButton.IsEnabled = false;
         ImportGuideButton.IsEnabled = false;
-        // The row that takes the removed row's place, or the previous row.
-        int index = GuideList.SelectedIndex;
-        Guide? neighbor = GuideAt(index + 1 < GuideList.Items.Count ? GuideList.Items[index + 1]
-            : index > 0 ? GuideList.Items[index - 1] : null);
         bool rendered = false;
         try
         {
@@ -916,7 +982,8 @@ public sealed partial class ShellWindow : Window
                 if (preview is null)
                 {
                     rendered = true;
-                    pendingGuideFocus = neighbor?.Id;
+                    // The render resolves the removed guide to its nearest survivor.
+                    pendingGuideFocus = guide.Id;
                     await RenderCurrentAsync();
                     ShowTransientStatus(GuideRemovalPresentation.AlreadyRemoved(guide.Title));
                     return;
@@ -950,7 +1017,8 @@ public sealed partial class ShellWindow : Window
                 if (!closeRequested && navigator.Current is GameRoute shown && shown.GameId == route.GameId)
                 {
                     rendered = true;
-                    pendingGuideFocus = neighbor?.Id;
+                    // The render resolves the removed guide to its nearest survivor.
+                    pendingGuideFocus = guide.Id;
                     await RenderCurrentAsync();
                 }
                 ShowTransientStatus(result.Outcome == GuideRemovalOutcome.NotFound
@@ -1265,6 +1333,9 @@ public sealed partial class ShellWindow : Window
     {
         int generation = ++renderGeneration;
         guideFocusRenderGeneration = -1;
+        bool restoreLibraryFocus = libraryFocusPending;
+        libraryFocusPending = false;
+        libraryFocusGeneration = -1;
         if (navigator.Current is not GameRoute)
         {
             pendingGuideFocus = null;
@@ -1317,14 +1388,24 @@ public sealed partial class ShellWindow : Window
                     {
                         ResumeButton.Content = $"Resume {resume.Title}";
                     }
+                    if (restoreLibraryFocus)
+                    {
+                        RestoreLibraryFocus(generation);
+                    }
                     ShowTransientStatus("Library ready.");
                     break;
 
                 case GameRoute gameRoute:
                     GamePanel.Visibility = Visibility.Visible;
                     ShowBusyStatus("Loading game…");
-                    Guid? selectedGuideId = pendingGuideFocus ??
-                        SelectedGuide?.Id;
+                    // The rows shown before this render, if they belong to this game;
+                    // ListAnchor.Resolve uses them to find a removed guide's survivor.
+                    bool sameGameList = detailsGameId == gameRoute.GameId;
+                    List<Guid> shownGuideIds = sameGameList
+                        ? [.. GuideList.Items.OfType<GuideRowItem>().Select(item => item.Guide.Id)]
+                        : [];
+                    Guid? wantedGuideId = pendingGuideFocus ?? navigator.CurrentAnchor ??
+                        (sameGameList ? SelectedGuide?.Id : null);
                     GameHeading.Text = "Loading game…";
                     GamePlatform.Text = string.Empty;
                     GameNotes.Text = string.Empty;
@@ -1390,9 +1471,20 @@ public sealed partial class ShellWindow : Window
                     ImportGuideButton.IsEnabled = !importRequested;
                     loadedGameGuideCount = guides.Count;
                     UpdateRemoveGameAction();
+                    Guid? selectedGuideId = ListAnchor.Resolve(
+                        shownGuideIds, [.. guides.Select(item => item.Guide.Id)], wantedGuideId);
                     GuideRowItem? selectedGuide = selectedGuideId is Guid id
-                        ? guides.FirstOrDefault(item => item.Guide.Id == id)
+                        ? guides.First(item => item.Guide.Id == id)
                         : null;
+                    if (pendingGuideFocus is not null)
+                    {
+                        // Focus follows the survivor when the wanted guide is gone.
+                        pendingGuideFocus = selectedGuide?.Guide.Id;
+                    }
+                    if (navigator.Current == gameRoute)
+                    {
+                        navigator.SetAnchor(selectedGuide?.Guide.Id);
+                    }
                     settingGuideSelection = true;
                     try
                     {
@@ -1689,10 +1781,16 @@ public sealed partial class ShellWindow : Window
         }
         await RunNavigationAsync(async () =>
         {
-            if (navigator.Current is GameRoute current && current.GameId == gameId)
+            // The person left this game: no re-render, no status on another page.
+            if (navigator.Current is not GameRoute current || current.GameId != gameId)
             {
-                await RenderCurrentAsync();
+                return;
             }
+            if (FocusIsWithin(GuideList))
+            {
+                pendingGuideFocus = navigator.CurrentAnchor;
+            }
+            await RenderCurrentAsync();
             if (error is not null)
             {
                 ShowErrorStatus(error);

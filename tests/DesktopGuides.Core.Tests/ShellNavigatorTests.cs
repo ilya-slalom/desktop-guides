@@ -115,4 +115,155 @@ public sealed class ShellNavigatorTests
         Assert.False(navigator.CanGoBack);
         Assert.False(navigator.GoBack());
     }
+
+    [Fact]
+    public void OpenGameFromLibraryAnchorsTheLibraryOnThatGame()
+    {
+        ShellNavigator navigator = new();
+        Guid gameId = Guid.NewGuid();
+
+        navigator.OpenGame(gameId);
+
+        Assert.Null(navigator.CurrentAnchor);
+        Assert.True(navigator.GoBack());
+        Assert.Equal(new LibraryRoute(), navigator.Current);
+        Assert.Equal(gameId, navigator.CurrentAnchor);
+    }
+
+    [Fact]
+    public void OpenReaderAnchorsTheGameOnThatGuide()
+    {
+        ShellNavigator navigator = new();
+        Guid gameId = Guid.NewGuid();
+        Guid guideId = Guid.NewGuid();
+        navigator.OpenGame(gameId);
+
+        navigator.OpenReader(guideId, gameId);
+
+        Assert.Null(navigator.CurrentAnchor);
+        Assert.True(navigator.GoBack());
+        Assert.Equal(new GameRoute(gameId), navigator.Current);
+        Assert.Equal(guideId, navigator.CurrentAnchor);
+    }
+
+    [Fact]
+    public void ResumeFromLibraryAnchorsTheGameAndTheLibrary()
+    {
+        ShellNavigator navigator = new();
+        Guid gameId = Guid.NewGuid();
+        Guid guideId = Guid.NewGuid();
+
+        navigator.OpenReader(guideId, gameId);
+
+        Assert.True(navigator.GoBack());
+        Assert.Equal(new GameRoute(gameId), navigator.Current);
+        Assert.Equal(guideId, navigator.CurrentAnchor);
+        Assert.True(navigator.GoBack());
+        Assert.Equal(new LibraryRoute(), navigator.Current);
+        Assert.Equal(gameId, navigator.CurrentAnchor);
+    }
+
+    [Fact]
+    public void SetAnchorIsKeptThroughSettingsAndBack()
+    {
+        ShellNavigator navigator = new();
+        Guid gameId = Guid.NewGuid();
+        Guid firstGuide = Guid.NewGuid();
+        Guid secondGuide = Guid.NewGuid();
+        navigator.OpenGame(gameId);
+
+        navigator.SetAnchor(firstGuide);
+        navigator.SetAnchor(secondGuide);
+        navigator.OpenSettings();
+
+        Assert.True(navigator.GoBack());
+        Assert.Equal(secondGuide, navigator.CurrentAnchor);
+    }
+
+    [Fact]
+    public void SetAnchorCanClearTheAnchor()
+    {
+        ShellNavigator navigator = new();
+        navigator.OpenGame(Guid.NewGuid());
+        navigator.SetAnchor(Guid.NewGuid());
+
+        navigator.SetAnchor(null);
+
+        Assert.Null(navigator.CurrentAnchor);
+    }
+
+    [Fact]
+    public void SetAnchorThrowsOnReaderAndSettings()
+    {
+        ShellNavigator navigator = new();
+        Guid gameId = Guid.NewGuid();
+        navigator.OpenReader(Guid.NewGuid(), gameId);
+
+        Assert.Throws<InvalidOperationException>(() => navigator.SetAnchor(Guid.NewGuid()));
+        navigator.OpenSettings();
+        Assert.Throws<InvalidOperationException>(() => navigator.SetAnchor(null));
+    }
+
+    [Fact]
+    public void BackToAnotherGameRestoresItsAnchor()
+    {
+        ShellNavigator navigator = new();
+        Guid firstGame = Guid.NewGuid();
+        Guid secondGame = Guid.NewGuid();
+        Guid guideId = Guid.NewGuid();
+        navigator.OpenGame(firstGame);
+        navigator.SetAnchor(guideId);
+
+        navigator.OpenLibrary();
+        navigator.OpenGame(secondGame);
+
+        Assert.True(navigator.GoBack());
+        Assert.Equal(new LibraryRoute(), navigator.Current);
+        Assert.Equal(secondGame, navigator.CurrentAnchor);
+        Assert.True(navigator.GoBack());
+        Assert.Equal(new GameRoute(firstGame), navigator.Current);
+        Assert.Equal(guideId, navigator.CurrentAnchor);
+    }
+
+    [Fact]
+    public void ResetToLibraryClearsEveryAnchor()
+    {
+        ShellNavigator navigator = new();
+        Guid gameId = Guid.NewGuid();
+        navigator.OpenGame(gameId);
+        navigator.SetAnchor(Guid.NewGuid());
+
+        navigator.ResetToLibrary();
+
+        Assert.Null(navigator.CurrentAnchor);
+        Assert.False(navigator.CanGoBack);
+    }
+
+    [Fact]
+    public void OpeningTheCurrentRouteKeepsItsAnchor()
+    {
+        ShellNavigator navigator = new();
+        Guid gameId = Guid.NewGuid();
+        Guid guideId = Guid.NewGuid();
+        navigator.OpenGame(gameId);
+        navigator.SetAnchor(guideId);
+
+        navigator.OpenGame(gameId);
+
+        Assert.Equal(guideId, navigator.CurrentAnchor);
+        Assert.True(navigator.GoBack());
+        Assert.Equal(new LibraryRoute(), navigator.Current);
+        Assert.False(navigator.CanGoBack);
+    }
+
+    [Fact]
+    public void RouteEqualityIgnoresAnchors()
+    {
+        ShellNavigator navigator = new();
+        Guid gameId = Guid.NewGuid();
+        navigator.OpenGame(gameId);
+        navigator.SetAnchor(Guid.NewGuid());
+
+        Assert.Equal(new GameRoute(gameId), navigator.Current);
+    }
 }

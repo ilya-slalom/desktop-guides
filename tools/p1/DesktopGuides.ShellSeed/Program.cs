@@ -387,10 +387,10 @@ if (args.Length == 2 &&
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second" or
         "seed-design" or "seed-catalog" or "seed-facts" or "seed-search" or "seed-import" or
-        "seed-actions"))
+        "seed-actions" or "seed-navigation"))
 {
     Console.Error.WriteLine(
-        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-search|seed-import|seed-actions " +
+        "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-search|seed-import|seed-actions|seed-navigation " +
         "<app-data-root> " +
         "or seed-linked-game|describe-providers|describe-import|describe-actions <app-data-root> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
@@ -673,6 +673,29 @@ if (args[0] == "seed-search")
         throw new InvalidOperationException("The search seed did not read back in activity order.");
     }
     Console.WriteLine("Seeded four search games.");
+    return 0;
+}
+
+if (args[0] == "seed-navigation")
+{
+    if ((await repository.ListGamesAsync()).Count != 0)
+    {
+        throw new InvalidOperationException("The navigation seed needs an empty library.");
+    }
+    const long navigationDay = 86_400_000;
+    long navigationNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    Game atlas = await repository.AddGameAsync("Atlas Navigation Game", null, null);
+    Game beacon = await repository.AddGameAsync("Beacon Navigation Game", null, null);
+    await repository.AddGameAsync("Cobalt Other Game", null, null);
+    // Import times fix the Atlas guide order: Third, Second, First.
+    await InsertGuideAsync(paths, atlas.Id, Guid.NewGuid(), "Atlas First Guide", navigationNow - 3 * navigationDay);
+    await InsertGuideAsync(paths, atlas.Id, Guid.NewGuid(), "Atlas Second Guide", navigationNow - 2 * navigationDay);
+    await InsertGuideAsync(paths, atlas.Id, Guid.NewGuid(), "Atlas Third Guide", navigationNow - navigationDay);
+    Guid beaconGuideId = Guid.NewGuid();
+    await InsertGuideAsync(paths, beacon.Id, beaconGuideId, "Beacon Guide", navigationNow - 4 * navigationDay);
+    AppSettings navigationSettings = await repository.GetSettingsAsync();
+    await repository.SaveSettingsAsync(navigationSettings with { LastActiveGuideId = beaconGuideId });
+    Console.WriteLine("Seeded three navigation games.");
     return 0;
 }
 

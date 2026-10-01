@@ -184,6 +184,9 @@ and no-result states use the same interaction language as Add game and import.
 - **T05.2** Add library title search and empty, loading, and no-result states.
 - **T05.3** Keep query, selection, and navigation stable on Back and when a
   game or guide is edited.
+  Follow-ups recorded by T05.3: keyboard and mouse Back (Alt+Left,
+  XButton1), a limit on the back stack's size, guide rename selection once
+  guides can be renamed, and keeping the Library query across a relaunch.
 - **T05.4** Build reusable catalog and workflow presentation components from
   the T04.4 provider flow using reviewed, version-compatible WinUI Gallery
   patterns. Cover artwork/result items, metadata groups, progress and status
