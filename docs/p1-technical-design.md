@@ -622,6 +622,11 @@ project uses a provisional package identity until T17.1 sets the public one.
   A BOM wins over a stored fallback code page; a contradictory metadata
   value is treated as a recoverable validation error. Test mixed newlines,
   CP437, Windows-1252, BOM, invalid UTF-8, and file truncation.
+  `ManagedTextDecoder` (Core) applies the rule to a managed copy's bytes and
+  `ManagedTextGuideLoader` (Infrastructure) reads `guide.txt` inside the
+  guide root; both return a `TextGuideLoad` value. A copy that no longer
+  matches its import fingerprint still opens with `ContentChanged` set.
+  Import rejects a BOM file that isn't valid UTF-8.
 - **T08.2** Keep a native virtualized list and default monospace,
   no-wrap presentation with horizontal scrolling for diagrams. Retain one
   normalized text buffer and line-start index; provide visible line slices

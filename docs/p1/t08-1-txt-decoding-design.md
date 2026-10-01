@@ -1,6 +1,9 @@
 # T08.1 Managed TXT decoding design
 
-Status: design approved in brainstorming on 1 October 2026.
+Status: design approved in brainstorming on 1 October 2026;
+implementation planned in
+[t08-1-txt-decoding-plan.md](t08-1-txt-decoding-plan.md) and verified in
+host unit runs (see the [verification record](#t081-verification-record)).
 Prerequisites T06.3 (PR #19) and T11.2 (M0, PR #3) are merged.
 
 ## Intent
@@ -196,8 +199,8 @@ newlines and truncation, with untouched originals.
 
 - `docs/p1-technical-design.md`: a T08.1 note on the loader and the BOM
   rule.
-- `docs/p1/e2e-testing.md`: the import row notes the BOM-with-invalid-UTF-8
-  rejection.
+- `docs/p1/e2e-testing.md`: unchanged; the BOM rejection is a unit test,
+  not an installed phase (planning ruling 5).
 - `docs/work-breakdown.md`: keep the S08 trace current.
 - `docs/progress.md` and `docs/p1/implementation-plan.md`: the T08.1 row and
   paragraph once verified.
@@ -209,3 +212,33 @@ means UTF-8, else the stored code page, else strict UTF-8), keeps every
 character apart from normalized newlines, and reports missing, oversized,
 unreadable, undecodable or contradictory cases as typed results, while a
 changed copy still opens and is flagged.
+
+## T08.1 verification record
+
+- **Unit tests.** On `pcsx2-win`, Core 323/323 and Infrastructure 438/438
+  passed. Against the T08.1 exit:
+  - BOM: `TextGuideDocumentTests.BomWinsOverAPassedCodePage` and
+    `BomWithInvalidUtf8RequiresAnEncodingEvenWithACodePage`;
+    `ManagedTextDecoderTests.BomWinsOverAStoredCodePage`; import rejection
+    `GuideImportValidatorTests.BomTextWithInvalidUtf8IsAnUnsupportedEncoding`;
+  - strict UTF-8 and truncation: `InvalidOrTruncatedUtf8IsNotUtf8` (four
+    rows, including a multibyte sequence cut off at the end);
+  - CP437: `DecodesCp437BoxDrawing`, `KeepsDosEndOfFileByte`;
+  - Windows-1252: `DecodesWindows1252AndPinsItsUndefinedByte` (`0x81` →
+    `U+0081`);
+  - newlines: `NormalizesMixedNewlinesAndKeepsTabsAndTrailingSpaces`,
+    `NormalizesNewlinesInLegacyText`;
+  - changed copies: `MatchingBytesAreUnchangedEvenWithAnUppercaseFingerprint`,
+    `DifferentBytesOpenAsChanged`, `ShortenedCopyOpensAsChanged`,
+    `LengthAloneMarksTheCopyChanged`, `EmptyCopyOpensAsChanged`;
+  - metadata: `NonTextGuideIsInvalidMetadata`,
+    `UnsupportedStoredCodePageIsInvalidMetadata`;
+  - loader and untouched originals: `ManagedTextGuideLoaderTests`
+    (`LoadsAPublishedGuideWithoutTouchingAnyFile` checks the source and
+    managed files' hashes and write times; Missing for a deleted file, a
+    deleted guide folder and an escaping path; TooLarge at 64 MiB + 1;
+    Unreadable while locked; InvalidMetadata without reading; cancellation
+    throws).
+- **CI.** Pending the PR run.
+- **Rulings.** Planning rulings 1–6 in the
+  [plan](t08-1-txt-decoding-plan.md#rulings-carried-from-planning).
