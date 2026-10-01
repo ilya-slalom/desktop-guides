@@ -1,7 +1,8 @@
 # T04.2 Game rename and remove actions design
 
-Status: design approved; not yet implemented. Prerequisites T04.1 (PR #11),
-T04.4 (PR #14), T05.4 (PR #16) and T11.1 (PR #6) are merged.
+Status: implemented on `feat/p1-t04-2-game-actions`; verified by CI run
+<run-id>. Prerequisites T04.1 (PR #11), T04.4 (PR #14), T05.4 (PR #16) and
+T11.1 (PR #6) are merged.
 
 ## Intent
 
@@ -263,3 +264,47 @@ state.
 
 The PR names T04.2, its merged prerequisites, and the outcome. Its body shows
 the Game page with the hint and the removal dialog, in light and dark.
+
+## T04.2 verification record
+
+- **Unit tests.** On `pcsx2-win`, Infrastructure 407/407 and Core 268/268
+  passed. The new tests are:
+  - `GameRemoverTests`: artwork deleted only on `Removed`, nothing deleted
+    for `HasGuides`, `NotFound` or a game without artwork, and `Removed`
+    kept when the artwork delete throws;
+  - `GameRemovalPresentationTests`: the dialog title and body, the hint,
+    and each status line;
+  - `GameRenameTests`: a rename keeps the provider link, snapshot, artwork
+    path, `CreatedUtc`, Guide IDs, reading state and `LastActiveGuideId`,
+    and the summary shows the new title under the same Game ID, before and
+    after reopening the repository;
+  - `EmptyGameRemovalTests`: manual and linked games removed, the provider
+    game addable again, `HasGuides` leaving the game, guide and reading
+    state intact, `NotFound`, `Guid.Empty`, other games untouched, the
+    artwork file and folder deleted, a locked artwork file swept at the
+    next start, and a publication into a removed game leaving nothing.
+- **Installed.** CI run [<run-id>](https://github.com/ilya-slalom/desktop-guides/actions/runs/<run-id>)
+  passed `production-shell-ui`:
+  - `game-actions`, light and dark: phases `remove-disabled-with-guides`,
+    `rename-keeps-selection`, `rename-library-row`, `remove-confirm`,
+    `remove-escape-cancels`, `remove-enter-cancels` and `removed`;
+  - `game-actions-persisted`: phases `persisted-resume`,
+    `persisted-selection`, `persisted-facts` and
+    `persisted-no-provider-traffic`, with zero non-loopback connections;
+  - `describe-actions` after each run: one game with the original ID,
+    provider game ID and artwork; no artwork folder for the removed game;
+    the seeded Guide IDs, Alpha's reading state and Beta as Resume;
+  - `design-language`: Remove game and its hint inside the window at both
+    widths.
+- **Rulings.** Rulings 1–21 in the
+  [plan](t04-2-game-actions-plan.md#rulings-against-the-spec), each with
+  what it costs if wrong. One was needed during implementation: CI run
+  [36810227220](https://github.com/ilya-slalom/desktop-guides/actions/runs/36810227220)
+  failed because the plan's `game-actions` block waited again for
+  `Library ready.`, which the smoke's shared prelude had already consumed.
+  The block now checks only the Library heading, as `catalog-facts` does.
+- **Evidence.**
+  - [Guides-first hint, light](evidence/t04-2-game-actions/remove-game-hint-light.png)
+  - [Guides-first hint, dark](evidence/t04-2-game-actions/remove-game-hint-dark.png)
+  - [Remove confirmation, light](evidence/t04-2-game-actions/remove-game-confirm-light.png)
+  - [Remove confirmation, dark](evidence/t04-2-game-actions/remove-game-confirm-dark.png)

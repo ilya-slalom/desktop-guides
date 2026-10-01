@@ -680,6 +680,18 @@ Search filters the loaded summaries in memory; it never opens guide files
 or calls a provider. CI run 36726600007 passed `library-search` in light and
 dark.
 
+T04.2 is implemented on `feat/p1-t04-2-game-actions`; see the
+[design and verification record](t04-2-game-actions-design.md). Renaming a
+game through Edit game keeps its Game ID, provider link and snapshot,
+artwork, Guide IDs, reading state, Resume and selected guide, after a
+refresh and after a restart. Remove game removes only a game without
+guides; for a game with guides it is disabled, with the visible hint
+`Remove this game's guides first.`. The confirmation defaults to Cancel.
+After a removal the Library is shown with an empty back stack, and the
+artwork is deleted best effort, with the startup sweep removing anything
+left. CI run <run-id> passed `game-actions` in light and dark and
+`game-actions-persisted`.
+
 ### UI design-language and Gallery adoption sequence
 
 The WinUI Gallery is a reference catalog, not a package or shell dependency.
