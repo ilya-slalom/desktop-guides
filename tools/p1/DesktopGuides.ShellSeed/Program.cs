@@ -211,6 +211,12 @@ if (args.Length == 2 && args[0] == "describe-actions")
     string[] artworkFolders = Directory.Exists(actionsPaths.ArtworkRoot)
         ? [.. Directory.EnumerateDirectories(actionsPaths.ArtworkRoot).Select(folder => Path.GetFileName(folder))]
         : [];
+    string[] contentDirectories = Directory.Exists(actionsPaths.ContentRoot)
+        ? [.. Directory.EnumerateDirectories(actionsPaths.ContentRoot).Select(folder => Path.GetFileName(folder))]
+        : [];
+    int trashEntries = Directory.Exists(actionsPaths.TrashRoot)
+        ? Directory.EnumerateFileSystemEntries(actionsPaths.TrashRoot).Count()
+        : 0;
     Console.WriteLine(JsonSerializer.Serialize(new
     {
         GameCount = actionsGames.Count,
@@ -224,6 +230,9 @@ if (args.Length == 2 && args[0] == "describe-actions")
             GuideIds = actionsGuides.Where(guide => guide.GameId == row.Id).Select(guide => guide.GuideId),
         }),
         ArtworkFolders = artworkFolders,
+        ContentDirectories = contentDirectories,
+        TrashEntries = trashEntries,
+        FileOperations = Rows("SELECT COUNT(*) FROM FileOperations", reader => reader.GetInt64(0)).Single(),
         ReadingStates = Rows(
             "SELECT GuideId, EstimatedFraction, LastOpenedUtcMs FROM ReadingStates",
             reader => new
@@ -698,17 +707,27 @@ if (args[0] == "seed-actions")
         "Linked Rename Game", "900100", SolidPng(60, 90, 0x2E, 0x5E, 0x8C));
     Guid emptyGameId = await AddActionsGameAsync(
         "Empty Linked Game", "900101", SolidPng(60, 90, 0x8C, 0x4A, 0x2E));
+    Guid guidedGameId = await AddActionsGameAsync(
+        "Guided Remove Game", "900102", SolidPng(60, 90, 0x3C, 0x7A, 0x4E));
+    Guid guidedWalkthroughId = Guid.NewGuid();
+    Guid guidedMapId = Guid.NewGuid();
     Guid alphaId = Guid.NewGuid();
     Guid betaId = Guid.NewGuid();
     await InsertGuideAsync(paths, renameGameId, alphaId, "Alpha Route Guide", actionsNow);
     await InsertGuideAsync(paths, renameGameId, betaId, "Beta Route Guide", actionsNow);
+    await InsertGuideAsync(paths, guidedGameId, guidedWalkthroughId, "Guided Walkthrough", actionsNow);
+    // Never opened in the smoke, so no WebView2 state is needed (ruling 7).
+    await InsertGuideAsync(
+        paths, guidedGameId, guidedMapId, "Guided Map Guide", actionsNow,
+        "Html", "index.html", "images/map.png");
     // No writer for reading state exists yet (T12.3, T13.2), so set it here.
     ExecuteSql(paths, $"""
         UPDATE ReadingStates SET EstimatedFraction = 0.45, LastOpenedUtcMs = {alphaOpened}
             WHERE GuideId = '{alphaId:N}';
+        UPDATE ReadingStates SET EstimatedFraction = 0.2 WHERE GuideId = '{guidedWalkthroughId:N}';
         """);
     AppSettings actionsSettings = await repository.GetSettingsAsync();
-    await repository.SaveSettingsAsync(actionsSettings with { LastActiveGuideId = betaId });
+    await repository.SaveSettingsAsync(actionsSettings with { LastActiveGuideId = guidedWalkthroughId });
     Console.WriteLine(JsonSerializer.Serialize(new
     {
         RenameGameId = renameGameId.ToString("N"),
@@ -716,6 +735,8 @@ if (args[0] == "seed-actions")
         AlphaGuideId = alphaId.ToString("N"),
         BetaGuideId = betaId.ToString("N"),
         AlphaLastOpenedUtcMs = alphaOpened,
+        GuidedGameId = guidedGameId.ToString("N"),
+        GuidedGuideIds = new[] { guidedWalkthroughId.ToString("N"), guidedMapId.ToString("N") },
     }));
     return 0;
 }
@@ -753,12 +774,19 @@ Console.WriteLine(
 return 0;
 
 static async Task InsertGuideAsync(
-    ManagedPathResolver paths, Guid gameId, Guid guideId, string title, long now)
+    ManagedPathResolver paths, Guid gameId, Guid guideId, string title, long now,
+    string format = "Txt", string primaryPath = "guide.txt", params string[] assetPaths)
 {
     string guideRoot = paths.GetGuideRoot(guideId);
     Directory.CreateDirectory(guideRoot);
-    string content = Path.Combine(guideRoot, "guide.txt");
+    string content = Path.Combine(guideRoot, primaryPath);
     await File.WriteAllTextAsync(content, "Test guide.");
+    foreach (string asset in assetPaths)
+    {
+        string assetPath = Path.Combine(guideRoot, asset);
+        Directory.CreateDirectory(Path.GetDirectoryName(assetPath)!);
+        await File.WriteAllTextAsync(assetPath, "Test asset.");
+    }
     byte[] bytes = await File.ReadAllBytesAsync(content);
     string hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
 
@@ -776,7 +804,7 @@ static async Task InsertGuideAsync(
             Id, GameId, Title, Format, ManagedRelativeRoot, PrimaryRelativePath,
             ContentSha256, ContentBytes, ImportedUtcMs, UpdatedUtcMs
         ) VALUES (
-            $guide, $game, $title, 'Txt', $root, 'guide.txt',
+            $guide, $game, $title, $format, $root, $primary,
             $hash, $bytes, $now, $now
         );
         INSERT INTO ReadingStates (GuideId) VALUES ($guide);
@@ -786,6 +814,8 @@ static async Task InsertGuideAsync(
     command.Parameters.AddWithValue("$game", gameId.ToString("N"));
     command.Parameters.AddWithValue("$title", title);
     command.Parameters.AddWithValue("$root", $"content/{guideId:N}");
+    command.Parameters.AddWithValue("$format", format);
+    command.Parameters.AddWithValue("$primary", primaryPath);
     command.Parameters.AddWithValue("$hash", hash);
     command.Parameters.AddWithValue("$bytes", bytes.LongLength);
     command.Parameters.AddWithValue("$now", now);

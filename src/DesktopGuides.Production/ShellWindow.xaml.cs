@@ -106,7 +106,6 @@ public sealed partial class ShellWindow : Window
         GuideList.AddHandler(
             UIElement.KeyDownEvent, new KeyEventHandler(GuideKeyDown), true);
         ArtworkListLoader.NameRows(GuideList);
-        RemoveGameHint.Text = GameRemovalPresentation.GuidesFirst;
         GuideList.LayoutUpdated += GuideListLayoutUpdated;
         Navigation.RegisterPropertyChangedCallback(
             NavigationView.IsPaneOpenProperty, (_, _) => UpdatePaneStatus());
@@ -257,7 +256,7 @@ public sealed partial class ShellWindow : Window
             await repository.InitializeAsync();
             guidePublisher = new GuideImportPublisher(repository, paths);
             guideRemover = new GuideRemover(repository, paths);
-            gameRemover = new GameRemover(repository, artwork);
+            gameRemover = new GameRemover(repository, paths, artwork);
             providers = new ProviderServices(dataRoot);
             await ProviderSettings.InitializeAsync(providers);
             importer = providers.CreateImporter(repository, artwork);
@@ -517,13 +516,9 @@ public sealed partial class ShellWindow : Window
 
     private void UpdateRemoveGameAction()
     {
-        bool hasGuides = loadedGameGuideCount > 0;
-        RemoveGameButton.IsEnabled = loadedGameGuideCount == 0 && !closeRequested &&
+        RemoveGameButton.IsEnabled = loadedGameGuideCount is not null && !closeRequested &&
             !importRequested && !gameEditorRequested && !removeRequested &&
             !gameRemoveRequested && refreshCancel is null;
-        RemoveGameHint.Visibility = hasGuides ? Visibility.Visible : Visibility.Collapsed;
-        AutomationProperties.SetHelpText(
-            RemoveGameButton, hasGuides ? GameRemovalPresentation.GuidesFirst : string.Empty);
     }
 
     private void UpdateOpenSelectedGuideAction()
@@ -1023,16 +1018,16 @@ public sealed partial class ShellWindow : Window
                 }
                 GameRemover remover = gameRemover
                     ?? throw new InvalidOperationException("The library is not ready.");
-                Game? game;
+                GameRemovalPreview? preview;
                 try
                 {
-                    game = await RequireRepository().GetGameAsync(route.GameId);
+                    preview = await remover.DescribeAsync(route.GameId);
                 }
-                catch (Exception)
+                catch (Exception error)
                 {
                     if (!closeRequested)
                     {
-                        ShowErrorStatus(GameRemovalPresentation.Failed(shownTitle));
+                        ShowErrorStatus(GameRemovalError(error, shownTitle));
                     }
                     return;
                 }
@@ -1040,16 +1035,14 @@ public sealed partial class ShellWindow : Window
                 {
                     return;
                 }
-                string title = game?.Title ?? shownTitle;
-                EmptyGameRemovalOutcome outcome;
-                if (game is null)
+                // A null preview means it was removed elsewhere before the dialog (T04.2 ruling 14).
+                string title = preview?.Title ?? shownTitle;
+                GameRemovalResult? result = null;
+                bool countChanged = false;
+                while (preview is not null)
                 {
-                    // Removed elsewhere before the dialog (ruling 14).
-                    outcome = EmptyGameRemovalOutcome.NotFound;
-                }
-                else
-                {
-                    ContentDialog dialog = RemoveGameDialog.Create(game.Title, Navigation.XamlRoot);
+                    title = preview.Title;
+                    ContentDialog dialog = RemoveGameDialog.Create(preview, countChanged, Navigation.XamlRoot);
                     DialogSurface.Apply(dialog, EffectiveMaterial);
                     activeRemoveDialog = dialog;
                     ContentDialogResult choice;
@@ -1067,13 +1060,14 @@ public sealed partial class ShellWindow : Window
                     }
                     try
                     {
-                        outcome = await remover.RemoveAsync(game.Id);
+                        result = await remover.RemoveAsync(preview.GameId, preview.GuideCount);
                     }
-                    catch (Exception)
+                    catch (Exception error)
                     {
+                        // Nothing changed in the database, so the page still shows the game.
                         if (!closeRequested)
                         {
-                            ShowErrorStatus(GameRemovalPresentation.Failed(title));
+                            ShowErrorStatus(GameRemovalError(error, title));
                         }
                         return;
                     }
@@ -1081,20 +1075,20 @@ public sealed partial class ShellWindow : Window
                     {
                         return;
                     }
+                    if (result.Outcome != GameRemovalOutcome.CountChanged)
+                    {
+                        break;
+                    }
+                    // Show the dialog again with the fresh counts.
+                    preview = result.Current!;
+                    countChanged = true;
                 }
                 rendered = true;
-                if (outcome == EmptyGameRemovalOutcome.HasGuides)
-                {
-                    await RenderCurrentAsync();
-                    ShowWarningStatus(GameRemovalPresentation.HasGuides(title));
-                    EditGameButton.Focus(FocusState.Programmatic);
-                    return;
-                }
                 // Clearing the back stack keeps Back from reaching the removed page.
                 navigator.ResetToLibrary();
                 await RenderCurrentAsync();
-                ShowTransientStatus(outcome == EmptyGameRemovalOutcome.Removed
-                    ? GameRemovalPresentation.Removed(title)
+                ShowTransientStatus(result is { Outcome: GameRemovalOutcome.Removed }
+                    ? GameRemovalPresentation.Removed(title, result.CleanupPending)
                     : GameRemovalPresentation.AlreadyRemoved(title));
                 AddGameButton.Focus(FocusState.Programmatic);
             });
@@ -1120,6 +1114,10 @@ public sealed partial class ShellWindow : Window
             }
         }
     }
+
+    private static string GameRemovalError(Exception error, string title) =>
+        GameRemovalPresentation.Error(
+            error is GameRemovalException removal ? removal.Issue : GameRemovalIssue.Failed, title);
 
     private async Task<string?> PickGuideFileAsync()
     {

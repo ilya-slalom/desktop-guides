@@ -680,7 +680,8 @@ Search filters the loaded summaries in memory; it never opens guide files
 or calls a provider. CI run 36726600007 passed `library-search` in light and
 dark.
 
-T04.2 is implemented on `feat/p1-t04-2-game-actions`; see the
+T04.2 was merged through PR #25 on 1 October 2026, merge commit
+`739212e`; see the
 [design and verification record](t04-2-game-actions-design.md). Renaming a
 game through Edit game keeps its Game ID, provider link and snapshot,
 artwork, Guide IDs, reading state, Resume and selected guide, after a
@@ -691,6 +692,15 @@ After a removal the Library is shown with an empty back stack, and the
 artwork is deleted best effort, with the startup sweep removing anything
 left. CI run 36827722176 passed `game-actions` in light and dark and
 `game-actions-persisted`.
+
+T04.3 is implemented on `feat/p1-t04-3-game-removal` (PR #26). Remove game
+works for every game: the confirmation states the guide and managed-file
+counts, and one Remove deletes the game, its guides, state, preferences,
+provider link, artwork and content through the T15.3 deletion journal as a
+`DeleteGame` operation. A changed count shows the dialog again rather than
+deleting. CI run 36841135926 passed `game-actions` in light and dark and
+`game-actions-persisted`. See the
+[design and verification record](t04-3-game-removal-design.md).
 
 ### UI design-language and Gallery adoption sequence
 

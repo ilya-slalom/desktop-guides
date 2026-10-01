@@ -52,16 +52,6 @@ internal sealed class FakeRepository : ILibraryRepository
     public Task InitializeAsync(CancellationToken token = default) => throw new NotSupportedException();
     public Task<Game> AddGameAsync(string title, string? platform, string? notes, CancellationToken token = default) => throw new NotSupportedException();
     public Task<Game> UpdateGameAsync(Guid gameId, string title, string? platform, string? notes, CancellationToken token = default) => throw new NotSupportedException();
-    public EmptyGameRemoval NextRemoval { get; set; } = new(EmptyGameRemovalOutcome.NotFound, null);
-    public List<Guid> RemoveCalls { get; } = [];
-
-    public Task<EmptyGameRemoval> RemoveEmptyGameAsync(Guid gameId, CancellationToken token = default)
-    {
-        token.ThrowIfCancellationRequested();
-        RemoveCalls.Add(gameId);
-        return Task.FromResult(NextRemoval);
-    }
-
     public Task<IReadOnlyList<Game>> ListGamesAsync(CancellationToken token = default) => throw new NotSupportedException();
     public Task<IReadOnlyList<Guide>> ListGuidesAsync(Guid gameId, CancellationToken token = default) => throw new NotSupportedException();
     public Task<IReadOnlyList<LibraryGameSummary>> ListGameSummariesAsync(CancellationToken token = default) => throw new NotSupportedException();

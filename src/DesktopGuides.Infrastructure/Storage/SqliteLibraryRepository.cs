@@ -109,53 +109,6 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         }, token);
     }
 
-    public Task<EmptyGameRemoval> RemoveEmptyGameAsync(
-        Guid gameId, CancellationToken token = default)
-    {
-        if (gameId == Guid.Empty)
-        {
-            throw new ArgumentException("A game ID is required.", nameof(gameId));
-        }
-        return WriteAsync(() =>
-        {
-            using SqliteConnection connection = OpenConnection();
-            using SqliteTransaction transaction = connection.BeginTransaction();
-            string? artwork;
-            using (SqliteCommand read = connection.CreateCommand())
-            {
-                read.Transaction = transaction;
-                read.CommandText = """
-                    SELECT ArtworkRelativePath,
-                           (SELECT COUNT(*) FROM Guides WHERE GameId = $id)
-                    FROM Games WHERE Id = $id
-                    """;
-                read.Parameters.AddWithValue("$id", gameId.ToString("N"));
-                using SqliteDataReader reader = read.ExecuteReader();
-                if (!reader.Read())
-                {
-                    return new EmptyGameRemoval(EmptyGameRemovalOutcome.NotFound, null);
-                }
-                if (reader.GetInt64(1) > 0)
-                {
-                    return new EmptyGameRemoval(EmptyGameRemovalOutcome.HasGuides, null);
-                }
-                artwork = NullableString(reader, 0);
-            }
-
-            // Guides cascade on delete; the guard keeps them out of reach.
-            using SqliteCommand delete = connection.CreateCommand();
-            delete.Transaction = transaction;
-            delete.CommandText = """
-                DELETE FROM Games
-                WHERE Id = $id AND NOT EXISTS (SELECT 1 FROM Guides WHERE GameId = $id)
-                """;
-            delete.Parameters.AddWithValue("$id", gameId.ToString("N"));
-            RequireUpdated(delete.ExecuteNonQuery(), "game");
-            transaction.Commit();
-            return new EmptyGameRemoval(EmptyGameRemovalOutcome.Removed, artwork);
-        }, token);
-    }
-
     public Task<Game?> GetGameAsync(Guid gameId, CancellationToken token = default) =>
         ReadAsync<Game?>(() =>
         {
@@ -985,6 +938,41 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             return SqliteLibraryRepository.GetGuide(connection, guideId);
         }
 
+        public GameForRemoval? GetGameForRemoval(Guid gameId)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            string title;
+            string? artwork;
+            using (SqliteCommand read = connection.CreateCommand())
+            {
+                read.CommandText = "SELECT Title, ArtworkRelativePath FROM Games WHERE Id = $id";
+                read.Parameters.AddWithValue("$id", gameId.ToString("N"));
+                using SqliteDataReader reader = read.ExecuteReader();
+                if (!reader.Read())
+                {
+                    return null;
+                }
+                title = reader.GetString(0);
+                artwork = NullableString(reader, 1);
+            }
+            return new GameForRemoval(title, artwork, GuideIdsOf(connection, null, gameId));
+        }
+
+        private static List<Guid> GuideIdsOf(SqliteConnection connection, SqliteTransaction? transaction, Guid gameId)
+        {
+            using SqliteCommand command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = "SELECT Id FROM Guides WHERE GameId = $game ORDER BY Id";
+            command.Parameters.AddWithValue("$game", gameId.ToString("N"));
+            using SqliteDataReader reader = command.ExecuteReader();
+            List<Guid> ids = [];
+            while (reader.Read())
+            {
+                ids.Add(Guid.ParseExact(reader.GetString(0), "N"));
+            }
+            return ids;
+        }
+
         public bool IsPending(Guid guideId)
         {
             using SqliteConnection connection = owner.OpenConnection();
@@ -1002,6 +990,21 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             command.Parameters.AddWithValue("$id", operationId.ToString("N"));
             command.Parameters.AddWithValue("$manifest",
                 FileOperationManifest.Create(FileOperationKind.DeleteGuide, operationId, [guideId]));
+            command.Parameters.AddWithValue("$now", owner.clock.GetUtcNow().ToUnixTimeMilliseconds());
+            command.ExecuteNonQuery();
+        }
+
+        public void PrepareGame(Guid operationId, IReadOnlyList<Guid> guideIds)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO FileOperations (Id, Kind, Phase, ManifestJson, CreatedUtcMs)
+                VALUES ($id, 'DeleteGame', 'Prepared', $manifest, $now)
+                """;
+            command.Parameters.AddWithValue("$id", operationId.ToString("N"));
+            command.Parameters.AddWithValue("$manifest",
+                FileOperationManifest.Create(FileOperationKind.DeleteGame, operationId, guideIds));
             command.Parameters.AddWithValue("$now", owner.clock.GetUtcNow().ToUnixTimeMilliseconds());
             command.ExecuteNonQuery();
         }
@@ -1028,6 +1031,48 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             if (Execute("""
                 UPDATE FileOperations SET Phase = 'Committed'
                 WHERE Id = $op AND Kind = 'DeleteGuide' AND Phase = 'Prepared'
+                """) != 1)
+            {
+                throw new InvalidDataException("The deletion's file operation is missing.");
+            }
+            beforeCommit();
+            transaction.Commit();
+        }
+
+        public void CommitGame(Guid? operationId, Guid gameId, IReadOnlyList<Guid> guideIds, Action beforeCommit)
+        {
+            if (operationId is null && guideIds.Count != 0)
+            {
+                throw new ArgumentException("Guides are only deleted under a file operation.", nameof(operationId));
+            }
+            using SqliteConnection connection = owner.OpenConnection();
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            int Execute(string sql)
+            {
+                using SqliteCommand command = connection.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText = sql;
+                command.Parameters.AddWithValue("$game", gameId.ToString("N"));
+                command.Parameters.AddWithValue("$op", (object?)operationId?.ToString("N") ?? DBNull.Value);
+                return command.ExecuteNonQuery();
+            }
+            // The remover holds the write gate, so this only keeps the delete exact.
+            if (!GuideIdsOf(connection, transaction, gameId).Order().SequenceEqual(guideIds.Order()))
+            {
+                throw new InvalidDataException("The game's guides changed.");
+            }
+            Execute("""
+                DELETE FROM Settings
+                WHERE Key = 'LastActiveGuideId' AND Value IN (SELECT Id FROM Guides WHERE GameId = $game)
+                """);
+            // Cascaded Guides, ReadingStates and ReaderPreferences deletes aren't counted.
+            if (Execute("DELETE FROM Games WHERE Id = $game") != 1)
+            {
+                throw new InvalidDataException("The game to delete is missing.");
+            }
+            if (operationId is not null && Execute("""
+                UPDATE FileOperations SET Phase = 'Committed'
+                WHERE Id = $op AND Kind = 'DeleteGame' AND Phase = 'Prepared'
                 """) != 1)
             {
                 throw new InvalidDataException("The deletion's file operation is missing.");
