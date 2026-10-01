@@ -137,6 +137,18 @@ public sealed class GuideImportValidatorTests
     }
 
     [Fact]
+    public async Task BomTextWithInvalidUtf8IsAnUnsupportedEncoding()
+    {
+        using ImportTestDirectory files = new();
+
+        GuideImportException error = await Rejected(
+            files.Write("bom.txt", [0xEF, 0xBB, 0xBF, 0x48, 0x82, 0x0A]));
+
+        Assert.Equal(ImportIssue.UnsupportedEncoding, error.Issue);
+        Assert.Equal(NotUtf8, error.Message);
+    }
+
+    [Fact]
     public async Task SamplesStayWithinEightLinesAndTwoKilobytes()
     {
         using ImportTestDirectory files = new();

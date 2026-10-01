@@ -18,6 +18,7 @@ public sealed class GuideImportValidator : IGuideImportValidator
     private const int SampleBytes = 2048;
     private const int SampleLines = 8;
     private const int TextSamplePages = 5;
+    private const string NotUtf8Message = "This text file isn't UTF-8. Save it as UTF-8 and import it again.";
     private static readonly int[] LegacyCodePages = [437, 1252];
     private static readonly byte[] PdfMarker = "%PDF-"u8.ToArray();
     private readonly GuideImportLimits limits;
@@ -103,13 +104,17 @@ public sealed class GuideImportValidator : IGuideImportValidator
             ((bytes[0] == 0xFF && bytes[1] == 0xFE) || (bytes[0] == 0xFE && bytes[1] == 0xFF));
         if (utf16Bom || bytes.AsSpan().IndexOf((byte)0) >= 0)
         {
-            throw new GuideImportException(ImportIssue.UnsupportedEncoding,
-                "This text file isn't UTF-8. Save it as UTF-8 and import it again.");
+            throw new GuideImportException(ImportIssue.UnsupportedEncoding, NotUtf8Message);
         }
         try
         {
             TextGuideDocument.Decode(bytes);
             return new ImportReady(new TxtImportManifest(source, title, null, GuideFingerprint.OfBytes(bytes)));
+        }
+        catch (EncodingSelectionRequiredException) when (TextGuideDocument.HasUtf8Bom(bytes))
+        {
+            // A BOM means UTF-8 when the guide is opened, so no legacy code page can apply.
+            throw new GuideImportException(ImportIssue.UnsupportedEncoding, NotUtf8Message);
         }
         catch (EncodingSelectionRequiredException)
         {
