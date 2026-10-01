@@ -221,6 +221,14 @@ public sealed partial class ShellWindow : Window
         ShellContent.Padding = (Thickness)resources[paddingKey];
     }
 
+    // The details card scrolls inside whatever height the guide list doesn't need.
+    private void GamePageSizeChanged(object sender, SizeChangedEventArgs args) =>
+        GameMetadataSurface.MaxHeight = GamePageLayout.DetailsMaxHeight(
+            GamePanel.ActualHeight,
+            GameHeader.ActualHeight,
+            GameGuidesHeader.ActualHeight,
+            GamePanel.RowSpacing);
+
     public Task InitializeAsync()
     {
         initializationTask = InitializeCoreAsync();

@@ -114,6 +114,25 @@ Task 5 records these rulings in the design's verification record.
       over `Find-ByName`, since the title has no AutomationId.
     - The new modes do not pass `-ExpectedResumeGuide`, whose
       `ValidateSet` rejects `Beta Route Guide`; they name it themselves.
+22. **The Game details card scrolls so the guide list keeps a row.** CI run
+    36813711960 failed `game-actions-light` with "Expected a visible guide
+    list.": in the 768 × 519 CI window the wrapped title, the
+    Remove game hint and the details card filled the page's Auto rows and
+    left the guide list no height. A user with a short window would have
+    seen no guides.
+    - `GamePageLayout.DetailsMaxHeight` caps `GameMetadataSurface` at what
+      the header, the Guides row and the row gaps leave, minus a 96 px guide
+      list minimum. The card has a floor of 48 px.
+    - The card's content sits in the `GameMetadataScroll` ScrollViewer.
+      `GamePanel`, `GameHeader` and `GameGuidesHeader` recompute the cap on
+      SizeChanged.
+    - The smoke's `Assert-GuideListUsable` adds the
+      `guide-list-keeps-a-row` phase. The CI run above is its RED evidence;
+      no host run reproduced it.
+    - `Wait-VisibleById` and `Wait-Name` scroll the card one step per poll
+      toward an element that is offscreen only because it is below the
+      card's viewport.
+    - Cost if wrong: on very short windows the details need scrolling.
 
 ## Review Focus
 

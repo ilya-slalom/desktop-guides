@@ -267,13 +267,16 @@ the Game page with the hint and the removal dialog, in light and dark.
 
 ## T04.2 verification record
 
-- **Unit tests.** On `pcsx2-win`, Infrastructure 407/407 and Core 268/268
+- **Unit tests.** On `pcsx2-win`, Infrastructure 407/407 and Core 276/276
   passed. The new tests are:
   - `GameRemoverTests`: artwork deleted only on `Removed`, nothing deleted
     for `HasGuides`, `NotFound` or a game without artwork, and `Removed`
     kept when the artwork delete throws;
   - `GameRemovalPresentationTests`: the dialog title and body, the hint,
     and each status line;
+  - `GamePageLayoutTests`: the details card cap leaves the guide list its
+    minimum on tall and short pages, keeps the card's floor on a tiny
+    page, and leaves an unmeasured page uncapped;
   - `GameRenameTests`: a rename keeps the provider link, snapshot, artwork
     path, `CreatedUtc`, Guide IDs, reading state and `LastActiveGuideId`,
     and the summary shows the new title under the same Game ID, before and
@@ -286,7 +289,7 @@ the Game page with the hint and the removal dialog, in light and dark.
 - **Installed.** CI run [<run-id>](https://github.com/ilya-slalom/desktop-guides/actions/runs/<run-id>)
   passed `production-shell-ui`:
   - `game-actions`, light and dark: phases `remove-disabled-with-guides`,
-    `rename-keeps-selection`, `rename-library-row`, `remove-confirm`,
+    `guide-list-keeps-a-row`, `rename-keeps-selection`, `rename-library-row`, `remove-confirm`,
     `remove-escape-cancels`, `remove-enter-cancels` and `removed`;
   - `game-actions-persisted`: phases `persisted-resume`,
     `persisted-selection`, `persisted-facts` and

@@ -108,6 +108,35 @@ try {
         return $root.FindFirst($scope, $condition)
     }
 
+    # A short window caps the Game details card, so an element inside it can
+    # sit past the card's viewport. Scroll the card one step toward it.
+    function Step-GameDetailToward([string] $id, $element) {
+        $viewer = Find-ById 'GameMetadataScroll'
+        if (-not $viewer -or $viewer.Current.IsOffscreen) { return }
+        $condition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::AutomationIdProperty, $id)
+        if (-not $viewer.FindFirst($scope, $condition)) { return }
+        $pattern = $null
+        if (-not $viewer.TryGetCurrentPattern(
+            [System.Windows.Automation.ScrollPattern]::Pattern, [ref] $pattern) -or
+            -not $pattern.Current.VerticallyScrollable) {
+            return
+        }
+        $amount = if ($element.Current.BoundingRectangle.Top -lt
+            $viewer.Current.BoundingRectangle.Top) {
+            [System.Windows.Automation.ScrollAmount]::SmallDecrement
+        }
+        else {
+            [System.Windows.Automation.ScrollAmount]::SmallIncrement
+        }
+        try {
+            $pattern.Scroll([System.Windows.Automation.ScrollAmount]::NoAmount, $amount)
+        }
+        catch [System.InvalidOperationException] {
+            # Already at that end of the card.
+        }
+    }
+
     function Find-ByName([string] $name) {
         $condition = [System.Windows.Automation.PropertyCondition]::new(
             [System.Windows.Automation.AutomationElement]::NameProperty, $name)
@@ -144,6 +173,9 @@ try {
             if ($element -and $element.Current.Name -eq $expected -and
                 -not $element.Current.IsOffscreen) {
                 return $element
+            }
+            if ($element -and $element.Current.IsOffscreen) {
+                Step-GameDetailToward $id $element
             }
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
@@ -200,6 +232,9 @@ try {
             $element = Find-ById $id
             if ($element -and -not $element.Current.IsOffscreen) {
                 return $element
+            }
+            if ($element) {
+                Step-GameDetailToward $id $element
             }
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
@@ -637,6 +672,28 @@ try {
         $selected.SetFocus()
         Wait-FocusedGuide $expected
         [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    }
+
+    # However tall the Game details are, the guide list keeps at least one
+    # whole row on screen.
+    function Assert-GuideListUsable {
+        $list = Find-ById 'GuideList'
+        if (-not $list -or $list.Current.IsOffscreen) {
+            throw 'Expected a visible guide list.'
+        }
+        $bounds = $list.Current.BoundingRectangle
+        $items = $list.FindAll($scope,
+            [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::ListItem))
+        foreach ($item in $items) {
+            $row = $item.Current.BoundingRectangle
+            if (-not $item.Current.IsOffscreen -and $row.Height -gt 0 -and
+                $row.Top -ge $bounds.Top - 2 -and $row.Bottom -le $bounds.Bottom + 2) {
+                return
+            }
+        }
+        throw "Expected a whole guide row in the guide list ($($bounds.Height) px tall)."
     }
 
     function Open-GuideFromGame([string] $name) {
@@ -2044,6 +2101,9 @@ try {
             [void](Wait-Name 'RemoveGameHint' $hint)
             $report.hintScreenshot = Save-WindowScreenshot 'remove-game-hint'
             $report.phases += 'remove-disabled-with-guides'
+
+            Assert-GuideListUsable
+            $report.phases += 'guide-list-keeps-a-row'
 
             # Selecting a guide opens it (ruling 5), so come back to the game
             # with it selected before renaming.
