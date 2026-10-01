@@ -680,7 +680,8 @@ Search filters the loaded summaries in memory; it never opens guide files
 or calls a provider. CI run 36726600007 passed `library-search` in light and
 dark.
 
-T04.2 is implemented on `feat/p1-t04-2-game-actions`; see the
+T04.2 was merged through PR #25 on 1 October 2026, merge commit
+`739212e`; see the
 [design and verification record](t04-2-game-actions-design.md). Renaming a
 game through Edit game keeps its Game ID, provider link and snapshot,
 artwork, Guide IDs, reading state, Resume and selected guide, after a

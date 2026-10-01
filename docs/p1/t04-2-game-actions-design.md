@@ -1,6 +1,7 @@
 # T04.2 Game rename and remove actions design
 
-Status: implemented on `feat/p1-t04-2-game-actions`; verified by CI run
+Status: merged through PR #25 on 1 October 2026, merge commit `739212e`;
+verified by CI run
 [36827722176](https://github.com/ilya-slalom/desktop-guides/actions/runs/36827722176). Prerequisites T04.1 (PR #11), T04.4 (PR #14), T05.4 (PR #16) and
 T11.1 (PR #6) are merged.
 
