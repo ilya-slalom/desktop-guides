@@ -1,7 +1,7 @@
 # T04.2 Game rename and remove actions design
 
 Status: implemented on `feat/p1-t04-2-game-actions`; verified by CI run
-<run-id>. Prerequisites T04.1 (PR #11), T04.4 (PR #14), T05.4 (PR #16) and
+[36818691348](https://github.com/ilya-slalom/desktop-guides/actions/runs/36818691348). Prerequisites T04.1 (PR #11), T04.4 (PR #14), T05.4 (PR #16) and
 T11.1 (PR #6) are merged.
 
 ## Intent
@@ -286,11 +286,12 @@ the Game page with the hint and the removal dialog, in light and dark.
     state intact, `NotFound`, `Guid.Empty`, other games untouched, the
     artwork file and folder deleted, a locked artwork file swept at the
     next start, and a publication into a removed game leaving nothing.
-- **Installed.** CI run [<run-id>](https://github.com/ilya-slalom/desktop-guides/actions/runs/<run-id>)
+- **Installed.** CI run [36818691348](https://github.com/ilya-slalom/desktop-guides/actions/runs/36818691348)
   passed `production-shell-ui`:
   - `game-actions`, light and dark: phases `remove-disabled-with-guides`,
-    `guide-list-keeps-a-row`, `rename-keeps-selection`, `rename-library-row`, `remove-confirm`,
-    `remove-escape-cancels`, `remove-enter-cancels` and `removed`;
+    `guide-list-keeps-a-row`, `rename-keeps-selection`,
+    `rename-library-row`, `remove-confirm`, `remove-escape-cancels`,
+    `remove-enter-cancels` and `removed`;
   - `game-actions-persisted`: phases `persisted-resume`,
     `persisted-selection`, `persisted-facts` and
     `persisted-no-provider-traffic`, with zero non-loopback connections;
@@ -298,14 +299,30 @@ the Game page with the hint and the removal dialog, in light and dark.
     provider game ID and artwork; no artwork folder for the removed game;
     the seeded Guide IDs, Alpha's reading state and Beta as Resume;
   - `design-language`: Remove game and its hint inside the window at both
-    widths.
-- **Rulings.** Rulings 1–21 in the
+    widths;
+  - `provider-offline-none`: every IGDB detail, the link included, reached
+    in the capped details card.
+  The live IGDB and SteamGridDB checks were skipped because CI has no
+  credential files.
+- **Rulings.** Rulings 1–22 in the
   [plan](t04-2-game-actions-plan.md#rulings-against-the-spec), each with
-  what it costs if wrong. One was needed during implementation: CI run
-  [36810227220](https://github.com/ilya-slalom/desktop-guides/actions/runs/36810227220)
-  failed because the plan's `game-actions` block waited again for
-  `Library ready.`, which the smoke's shared prelude had already consumed.
-  The block now checks only the Library heading, as `catalog-facts` does.
+  what it costs if wrong. Three CI failures needed fixes during
+  implementation:
+  - CI run
+    [36810227220](https://github.com/ilya-slalom/desktop-guides/actions/runs/36810227220)
+    failed because the plan's `game-actions` block waited again for
+    `Library ready.`, which the smoke's shared prelude had already
+    consumed. The block now checks only the Library heading, as
+    `catalog-facts` does.
+  - CI run
+    [36813711960](https://github.com/ilya-slalom/desktop-guides/actions/runs/36813711960)
+    showed the details card leaving the guide list no height in a short
+    window. Ruling 22 caps the card and makes it scroll.
+  - CI run
+    [36816949628](https://github.com/ilya-slalom/desktop-guides/actions/runs/36816949628)
+    failed because the smoke waited for `"Remove $emptyTitle?"`, which
+    PowerShell reads as the undefined variable `${emptyTitle?}`. The
+    wait now uses `"Remove ${emptyTitle}?"`.
 - **Evidence.**
   - [Guides-first hint, light](evidence/t04-2-game-actions/remove-game-hint-light.png)
   - [Guides-first hint, dark](evidence/t04-2-game-actions/remove-game-hint-dark.png)

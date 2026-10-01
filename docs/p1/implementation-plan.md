@@ -689,7 +689,7 @@ guides; for a game with guides it is disabled, with the visible hint
 `Remove this game's guides first.`. The confirmation defaults to Cancel.
 After a removal the Library is shown with an empty back stack, and the
 artwork is deleted best effort, with the startup sweep removing anything
-left. CI run <run-id> passed `game-actions` in light and dark and
+left. CI run 36818691348 passed `game-actions` in light and dark and
 `game-actions-persisted`.
 
 ### UI design-language and Gallery adoption sequence
