@@ -1240,7 +1240,6 @@ try {
         Assert-InsideWindow 'GameHeading'
         Assert-InsideWindow 'EditGameButton'
         Assert-InsideWindow 'RemoveGameButton'
-        Assert-InsideWindow 'RemoveGameHint'
         Assert-ReachesWindowRightEdge 'ShellContent'
         Assert-GameDetailsUncapped
         $report.gameWideScreenshot = Save-WindowScreenshot 'game-wide'
@@ -1250,7 +1249,6 @@ try {
         Assert-InsideWindow 'GameHeading'
         Assert-InsideWindow 'EditGameButton'
         Assert-InsideWindow 'RemoveGameButton'
-        Assert-InsideWindow 'RemoveGameHint'
         Assert-InsideWindow 'GameNotesScroll'
         Assert-NoOverlap 'PART_PaneToggleButton' 'GameHeading'
         Assert-NoOverlap 'PART_PaneToggleButton' 'EditGameButton'
@@ -2076,7 +2074,7 @@ try {
         $renameTitle = 'Linked Rename Game'
         $renamed = 'Renamed Linked Game'
         $emptyTitle = 'Empty Linked Game'
-        $hint = "Remove this game's guides first."
+        $guidedTitle = 'Guided Remove Game'
         $summary = 'A seeded summary for the game actions check.'
 
         # The title-bar Back button stays visible on the Library, disabled.
@@ -2101,20 +2099,52 @@ try {
         # The shared prelude already consumed 'Library ready.'.
         [void](Wait-Name 'LibraryHeading' 'Library')
         if ($Mode -eq 'game-actions') {
+            # The guided game goes first, while it is still the Resume guide's game (ruling 6).
+            [void](Wait-Name 'ResumeGuide' 'Resume Guided Walkthrough')
+            [void](Wait-GameRow $guidedTitle)
+            Select-Element $guidedTitle
+            [void](Wait-Name 'GameHeading' $guidedTitle)
+            [void](Wait-Status 'Game ready.')
+            [void](Wait-GuideRowCount 2)
+            Invoke-Element (Wait-EnabledById 'RemoveGameButton')
+            [void](Wait-VisibleById 'RemoveGameDialog')
+            [void](Wait-VisibleName "Remove $guidedTitle and its 2 guides?")
+            [void](Wait-Name 'RemoveGameMessage' ('This removes the game, its 2 guides with their reading progress, ' +
+                "and their 3 managed files from Desktop Guides. The original files you imported aren't affected."))
+            Assert-Absent 'RemoveGameCountChanged'
+            Wait-FocusedId 'CloseButton'
+            $report.guidedDialogScreenshot = Save-WindowScreenshot 'remove-game-with-guides-confirm'
+            [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+            [void](Wait-HiddenById 'RemoveGameDialog')
+            Wait-FocusedId 'RemoveGameButton'
+            [void](Wait-Name 'GameHeading' $guidedTitle)
+            [void](Wait-GuideRowCount 2)
+            $report.phases += 'remove-with-guides-cancel'
+
+            Invoke-Element (Wait-EnabledById 'RemoveGameButton')
+            [void](Wait-VisibleById 'RemoveGameDialog')
+            Invoke-Element (Wait-EnabledById 'PrimaryButton')
+            [void](Wait-HiddenById 'RemoveGameDialog')
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            [void](Wait-Status "Removed $guidedTitle.")
+            Wait-FocusedId 'AddGameButton'
+            Assert-Absent 'ResumeGuide'
+            [void](Wait-GameRow $renameTitle)
+            if ((Count-GameRows $guidedTitle) -ne 0) {
+                throw "The removed game '$guidedTitle' is still listed."
+            }
+            $report.phases += 'remove-with-guides'
+
             $before = (Wait-GameRow $renameTitle).Current.HelpText
             Select-Element $renameTitle
             [void](Wait-Name 'GameHeading' $renameTitle)
             [void](Wait-Status 'Game ready.')
-            $remove = Wait-VisibleById 'RemoveGameButton'
-            if ($remove.Current.IsEnabled) {
-                throw 'Remove game was enabled for a game with guides.'
+            $remove = Wait-EnabledById 'RemoveGameButton'
+            if ($remove.Current.HelpText) {
+                throw "Remove game's HelpText was '$($remove.Current.HelpText)' for a game with guides."
             }
-            if ($remove.Current.HelpText -ne $hint) {
-                throw "Remove game's HelpText was '$($remove.Current.HelpText)'."
-            }
-            [void](Wait-Name 'RemoveGameHint' $hint)
-            $report.hintScreenshot = Save-WindowScreenshot 'remove-game-hint'
-            $report.phases += 'remove-disabled-with-guides'
+            Assert-Absent 'RemoveGameHint'
+            $report.phases += 'remove-enabled-with-guides'
 
             Assert-GuideListUsable
             $report.phases += 'guide-list-keeps-a-row'
@@ -2182,7 +2212,6 @@ try {
             if ($remove.Current.HelpText) {
                 throw "Remove game's HelpText was '$($remove.Current.HelpText)' for a game without guides."
             }
-            Assert-Absent 'RemoveGameHint'
             if (-not (Test-BackEnabled)) {
                 throw 'Back was unavailable on the Game page before the removal.'
             }
@@ -2235,6 +2264,9 @@ try {
         }
         else {
             [void](Wait-GameRow $renamed)
+            if ((Count-GameRows $guidedTitle) -ne 0) {
+                throw "The removed game '$guidedTitle' came back."
+            }
             Invoke-Element (Wait-Name 'ResumeGuide' 'Resume Beta Route Guide')
             [void](Wait-Name 'ReaderHeading' 'Beta Route Guide')
             [void](Wait-Name 'ReaderGameName' $renamed)
@@ -2816,7 +2848,7 @@ catch {
                 'ProviderSettingsStatus', 'GameEditorNotice', 'GameAttribution',
                 'ImportStatus', 'ImportGuideDialog', 'ImportBusyText',
                 'RemoveGuideDialog', 'RemoveGuideMessage', 'RemoveSelectedGuide',
-                'RemoveGameButton', 'RemoveGameHint', 'RemoveGameDialog', 'RemoveGameMessage')) {
+                'RemoveGameButton', 'RemoveGameCountChanged', 'RemoveGameDialog', 'RemoveGameMessage')) {
                 $element = Find-ById $id
                 if ($element) {
                     $report["failure$id"] = [ordered]@{

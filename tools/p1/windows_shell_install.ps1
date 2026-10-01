@@ -959,6 +959,26 @@ function Assert-GameActionsState([string] $label, $seed) {
     if ($state.LastActiveGuideId -ne $seed.BetaGuideId) {
         throw "$label, the Resume guide was $($state.LastActiveGuideId)."
     }
+    if (@($state.ArtworkFolders) -contains $seed.GuidedGameId) {
+        throw "$label, the guided game's artwork folder remains."
+    }
+    $removedGuides = @($seed.GuidedGuideIds)
+    $leftContent = @(@($state.ContentDirectories) | Where-Object { $removedGuides -contains $_ })
+    if ($leftContent.Count -ne 0) {
+        throw "$label, removed guide content remains: $($leftContent -join ', ')."
+    }
+    $leftStates = @(@($state.ReadingStates) | Where-Object { $removedGuides -contains $_.GuideId })
+    if ($leftStates.Count -ne 0) {
+        throw "$label, removed guides' reading states remain."
+    }
+    foreach ($kept in @($seed.AlphaGuideId, $seed.BetaGuideId)) {
+        if (@($state.ContentDirectories) -notcontains $kept) {
+            throw "$label, guide $kept lost its content."
+        }
+    }
+    if ($state.TrashEntries -ne 0 -or $state.FileOperations -ne 0) {
+        throw "$label, $($state.TrashEntries) trash entries and $($state.FileOperations) file operations remain."
+    }
     return $state
 }
 
