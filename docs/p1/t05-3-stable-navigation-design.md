@@ -1,6 +1,7 @@
 # T05.3 Stable navigation design
 
-Status: design approved in brainstorming on 1 October 2026;
+Status: merged through PR #27 on 1 October 2026, merge commit `8dd9cd5`.
+Design approved in brainstorming on 1 October 2026;
 implementation planned in
 [t05-3-stable-navigation-plan.md](t05-3-stable-navigation-plan.md) and
 verified in CI run

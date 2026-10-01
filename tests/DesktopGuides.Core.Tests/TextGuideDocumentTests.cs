@@ -19,6 +19,25 @@ public sealed class TextGuideDocumentTests
     }
 
     [Fact]
+    public void BomWinsOverAPassedCodePage()
+    {
+        byte[] bytes = [0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes("é\r\n")];
+
+        TextGuideDocument document = TextGuideDocument.Decode(bytes, 437);
+
+        Assert.Equal("é\n", document.Text);
+        Assert.Equal("utf-8", document.EncodingName);
+    }
+
+    [Fact]
+    public void BomWithInvalidUtf8RequiresAnEncodingEvenWithACodePage()
+    {
+        byte[] bytes = [0xEF, 0xBB, 0xBF, 0x48, 0x82, 0x0A];
+
+        Assert.Throws<EncodingSelectionRequiredException>(() => TextGuideDocument.Decode(bytes, 437));
+    }
+
+    [Fact]
     public void InvalidUtf8RequiresAnExplicitEncoding()
     {
         byte[] bytes = [0x48, 0x82, 0x0A];

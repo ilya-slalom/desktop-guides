@@ -266,6 +266,8 @@ font-size or window-size change returns near the same text.
 
 - **T08.1** Decode BOM/UTF-8 and explicit fallback encodings into a normalized
   text model while retaining the chosen encoding in guide metadata.
+  A UTF-8 BOM wins over a stored code page; missing, oversized, unreadable
+  or undecodable copies are typed load results (P1 T08.1).
 - **T08.2** Render using a bounded or virtualized native view with monospace
   preformatted layout by default.
 - **T08.3** Implement navigation and character-offset/context location APIs.
