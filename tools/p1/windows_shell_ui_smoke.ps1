@@ -2158,7 +2158,7 @@ try {
             }
             Invoke-Element $remove
             [void](Wait-VisibleById 'RemoveGameDialog')
-            [void](Wait-VisibleName "Remove $emptyTitle?")
+            [void](Wait-VisibleName "Remove ${emptyTitle}?")
             [void](Wait-Name 'RemoveGameMessage' 'This removes the game and its details from Desktop Guides.')
             [void](Wait-Name 'PrimaryButton' 'Remove')
             [void](Wait-Name 'CloseButton' 'Cancel')
