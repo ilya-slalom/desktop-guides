@@ -1,6 +1,7 @@
 # T04.3 Game removal design
 
-Status: implemented on `feat/p1-t04-3-game-removal`; verified by CI run 36841135926 on 1 October 2026.
+Status: merged through PR #26 on 1 October 2026, merge commit `d7a4e77`;
+verified by CI run 36841135926 on 1 October 2026.
 Prerequisites T04.2 (PR #25), T04.4 (PR #14) and T15.3 (PR #22) are merged.
 
 ## Intent
