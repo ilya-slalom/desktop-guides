@@ -2027,8 +2027,8 @@ try {
             throw "Expected a visible element named '$name'."
         }
 
+        # The shared prelude already consumed 'Library ready.'.
         [void](Wait-Name 'LibraryHeading' 'Library')
-        [void](Wait-Status 'Library ready.')
         if ($Mode -eq 'game-actions') {
             $before = (Wait-GameRow $renameTitle).Current.HelpText
             Select-Element $renameTitle
