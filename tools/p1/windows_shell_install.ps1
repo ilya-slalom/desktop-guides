@@ -880,6 +880,34 @@ function Run-TxtReaderScenarios {
     finally {
         Restore-AppThemePreference $originalTheme
     }
+    Assert-TxtBackDuringLoad
+}
+
+function Assert-TxtBackDuringLoad {
+    # Holds a TXT load at its test gate so Back runs while the load is in flight.
+    Start-InstalledShell
+    $processId = $report.launchedProcessId
+    $reached = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::AutoReset,
+        "Local\DesktopGuides.Preview.TextLoad.$($processId).Reached")
+    $resume = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::ManualReset,
+        "Local\DesktopGuides.Preview.TextLoad.$($processId).Continue")
+    try {
+        $report.txtLoadPaused = Run-ShellSmoke 'txt-load-paused'
+        if (-not $reached.WaitOne(15000)) {
+            throw 'The TXT load did not reach its test gate.'
+        }
+        $report.txtBackDuringLoad = Run-ShellSmoke 'txt-back-during-load'
+        $resume.Set() | Out-Null
+        $report.txtLoadReleased = Run-ShellSmoke 'txt-load-released'
+        Close-InstalledShell
+    }
+    finally {
+        $resume.Set() | Out-Null
+        $resume.Dispose()
+        $reached.Dispose()
+    }
 }
 
 function Run-ImportScenarios {

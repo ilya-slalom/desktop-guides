@@ -320,6 +320,7 @@ public sealed partial class ShellWindow : Window
         refreshCancel?.Cancel();
         ProviderSettings.Cancel();
         leaseWait.Cancel();
+        CancelReaderLoad();
         Task pendingNavigation = navigationQueue.StopAndDrainAsync();
         Program.ReleaseInstanceKey();
         _ = CloseWhenIdleAsync(pendingNavigation);
@@ -373,6 +374,7 @@ public sealed partial class ShellWindow : Window
         NavigationView sender, NavigationViewItemInvokedEventArgs args)
     {
         bool openSettings = args.IsSettingsInvoked;
+        CancelReaderLoad();
         await RunNavigationAsync(async () =>
         {
             if (openSettings)
@@ -389,6 +391,7 @@ public sealed partial class ShellWindow : Window
 
     private async void TitleBarBackRequested(TitleBar sender, object args)
     {
+        CancelReaderLoad();
         await RunNavigationAsync(GoBackAsync);
     }
 
@@ -397,6 +400,7 @@ public sealed partial class ShellWindow : Window
 
     private async void ReaderBackClicked(object sender, RoutedEventArgs args)
     {
+        CancelReaderLoad();
         await RunNavigationAsync(GoBackAsync);
     }
 
@@ -1242,6 +1246,10 @@ public sealed partial class ShellWindow : Window
         ReaderSurface.Content = view;
     }
 
+    // A render holds the navigation queue while its TXT guide loads, so a
+    // request that leaves the Reader cancels the load before it queues.
+    private void CancelReaderLoad() => readerLoad?.Cancel();
+
     // Every render closes the Reader: a load in flight is cancelled, and the
     // toolbar and surface drop the old session before it is disposed.
     private async Task CloseReaderSessionAsync()
@@ -1282,6 +1290,43 @@ public sealed partial class ShellWindow : Window
                     if (!await Task.Run(() => resume.WaitOne(30_000)))
                     {
                         throw new TimeoutException("Reader metadata test gate timed out.");
+                    }
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Optional installed-test synchronization must not affect normal reading.
+        }
+    }
+
+    // Holds a TXT load until the installed test continues it or the load is cancelled.
+    private static async Task PauseTextLoadForTestAsync(CancellationToken token)
+    {
+        string prefix = $@"Local\DesktopGuides.Preview.TextLoad.{Environment.ProcessId}";
+        try
+        {
+            if (!EventWaitHandle.TryOpenExisting(
+                $"{prefix}.Reached", out EventWaitHandle? reached))
+            {
+                return;
+            }
+            using (reached)
+            {
+                if (!EventWaitHandle.TryOpenExisting(
+                    $"{prefix}.Continue", out EventWaitHandle? resume))
+                {
+                    return;
+                }
+                using (resume)
+                {
+                    reached.Set();
+                    int signaled = await Task.Run(
+                        () => WaitHandle.WaitAny([resume, token.WaitHandle], 30_000));
+                    token.ThrowIfCancellationRequested();
+                    if (signaled == WaitHandle.WaitTimeout)
+                    {
+                        throw new TimeoutException("TXT load test gate timed out.");
                     }
                 }
             }
@@ -1603,6 +1648,7 @@ public sealed partial class ShellWindow : Window
                     TextGuideLoad textLoad;
                     try
                     {
+                        await PauseTextLoadForTestAsync(readerToken);
                         textLoad = await textLoader!.LoadAsync(guide, readerToken);
                     }
                     catch (OperationCanceledException) when (readerToken.IsCancellationRequested)
