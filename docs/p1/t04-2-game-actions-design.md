@@ -290,8 +290,8 @@ the Game page with the hint and the removal dialog, in light and dark.
   passed `production-shell-ui`:
   - `game-actions`, light and dark: phases `remove-disabled-with-guides`,
     `guide-list-keeps-a-row`, `rename-keeps-selection`,
-    `rename-library-row`, `remove-confirm`, `remove-escape-cancels`,
-    `remove-enter-cancels` and `removed`;
+    `rename-library-row`, `next-game-details-at-top`, `remove-confirm`,
+    `remove-escape-cancels`, `remove-enter-cancels` and `removed`;
   - `game-actions-persisted`: phases `persisted-resume`,
     `persisted-selection`, `persisted-facts` and
     `persisted-no-provider-traffic`, with zero non-loopback connections;
@@ -299,7 +299,7 @@ the Game page with the hint and the removal dialog, in light and dark.
     provider game ID and artwork; no artwork folder for the removed game;
     the seeded Guide IDs, Alpha's reading state and Beta as Resume;
   - `design-language`: Remove game and its hint inside the window at both
-    widths;
+    widths, and the short details card uncapped at 1024 × 720;
   - `provider-offline-none`: every IGDB detail, the link included, reached
     in the capped details card.
   The live IGDB and SteamGridDB checks were skipped because CI has no

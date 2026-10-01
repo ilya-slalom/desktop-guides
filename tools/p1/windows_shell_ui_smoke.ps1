@@ -674,6 +674,19 @@ try {
         [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
     }
 
+    function Get-GameDetailsScroll {
+        $viewer = Wait-VisibleById 'GameMetadataScroll'
+        return $viewer.GetCurrentPattern(
+            [System.Windows.Automation.ScrollPattern]::Pattern)
+    }
+
+    # A page with room to spare shows the whole details card unscrolled.
+    function Assert-GameDetailsUncapped {
+        if ((Get-GameDetailsScroll).Current.VerticallyScrollable) {
+            throw 'The Game details card scrolled on a page with room for all of it.'
+        }
+    }
+
     # However tall the Game details are, the guide list keeps at least one
     # whole row on screen.
     function Assert-GuideListUsable {
@@ -1229,6 +1242,7 @@ try {
         Assert-InsideWindow 'RemoveGameButton'
         Assert-InsideWindow 'RemoveGameHint'
         Assert-ReachesWindowRightEdge 'ShellContent'
+        Assert-GameDetailsUncapped
         $report.gameWideScreenshot = Save-WindowScreenshot 'game-wide'
         $report.phases += 'game-wide-full-width-metadata'
 
@@ -2125,6 +2139,16 @@ try {
             [void](Wait-Name 'GameSummary' $summary)
             $report.phases += 'rename-keeps-selection'
 
+            # Scroll this game's capped details to the end; the next game
+            # must open with its details at the top (final review minor 1).
+            Resize-ShellWindow 768 519
+            $details = Get-GameDetailsScroll
+            if (-not $details.Current.VerticallyScrollable) {
+                throw "The details card was not capped in a 768 x 519 window."
+            }
+            $details.SetScrollPercent(
+                [System.Windows.Automation.ScrollPattern]::NoScroll, 100)
+
             Go-Back
             [void](Wait-Name 'LibraryHeading' 'Library')
             [void](Wait-Status 'Library ready.')
@@ -2148,6 +2172,12 @@ try {
             Select-Element $emptyTitle
             [void](Wait-Name 'GameHeading' $emptyTitle)
             [void](Wait-Status 'Game ready.')
+            $details = Get-GameDetailsScroll
+            if ($details.Current.VerticallyScrollable -and
+                $details.Current.VerticalScrollPercent -gt 0) {
+                throw "'$emptyTitle' opened with its details scrolled to $($details.Current.VerticalScrollPercent)%."
+            }
+            $report.phases += 'next-game-details-at-top'
             $remove = Wait-EnabledById 'RemoveGameButton'
             if ($remove.Current.HelpText) {
                 throw "Remove game's HelpText was '$($remove.Current.HelpText)' for a game without guides."

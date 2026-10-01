@@ -67,6 +67,8 @@ public sealed partial class ShellWindow : Window
     private bool gameRemoveRequested;
     // Null while the Game page loads, so Remove game stays disabled until the count is known.
     private int? loadedGameGuideCount;
+    // The game whose details the card last showed; another game opens them at the top.
+    private Guid? detailsGameId;
     private CancellationTokenSource? refreshCancel;
     private Task refreshTask = Task.CompletedTask;
 
@@ -1381,6 +1383,11 @@ public sealed partial class ShellWindow : Window
                         game.Metadata is null && cover is null
                             ? Visibility.Collapsed
                             : Visibility.Visible;
+                    if (detailsGameId != game.Id)
+                    {
+                        GameMetadataScroll.ChangeView(null, 0, null, disableAnimation: true);
+                        detailsGameId = game.Id;
+                    }
                     EditGameButton.IsEnabled = true;
                     ImportGuideButton.IsEnabled = !importRequested;
                     loadedGameGuideCount = guides.Count;

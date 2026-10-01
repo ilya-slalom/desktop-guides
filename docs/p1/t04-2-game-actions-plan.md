@@ -133,6 +133,10 @@ Task 5 records these rulings in the design's verification record.
       toward an element that is offscreen only because it is below the
       card's viewport.
     - Cost if wrong: on very short windows the details need scrolling.
+    - From the final review: opening a different game resets the card's
+      scroll to the top (`next-game-details-at-top`), and `design-language`
+      checks that a short card is uncapped at 1024 × 720, since the
+      scrolling waits would otherwise hide a cap that is too tight.
 
 ## Review Focus
 
