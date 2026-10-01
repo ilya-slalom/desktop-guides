@@ -634,6 +634,14 @@ project uses a provisional package identity until T17.1 sets the public one.
   Compare first-text time, realized controls, and window-response samples
   with P0 on the Windows 11 x64 reference host. A size-limit rejection is
   explicit; the reader never silently drops trailing text.
+  `TextLineView` (Core) applies the display rules; `TextLineList` is the
+  lazy `IList` the `ListView` reads, built fresh per row, and
+  `TextLineMetrics` sizes every row to the widest line so the scroll range
+  is fixed from the first frame. `TextReaderSession` reports only `Scroll`
+  and shows no selection. The P0 comparison runs in CI
+  `production-shell-ui` (`txt-reader` smoke) against the P0 thresholds;
+  `pcsx2-win` is used only when CI fails or a measure is within 20% of its
+  threshold.
 - **T08.3** Expose page up/down, start/end, and a normalized offset/context
   capture/restore path through `IReaderAdapter`. Exact unchanged-file
   restore returns within one visible logical line after width/font change;
