@@ -1,6 +1,7 @@
 # T08.1 Managed TXT decoding design
 
-Status: design approved in brainstorming on 1 October 2026;
+Status: merged through PR #28 on 1 October 2026, merge commit `da1e975`.
+Design approved in brainstorming on 1 October 2026;
 implementation planned in
 [t08-1-txt-decoding-plan.md](t08-1-txt-decoding-plan.md) and verified in CI run
 [36865349872](https://github.com/ilya-slalom/desktop-guides/actions/runs/36865349872)
