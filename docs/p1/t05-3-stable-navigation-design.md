@@ -1,7 +1,8 @@
 # T05.3 Stable navigation design
 
-Status: design approved in brainstorming on 1 October 2026; not yet
-implemented.
+Status: design approved in brainstorming on 1 October 2026;
+implementation planned in
+[t05-3-stable-navigation-plan.md](t05-3-stable-navigation-plan.md).
 Prerequisites T04.2 (PR #25), T05.2 (PR #24), T06.3 (PR #19) and T15.3
 (PR #22) are merged.
 
@@ -107,24 +108,25 @@ IDs in each list are unique. The result is:
 Selecting a Library row opens that game, so restoring the Library anchor
 focuses the row and never sets `SelectedItem`.
 
-- **After a Library render,** if `CurrentAnchor` is a visible row, the shell
-  scrolls it into view and focuses it after layout through a new
-  `pendingGameFocus` and `TryRestoreGameFocus`, which follow
+- **After Back to the Library,** if `CurrentAnchor` is a visible row, the
+  shell scrolls it into view and focuses it after layout through a new
+  `libraryFocusPending` and `TryRestoreLibraryFocus`, which follow
   `TryRestoreGuideFocus`: an immediate attempt and one more through
   `DispatcherQueue`, both guarded by `renderGeneration` and the route.
+  Other routes to the Library leave focus alone; after a game removal
+  focus stays on Add game (T04.3).
 - **If the anchor isn't visible** (the query hides it, or it was removed),
   focus goes to the first row. If no row is shown, it goes to
-  `LibrarySearchInput`. Focus is never left on the disabled Back button.
-- **An in-place reload** (import, rename or removal while the Library is
-  showing) records the visible game IDs and the focused game first. After
-  `ApplyLibrarySearch`, `ListAnchor.Resolve` picks the row to focus, with the
-  first-row fallback. This runs only if a Library row had focus before the
-  reload, so typing in the search box keeps focus there.
+  `LibrarySearchInput`, or to Add game when search is disabled. Focus is
+  never left on the disabled Back button.
+- **No in-place reload.** Nothing re-renders the Library while it is
+  showing (import, rename and removal happen on the Game page), so there is
+  no in-place reload to handle.
 
 ### Game page (Production/ShellWindow.xaml.cs)
 
-- **Selection comes from `navigator.CurrentAnchor`,** replacing the
-  `selectedGuideId` field. The `GuideList` selection handler calls
+- **Selection comes from `navigator.CurrentAnchor`,** falling back to the
+  list's own selection only when it still shows this game. The `GuideList` selection handler calls
   `SetAnchor` for changes made by the person (outside
   `settingGuideSelection`).
 - **Reader → Game** keeps the existing `pendingGuideFocus` behaviour.
@@ -194,12 +196,13 @@ New or extended phases in `tools/p1/windows_shell_ui_smoke.ps1`:
   rename and game removal.
 - **Game → Settings → Back** keeps the selected guide.
 - **Guide removal** selects the neighbouring guide and keeps the query.
-- **Stale refresh.** A deterministic phase needs a metadata refresh whose
-  completion the smoke can order against a navigation. The plan checks
-  whether the existing seed or provider fixture allows this without a
-  test hook in production code. If not, the stale-refresh guard is a Review
-  Focus item backed by the generation checks, and the verification record
-  says so.
+- **Stale refresh.** CI has no provider keys, so a refresh fails at once
+  and can't be ordered against a navigation. The guard is a Review Focus
+  item backed by the route check in the queued refresh action and the
+  generation checks; the verification record says so.
+- **Guide order.** Nothing writes `LastOpenedUtcMs` yet, so opening a guide
+  doesn't reorder the list and the smoke covers both next-row and
+  previous-row removal.
 
 UI tests assert only what app code controls: which element has focus, which
 row is selected, the search text and the visible rows.

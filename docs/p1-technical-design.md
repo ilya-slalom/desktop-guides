@@ -539,6 +539,9 @@ project uses a provisional package identity until T17.1 sets the public one.
   move focus to the nearest safe list row or heading. Restore the prior
   Library query on Back and prevent a stale async refresh from replacing a
   newer selection.
+  The navigator keeps an optional anchor ID with each back-stack entry
+  (the focused game on the Library, the selected guide on a Game), and
+  `ListAnchor.Resolve` picks the nearest surviving row by its old position.
 - **T05.4** Extract the provider result's artwork, metadata, progress, status,
   and error presentations into shared styles and data templates after T04.4
   proves their real content. Reuse them in Library, Game, and import surfaces.
