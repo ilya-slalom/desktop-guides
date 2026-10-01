@@ -109,6 +109,10 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         }, token);
     }
 
+    public Task<EmptyGameRemoval> RemoveEmptyGameAsync(
+        Guid gameId, CancellationToken token = default) =>
+        throw new NotSupportedException();
+
     public Task<Game?> GetGameAsync(Guid gameId, CancellationToken token = default) =>
         ReadAsync<Game?>(() =>
         {

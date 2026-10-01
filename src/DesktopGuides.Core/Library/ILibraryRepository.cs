@@ -11,6 +11,9 @@ public interface ILibraryRepository : IAsyncDisposable
     Task<Game> UpdateGameAsync(
         Guid gameId, string title, string? platform, string? notes,
         CancellationToken token = default);
+    // Deletes the game only while it has no guides.
+    Task<EmptyGameRemoval> RemoveEmptyGameAsync(
+        Guid gameId, CancellationToken token = default);
     Task<IReadOnlyList<Game>> ListGamesAsync(CancellationToken token = default);
     Task<Game?> GetGameAsync(Guid gameId, CancellationToken token = default);
     Task<IReadOnlyList<Guide>> ListGuidesAsync(
