@@ -63,6 +63,10 @@ public sealed partial class ShellWindow : Window
     private GuideRemover? guideRemover;
     private bool removeRequested;
     private ContentDialog? activeRemoveDialog;
+    private GameRemover? gameRemover;
+    private bool gameRemoveRequested;
+    // Null while the Game page loads, so Remove game stays disabled until the count is known.
+    private int? loadedGameGuideCount;
     private CancellationTokenSource? refreshCancel;
     private Task refreshTask = Task.CompletedTask;
 
@@ -100,6 +104,7 @@ public sealed partial class ShellWindow : Window
         GuideList.AddHandler(
             UIElement.KeyDownEvent, new KeyEventHandler(GuideKeyDown), true);
         ArtworkListLoader.NameRows(GuideList);
+        RemoveGameHint.Text = GameRemovalPresentation.GuidesFirst;
         GuideList.LayoutUpdated += GuideListLayoutUpdated;
         Navigation.RegisterPropertyChangedCallback(
             NavigationView.IsPaneOpenProperty, (_, _) => UpdatePaneStatus());
@@ -242,6 +247,7 @@ public sealed partial class ShellWindow : Window
             await repository.InitializeAsync();
             guidePublisher = new GuideImportPublisher(repository, paths);
             guideRemover = new GuideRemover(repository, paths);
+            gameRemover = new GameRemover(repository, artwork);
             providers = new ProviderServices(dataRoot);
             await ProviderSettings.InitializeAsync(providers);
             importer = providers.CreateImporter(repository, artwork);
@@ -499,6 +505,17 @@ public sealed partial class ShellWindow : Window
             () => OpenGuideAsync(guide.Id, guide.GameId, intentVersion));
     }
 
+    private void UpdateRemoveGameAction()
+    {
+        bool hasGuides = loadedGameGuideCount > 0;
+        RemoveGameButton.IsEnabled = loadedGameGuideCount == 0 && !closeRequested &&
+            !importRequested && !gameEditorRequested && !removeRequested &&
+            !gameRemoveRequested && refreshCancel is null;
+        RemoveGameHint.Visibility = hasGuides ? Visibility.Visible : Visibility.Collapsed;
+        AutomationProperties.SetHelpText(
+            RemoveGameButton, hasGuides ? GameRemovalPresentation.GuidesFirst : string.Empty);
+    }
+
     private void UpdateOpenSelectedGuideAction()
     {
         if (GuideList.IsEnabled &&
@@ -730,9 +747,18 @@ public sealed partial class ShellWindow : Window
         finally
         {
             gameEditorRequested = false;
-            if (!closeRequested && navigator.Current is GameRoute)
+            if (!closeRequested && navigator.Current is GameRoute shown)
             {
                 EditGameButton.IsEnabled = true;
+                // The button was disabled while the dialog was open, so WinUI could not return focus to it.
+                if (shown.GameId == route.GameId)
+                {
+                    EditGameButton.Focus(FocusState.Programmatic);
+                }
+            }
+            if (!closeRequested)
+            {
+                UpdateRemoveGameAction();
             }
         }
     }
@@ -829,6 +855,10 @@ public sealed partial class ShellWindow : Window
                 {
                     ImportGuideButton.Focus(FocusState.Programmatic);
                 }
+            }
+            if (!closeRequested)
+            {
+                UpdateRemoveGameAction();
             }
         }
     }
@@ -942,6 +972,10 @@ public sealed partial class ShellWindow : Window
                     ImportGuideButton.Focus(FocusState.Programmatic);
                 }
             }
+            if (!closeRequested)
+            {
+                UpdateRemoveGameAction();
+            }
         }
     }
 
@@ -951,6 +985,129 @@ public sealed partial class ShellWindow : Window
         {
             ShowErrorStatus(GuideRemovalPresentation.Error(
                 error is GuideRemovalException removal ? removal.Issue : GuideRemovalIssue.Failed, title));
+        }
+    }
+
+    private async void RemoveGameClicked(object sender, RoutedEventArgs args)
+    {
+        if (gameRemoveRequested || closeRequested || navigator.Current is not GameRoute route)
+        {
+            return;
+        }
+        gameRemoveRequested = true;
+        string shownTitle = GameHeading.Text;
+        EditGameButton.IsEnabled = false;
+        RefreshMetadataButton.IsEnabled = false;
+        ImportGuideButton.IsEnabled = false;
+        RemoveGameButton.IsEnabled = false;
+        bool rendered = false;
+        try
+        {
+            await RunNavigationAsync(async () =>
+            {
+                if (closeRequested ||
+                    navigator.Current is not GameRoute current ||
+                    current.GameId != route.GameId)
+                {
+                    return;
+                }
+                GameRemover remover = gameRemover
+                    ?? throw new InvalidOperationException("The library is not ready.");
+                Game? game;
+                try
+                {
+                    game = await RequireRepository().GetGameAsync(route.GameId);
+                }
+                catch (Exception)
+                {
+                    if (!closeRequested)
+                    {
+                        ShowErrorStatus(GameRemovalPresentation.Failed(shownTitle));
+                    }
+                    return;
+                }
+                if (closeRequested)
+                {
+                    return;
+                }
+                string title = game?.Title ?? shownTitle;
+                EmptyGameRemovalOutcome outcome;
+                if (game is null)
+                {
+                    // Removed elsewhere before the dialog (ruling 14).
+                    outcome = EmptyGameRemovalOutcome.NotFound;
+                }
+                else
+                {
+                    ContentDialog dialog = RemoveGameDialog.Create(game.Title, Navigation.XamlRoot);
+                    DialogSurface.Apply(dialog, EffectiveMaterial);
+                    activeRemoveDialog = dialog;
+                    ContentDialogResult choice;
+                    try
+                    {
+                        choice = await dialog.ShowAsync();
+                    }
+                    finally
+                    {
+                        activeRemoveDialog = null;
+                    }
+                    if (choice != ContentDialogResult.Primary || closeRequested)
+                    {
+                        return;
+                    }
+                    try
+                    {
+                        outcome = await remover.RemoveAsync(game.Id);
+                    }
+                    catch (Exception)
+                    {
+                        if (!closeRequested)
+                        {
+                            ShowErrorStatus(GameRemovalPresentation.Failed(title));
+                        }
+                        return;
+                    }
+                    if (closeRequested)
+                    {
+                        return;
+                    }
+                }
+                rendered = true;
+                if (outcome == EmptyGameRemovalOutcome.HasGuides)
+                {
+                    await RenderCurrentAsync();
+                    ShowWarningStatus(GameRemovalPresentation.HasGuides(title));
+                    EditGameButton.Focus(FocusState.Programmatic);
+                    return;
+                }
+                // Clearing the back stack keeps Back from reaching the removed page.
+                navigator.ResetToLibrary();
+                await RenderCurrentAsync();
+                ShowTransientStatus(outcome == EmptyGameRemovalOutcome.Removed
+                    ? GameRemovalPresentation.Removed(title)
+                    : GameRemovalPresentation.AlreadyRemoved(title));
+                AddGameButton.Focus(FocusState.Programmatic);
+            });
+        }
+        finally
+        {
+            gameRemoveRequested = false;
+            if (!closeRequested)
+            {
+                bool restore = !rendered &&
+                    navigator.Current is GameRoute shown && shown.GameId == route.GameId;
+                if (restore)
+                {
+                    EditGameButton.IsEnabled = true;
+                    ImportGuideButton.IsEnabled = !importRequested;
+                    RefreshMetadataButton.IsEnabled = refreshCancel is null;
+                }
+                UpdateRemoveGameAction();
+                if (restore)
+                {
+                    RemoveGameButton.Focus(FocusState.Programmatic);
+                }
+            }
         }
     }
 
@@ -1110,6 +1267,8 @@ public sealed partial class ShellWindow : Window
         SettingsPanel.Visibility = Visibility.Collapsed;
         OpenSelectedGuideButton.Visibility = Visibility.Collapsed;
         RemoveSelectedGuideButton.Visibility = Visibility.Collapsed;
+        loadedGameGuideCount = null;
+        UpdateRemoveGameAction();
         AppTitleBar.IsBackButtonEnabled = navigator.CanGoBack;
         Navigation.SelectedItem = navigator.Current is SettingsRoute
             ? Navigation.SettingsItem
@@ -1216,6 +1375,8 @@ public sealed partial class ShellWindow : Window
                             : Visibility.Visible;
                     EditGameButton.IsEnabled = true;
                     ImportGuideButton.IsEnabled = !importRequested;
+                    loadedGameGuideCount = guides.Count;
+                    UpdateRemoveGameAction();
                     GuideRowItem? selectedGuide = selectedGuideId is Guid id
                         ? guides.FirstOrDefault(item => item.Guide.Id == id)
                         : null;
@@ -1475,6 +1636,7 @@ public sealed partial class ShellWindow : Window
         using CancellationTokenSource cancel = new();
         refreshCancel = cancel;
         RefreshMetadataButton.IsEnabled = false;
+        UpdateRemoveGameAction();
         ShowBusyStatus("Refreshing metadata…");
         ProviderRefreshResult? result = null;
         string? error = null;
@@ -1502,7 +1664,11 @@ public sealed partial class ShellWindow : Window
         {
             refreshCancel = null;
             // Re-enable here: the user may have moved to another game, which won't re-render.
-            if (!closeRequested) RefreshMetadataButton.IsEnabled = true;
+            if (!closeRequested)
+            {
+                RefreshMetadataButton.IsEnabled = true;
+                UpdateRemoveGameAction();
+            }
         }
         if (closeRequested)
         {

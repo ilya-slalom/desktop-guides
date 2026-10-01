@@ -219,31 +219,48 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <Grid ColumnSpacing="{StaticResource DesktopGuidesSpacing16}">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock x:Name="GameHeading"
-                               Style="{StaticResource DesktopGuidesPageTitleStyle}"
-                               AutomationProperties.AutomationId="GameHeading" />
-                    <Button x:Name="RefreshMetadataButton"
-                            Grid.Column="1"
-                            Content="Refresh metadata"
-                            Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
-                            VerticalAlignment="Center"
-                            Visibility="Collapsed"
-                            Click="RefreshMetadataClicked"
-                            AutomationProperties.AutomationId="RefreshMetadataButton" />
-                    <Button x:Name="EditGameButton"
-                            Grid.Column="2"
-                            Content="Edit game"
-                            Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
-                            VerticalAlignment="Center"
-                            Click="EditGameClicked"
-                            AutomationProperties.AutomationId="EditGameButton" />
-                </Grid>
+                <StackPanel Spacing="{StaticResource DesktopGuidesSpacing4}">
+                    <Grid ColumnSpacing="{StaticResource DesktopGuidesSpacing16}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="GameHeading"
+                                   Style="{StaticResource DesktopGuidesPageTitleStyle}"
+                                   AutomationProperties.AutomationId="GameHeading" />
+                        <Button x:Name="RefreshMetadataButton"
+                                Grid.Column="1"
+                                Content="Refresh metadata"
+                                Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                                VerticalAlignment="Center"
+                                Visibility="Collapsed"
+                                Click="RefreshMetadataClicked"
+                                AutomationProperties.AutomationId="RefreshMetadataButton" />
+                        <Button x:Name="EditGameButton"
+                                Grid.Column="2"
+                                Content="Edit game"
+                                Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                                VerticalAlignment="Center"
+                                Click="EditGameClicked"
+                                AutomationProperties.AutomationId="EditGameButton" />
+                        <Button x:Name="RemoveGameButton"
+                                Grid.Column="3"
+                                Content="Remove game"
+                                Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                                VerticalAlignment="Center"
+                                IsEnabled="False"
+                                Click="RemoveGameClicked"
+                                AutomationProperties.AutomationId="RemoveGameButton" />
+                    </Grid>
+                    <TextBlock x:Name="RemoveGameHint"
+                               Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                               HorizontalAlignment="Right"
+                               TextWrapping="Wrap"
+                               Visibility="Collapsed"
+                               AutomationProperties.AutomationId="RemoveGameHint" />
+                </StackPanel>
 
                 <Border x:Name="GameMetadataSurface"
                         Grid.Row="1"
