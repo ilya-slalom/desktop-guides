@@ -188,7 +188,7 @@ try {
         $transient = @($expected | Where-Object { $_ -in @(
             'Library ready.',
             'Game ready.',
-            'Guide details ready.',
+            'Guide ready.',
             'Settings ready.') }).Count -gt 0
         $lastObserved = 'status probe was not found'
         $deadline = (Get-Date).AddSeconds(15)
@@ -1109,7 +1109,7 @@ try {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         Open-GuideFromGame 'Blocked Write Guide'
         [void](Wait-Name 'ReaderHeading' 'Blocked Write Guide')
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'guide-reader-open-while-save-blocked'
     }
     elseif ($Mode -eq 'queue-game-editor') {
@@ -1262,7 +1262,7 @@ try {
         [void](Wait-Name 'ReaderHeading' $designGuide)
         [void](Wait-Name 'ReaderGameName' $designGame)
         [void](Wait-Name 'ReaderFormat' 'TXT')
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         [void](Wait-HiddenById 'ShellStatus')
         Assert-HeadingLevel 'ReaderHeading' 1
         Assert-InsideWindow 'ReaderHeading'
@@ -1274,7 +1274,7 @@ try {
         Assert-InsideWindow 'ReaderHeading'
         Assert-InsideWindow 'ReaderBackToGame'
         Assert-InsideWindow 'ReaderFormat'
-        Assert-InsideWindow 'ReaderPlaceholder'
+        Assert-InsideWindow 'ReaderTextLines'
         Assert-NoOverlap 'PART_PaneToggleButton' 'ReaderBackToGame'
         Assert-NoOverlap 'PART_BackButton' 'ReaderBackToGame'
         $report.readerNarrowScreenshot =
@@ -1361,7 +1361,7 @@ try {
 
         Press-Enter (Wait-GuideRow $designGuide)
         [void](Wait-Name 'ReaderHeading' $designGuide)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         [void](Wait-HiddenById 'ShellStatus')
         Assert-ShellForeground
         $report.readerScreenshot = Save-WindowScreenshot "material-$selected-reader"
@@ -1641,7 +1641,7 @@ try {
         # Resume pushes Library -> Game -> Reader; Back walks the same entries.
         Invoke-Element (Wait-Name 'ResumeGuide' 'Resume Beacon Guide')
         [void](Wait-Name 'ReaderHeading' 'Beacon Guide')
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         Go-Back
         [void](Wait-Name 'GameHeading' $beacon)
         [void](Wait-Status 'Game ready.')
@@ -1665,7 +1665,7 @@ try {
         Open-AtlasGame
         Open-GuideFromGame 'Atlas Second Guide'
         [void](Wait-Name 'ReaderHeading' 'Atlas Second Guide')
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         Go-Back
         [void](Wait-Name 'GameHeading' $atlas)
         [void](Wait-SelectedGuide 'Atlas Second Guide')
@@ -2166,7 +2166,7 @@ try {
                     Invoke-Element (Wait-EnabledById 'ImportOpenExisting')
                     [void](Wait-HiddenById 'ImportGuideDialog')
                     [void](Wait-Name 'ReaderHeading' $ExpectedGuideTitle)
-                    [void](Wait-Status 'Guide details ready.')
+                    [void](Wait-Status 'Guide ready.')
                     $report.importOpenExistingScreenshot = Save-WindowScreenshot 'import-open-existing'
                     $report.phases += 'import-open-existing'
                 }
@@ -2186,7 +2186,7 @@ try {
         # with it selected before removing it.
         Open-GuideFromGame $title
         [void](Wait-Name 'ReaderHeading' $title)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Name 'GameHeading' 'Import Test Game')
         [void](Wait-Status 'Game ready.')
@@ -2308,7 +2308,7 @@ try {
             # with it selected before renaming.
             Open-GuideFromGame 'Beta Route Guide'
             [void](Wait-Name 'ReaderHeading' 'Beta Route Guide')
-            [void](Wait-Status 'Guide details ready.')
+            [void](Wait-Status 'Guide ready.')
             Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
             [void](Wait-Name 'GameHeading' $renameTitle)
             [void](Wait-Status 'Game ready.')
@@ -2425,7 +2425,7 @@ try {
             Invoke-Element (Wait-Name 'ResumeGuide' 'Resume Beta Route Guide')
             [void](Wait-Name 'ReaderHeading' 'Beta Route Guide')
             [void](Wait-Name 'ReaderGameName' $renamed)
-            [void](Wait-Status 'Guide details ready.')
+            [void](Wait-Status 'Guide ready.')
             $report.phases += 'persisted-resume'
 
             Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
@@ -2470,7 +2470,7 @@ try {
         [void](Wait-Status 'Library ready.')
         Invoke-Element (Wait-Name 'ResumeGuide' "Resume $target")
         [void](Wait-Name 'ReaderHeading' $target)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Status 'Game ready.')
@@ -2480,7 +2480,7 @@ try {
         $report.phases += 'virtualized-guide-back-focus'
         [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
         [void](Wait-Name 'ReaderHeading' $target)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'virtualized-guide-enter-reopen'
     }
     elseif ($Mode -eq 'switch-game-prepare') {
@@ -2549,7 +2549,7 @@ try {
     elseif ($Mode -eq 'later-guide-result') {
         [void](Wait-Name 'ReaderHeading' 'Blocked Write Guide')
         [void](Wait-Name 'ReaderGameName' 'Route Test Game')
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'later-guide-opened'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
@@ -2844,13 +2844,22 @@ try {
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
         [void](Wait-Name 'ReaderGameName' 'Route Test Game')
         [void](Wait-Name 'ReaderFormat' 'TXT')
-        [void](Wait-Name 'ReaderPlaceholder' `
-            'Reading this guide is unavailable in this preview.')
+        [void](Wait-VisibleById 'ReaderTextLines')
+        [void](Wait-Name 'ReaderTextLines' 'Guide text')
+        $firstLine = (Find-ById 'ReaderTextLines').FindFirst(
+            [System.Windows.Automation.TreeScope]::Descendants,
+            (New-Object System.Windows.Automation.PropertyCondition(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::ListItem)))
+        if (-not $firstLine -or $firstLine.Current.Name -ne 'Test guide.') {
+            throw 'The TXT reader did not show the seeded guide text.'
+        }
+        Assert-Absent 'ReaderPlaceholder'
         $commands = Find-ById 'ReaderCommands'
         if ($commands -and -not $commands.Current.IsOffscreen) {
-            throw 'The preview reader exposed commands without an adapter.'
+            throw 'The TXT reader exposed commands that T08.2 does not provide.'
         }
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         Wait-PaneState 'Navigation pane closed'
         $report.readerScreenshot = Save-WindowScreenshot 'reader'
         $report.phases += 'resume-reader'
@@ -2874,7 +2883,7 @@ try {
         $report.gameScreenshot = Save-WindowScreenshot 'game'
         Invoke-Element $openSelected
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'uia-reopen-selected-guide'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
@@ -2884,7 +2893,7 @@ try {
 
         Click-Element (Wait-SelectedGuide $ExpectedResumeGuide)
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'pointer-reopen-selected-guide'
         Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
@@ -2893,7 +2902,7 @@ try {
         Wait-FocusedGuide $ExpectedResumeGuide
         Activate-SelectedGuide $ExpectedResumeGuide
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'keyboard-reopen-selected-guide'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
@@ -2909,13 +2918,13 @@ try {
         Focus-OtherGuideWithoutSelection $ExpectedResumeGuide $otherGuide
         [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
         [void](Wait-Name 'ReaderHeading' $otherGuide)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'focused-guide-enter'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         Open-GuideFromGame $ExpectedResumeGuide
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'restore-route-guide'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
@@ -2929,7 +2938,7 @@ try {
         [void](Wait-Status 'Game ready.')
         Click-Element (Wait-GuideRow 'Route Test Guide')
         [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         Click-Element (Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Status 'Game ready.')
@@ -2943,7 +2952,7 @@ try {
         [void](Wait-Status 'Game ready.')
         Press-Enter (Wait-GuideRow 'Route Test Guide')
         [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Status 'Game ready.')
@@ -2975,7 +2984,7 @@ try {
         [void](Wait-Status 'Settings ready.')
         Go-Back
         [void](Wait-Name 'ReaderHeading' $rapidGuide)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'rapid-guide-settings-back-reader'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
@@ -2984,7 +2993,7 @@ try {
         if ($rapidGuide -ne 'Route Test Guide') {
             Open-GuideFromGame 'Route Test Guide'
             [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
-            [void](Wait-Status 'Guide details ready.')
+            [void](Wait-Status 'Guide ready.')
             Go-Back
             [void](Wait-Name 'GameHeading' 'Route Test Game')
             [void](Wait-Status 'Game ready.')

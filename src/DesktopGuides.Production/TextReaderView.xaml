@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl x:Class="DesktopGuides.Production.TextReaderView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <!-- Measures one Consolas cell; never shown or read. -->
+        <TextBlock x:Name="CellProbe"
+                   FontFamily="Consolas"
+                   Text="MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM"
+                   Opacity="0"
+                   IsHitTestVisible="False"
+                   HorizontalAlignment="Left"
+                   VerticalAlignment="Top"
+                   AutomationProperties.AccessibilityView="Raw" />
+        <ListView x:Name="Lines"
+                  AutomationProperties.AutomationId="ReaderTextLines"
+                  AutomationProperties.Name="Guide text"
+                  SelectionMode="None"
+                  IsItemClickEnabled="False"
+                  ScrollViewer.HorizontalScrollMode="Enabled"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                  ScrollViewer.VerticalScrollMode="Enabled"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  ContainerContentChanging="LineContainerChanging">
+            <ListView.Resources>
+                <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="Transparent" />
+                <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="Transparent" />
+            </ListView.Resources>
+            <ListView.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <ItemsStackPanel />
+                </ItemsPanelTemplate>
+            </ListView.ItemsPanel>
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="Padding" Value="12,0" />
+                    <Setter Property="MinHeight" Value="0" />
+                    <Setter Property="HorizontalContentAlignment" Value="Left" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock FontFamily="Consolas"
+                               TextWrapping="NoWrap"
+                               IsTextSelectionEnabled="False"
+                               Foreground="{ThemeResource DesktopGuidesPrimaryTextBrush}" />
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </Grid>
+</UserControl>

@@ -2,8 +2,11 @@ using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Navigation;
 using DesktopGuides.Core.Providers;
+using DesktopGuides.Core.Reading;
+using DesktopGuides.Core.Text;
 using DesktopGuides.Infrastructure.Artwork;
 using DesktopGuides.Infrastructure.Import;
+using DesktopGuides.Infrastructure.Reading;
 using DesktopGuides.Infrastructure.Storage;
 using DesktopGuides.Production.Materials;
 using DesktopGuides.Production.Providers;
@@ -67,6 +70,9 @@ public sealed partial class ShellWindow : Window
     private bool removeRequested;
     private ContentDialog? activeRemoveDialog;
     private GameRemover? gameRemover;
+    private ManagedTextGuideLoader? textLoader;
+    private CancellationTokenSource? readerLoad;
+    private IReaderSession? readerSession;
     private bool gameRemoveRequested;
     // Null while the Game page loads, so Remove game stays disabled until the count is known.
     private int? loadedGameGuideCount;
@@ -260,6 +266,7 @@ public sealed partial class ShellWindow : Window
             guidePublisher = new GuideImportPublisher(repository, paths);
             guideRemover = new GuideRemover(repository, paths);
             gameRemover = new GameRemover(repository, paths, artwork);
+            textLoader = new ManagedTextGuideLoader(paths);
             providers = new ProviderServices(dataRoot);
             await ProviderSettings.InitializeAsync(providers);
             importer = providers.CreateImporter(repository, artwork);
@@ -1227,6 +1234,31 @@ public sealed partial class ShellWindow : Window
     private bool IsSupersededGameGuideIntent(long? intentVersion) =>
         intentVersion is long version && version != gameGuideIntentVersion;
 
+    private void ShowReaderSurface(bool placeholder, string? error = null, UIElement? view = null)
+    {
+        ReaderPlaceholder.Visibility = placeholder ? Visibility.Visible : Visibility.Collapsed;
+        ReaderLoadError.Text = error ?? string.Empty;
+        ReaderLoadError.Visibility = error is null ? Visibility.Collapsed : Visibility.Visible;
+        ReaderSurface.Content = view;
+    }
+
+    // Every render closes the Reader: a load in flight is cancelled, and the
+    // toolbar and surface drop the old session before it is disposed.
+    private async Task CloseReaderSessionAsync()
+    {
+        readerLoad?.Cancel();
+        readerLoad?.Dispose();
+        readerLoad = null;
+        ReaderActions.SetSession(null);
+        ShowReaderSurface(placeholder: true);
+        IReaderSession? closing = readerSession;
+        readerSession = null;
+        if (closing is not null)
+        {
+            await closing.DisposeAsync();
+        }
+    }
+
     private static async Task PauseReaderMetadataReadForTestAsync()
     {
         string prefix = $@"Local\DesktopGuides.Preview.ReaderLoad.{Environment.ProcessId}";
@@ -1332,6 +1364,11 @@ public sealed partial class ShellWindow : Window
     private async Task<bool> RenderCurrentAsync()
     {
         int generation = ++renderGeneration;
+        await CloseReaderSessionAsync();
+        if (generation != renderGeneration)
+        {
+            return false;
+        }
         guideFocusRenderGeneration = -1;
         bool restoreLibraryFocus = libraryFocusPending;
         libraryFocusPending = false;
@@ -1555,7 +1592,55 @@ public sealed partial class ShellWindow : Window
                     ReaderHeading.Text = guide.Title;
                     ReaderGameName.Text = readerGame.Title;
                     ReaderFormat.Text = guide.Format.ToString().ToUpperInvariant();
-                    ShowTransientStatus("Guide details ready.");
+                    if (guide.Format != GuideFormat.Txt)
+                    {
+                        ShowTransientStatus("Guide ready.");
+                        break;
+                    }
+                    ShowReaderSurface(placeholder: false);
+                    readerLoad = new CancellationTokenSource();
+                    CancellationToken readerToken = readerLoad.Token;
+                    TextGuideLoad textLoad;
+                    try
+                    {
+                        textLoad = await textLoader!.LoadAsync(guide, readerToken);
+                    }
+                    catch (OperationCanceledException) when (readerToken.IsCancellationRequested)
+                    {
+                        return false;
+                    }
+                    if (generation != renderGeneration)
+                    {
+                        return false;
+                    }
+                    if (textLoad is TextGuideLoadFailed failed)
+                    {
+                        string message = TextGuideLoadMessages.For(failed.Error);
+                        ShowReaderSurface(placeholder: false, error: message);
+                        ShowWarningStatus(message);
+                        break;
+                    }
+                    // ContentChanged is T12.3's; T08.2 shows the file as it is.
+                    TextGuideDocument document = ((TextGuideLoaded)textLoad).Document;
+                    int maxColumns;
+                    try
+                    {
+                        maxColumns = await Task.Run(
+                            () => TextLineMetrics.MaxColumns(document, readerToken), readerToken);
+                    }
+                    catch (OperationCanceledException) when (readerToken.IsCancellationRequested)
+                    {
+                        return false;
+                    }
+                    if (generation != renderGeneration)
+                    {
+                        return false;
+                    }
+                    TextReaderSession session = new(document, maxColumns);
+                    readerSession = session;
+                    ShowReaderSurface(placeholder: false, view: session.View);
+                    ReaderActions.SetSession(session);
+                    ShowTransientStatus("Guide ready.");
                     break;
 
                 case SettingsRoute:
