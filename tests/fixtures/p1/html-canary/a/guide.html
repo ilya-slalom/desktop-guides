@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Canary guide A</title>
+<meta http-equiv="refresh" content="1; url=http://127.0.0.1:8765/redirect">
+<base href="http://127.0.0.1:8765/base/">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="http://127.0.0.1:8765/link-stylesheet">
+<link rel="icon" href="http://127.0.0.1:8765/link-icon">
+<link rel="preconnect" href="http://127.0.0.1:8765">
+<link rel="dns-prefetch" href="http://127.0.0.1:8765">
+<link rel="prefetch" href="http://127.0.0.1:8765/link-prefetch">
+<link rel="preload" href="http://127.0.0.1:8765/link-preload" as="image">
+</head>
+<body>
+<h1>Canary guide A loaded</h1>
+<p><a href="https://example.com/desktop-guides-canary" ping="http://127.0.0.1:8765/ping">External canary link</a></p>
+<p><a href="https://example.org/desktop-guides-canary-blank" target="_blank">New window canary link</a></p>
+<p><a href="__GUIDE_B_ORIGIN__/guide.html">Open canary guide B</a></p>
+<p><a href="#details">Jump to details</a></p>
+<p class="nested set">Styled by the canary style sheet</p>
+<p><img src="images/a.png" srcset="images/a.png 1x, http://127.0.0.1:8765/img-srcset 2x" alt="Local canary image" width="64" height="64"></p>
+<p><img src="http://127.0.0.1:8765/img-src" alt="" width="1" height="1"></p>
+<picture><source srcset="http://127.0.0.1:8765/picture-source"><img src="images/a.png" alt="" width="1" height="1"></picture>
+<p><input type="image" src="http://127.0.0.1:8765/input-image" alt="" width="1" height="1"></p>
+<video poster="http://127.0.0.1:8765/video-poster" width="1" height="1"></video>
+<table background="http://127.0.0.1:8765/table-background"><tr><td>Background attribute</td></tr></table>
+<div style="background-image: url(http://127.0.0.1:8765/inline-style)">Inline style</div>
+<object data="http://127.0.0.1:8765/object" width="1" height="1"></object>
+<embed src="http://127.0.0.1:8765/embed" width="1" height="1">
+<iframe src="http://127.0.0.1:8765/iframe" width="1" height="1"></iframe>
+<p><img src="__GUIDE_B_ORIGIN__/images/b.png" alt="" width="1" height="1"></p>
+<div style="height: 3000px"></div>
+<section id="details"><h2>Canary details</h2><p>The fragment link scrolls here.</p></section>
+</body>
+</html>

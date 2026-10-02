@@ -1,0 +1,5 @@
+@import url(http://127.0.0.1:8765/css-import);
+body { font-family: sans-serif; margin: 24px; }
+h1 { padding-right: 72px; background: url(images/a.png) no-repeat right center; }
+.nested { background: linear-gradient(#ffffff, #eeeeee), url("http://127.0.0.1:8765/css-nested-url"); }
+.set { list-style-image: image-set(url(http://127.0.0.1:8765/css-image-set-1x) 1x, url(http://127.0.0.1:8765/css-image-set-2x) 2x); }
