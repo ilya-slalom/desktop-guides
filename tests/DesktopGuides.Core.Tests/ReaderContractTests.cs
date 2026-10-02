@@ -51,6 +51,32 @@ public sealed class ReaderContractTests
             ReaderCommandPolicy.VisibleCommands(reader));
     }
 
+    [Fact]
+    public void PageEdgeIsVisibleOnlyWithPageNavigation()
+    {
+        using FakeReader scroll = new(GuideFormat.Txt, ReaderCapabilities.Scroll);
+        using FakeReader paged = new(GuideFormat.Txt,
+            ReaderCapabilities.Scroll | ReaderCapabilities.PageNavigation);
+
+        Assert.DoesNotContain(ReaderCommand.PageEdge, ReaderCommandPolicy.VisibleCommands(scroll));
+        Assert.Contains(ReaderCommand.PageEdge, ReaderCommandPolicy.VisibleCommands(paged));
+    }
+
+    [Fact]
+    public async Task PageEdgeDispatchesOnlyWithPageNavigation()
+    {
+        using FakeReader scroll = new(GuideFormat.Txt, ReaderCapabilities.Scroll);
+        using FakeReader paged = new(GuideFormat.Txt, ReaderCapabilities.PageNavigation);
+        ReaderAction end = new PageEdgeAction(ReaderEdge.End);
+
+        await Assert.ThrowsAsync<NotSupportedException>(() =>
+            ReaderCommandPolicy.ExecuteAsync(scroll, end, CancellationToken.None));
+        await ReaderCommandPolicy.ExecuteAsync(paged, end, CancellationToken.None);
+
+        Assert.Null(scroll.LastAction);
+        Assert.Same(end, paged.LastAction);
+    }
+
     private sealed class FakeReader(GuideFormat format, ReaderCapabilities capabilities)
         : IReaderSession, IDisposable
     {

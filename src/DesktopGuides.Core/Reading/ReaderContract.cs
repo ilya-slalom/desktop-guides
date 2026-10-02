@@ -20,6 +20,7 @@ public enum ReaderCommand
 {
     Scroll,
     PageTurn,
+    PageEdge,
     PageJump,
     FitWidth,
     Zoom,
@@ -32,6 +33,16 @@ public sealed record ScrollAction(double VerticalViewportFraction)
     : ReaderAction(ReaderCommand.Scroll);
 public sealed record PageTurnAction(int Delta)
     : ReaderAction(ReaderCommand.PageTurn);
+
+public enum ReaderEdge
+{
+    Start,
+    End
+}
+
+public sealed record PageEdgeAction(ReaderEdge Edge)
+    : ReaderAction(ReaderCommand.PageEdge);
+
 public sealed record PageJumpAction(int PageNumber)
     : ReaderAction(ReaderCommand.PageJump);
 public sealed record FitWidthAction()
@@ -49,6 +60,7 @@ public static class ReaderCommandPolicy
     [
         (ReaderCommand.Scroll, ReaderCapabilities.Scroll),
         (ReaderCommand.PageTurn, ReaderCapabilities.PageNavigation),
+        (ReaderCommand.PageEdge, ReaderCapabilities.PageNavigation),
         (ReaderCommand.PageJump, ReaderCapabilities.PageJump),
         (ReaderCommand.FitWidth, ReaderCapabilities.FitWidth),
         (ReaderCommand.Zoom, ReaderCapabilities.Zoom),
