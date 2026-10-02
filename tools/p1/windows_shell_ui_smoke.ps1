@@ -184,6 +184,25 @@ try {
         throw "Expected visible '$id' named '$expected'."
     }
 
+    # A transient status takes rows from the content until it closes itself,
+    # so wait for it before measuring the reader's layout.
+    # Call it after Wait-Status; the bar can lag the status probe briefly.
+    function Wait-StatusClosed {
+        $deadline = (Get-Date).AddSeconds(1)
+        do {
+            $status = Find-ById 'ShellStatus'
+            if ($status -and -not $status.Current.IsOffscreen) { break }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+        $deadline = (Get-Date).AddSeconds(10)
+        do {
+            $status = Find-ById 'ShellStatus'
+            if (-not $status -or $status.Current.IsOffscreen) { return }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+        throw "The shell status '$($status.Current.Name)' did not close."
+    }
+
     function Wait-Status(
         [string[]] $expected,
         [switch] $AllowHidden) {
@@ -1517,6 +1536,7 @@ try {
             Back-ToTextGame
             Open-TextGuide 'Numbered Lines Guide'
             [void](Wait-Status 'Guide ready.')
+            Wait-StatusClosed
             Wait-FirstTextRow
             Wait-TopLine 1 'Opening the guide'
             $visibleRows = Get-FullyVisibleRows
@@ -1629,6 +1649,8 @@ try {
             # txt-switch: a new guide starts at its first line with normal rows.
             Back-ToTextGame
             Open-TextGuide 'Numbered Lines Guide'
+            [void](Wait-Status 'Guide ready.')
+            Wait-StatusClosed
             Wait-FirstTextRow
             Wait-TopLine 1 'Reopening the Numbered guide'
             $switchRatio = (Get-TopRowHeight) / $heightBefore
@@ -1643,6 +1665,8 @@ try {
             Back-ToTextGame
             Open-TextGuide 'ASCII Map Guide'
             Assert-RowNames 'ASCII Map Guide (horizontal)' $asciiNames
+            [void](Wait-Status 'Guide ready.')
+            Wait-StatusClosed
             $window = $root.Current.BoundingRectangle
             $listHeight = (Find-ById 'ReaderTextLines').Current.BoundingRectangle.Height
             # About three rows, so Next page moves through the seven lines.
