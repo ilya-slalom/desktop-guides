@@ -4,9 +4,12 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using DesktopGuides.Core.Html;
+using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Providers;
 using DesktopGuides.Infrastructure.Artwork;
+using DesktopGuides.Infrastructure.Import;
 using DesktopGuides.Infrastructure.Providers;
 using DesktopGuides.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
@@ -418,6 +421,65 @@ if (args.Length == 3 && args[0] == "seed-txt-reader")
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "seed-html-reader")
+{
+    ManagedPathResolver htmlPaths = new(args[1]);
+    await using SqliteLibraryRepository htmlRepository = new(htmlPaths);
+    await htmlRepository.InitializeAsync();
+    if ((await htmlRepository.ListGamesAsync()).Count != 0)
+    {
+        throw new InvalidOperationException("The HTML reader seed needs an empty library.");
+    }
+    string canaries = Path.Combine(Path.GetFullPath(args[2]), "p1", "html-canary");
+    Game htmlGame = await htmlRepository.AddGameAsync("Web Reader Game", null, null);
+    GuideImportValidator validator = new();
+    GuideImportPublisher publisher = new(htmlRepository, htmlPaths);
+    string staging = Path.Combine(Path.GetTempPath(), "desktop-guides-html-seed-" + Guid.NewGuid().ToString("N"));
+    try
+    {
+        // Copies one canary guide, points its cross-guide references at the
+        // other guide's origin, and imports it as a user would.
+        async Task<Guid> PublishCanaryAsync(string guide, string title, Guid? otherGuide)
+        {
+            string source = Path.Combine(canaries, guide);
+            string target = Path.Combine(staging, guide);
+            foreach (string file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+            {
+                string copy = Path.Combine(target, Path.GetRelativePath(source, file));
+                Directory.CreateDirectory(Path.GetDirectoryName(copy)!);
+                File.Copy(file, copy);
+            }
+            string entry = Path.Combine(target, "guide.html");
+            if (otherGuide is Guid other)
+            {
+                File.WriteAllText(entry, File.ReadAllText(entry).Replace(
+                    "__GUIDE_B_ORIGIN__", GuideWebOrigin.OriginFor(other).AbsoluteUri.TrimEnd('/'),
+                    StringComparison.Ordinal));
+            }
+            ImportInspection inspection = await validator.InspectAsync(entry, CancellationToken.None);
+            if (inspection is not ImportReady ready)
+            {
+                throw new InvalidOperationException($"The {guide} canary guide failed the import preview: {inspection}.");
+            }
+            return await publisher.PublishAsync(
+                ready.Manifest, htmlGame.Id, title, false, null, CancellationToken.None);
+        }
+
+        Guid guideB = await PublishCanaryAsync("b", "Canary Guide B", null);
+        Guid guideA = await PublishCanaryAsync("a", "Canary Guide A", guideB);
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            guideA = guideA.ToString("N"),
+            guideB = guideB.ToString("N"),
+        }));
+    }
+    finally
+    {
+        if (Directory.Exists(staging)) Directory.Delete(staging, true);
+    }
+    return 0;
+}
+
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second" or
         "seed-design" or "seed-catalog" or "seed-facts" or "seed-search" or "seed-import" or
@@ -427,7 +489,7 @@ if (args.Length != 2 ||
         "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-search|seed-import|seed-actions|seed-navigation " +
         "<app-data-root> " +
         "or seed-linked-game|describe-providers|describe-import|describe-actions <app-data-root> " +
-        "or seed-txt-reader <app-data-root> <fixtures-root> " +
+        "or seed-txt-reader|seed-html-reader <app-data-root> <fixtures-root> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
         "or invalidate-blocked-guide <app-data-root> " +
         "or corrupt-reader-guide|restore-reader-guide <app-data-root> " +

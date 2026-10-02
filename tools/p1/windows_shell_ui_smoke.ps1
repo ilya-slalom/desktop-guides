@@ -12,7 +12,7 @@ param(
         'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
         'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted', 'txt-reader',
-        'txt-load-paused', 'txt-back-during-load', 'txt-load-released')]
+        'txt-load-paused', 'txt-back-during-load', 'txt-load-released', 'html-reader')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -1187,8 +1187,8 @@ try {
         # These modes continue a shell left on Reader, Game, or Library.
     }
     elseif ($Mode -in @('txt-reader', 'txt-load-paused', 'txt-back-during-load',
-        'txt-load-released')) {
-        $textGame = 'Text Reader Game'
+        'txt-load-released', 'html-reader')) {
+        $textGame = if ($Mode -eq 'html-reader') { 'Web Reader Game' } else { 'Text Reader Game' }
         $missingMessage = "This guide's file is missing from the library."
         $listItem = New-Object System.Windows.Automation.PropertyCondition(
             [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
@@ -1407,6 +1407,96 @@ try {
             Assert-RowNames 'ASCII Map Guide (after a cancelled load)' $asciiNames
             $report.phases += 'txt-load-released'
         }
+        elseif ($Mode -eq 'html-reader') {
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            Select-Element $textGame
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+
+            # WebView2 content joins the window's UI Automation tree once the
+            # page has rendered.
+            function Wait-PageName([string] $name) {
+                $deadline = (Get-Date).AddSeconds(15)
+                do {
+                    $element = Find-ByName $name
+                    if ($element) { return $element }
+                    Start-Sleep -Milliseconds 250
+                } while ((Get-Date) -lt $deadline)
+                throw "The guide page did not show '$name'."
+            }
+
+            function Assert-NoExternalLinkBar([string] $after) {
+                $bar = Find-ById 'ReaderExternalLinkBar'
+                if ($bar -and -not $bar.Current.IsOffscreen) {
+                    throw "The external-link bar opened after $after."
+                }
+            }
+
+            # html-canary-a: the guide renders at its own origin with no
+            # commands and no load error.
+            Open-TextGuide 'Canary Guide A'
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PageName 'Canary guide A loaded')
+            Assert-NoReaderCommands 'Canary Guide A'
+            Assert-Absent 'ReaderLoadError'
+            Assert-Absent 'ReaderPlaceholder'
+            # The meta refresh fires after one second. It isn't
+            # user-initiated, so it is cancelled without the bar (R9).
+            Start-Sleep -Seconds 2
+            Assert-NoExternalLinkBar 'the meta refresh'
+            [void](Wait-PageName 'Canary guide A loaded')
+            $report.phases += 'html-canary-a'
+
+            # html-external-links: another guide's origin is denied
+            # silently; website links go to the bar; a fragment scrolls.
+            Click-Element (Wait-PageName 'Open canary guide B')
+            Start-Sleep -Seconds 1
+            Assert-NoExternalLinkBar 'a link into another guide'
+            [void](Wait-PageName 'Canary guide A loaded')
+            if (Find-ByName 'Canary guide B loaded') {
+                throw 'A link into another guide loaded that guide.'
+            }
+
+            Click-Element (Wait-PageName 'External canary link')
+            [void](Wait-VisibleById 'ReaderExternalLinkBar')
+            [void](Wait-Name 'ReaderExternalLinkUrl' 'https://example.com/desktop-guides-canary')
+            $report.htmlExternalLinkScreenshot = Save-WindowScreenshot 'html-external-link'
+            Invoke-Element (Find-ById 'ReaderExternalLinkOpen')
+            Wait-HiddenById 'ReaderExternalLinkBar'
+            [void](Wait-PageName 'Canary guide A loaded')
+
+            Click-Element (Wait-PageName 'New window canary link')
+            [void](Wait-VisibleById 'ReaderExternalLinkBar')
+            [void](Wait-Name 'ReaderExternalLinkUrl' 'https://example.org/desktop-guides-canary-blank')
+            Invoke-Element (Find-ById 'ReaderExternalLinkDismiss')
+            Wait-HiddenById 'ReaderExternalLinkBar'
+
+            Click-Element (Wait-PageName 'Jump to details')
+            $details = Wait-PageName 'Canary details'
+            $deadline = (Get-Date).AddSeconds(5)
+            while ($details.Current.IsOffscreen -and (Get-Date) -lt $deadline) {
+                Start-Sleep -Milliseconds 250
+            }
+            if ($details.Current.IsOffscreen) {
+                throw 'The fragment link did not scroll to its section.'
+            }
+            Assert-NoExternalLinkBar 'a fragment link'
+            [void](Wait-PageName 'Canary guide A loaded')
+            $report.phases += 'html-external-links'
+
+            # html-canary-b: the second guide renders at its own origin.
+            Back-ToTextGame
+            Open-TextGuide 'Canary Guide B'
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PageName 'Canary guide B loaded')
+            Assert-NoReaderCommands 'Canary Guide B'
+            Assert-Absent 'ReaderLoadError'
+            Assert-NoExternalLinkBar 'opening Canary Guide B'
+            $report.phases += 'html-canary-b'
+
+            # Back closes the session, which writes its diagnostics.
+            Back-ToTextGame
+        }
         else {
             # The view re-measures at a larger test font size on this signal.
             $remeasure = [System.Threading.EventWaitHandle]::new(
@@ -1517,14 +1607,16 @@ try {
             Assert-NoReaderCommands 'Missing File Guide'
             $report.phases += 'txt-missing'
 
-            # A non-TXT guide after TXT guides shows the placeholder again.
+            # A Web Page Guide with no saved asset rows (imported before
+            # schema v4) asks to be re-imported.
             Back-ToTextGame
             Open-TextGuide 'Web Page Guide'
-            [void](Wait-Status 'Guide ready.')
-            [void](Wait-Name 'ReaderPlaceholder' 'Reading this guide is unavailable in this preview.')
+            [void](Wait-Status 'Re-import this guide to read it.')
+            [void](Wait-Name 'ReaderLoadError' 'Re-import this guide to read it.')
             Assert-Absent 'ReaderTextLines'
-            Assert-Absent 'ReaderLoadError'
-            $report.phases += 'html-placeholder'
+            Assert-Absent 'ReaderPlaceholder'
+            Assert-NoReaderCommands 'Web Page Guide'
+            $report.phases += 'html-no-manifest'
 
             # Reopening reads the file again.
             Back-ToTextGame

@@ -326,6 +326,7 @@ jobs:
           path: |
             artifacts/production-shell/installed/*.json
             artifacts/production-shell/installed/*.png
+            artifacts/production-shell/installed/*.log
           if-no-files-found: warn
 
   reader-toolbar-ui:
