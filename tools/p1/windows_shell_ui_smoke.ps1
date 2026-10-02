@@ -1462,6 +1462,15 @@ try {
                 throw "The guide page did not show '$name'. WebView2 processes (pid<-parent): $($webViews -join ', ')."
             }
 
+            # Diagnostic: canary log line counts at each step, to attribute
+            # guide-originated connections.
+            $canaryLog = Join-Path (Split-Path -Parent $ResultPath) 'html-canary.log'
+            $report.canaryLines = @()
+            function Mark-CanaryLines([string] $step) {
+                $count = if (Test-Path -LiteralPath $canaryLog) { @(Get-Content -LiteralPath $canaryLog).Count } else { 0 }
+                $report.canaryLines += "$step=$count"
+            }
+
             function Assert-NoExternalLinkBar([string] $after) {
                 $bar = Find-ById 'ReaderExternalLinkBar'
                 if ($bar -and -not $bar.Current.IsOffscreen) {
@@ -1471,6 +1480,7 @@ try {
 
             # html-canary-a: the guide renders at its own origin with no
             # commands and no load error.
+            Mark-CanaryLines 'before-a'
             Open-TextGuide 'Canary Guide A'
             [void](Wait-Status 'Guide ready.')
             [void](Wait-PageName 'Canary guide A loaded')
@@ -1479,6 +1489,7 @@ try {
             Assert-Absent 'ReaderPlaceholder'
             # The meta refresh fires after one second. It isn't
             # user-initiated, so it is cancelled without the bar (R9).
+            Mark-CanaryLines 'loaded-a'
             Start-Sleep -Seconds 2
             Assert-NoExternalLinkBar 'the meta refresh'
             [void](Wait-PageName 'Canary guide A loaded')
@@ -1486,6 +1497,7 @@ try {
 
             # html-external-links: another guide's origin is denied
             # silently; website links go to the bar; a fragment scrolls.
+            Mark-CanaryLines 'after-refresh'
             Click-Element (Wait-PageName 'Open canary guide B')
             Start-Sleep -Seconds 1
             Assert-NoExternalLinkBar 'a link into another guide'
@@ -1494,6 +1506,7 @@ try {
                 throw 'A link into another guide loaded that guide.'
             }
 
+            Mark-CanaryLines 'after-cross-guide-link'
             Click-Element (Wait-PageName 'External canary link')
             [void](Wait-VisibleById 'ReaderExternalLinkBar')
             [void](Wait-Name 'ReaderExternalLinkUrl' 'https://example.com/desktop-guides-canary')
@@ -1502,12 +1515,14 @@ try {
             Wait-HiddenById 'ReaderExternalLinkBar'
             [void](Wait-PageName 'Canary guide A loaded')
 
+            Mark-CanaryLines 'after-external-link'
             Click-Element (Wait-PageName 'New window canary link')
             [void](Wait-VisibleById 'ReaderExternalLinkBar')
             [void](Wait-Name 'ReaderExternalLinkUrl' 'https://example.org/desktop-guides-canary-blank')
             Invoke-Element (Find-ById 'ReaderExternalLinkDismiss')
             Wait-HiddenById 'ReaderExternalLinkBar'
 
+            Mark-CanaryLines 'after-blank-link'
             Click-Element (Wait-PageName 'Jump to details')
             $details = Wait-PageName 'Canary details'
             $deadline = (Get-Date).AddSeconds(5)
@@ -1523,6 +1538,7 @@ try {
 
             # html-canary-b: the second guide renders at its own origin.
             Back-ToTextGame
+            Mark-CanaryLines 'after-links'
             Open-TextGuide 'Canary Guide B'
             [void](Wait-Status 'Guide ready.')
             [void](Wait-PageName 'Canary guide B loaded')
@@ -1531,8 +1547,10 @@ try {
             Assert-NoExternalLinkBar 'opening Canary Guide B'
             $report.phases += 'html-canary-b'
 
+            Mark-CanaryLines 'opened-b'
             # Back closes the session, which writes its diagnostics.
             Back-ToTextGame
+            Mark-CanaryLines 'closed-b'
         }
         else {
             # The view re-measures at a larger test font size on this signal.
