@@ -184,6 +184,25 @@ try {
         throw "Expected visible '$id' named '$expected'."
     }
 
+    # A transient status takes rows from the content until it closes itself,
+    # so wait for it before measuring the reader's layout.
+    # Call it after Wait-Status; the bar can lag the status probe briefly.
+    function Wait-StatusClosed {
+        $deadline = (Get-Date).AddSeconds(1)
+        do {
+            $status = Find-ById 'ShellStatus'
+            if ($status -and -not $status.Current.IsOffscreen) { break }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+        $deadline = (Get-Date).AddSeconds(10)
+        do {
+            $status = Find-ById 'ShellStatus'
+            if (-not $status -or $status.Current.IsOffscreen) { return }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+        throw "The shell status '$($status.Current.Name)' did not close."
+    }
+
     function Wait-Status(
         [string[]] $expected,
         [switch] $AllowHidden) {
@@ -1269,6 +1288,19 @@ try {
             [void](Wait-Status 'Game ready.')
         }
 
+        # A row can be recycled or not yet realized mid-read; retry briefly,
+        # then report the last error.
+        function Invoke-UiaRetry([scriptblock] $read) {
+            $deadline = (Get-Date).AddSeconds(2)
+            while ($true) {
+                try { return & $read }
+                catch {
+                    if ((Get-Date) -ge $deadline) { throw }
+                    Start-Sleep -Milliseconds 100
+                }
+            }
+        }
+
         # The first row whose middle is inside the list is the top line.
         function Get-TopRow {
             $top = (Find-ById 'ReaderTextLines').Current.BoundingRectangle.Top
@@ -1282,9 +1314,17 @@ try {
         }
 
         function Get-TopLine {
-            $name = (Get-TopRow).Current.Name
-            if ($name -notmatch '^Line (\d{4}) ') { throw "Unexpected top row '$name'." }
-            return [int]$Matches[1]
+            return Invoke-UiaRetry {
+                $name = (Get-TopRow).Current.Name
+                if ($name -notmatch '^Line (\d{4}) ') { throw "Unexpected top row '$name'." }
+                [int]$Matches[1]
+            }
+        }
+
+        function Get-TopRowName { return Invoke-UiaRetry { (Get-TopRow).Current.Name } }
+
+        function Get-TopRowHeight {
+            return Invoke-UiaRetry { (Get-TopRow).Current.BoundingRectangle.Height }
         }
 
         function Wait-TopLine([int] $expected, [string] $step) {
@@ -1308,12 +1348,23 @@ try {
         }
 
         function Get-FullyVisibleRows {
-            $list = (Find-ById 'ReaderTextLines').Current.BoundingRectangle
-            return @(Get-TextRows | Where-Object {
-                $bounds = $_.Current.BoundingRectangle
-                -not $_.Current.IsOffscreen -and
-                    $bounds.Top -ge $list.Top - 1 -and $bounds.Bottom -le $list.Bottom + 1
-            }).Count
+            return Invoke-UiaRetry {
+                $list = (Find-ById 'ReaderTextLines').Current.BoundingRectangle
+                @(Get-TextRows | Where-Object {
+                    $bounds = $_.Current.BoundingRectangle
+                    -not $_.Current.IsOffscreen -and
+                        $bounds.Top -ge $list.Top - 1 -and $bounds.Bottom -le $list.Bottom + 1
+                }).Count
+            }
+        }
+
+        # Commands and resizes move the text vertically only.
+        function Assert-HorizontalPercent($scroll, [double] $expected, [string] $step) {
+            Start-Sleep -Milliseconds 300
+            $actual = $scroll.Current.HorizontalScrollPercent
+            if ([Math]::Abs($actual - $expected) -gt 1) {
+                throw "$step moved the text sideways to $([Math]::Round($actual, 1))%; expected $([Math]::Round($expected, 1))%."
+            }
         }
 
         function Invoke-ReaderCommand([string] $name) {
@@ -1485,6 +1536,7 @@ try {
             Back-ToTextGame
             Open-TextGuide 'Numbered Lines Guide'
             [void](Wait-Status 'Guide ready.')
+            Wait-StatusClosed
             Wait-FirstTextRow
             Wait-TopLine 1 'Opening the guide'
             $visibleRows = Get-FullyVisibleRows
@@ -1516,7 +1568,7 @@ try {
             # shrinking again brings the kept line back.
             $window = $root.Current.BoundingRectangle
             $listHeight = (Find-ById 'ReaderTextLines').Current.BoundingRectangle.Height
-            $rowHeight = (Get-TopRow).Current.BoundingRectangle.Height
+            $rowHeight = Get-TopRowHeight
             # Leave about three rows, so the shorter page step ends past the taller window's last top line.
             $shrink = [int]($listHeight - 3.5 * $rowHeight)
             Resize-ShellWindow ([int]$window.Width) ([int]($window.Height - $shrink))
@@ -1537,12 +1589,12 @@ try {
             $report.phases += 'txt-resize'
 
             # txt-remeasure (issue #29): larger text grows the rows, keeps the line.
-            $heightBefore = (Get-TopRow).Current.BoundingRectangle.Height
+            $heightBefore = Get-TopRowHeight
             [void]$remeasure.Set()
             $deadline = (Get-Date).AddSeconds(10)
             do {
                 Start-Sleep -Milliseconds 100
-                $heightRatio = (Get-TopRow).Current.BoundingRectangle.Height / $heightBefore
+                $heightRatio = (Get-TopRowHeight) / $heightBefore
             } while (($heightRatio -lt 1.3 -or $heightRatio -gt 1.7) -and (Get-Date) -lt $deadline)
             if ($heightRatio -lt 1.3 -or $heightRatio -gt 1.7) {
                 throw "Re-measured rows were $([Math]::Round($heightRatio, 2))x as tall; expected about 1.5x."
@@ -1574,15 +1626,49 @@ try {
             # txt-switch: a new guide starts at its first line with normal rows.
             Back-ToTextGame
             Open-TextGuide 'Numbered Lines Guide'
+            [void](Wait-Status 'Guide ready.')
+            Wait-StatusClosed
             Wait-FirstTextRow
             Wait-TopLine 1 'Reopening the Numbered guide'
-            $switchRatio = (Get-TopRow).Current.BoundingRectangle.Height / $heightBefore
+            $switchRatio = (Get-TopRowHeight) / $heightBefore
             if ([Math]::Abs($switchRatio - 1) -gt 0.1) {
                 throw "A new TXT session kept the test text size (rows $([Math]::Round($switchRatio, 2))x)."
             }
             Invoke-ReaderCommand 'Next page'
             Wait-TopLine (1 + $pageStep) 'Next page after switching guides'
             $report.phases += 'txt-switch'
+
+            # txt-horizontal: paging, Go to start and resizing keep the sideways scroll.
+            Back-ToTextGame
+            Open-TextGuide 'ASCII Map Guide'
+            Assert-RowNames 'ASCII Map Guide (horizontal)' $asciiNames
+            [void](Wait-Status 'Guide ready.')
+            Wait-StatusClosed
+            $window = $root.Current.BoundingRectangle
+            $listHeight = (Find-ById 'ReaderTextLines').Current.BoundingRectangle.Height
+            # About three rows, so Next page moves through the seven lines.
+            $shrink = [int]($listHeight - 3.5 * (Get-TopRowHeight))
+            Resize-ShellWindow ([int]$window.Width) ([int]($window.Height - $shrink))
+            $scroll = (Find-ById 'ReaderTextLines').GetCurrentPattern(
+                [System.Windows.Automation.ScrollPattern]::Pattern)
+            $scroll.SetScrollPercent(50, [System.Windows.Automation.ScrollPattern]::NoScroll)
+            Start-Sleep -Milliseconds 300
+            $horizontal = $scroll.Current.HorizontalScrollPercent
+            if ($horizontal -lt 10) { throw "The ASCII guide scrolled only to $horizontal% sideways." }
+            $topName = Get-TopRowName
+            Invoke-ReaderCommand 'Next page'
+            $deadline = (Get-Date).AddSeconds(10)
+            while ((Get-TopRowName) -eq $topName -and (Get-Date) -lt $deadline) {
+                Start-Sleep -Milliseconds 100
+            }
+            if ((Get-TopRowName) -eq $topName) { throw 'Next page did not move the ASCII guide.' }
+            Assert-HorizontalPercent $scroll $horizontal 'Next page'
+            Invoke-ReaderCommand 'Go to start'
+            Assert-HorizontalPercent $scroll $horizontal 'Go to start'
+            Resize-ShellWindow ([int]$window.Width) ([int]$window.Height)
+            Assert-HorizontalPercent $scroll $horizontal 'The restored window'
+            $report.txtPosition.horizontalPercent = $horizontal
+            $report.phases += 'txt-horizontal'
             $remeasure.Dispose()
         }
     }

@@ -209,6 +209,8 @@ public sealed partial class TextReaderView : UserControl
 
     private void OnSizeChanged(object sender, SizeChangedEventArgs args)
     {
+        // Re-applying when the top line hasn't moved is harmless:
+        // ScrollIntoView keeps the sideways scroll.
         if (Lines.ItemsSource is not null)
         {
             ScrollToLine(anchorLine);

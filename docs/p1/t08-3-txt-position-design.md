@@ -282,6 +282,15 @@ Where the build differs from the design above:
   now re-measures when `CellProbe` raises `SizeChanged` with a new height,
   which happens only after the new size is in effect. The test hook now
   changes only the probe's font size, so CI exercises that same path.
+- **Resize always re-applies the anchor.** A follow-up check
+  (`txt-horizontal`) showed `ScrollIntoView` keeps the sideways scroll for
+  paging, Go to start and resizing, so re-applying an unmoved top line is
+  harmless and needs no guard.
+- **TXT layout checks wait for the shell status to close.** "Guide ready."
+  closes itself after 3 s and gives its 53 px back to the reader. Checks
+  that measured rows or page steps while it was open saw the list grow
+  mid-step, which made `txt-resize` flaky on `main` (for example CI run
+  [36969491149](https://github.com/ilya-slalom/desktop-guides/actions/runs/36969491149)).
 - **The normal-mode shell smoke** still asserted that the TXT reader had no
   commands (a T08.2 check); it now requires the four TXT commands.
 
