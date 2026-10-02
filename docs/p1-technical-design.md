@@ -651,10 +651,10 @@ project uses a provisional package identity until T17.1 sets the public one.
   the T12.1 `TextPosition` (line start offset plus up to 128 characters of
   following context), so the v1 contract and codec are unchanged. The
   contract gains `ReaderCommand.PageEdge` with `PageEdgeAction(ReaderEdge)`,
-  gated by `PageNavigation`. The font-change trigger is
-  `UISettings.TextScaleFactorChanged`, confirmed on `pcsx2-win` to reach a
-  desktop process; the view re-measures its rows and keeps the top line,
-  which closes issue #29. See
+  gated by `PageNavigation`. The font-change trigger is the hidden
+  Consolas probe's own `SizeChanged`: XAML re-lays it out at the new system
+  text size, so the view re-measures its rows only once that size is in
+  effect, and keeps the top line, which closes issue #29. See
   [t08-3-txt-position-design.md](p1/t08-3-txt-position-design.md).
 
 ### S09 — Read imported HTML

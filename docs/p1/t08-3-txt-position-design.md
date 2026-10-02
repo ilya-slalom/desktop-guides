@@ -173,10 +173,11 @@ In `src/DesktopGuides.Core/Reading/ReaderContract.cs`:
   [p1-technical-design.md](../p1-technical-design.md).
 - **Test hook.** CI can't change a per-user accessibility setting, so the
   smoke signals a named event `Local\DesktopGuides.Preview.TextRemeasure.{pid}`,
-  following the T08.2 `TextLoad` gate pattern. On that signal the view runs
-  `Remeasure()` with a test font-size multiplier of 1.5 applied to
-  `CellProbe` and the row text. This exercises app-owned code (re-measure,
-  row sizes, anchor restore), not Windows text scaling.
+  following the T08.2 `TextLoad` gate pattern. On that signal the view sets a
+  test font-size multiplier of 1.5 and applies it to `CellProbe` only; the
+  probe's `SizeChanged` then runs `Remeasure()`, which applies it to the row
+  text. This exercises app-owned code (the trigger, re-measure, row sizes,
+  anchor restore), not Windows text scaling.
 
 ### `ReaderToolbar`
 
@@ -223,8 +224,9 @@ UIA name of the first on-screen `ListItem` in `ReaderTextLines`.
 - **`txt-commands` (txt-long):** the four buttons are visible for TXT; Next
   page moves the top line forward by a whole number of rows and Previous page
   brings it back; Go to end shows the last line; Go to start shows line 1.
-- **`txt-resize`:** after paging down, resize the window through
-  `TransformPattern`; the top line is unchanged.
+- **`txt-resize`:** in a window about three rows tall, Go to end and
+  Previous page; restoring the window clamps the top line, and shrinking it
+  again brings the kept line back.
 - **`txt-remeasure`:** after paging down, signal the TextRemeasure event;
   row height (bounding rectangle) grows by about 1.5×, the top line is
   unchanged, and the 2,048-column line still scrolls fully into view.
@@ -274,8 +276,12 @@ Where the build differs from the design above:
   it, so Previous page pages up from the line the reader sees.
 - **Text-size trigger.** `UISettings.TextScaleFactorChanged` reaches a
   WinUI 3 desktop process: a throwaway listener on `pcsx2-win` saw 1.25
-  after the Settings slider moved and 1 after it was restored. The
-  `XamlRoot.Changed` fallback isn't needed.
+  after the Settings slider moved and 1 after it was restored. The final
+  review found that a handler posting `Remeasure` isn't ordered after XAML's
+  own re-layout, so it could measure the probe at the old size. The view
+  now re-measures when `CellProbe` raises `SizeChanged` with a new height,
+  which happens only after the new size is in effect. The test hook now
+  changes only the probe's font size, so CI exercises that same path.
 - **The normal-mode shell smoke** still asserted that the TXT reader had no
   commands (a T08.2 check); it now requires the four TXT commands.
 
@@ -312,7 +318,8 @@ Where the build differs from the design above:
   not run: `pcsx2-win` is used only for the feasibility check and CI
   failures. CI covers the re-measure through the `TextRemeasure` test hook,
   and the spike showed the system event arrives. The step between them,
-  the `UISettings` handler posting `Remeasure`, is reviewed, not observed.
+  XAML re-laying out the probe at a new system text size, is reviewed, not
+  observed.
 - **Evidence.** ASCII Map Guide with the TXT commands:
   [light](evidence/t08-3-txt-position/txt-reader-light.png) and
   [dark](evidence/t08-3-txt-position/txt-reader-dark.png).

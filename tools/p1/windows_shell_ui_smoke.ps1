@@ -1512,16 +1512,28 @@ try {
             $report.txtPosition.endTopLine = $endTop
             $report.phases += 'txt-commands'
 
-            # txt-resize: a shorter then restored window keeps the top line.
-            Invoke-ReaderCommand 'Next page'
-            $anchor = Wait-TopLineChange 1 'Next page before resizing'
+            # txt-resize: near the end, a taller window clamps the top line;
+            # shrinking again brings the kept line back.
             $window = $root.Current.BoundingRectangle
-            # Half the list's height: fewer rows fit, but some stay on screen.
-            $shrink = [int]((Find-ById 'ReaderTextLines').Current.BoundingRectangle.Height / 2)
+            $listHeight = (Find-ById 'ReaderTextLines').Current.BoundingRectangle.Height
+            $rowHeight = (Get-TopRow).Current.BoundingRectangle.Height
+            # Leave about three rows, so the shorter page step ends past the taller window's last top line.
+            $shrink = [int]($listHeight - 3.5 * $rowHeight)
             Resize-ShellWindow ([int]$window.Width) ([int]($window.Height - $shrink))
-            Wait-TopLine $anchor 'A shorter window'
+            Invoke-ReaderCommand 'Go to end'
+            $shortEnd = Wait-TopLineChange 1 'Go to end in a shorter window'
+            Invoke-ReaderCommand 'Previous page'
+            $anchor = Wait-TopLineChange $shortEnd 'Previous page in a shorter window'
             Resize-ShellWindow ([int]$window.Width) ([int]$window.Height)
-            Wait-TopLine $anchor 'The restored window'
+            $clamped = Wait-TopLineChange $anchor 'The taller window'
+            Resize-ShellWindow ([int]$window.Width) ([int]($window.Height - $shrink))
+            Wait-TopLine $anchor 'A shorter window again'
+            $report.txtPosition.resizeTopLines = @($anchor, $clamped)
+            Resize-ShellWindow ([int]$window.Width) ([int]$window.Height)
+            Invoke-ReaderCommand 'Go to start'
+            Wait-TopLine 1 'Go to start after resizing'
+            Invoke-ReaderCommand 'Next page'
+            $anchor = Wait-TopLineChange 1 'Next page before re-measuring'
             $report.phases += 'txt-resize'
 
             # txt-remeasure (issue #29): larger text grows the rows, keeps the line.

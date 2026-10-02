@@ -6,7 +6,6 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
-using Windows.UI.ViewManagement;
 
 namespace DesktopGuides.Production;
 
@@ -30,7 +29,6 @@ public sealed partial class TextReaderView : UserControl
     private bool restoring;
     private ScrollViewer? viewer;
     private DispatcherQueue? dispatcher;
-    private UISettings? uiSettings;
     private RegisteredWaitHandle? remeasureWait;
     private EventWaitHandle? remeasureSignal;
 
@@ -100,11 +98,7 @@ public sealed partial class TextReaderView : UserControl
             viewer.ViewChanged -= OnViewChanged;
             viewer = null;
         }
-        if (uiSettings is not null)
-        {
-            uiSettings.TextScaleFactorChanged -= OnTextScaleFactorChanged;
-            uiSettings = null;
-        }
+        CellProbe.SizeChanged -= OnProbeSizeChanged;
         remeasureWait?.Unregister(null);
         remeasureWait = null;
         remeasureSignal?.Dispose();
@@ -124,8 +118,7 @@ public sealed partial class TextReaderView : UserControl
         {
             viewer.ViewChanged += OnViewChanged;
         }
-        uiSettings = new UISettings();
-        uiSettings.TextScaleFactorChanged += OnTextScaleFactorChanged;
+        CellProbe.SizeChanged += OnProbeSizeChanged;
         OpenRemeasureHook();
         if (anchorLine > 0)
         {
@@ -141,8 +134,8 @@ public sealed partial class TextReaderView : UserControl
         rowHeight = Math.Ceiling(CellProbe.DesiredSize.Height);
     }
 
-    // Issue #29: the system text size changed, so rows measured at the old
-    // size would clip. Re-measure, resize realized rows, and keep the top line.
+    // Issue #29: the text size changed, so rows measured at the old size
+    // would clip. Re-measure, resize realized rows, and keep the top line.
     private void Remeasure()
     {
         if (Lines.ItemsSource is null)
@@ -176,11 +169,18 @@ public sealed partial class TextReaderView : UserControl
         text.Height = rowHeight;
     }
 
-    private void OnTextScaleFactorChanged(UISettings sender, object args) =>
-        dispatcher?.TryEnqueue(Remeasure);
+    // XAML re-lays the probe out at the new system text size, so its height
+    // changes only after the new size is in effect.
+    private void OnProbeSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        if (Math.Ceiling(args.NewSize.Height) != rowHeight)
+        {
+            Remeasure();
+        }
+    }
 
     // Installed tests can't change the system text size, so they signal this
-    // event to re-measure at a larger test font size instead.
+    // event to grow the probe to a larger test font size instead.
     private void OpenRemeasureHook()
     {
         try
@@ -193,10 +193,12 @@ public sealed partial class TextReaderView : UserControl
             }
             remeasureSignal = signal;
             remeasureWait = ThreadPool.RegisterWaitForSingleObject(signal, (_, _) =>
+                // Only the probe changes, as a system text size change would
+                // change it; the view must notice on its own.
                 dispatcher?.TryEnqueue(() =>
                 {
                     fontScale = TestFontScale;
-                    Remeasure();
+                    CellProbe.FontSize = baseFontSize * fontScale;
                 }), null, Timeout.Infinite, executeOnlyOnce: false);
         }
         catch (UnauthorizedAccessException)
