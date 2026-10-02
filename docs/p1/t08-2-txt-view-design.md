@@ -1,6 +1,7 @@
 # T08.2 Virtualized TXT view design
 
-Status: design approved in brainstorming on 1 October 2026;
+Status: merged through PR #30 on 2 October 2026, merge commit `1294e4b`.
+Design approved in brainstorming on 1 October 2026;
 implementation planned in [t08-2-txt-view-plan.md](t08-2-txt-view-plan.md)
 and verified in CI run
 [36946245355](https://github.com/ilya-slalom/desktop-guides/actions/runs/36946245355)

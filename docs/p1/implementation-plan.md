@@ -779,6 +779,14 @@ means strict UTF-8, otherwise the stored CP437 or Windows-1252 choice.
 or `TextGuideLoadFailed` with a typed error, and import now rejects BOM text
 that isn't valid UTF-8. CI run 36865349872 passed all checks.
 
+T08.2 was merged through PR #30 on 2 October 2026, merge commit `1294e4b`;
+see the [design and verification record](t08-2-txt-view-design.md). TXT
+guides open in a virtualized fixed-width view with one fixed-size row per
+line, and leaving the Reader cancels a load in progress. CI run 36946245355
+passed the installed `txt-reader` scenario in light and dark, with
+`txt-long` first text at 133–138 ms and at most 56 realized rows. Rows clip
+after a Windows text-size change until the guide is reopened (#29).
+
 ## M4 — progress, completion, and appearance
 
 Exit: two guides retain independent positions across restart; completion
