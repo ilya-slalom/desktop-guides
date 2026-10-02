@@ -1413,108 +1413,53 @@ try {
             [void](Wait-Name 'GameHeading' $textGame)
             [void](Wait-Status 'Game ready.')
 
-            # WebView2 content joins the window's UI Automation tree once the
-            # page has rendered.
+            # WebView2 content sits in a top-level Chromium window owned by
+            # the shell's WebView2 browser process, so its UI Automation tree
+            # is read from that window rather than from the shell window.
+            function Get-PageRoots {
+                $browsers = @(Get-CimInstance Win32_Process -Filter (
+                    "ParentProcessId = $ProcessId AND Name = 'msedgewebview2.exe'") |
+                    ForEach-Object { [uint32] $_.ProcessId })
+                if ($browsers.Count -eq 0) { return @() }
+                $pages = @()
+                foreach ($window in [DesktopGuidesForegroundProbe]::FindWindows(
+                    'Chrome_RenderWidgetHostHWND', [uint32[]] $browsers)) {
+                    try {
+                        $pages += [System.Windows.Automation.AutomationElement]::FromHandle($window)
+                    }
+                    catch [System.Windows.Automation.ElementNotAvailableException] {
+                        # The window closed after it was listed.
+                    }
+                }
+                return $pages
+            }
+
+            function Find-PageByName([string] $name) {
+                $condition = [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::NameProperty, $name)
+                foreach ($page in Get-PageRoots) {
+                    try {
+                        $element = $page.FindFirst($scope, $condition)
+                        if ($element) { return $element }
+                    }
+                    catch [System.Windows.Automation.ElementNotAvailableException] {
+                        # A closing session's window can vanish mid-search.
+                    }
+                }
+                return $null
+            }
+
             function Wait-PageName([string] $name) {
                 $deadline = (Get-Date).AddSeconds(15)
                 do {
-                    $element = Find-ByName $name
+                    $element = Find-PageByName $name
                     if ($element) { return $element }
                     Start-Sleep -Milliseconds 250
                 } while ((Get-Date) -lt $deadline)
                 [void](Save-WindowScreenshot 'html-page-missing')
-                throw "The guide page did not show '$name'. UIA tree: $(Get-PageTreeSummary)"
-            }
-
-            # Names the web content elements so a missing page name can be
-            # told apart from content that never joined the UIA tree.
-            function Get-PageTreeSummary {
-                $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
-                $pending = [System.Collections.Generic.Queue[object]]::new()
-                $pending.Enqueue(@($root, 0))
-                $found = [System.Collections.Generic.List[string]]::new()
-                while ($pending.Count -gt 0 -and $found.Count -lt 80) {
-                    $entry = $pending.Dequeue()
-                    $element = $entry[0]
-                    try {
-                        $current = $element.Current
-                        if ($current.ClassName -match 'WebView|Chrome' -or
-                            $current.FrameworkId -eq 'Chrome' -or $entry[1] -gt 0) {
-                            $found.Add("[$($current.ControlType.ProgrammaticName)|$($current.ClassName)|$($current.FrameworkId)|$($current.Name)]")
-                            $depth = $entry[1] + 1
-                        }
-                        else {
-                            $depth = 0
-                        }
-                        $child = $walker.GetFirstChild($element)
-                        while ($child) {
-                            $pending.Enqueue(@($child, $depth))
-                            $child = $walker.GetNextSibling($child)
-                        }
-                    }
-                    catch [System.Windows.Automation.ElementNotAvailableException] {
-                    }
-                }
-                # Diagnostic: the Chromium windows and what UIA sees from them.
-                try {
-                    Add-Type -TypeDefinition @'
-using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Text;
-public static class DesktopGuidesWindowList
-{
-    private delegate bool EnumProc(IntPtr window, IntPtr data);
-    [DllImport("user32.dll")] private static extern bool EnumWindows(EnumProc proc, IntPtr data);
-    [DllImport("user32.dll")] private static extern bool EnumChildWindows(IntPtr parent, EnumProc proc, IntPtr data);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder name, int count);
-    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
-    [DllImport("user32.dll")] private static extern IntPtr GetParent(IntPtr window);
-    [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
-    public static List<string> Describe(out List<IntPtr> handles)
-    {
-        List<string> lines = new List<string>();
-        List<IntPtr> found = new List<IntPtr>();
-        EnumProc child = null;
-        child = (window, data) =>
-        {
-            StringBuilder name = new StringBuilder(256);
-            GetClassName(window, name, 256);
-            uint pid;
-            GetWindowThreadProcessId(window, out pid);
-            string text = name.ToString();
-            if (text.StartsWith("Chrome") || text.Contains("WebView") || text.Contains("Intermediate"))
-            {
-                lines.Add(string.Format("{0}:{1}:pid{2}:parent{3}:vis{4}", window, text, pid, GetParent(window), IsWindowVisible(window)));
-                found.Add(window);
-            }
-            return true;
-        };
-        EnumWindows((window, data) => { child(window, data); EnumChildWindows(window, child, IntPtr.Zero); return true; }, IntPtr.Zero);
-        handles = found;
-        return lines;
-    }
-}
-'@ -ErrorAction SilentlyContinue
-                    $handles = $null
-                    $lines = [DesktopGuidesWindowList]::Describe([ref] $handles)
-                    $found.Add("HWNDS: $($lines -join ' ; ')")
-                    foreach ($handle in $handles) {
-                        try {
-                            $element = [System.Windows.Automation.AutomationElement]::FromHandle($handle)
-                            $all = $element.FindAll($scope, [System.Windows.Automation.Condition]::TrueCondition)
-                            $names = @($all | Select-Object -First 15 | ForEach-Object { $_.Current.Name } | Where-Object { $_ })
-                            $found.Add("FROM $handle count=$($all.Count) names=$($names -join '|')")
-                        }
-                        catch {
-                            $found.Add("FROM $handle error=$($_.Exception.Message)")
-                        }
-                    }
-                }
-                catch {
-                    $found.Add("HWND diagnostic failed: $($_.Exception.Message)")
-                }
-                return ($found -join ' ')
+                $webViews = @(Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'" |
+                    ForEach-Object { "$($_.ProcessId)<-$($_.ParentProcessId)" })
+                throw "The guide page did not show '$name'. WebView2 processes (pid<-parent): $($webViews -join ', ')."
             }
 
             function Assert-NoExternalLinkBar([string] $after) {
@@ -1545,7 +1490,7 @@ public static class DesktopGuidesWindowList
             Start-Sleep -Seconds 1
             Assert-NoExternalLinkBar 'a link into another guide'
             [void](Wait-PageName 'Canary guide A loaded')
-            if (Find-ByName 'Canary guide B loaded') {
+            if (Find-PageByName 'Canary guide B loaded') {
                 throw 'A link into another guide loaded that guide.'
             }
 

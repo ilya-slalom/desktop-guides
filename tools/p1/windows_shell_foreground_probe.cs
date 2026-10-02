@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Text;
 
 public static class DesktopGuidesForegroundProbe
 {
@@ -25,6 +27,20 @@ public static class DesktopGuidesForegroundProbe
     [DllImport("user32.dll")]
     private static extern void mouse_event(
         uint flags, uint x, uint y, uint data, UIntPtr extraInfo);
+
+    private delegate bool EnumWindowsProc(IntPtr window, IntPtr data);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr data);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumChildWindows(IntPtr parent, EnumWindowsProc callback, IntPtr data);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr window, StringBuilder name, int count);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
 
     public static void Click(int x, int y)
     {
@@ -52,6 +68,34 @@ public static class DesktopGuidesForegroundProbe
             throw new InvalidOperationException("Could not read the shell window DPI.");
         }
         return dpi;
+    }
+
+    // WebView2 content sits in a top-level Chromium window owned by its
+    // browser process, outside the shell window's UIA tree. Returns every
+    // window, top-level or child, of a class owned by one of the processes.
+    public static IntPtr[] FindWindows(string className, uint[] processIds)
+    {
+        List<IntPtr> found = new List<IntPtr>();
+        HashSet<uint> owners = new HashSet<uint>(processIds);
+        EnumWindowsProc check = (window, data) =>
+        {
+            StringBuilder name = new StringBuilder(256);
+            uint owner;
+            GetWindowThreadProcessId(window, out owner);
+            if (owners.Contains(owner) && GetClassName(window, name, name.Capacity) > 0 &&
+                name.ToString() == className)
+            {
+                found.Add(window);
+            }
+            return true;
+        };
+        EnumWindows((window, data) =>
+        {
+            check(window, data);
+            EnumChildWindows(window, check, IntPtr.Zero);
+            return true;
+        }, IntPtr.Zero);
+        return found.ToArray();
     }
 
     // The common Open dialog's Win32 controls reach managed UIA only as

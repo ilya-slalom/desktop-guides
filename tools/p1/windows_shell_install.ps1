@@ -975,6 +975,14 @@ function Invoke-HtmlReaderPass([string] $resultName) {
     }
 }
 
+function Save-HtmlDiagnostics([string] $resultName, [string] $cacheRoot) {
+    # Keeps each pass's diagnostics with the evidence, even when a check fails.
+    $diagnostics = Join-Path $cacheRoot 'diagnostics'
+    foreach ($file in @(Get-ChildItem -LiteralPath $diagnostics -Filter '*.json' -ErrorAction SilentlyContinue)) {
+        Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $ResultDirectory "$resultName.$($file.Name)")
+    }
+}
+
 function Assert-HtmlReaderPass([string] $pass, [string] $cacheRoot, $ids, [string] $logPath, [int] $baseline) {
     # R19: isolation is shown by exactly what each guide served. Deny counts
     # are kept as evidence only, because the CSP can stop a reference before
@@ -1041,9 +1049,9 @@ function Run-HtmlReaderScenarios {
     try {
         $canary = Start-HtmlCanary $logPath
         $baseline = @(Get-HtmlCanaryLines $logPath).Count
-        $report.htmlReader.onlineCanaryBaseline = $baseline
         Set-AppThemePreference $true
         Invoke-HtmlReaderPass 'html-reader-online'
+        Save-HtmlDiagnostics 'html-reader-online' $cacheRoot
         $report.htmlReader.online = Assert-HtmlReaderPass 'online' $cacheRoot $ids $logPath $baseline
 
         Stop-HtmlCanary $canary
@@ -1055,6 +1063,7 @@ function Run-HtmlReaderScenarios {
         $baseline = @(Get-HtmlCanaryLines $logPath).Count
         Set-AppThemePreference $false
         Invoke-HtmlReaderPass 'html-reader-offline'
+        Save-HtmlDiagnostics 'html-reader-offline' $cacheRoot
         $report.htmlReader.offline = Assert-HtmlReaderPass 'offline' $cacheRoot $ids $logPath $baseline
     }
     finally {
