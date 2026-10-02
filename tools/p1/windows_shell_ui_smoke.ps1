@@ -1225,7 +1225,40 @@ try {
             }
         }
 
+        # The smoke window shows only a few guide rows, so scroll a lower
+        # guide into view before selecting it.
+        function Show-TextGuide([string] $guide) {
+            $list = Find-ById 'GuideList'
+            if (-not $list -or $list.Current.IsOffscreen) {
+                throw 'Expected a visible guide list.'
+            }
+            $row = [System.Windows.Automation.AndCondition]::new(
+                $listItem,
+                [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::NameProperty, $guide))
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $item = $list.FindFirst($scope, $row)
+                if ($item) {
+                    if ($item.Current.IsOffscreen) {
+                        $item.GetCurrentPattern(
+                            [System.Windows.Automation.ScrollItemPattern]::Pattern).ScrollIntoView()
+                    }
+                    return
+                }
+                # A virtualized row may not exist until the list scrolls toward it.
+                $scroll = $list.GetCurrentPattern([System.Windows.Automation.ScrollPattern]::Pattern)
+                if ($scroll.Current.VerticallyScrollable) {
+                    $scroll.Scroll([System.Windows.Automation.ScrollAmount]::NoAmount,
+                        [System.Windows.Automation.ScrollAmount]::LargeIncrement)
+                }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            throw "The guide list has no row named '$guide'."
+        }
+
         function Open-TextGuide([string] $guide) {
+            Show-TextGuide $guide
             Open-GuideFromGame $guide
             [void](Wait-Name 'ReaderHeading' $guide)
         }
@@ -1308,6 +1341,7 @@ try {
 
             # txt-long: the P0 measures, gated at the P0 thresholds.
             Back-ToTextGame
+            Show-TextGuide 'Long Text Guide'
             $clock = [System.Diagnostics.Stopwatch]::StartNew()
             Open-GuideFromGame 'Long Text Guide'
             Wait-FirstTextRow
