@@ -307,6 +307,16 @@ Where the build differs from the design above:
     | Row height after re-measure | 1.47x | 1.47x | 1.3-1.7x |
     | ASCII horizontal extent after re-measure | 1.50x | 1.50x | 1.3-1.7x |
 
+- **Final-review fixes.** On `a27b5df`, run
+  [36967638178](https://github.com/ilya-slalom/desktop-guides/actions/runs/36967638178)
+  passed `production-shell-ui` in light and dark with the same numbers as
+  above. In the new `txt-resize`, the kept line 394 clamped to 389 in the
+  taller window and came back in the shorter one. Before the fixes, two
+  throwaway runs failed as intended:
+  [36966460925](https://github.com/ilya-slalom/desktop-guides/actions/runs/36966460925)
+  (the probe-only hook with the `UISettings` trigger: rows stayed 1x) and
+  [36966463838](https://github.com/ilya-slalom/desktop-guides/actions/runs/36966463838)
+  (no resize anchor: `txt-resize` failed).
 - **CI fixes.** Run
   [36955267358](https://github.com/ilya-slalom/desktop-guides/actions/runs/36955267358)
   failed on the T08.2 no-commands check in normal mode (fixed in
