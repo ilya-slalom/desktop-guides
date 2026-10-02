@@ -83,6 +83,12 @@ public sealed class HtmlRequestPolicyTests
         Assert.Equal("guide.html", Served(Origin + "/images/../guide.html").Asset.RequestPath);
 
     [Theory]
+    [InlineData("/%2e%2e/guide.html", "guide.html")]
+    [InlineData("/images/%2e/map.png", "images/map.png")]
+    public void EncodedDotSegmentsAreCollapsedByUriLikeABrowser(string path, string requestPath) =>
+        Assert.Equal(requestPath, Served(Origin + path).Asset.RequestPath);
+
+    [Theory]
     [InlineData("HEAD")]
     [InlineData("POST")]
     [InlineData("get")]
@@ -96,8 +102,6 @@ public sealed class HtmlRequestPolicyTests
     [InlineData("https://g3f2a9c0e4b7d1a65f08c2e9d3b4a7c10.guide.invalid/")]
     [InlineData("https://g3f2a9c0e4b7d1a65f08c2e9d3b4a7c10.guide.invalid/styles/")]
     [InlineData("https://g3f2a9c0e4b7d1a65f08c2e9d3b4a7c10.guide.invalid/styles//main.css")]
-    [InlineData("https://g3f2a9c0e4b7d1a65f08c2e9d3b4a7c10.guide.invalid/%2e%2e/guide.html")]
-    [InlineData("https://g3f2a9c0e4b7d1a65f08c2e9d3b4a7c10.guide.invalid/images/%2e/map.png")]
     [InlineData("https://g3f2a9c0e4b7d1a65f08c2e9d3b4a7c10.guide.invalid/images%5cmap.png")]
     [InlineData("https://g3f2a9c0e4b7d1a65f08c2e9d3b4a7c10.guide.invalid/guide.html%00")]
     [InlineData("not a uri")]
