@@ -102,6 +102,7 @@ public sealed class ToolbarWindow : Window
     private static string Describe(ReaderAction action) => action switch
     {
         PageTurnAction page => $"Page turn {page.Delta}",
+        PageEdgeAction edge => $"Page edge {edge.Edge}",
         PageJumpAction page => $"Page jump {page.PageNumber}",
         FitWidthAction => "Fit to width",
         ZoomAction zoom => $"Zoom {zoom.Factor:G}",

@@ -8,6 +8,15 @@
                 Visibility="Collapsed"
                 AutomationProperties.AutomationId="ReaderCommands">
         <CommandBar.PrimaryCommands>
+            <AppBarButton x:Name="PageStart"
+                          Label="Go to start"
+                          AutomationProperties.AutomationId="ReaderStart"
+                          Visibility="Collapsed"
+                          Click="PageStartClicked">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE74A;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
             <AppBarButton x:Name="PreviousPage"
                           Icon="Back"
                           Label="Previous page"
@@ -18,6 +27,15 @@
                           Label="Next page"
                           Visibility="Collapsed"
                           Click="NextPageClicked" />
+            <AppBarButton x:Name="PageEnd"
+                          Label="Go to end"
+                          AutomationProperties.AutomationId="ReaderEnd"
+                          Visibility="Collapsed"
+                          Click="PageEndClicked">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE74B;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
             <AppBarButton x:Name="SmallerText"
                           Icon="Remove"
                           Label="Smaller text"

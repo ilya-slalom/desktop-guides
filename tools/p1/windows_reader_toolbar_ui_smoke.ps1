@@ -273,6 +273,8 @@ try {
     [void](Wait-VisibleByName 'Next page')
     [void](Wait-VisibleByName 'Zoom in')
     Invoke-Command 'Next page' 'Page turn 1'
+    Invoke-Command 'Go to start' 'Page edge Start'
+    Invoke-Command 'Go to end' 'Page edge End'
     Invoke-Command 'Zoom in' 'Zoom 1.1'
     Open-Overflow
     Invoke-Element (Wait-VisibleByName 'Go to page')
