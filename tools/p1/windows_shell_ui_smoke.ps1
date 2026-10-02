@@ -3262,9 +3262,11 @@ try {
             throw 'The TXT reader did not show the seeded guide text.'
         }
         Assert-Absent 'ReaderPlaceholder'
-        $commands = Find-ById 'ReaderCommands'
-        if ($commands -and -not $commands.Current.IsOffscreen) {
-            throw 'The TXT reader exposed commands that T08.2 does not provide.'
+        foreach ($name in 'Go to start', 'Previous page', 'Next page', 'Go to end') {
+            $button = Find-ByName $name
+            if (-not $button -or $button.Current.IsOffscreen) {
+                throw "The TXT reader has no visible '$name' command."
+            }
         }
         [void](Wait-Status 'Guide ready.')
         Wait-PaneState 'Navigation pane closed'
