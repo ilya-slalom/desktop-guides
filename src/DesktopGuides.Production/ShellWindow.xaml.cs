@@ -71,6 +71,8 @@ public sealed partial class ShellWindow : Window
     private ContentDialog? activeRemoveDialog;
     private GameRemover? gameRemover;
     private ManagedTextGuideLoader? textLoader;
+    private ManagedHtmlGuideLoader? htmlLoader;
+    private string? cacheRoot;
     private CancellationTokenSource? readerLoad;
     private IReaderSession? readerSession;
     private bool gameRemoveRequested;
@@ -267,6 +269,11 @@ public sealed partial class ShellWindow : Window
             guideRemover = new GuideRemover(repository, paths);
             gameRemover = new GameRemover(repository, paths, artwork);
             textLoader = new ManagedTextGuideLoader(paths);
+            htmlLoader = new ManagedHtmlGuideLoader(repository, paths);
+            cacheRoot = AppCacheRoot.Resolve(
+                AppDataRoot.HasPackageIdentity(),
+                () => ApplicationData.Current.LocalCacheFolder.Path,
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
             providers = new ProviderServices(dataRoot);
             await ProviderSettings.InitializeAsync(providers);
             importer = providers.CreateImporter(repository, artwork);
@@ -1254,6 +1261,7 @@ public sealed partial class ShellWindow : Window
     // toolbar and surface drop the old session before it is disposed.
     private async Task CloseReaderSessionAsync()
     {
+        HideExternalLinkBar();
         readerLoad?.Cancel();
         readerLoad?.Dispose();
         readerLoad = null;
@@ -1637,6 +1645,15 @@ public sealed partial class ShellWindow : Window
                     ReaderHeading.Text = guide.Title;
                     ReaderGameName.Text = readerGame.Title;
                     ReaderFormat.Text = guide.Format.ToString().ToUpperInvariant();
+                    if (guide.Format == GuideFormat.Html)
+                    {
+                        if (!await OpenHtmlGuideAsync(guide, generation))
+                        {
+                            return false;
+                        }
+                        break;
+                    }
+                    // PDF keeps the placeholder until T10.
                     if (guide.Format != GuideFormat.Txt)
                     {
                         ShowTransientStatus("Guide ready.");
