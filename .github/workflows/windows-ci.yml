@@ -295,6 +295,16 @@ jobs:
           }
       - name: Restore locked shell seed dependencies
         run: dotnet restore tools/p1/DesktopGuides.ShellSeed/DesktopGuides.ShellSeed.csproj --locked-mode
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.11'
+      - name: Generate fixtures
+        shell: pwsh
+        run: |
+          python tools/p0/make_fixtures.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/p0/verify_fixtures.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Sign, install, and test production shell
         shell: pwsh
         run: |

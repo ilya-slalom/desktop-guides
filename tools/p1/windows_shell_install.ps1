@@ -857,6 +857,59 @@ function Run-StableNavigationScenarios {
     }
 }
 
+function Run-TxtReaderScenarios {
+    # The smoke only reads, so one seed serves both themes.
+    $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
+    if (-not (Test-Path -LiteralPath (Join-Path $fixtureRoot 'p0\generated\txt-long.txt'))) {
+        throw 'txt-long.txt is missing. Run tools/p0/make_fixtures.py first.'
+    }
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    Invoke-ShellSeed @('seed-txt-reader', $dataRoot, $fixtureRoot) | Out-Null
+    $originalTheme = Get-AppThemePreference
+    try {
+        Set-AppThemePreference $true
+        Start-InstalledShell
+        $report.txtReaderLight = Run-ShellSmoke 'txt-reader' -ResultName 'txt-reader-light'
+        Close-InstalledShell
+
+        Set-AppThemePreference $false
+        Start-InstalledShell
+        $report.txtReaderDark = Run-ShellSmoke 'txt-reader' -ResultName 'txt-reader-dark'
+        Close-InstalledShell
+    }
+    finally {
+        Restore-AppThemePreference $originalTheme
+    }
+    Assert-TxtBackDuringLoad
+}
+
+function Assert-TxtBackDuringLoad {
+    # Holds a TXT load at its test gate so Back runs while the load is in flight.
+    Start-InstalledShell
+    $processId = $report.launchedProcessId
+    $reached = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::AutoReset,
+        "Local\DesktopGuides.Preview.TextLoad.$($processId).Reached")
+    $resume = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::ManualReset,
+        "Local\DesktopGuides.Preview.TextLoad.$($processId).Continue")
+    try {
+        $report.txtLoadPaused = Run-ShellSmoke 'txt-load-paused'
+        if (-not $reached.WaitOne(15000)) {
+            throw 'The TXT load did not reach its test gate.'
+        }
+        $report.txtBackDuringLoad = Run-ShellSmoke 'txt-back-during-load'
+        $resume.Set() | Out-Null
+        $report.txtLoadReleased = Run-ShellSmoke 'txt-load-released'
+        Close-InstalledShell
+    }
+    finally {
+        $resume.Set() | Out-Null
+        $resume.Dispose()
+        $reached.Dispose()
+    }
+}
+
 function Run-ImportScenarios {
     Invoke-ShellSeed @('seed-import', $dataRoot) | Out-Null
     $originalTheme = Get-AppThemePreference
@@ -1445,6 +1498,7 @@ try {
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-LibrarySearchScenarios
     Run-StableNavigationScenarios
+    Run-TxtReaderScenarios
 
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-ImportScenarios

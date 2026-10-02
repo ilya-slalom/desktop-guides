@@ -384,6 +384,38 @@ if (args.Length == 2 &&
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "seed-txt-reader")
+{
+    ManagedPathResolver textPaths = new(args[1]);
+    await using SqliteLibraryRepository textRepository = new(textPaths);
+    await textRepository.InitializeAsync();
+    if ((await textRepository.ListGamesAsync()).Count != 0)
+    {
+        throw new InvalidOperationException("The TXT reader seed needs an empty library.");
+    }
+    string fixtures = Path.GetFullPath(args[2]);
+    byte[] Fixture(string relative) =>
+        File.ReadAllBytes(Path.Combine(fixtures, relative.Replace('/', Path.DirectorySeparatorChar)));
+    long textNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    Game textGame = await textRepository.AddGameAsync("Text Reader Game", null, null);
+    await InsertTextGuideAsync(textPaths, textGame.Id, Guid.NewGuid(), "ASCII Map Guide", textNow,
+        Fixture("p0/txt-ascii.txt"));
+    await InsertTextGuideAsync(textPaths, textGame.Id, Guid.NewGuid(), "Tab Table Guide", textNow,
+        Fixture("p1/txt-tabs.txt"));
+    await InsertTextGuideAsync(textPaths, textGame.Id, Guid.NewGuid(), "Long Text Guide", textNow,
+        Fixture("p0/generated/txt-long.txt"));
+    await InsertTextGuideAsync(textPaths, textGame.Id, Guid.NewGuid(), "Legacy Code Page Guide", textNow,
+        Fixture("p0/txt-legacy.txt"), codePage: 437);
+    Guid missingGuideId = Guid.NewGuid();
+    await InsertTextGuideAsync(textPaths, textGame.Id, missingGuideId, "Missing File Guide", textNow,
+        Fixture("p0/txt-ascii.txt"));
+    File.Delete(Path.Combine(textPaths.GetGuideRoot(missingGuideId), "guide.txt"));
+    await InsertGuideAsync(textPaths, textGame.Id, Guid.NewGuid(), "Web Page Guide", textNow,
+        "Html", "guide.html");
+    Console.WriteLine("Seeded the TXT reader game with six guides.");
+    return 0;
+}
+
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second" or
         "seed-design" or "seed-catalog" or "seed-facts" or "seed-search" or "seed-import" or
@@ -393,6 +425,7 @@ if (args.Length != 2 ||
         "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-search|seed-import|seed-actions|seed-navigation " +
         "<app-data-root> " +
         "or seed-linked-game|describe-providers|describe-import|describe-actions <app-data-root> " +
+        "or seed-txt-reader <app-data-root> <fixtures-root> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
         "or invalidate-blocked-guide <app-data-root> " +
         "or corrupt-reader-guide|restore-reader-guide <app-data-root> " +
@@ -811,8 +844,24 @@ static async Task InsertGuideAsync(
         await File.WriteAllTextAsync(assetPath, "Test asset.");
     }
     byte[] bytes = await File.ReadAllBytesAsync(content);
-    string hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
+    InsertGuideRow(paths, gameId, guideId, title, now, format, primaryPath, bytes, codePage: null);
+}
 
+static async Task InsertTextGuideAsync(
+    ManagedPathResolver paths, Guid gameId, Guid guideId, string title, long now,
+    byte[] content, int? codePage = null)
+{
+    string guideRoot = paths.GetGuideRoot(guideId);
+    Directory.CreateDirectory(guideRoot);
+    await File.WriteAllBytesAsync(Path.Combine(guideRoot, "guide.txt"), content);
+    InsertGuideRow(paths, gameId, guideId, title, now, "Txt", "guide.txt", content, codePage);
+}
+
+static void InsertGuideRow(
+    ManagedPathResolver paths, Guid gameId, Guid guideId, string title, long now,
+    string format, string primaryPath, byte[] bytes, int? codePage)
+{
+    string hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
     using SqliteConnection connection = new(new SqliteConnectionStringBuilder
     {
         DataSource = paths.DatabasePath,
@@ -825,10 +874,10 @@ static async Task InsertGuideAsync(
     command.CommandText = """
         INSERT INTO Guides (
             Id, GameId, Title, Format, ManagedRelativeRoot, PrimaryRelativePath,
-            ContentSha256, ContentBytes, ImportedUtcMs, UpdatedUtcMs
+            ContentSha256, ContentBytes, TextCodePage, ImportedUtcMs, UpdatedUtcMs
         ) VALUES (
             $guide, $game, $title, $format, $root, $primary,
-            $hash, $bytes, $now, $now
+            $hash, $bytes, $codePage, $now, $now
         );
         INSERT INTO ReadingStates (GuideId) VALUES ($guide);
         INSERT INTO ReaderPreferences (GuideId) VALUES ($guide);
@@ -841,6 +890,7 @@ static async Task InsertGuideAsync(
     command.Parameters.AddWithValue("$primary", primaryPath);
     command.Parameters.AddWithValue("$hash", hash);
     command.Parameters.AddWithValue("$bytes", bytes.LongLength);
+    command.Parameters.AddWithValue("$codePage", codePage is int page ? page : DBNull.Value);
     command.Parameters.AddWithValue("$now", now);
     command.ExecuteNonQuery();
 }

@@ -771,6 +771,14 @@ observed again in the actual adapter, beyond the T10.0 prototype.
 | T10.2 | T10.1 | Page controls, fit-width, zoom, keyboard parity, and password retry. Range, focus, password-clearing, and offline installed-app cases pass. | TR10.1–TR10.3 |
 | T10.3 | T10.1, T12.1 | Versioned page/fraction locator and restore. `pdf-long` returns to the same page within 0.1 page after resize; invalid or changed locators recover safely. | TR10.1, TR10.3 |
 
+T08.1 was merged through PR #28 on 1 October 2026, merge commit `da1e975`;
+see the [design and verification record](t08-1-txt-decoding-design.md).
+Managed TXT copies decode by one rule: a UTF-8 BOM or no stored code page
+means strict UTF-8, otherwise the stored CP437 or Windows-1252 choice.
+`ManagedTextGuideLoader` returns `TextGuideLoaded` with a changed-content flag
+or `TextGuideLoadFailed` with a typed error, and import now rejects BOM text
+that isn't valid UTF-8. CI run 36865349872 passed all checks.
+
 ## M4 — progress, completion, and appearance
 
 Exit: two guides retain independent positions across restart; completion

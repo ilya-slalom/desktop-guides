@@ -447,12 +447,22 @@
                 <Border Grid.Row="3"
                         Style="{StaticResource DesktopGuidesElevatedSurfaceStyle}"
                         Background="{ThemeResource DesktopGuidesReadingSurfaceBrush}">
-                    <ContentControl x:Name="ReaderSurface">
+                    <Grid>
                         <TextBlock x:Name="ReaderPlaceholder"
                                    Text="Reading this guide is unavailable in this preview."
                                    Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
                                    AutomationProperties.AutomationId="ReaderPlaceholder" />
-                    </ContentControl>
+                        <TextBlock x:Name="ReaderLoadError"
+                                   Visibility="Collapsed"
+                                   TextWrapping="Wrap"
+                                   Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                                   AutomationProperties.AutomationId="ReaderLoadError" />
+                        <ContentControl x:Name="ReaderSurface"
+                                        HorizontalAlignment="Stretch"
+                                        VerticalAlignment="Stretch"
+                                        HorizontalContentAlignment="Stretch"
+                                        VerticalContentAlignment="Stretch" />
+                    </Grid>
                 </Border>
             </Grid>
 

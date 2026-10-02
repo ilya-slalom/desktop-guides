@@ -11,7 +11,8 @@ param(
         'provider-none', 'provider-offline', 'provider-settings',
         'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
-        'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted')]
+        'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted', 'txt-reader',
+        'txt-load-paused', 'txt-back-during-load', 'txt-load-released')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -77,6 +78,7 @@ try {
     Add-Type -AssemblyName UIAutomationTypes
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -Path (Join-Path $PSScriptRoot 'windows_shell_foreground_probe.cs')
+    Add-Type -Path (Join-Path $PSScriptRoot 'windows_shell_response_monitor.cs')
     . (Join-Path $PSScriptRoot 'windows_provider_credentials.ps1')
     $deadline = (Get-Date).AddSeconds(30)
     do {
@@ -188,7 +190,7 @@ try {
         $transient = @($expected | Where-Object { $_ -in @(
             'Library ready.',
             'Game ready.',
-            'Guide details ready.',
+            'Guide ready.',
             'Settings ready.') }).Count -gt 0
         $lastObserved = 'status probe was not found'
         $deadline = (Get-Date).AddSeconds(15)
@@ -1109,7 +1111,7 @@ try {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         Open-GuideFromGame 'Blocked Write Guide'
         [void](Wait-Name 'ReaderHeading' 'Blocked Write Guide')
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'guide-reader-open-while-save-blocked'
     }
     elseif ($Mode -eq 'queue-game-editor') {
@@ -1164,6 +1166,256 @@ try {
         'reader-render-error-observed', 'reader-render-error-result',
         'switch-game-loading', 'switch-game')) {
         # These modes continue a shell left on Reader, Game, or Library.
+    }
+    elseif ($Mode -in @('txt-reader', 'txt-load-paused', 'txt-back-during-load',
+        'txt-load-released')) {
+        $textGame = 'Text Reader Game'
+        $missingMessage = "This guide's file is missing from the library."
+        $listItem = New-Object System.Windows.Automation.PropertyCondition(
+            [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+            [System.Windows.Automation.ControlType]::ListItem)
+        $fixtureRoot = Join-Path $PSScriptRoot '..\..\tests\fixtures'
+        # The reader names a blank or whitespace-only row "Blank line" and
+        # shows no row for the empty line after a final newline.
+        $asciiText = [System.IO.File]::ReadAllText((Join-Path $fixtureRoot 'p0\txt-ascii.txt'))
+        if ($asciiText.EndsWith("`n")) { $asciiText = $asciiText.Substring(0, $asciiText.Length - 1) }
+        $asciiNames = @(
+            $asciiText -split "`n" |
+                ForEach-Object { if ([string]::IsNullOrWhiteSpace($_)) { 'Blank line' } else { $_ } })
+        if ($asciiNames.Count -ne 7) {
+            throw "Expected 7 txt-ascii lines; read $($asciiNames.Count)."
+        }
+
+        function Get-TextRows {
+            $lines = Find-ById 'ReaderTextLines'
+            if (-not $lines -or $lines.Current.IsOffscreen) { return @() }
+            return @($lines.FindAll($scope, $listItem))
+        }
+
+        function Wait-FirstTextRow {
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $lines = Find-ById 'ReaderTextLines'
+                if ($lines -and -not $lines.Current.IsOffscreen -and
+                    $lines.FindFirst($scope, $listItem)) {
+                    return
+                }
+                Start-Sleep -Milliseconds 50
+            } while ((Get-Date) -lt $deadline)
+            throw 'The TXT reader showed no lines.'
+        }
+
+        function Assert-RowNames([string] $guide, [string[]] $expected) {
+            Wait-FirstTextRow
+            $names = @(Get-TextRows | ForEach-Object { $_.Current.Name })
+            if ($names.Count -ne $expected.Count) {
+                throw "$guide showed $($names.Count) rows; expected $($expected.Count)."
+            }
+            for ($index = 0; $index -lt $expected.Count; $index++) {
+                if ($names[$index] -ne $expected[$index]) {
+                    throw "$guide row $index was '$($names[$index])'; expected '$($expected[$index])'."
+                }
+            }
+        }
+
+        function Assert-NoReaderCommands([string] $guide) {
+            $commands = Find-ById 'ReaderCommands'
+            if ($commands -and -not $commands.Current.IsOffscreen) {
+                throw "$guide exposed reader commands."
+            }
+        }
+
+        # The smoke window shows only a few guide rows, so scroll a lower
+        # guide into view before selecting it.
+        function Show-TextGuide([string] $guide) {
+            $list = Find-ById 'GuideList'
+            if (-not $list -or $list.Current.IsOffscreen) {
+                throw 'Expected a visible guide list.'
+            }
+            $row = [System.Windows.Automation.AndCondition]::new(
+                $listItem,
+                [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::NameProperty, $guide))
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $item = $list.FindFirst($scope, $row)
+                if ($item) {
+                    if ($item.Current.IsOffscreen) {
+                        $item.GetCurrentPattern(
+                            [System.Windows.Automation.ScrollItemPattern]::Pattern).ScrollIntoView()
+                    }
+                    return
+                }
+                # A virtualized row may not exist until the list scrolls toward it.
+                $scroll = $list.GetCurrentPattern([System.Windows.Automation.ScrollPattern]::Pattern)
+                if ($scroll.Current.VerticallyScrollable) {
+                    $scroll.Scroll([System.Windows.Automation.ScrollAmount]::NoAmount,
+                        [System.Windows.Automation.ScrollAmount]::LargeIncrement)
+                }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            throw "The guide list has no row named '$guide'."
+        }
+
+        function Open-TextGuide([string] $guide) {
+            Show-TextGuide $guide
+            Open-GuideFromGame $guide
+            [void](Wait-Name 'ReaderHeading' $guide)
+        }
+
+        function Back-ToTextGame {
+            Go-Back
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+        }
+
+        # The installer holds this process's TXT load at its test gate between
+        # these three modes, so Back runs while the load is still in flight.
+        if ($Mode -eq 'txt-load-paused') {
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            Select-Element $textGame
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+            Open-TextGuide 'ASCII Map Guide'
+            $report.phases += 'txt-load-paused'
+        }
+        elseif ($Mode -eq 'txt-back-during-load') {
+            # Back doesn't wait for the held load.
+            Back-ToTextGame
+            Assert-Absent 'ReaderTextLines'
+            Assert-NoReaderCommands 'Game page after Back'
+            $report.phases += 'txt-back-during-load'
+        }
+        elseif ($Mode -eq 'txt-load-released') {
+            # The released load was cancelled: no late text or Guide ready.
+            Start-Sleep -Seconds 2
+            $status = (Find-RawById 'ShellContent').Current.ItemStatus
+            $message = $status.Substring($status.IndexOf('|') + 1)
+            if ($message -ne 'Game ready.') {
+                throw "After the held TXT load was released the status was '$message'; expected 'Game ready.'."
+            }
+            [void](Wait-Name 'GameHeading' $textGame)
+            Assert-Absent 'ReaderTextLines'
+            Open-TextGuide 'ASCII Map Guide'
+            [void](Wait-Status 'Guide ready.')
+            Assert-RowNames 'ASCII Map Guide (after a cancelled load)' $asciiNames
+            $report.phases += 'txt-load-released'
+        }
+        else {
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            Select-Element $textGame
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+
+            # txt-ascii: exact lines, whitespace kept, a 2048-column line scrolls sideways.
+            Open-TextGuide 'ASCII Map Guide'
+            [void](Wait-Status 'Guide ready.')
+            Assert-RowNames 'ASCII Map Guide' $asciiNames
+            [void](Wait-Name 'ReaderTextLines' 'Guide text')
+            $scroll = (Find-ById 'ReaderTextLines').GetCurrentPattern(
+                [System.Windows.Automation.ScrollPattern]::Pattern)
+            if (-not $scroll.Current.HorizontallyScrollable) {
+                throw 'The long txt-ascii line did not make the reader scroll sideways.'
+            }
+            Assert-Absent 'ReaderPlaceholder'
+            Assert-Absent 'ReaderLoadError'
+            Assert-NoReaderCommands 'ASCII Map Guide'
+            $report.txtReaderScreenshot = Save-WindowScreenshot 'txt-reader'
+            $report.phases += 'txt-ascii'
+
+            # txt-tabs: 8-column tab stops; a form feed shows as a space.
+            Back-ToTextGame
+            Open-TextGuide 'Tab Table Guide'
+            Assert-RowNames 'Tab Table Guide' @(
+                'Item    Cost    Where',
+                'Potion  50      Item shop',
+                'Elixir  1500    Secret room',
+                ' Chapter 2')
+            $report.phases += 'txt-tabs'
+
+            # A guide saved with code page 437 shows its decoded characters.
+            Back-ToTextGame
+            Open-TextGuide 'Legacy Code Page Guide'
+            Assert-RowNames 'Legacy Code Page Guide' @("Guide $([char]0x00E9)", 'Item list')
+            $report.phases += 'txt-legacy'
+
+            # txt-long: the P0 measures, gated at the P0 thresholds.
+            Back-ToTextGame
+            Show-TextGuide 'Long Text Guide'
+            $clock = [System.Diagnostics.Stopwatch]::StartNew()
+            Open-GuideFromGame 'Long Text Guide'
+            Wait-FirstTextRow
+            $clock.Stop()
+            [void](Wait-Status 'Guide ready.')
+            $realizedAfterOpen = @(Get-TextRows).Count
+            $scroll = (Find-ById 'ReaderTextLines').GetCurrentPattern(
+                [System.Windows.Automation.ScrollPattern]::Pattern)
+            $monitor = [WindowResponseMonitor]::new($process.MainWindowHandle)
+            $monitor.Start()
+            try {
+                for ($step = 0; $step -lt 8; $step++) {
+                    $scroll.Scroll([System.Windows.Automation.ScrollAmount]::NoAmount,
+                        [System.Windows.Automation.ScrollAmount]::LargeIncrement)
+                }
+                Start-Sleep -Milliseconds 500
+            }
+            finally {
+                $monitor.Stop()
+            }
+            $realizedAfterScroll = @(Get-TextRows).Count
+            $report.txtLong = [ordered]@{
+                firstTextMilliseconds = $clock.ElapsedMilliseconds
+                realizedAfterOpen = $realizedAfterOpen
+                realizedAfterScroll = $realizedAfterScroll
+                verticalScrollPercent = $scroll.Current.VerticalScrollPercent
+                responseSamples = $monitor.Samples
+                responseMaximumMilliseconds = $monitor.MaximumMilliseconds
+                responseSlowSamples = $monitor.SlowSamples
+                responseTimeouts = $monitor.Timeouts
+            }
+            if ($clock.ElapsedMilliseconds -gt 3000) {
+                throw "txt-long first text took $($clock.ElapsedMilliseconds) ms; the limit is 3000 ms."
+            }
+            if ($realizedAfterOpen -gt 300 -or $realizedAfterScroll -gt 300) {
+                throw "txt-long realized $realizedAfterOpen then $realizedAfterScroll rows; the limit is 300."
+            }
+            if ($scroll.Current.VerticalScrollPercent -le 0) {
+                throw 'txt-long did not scroll.'
+            }
+            if ($monitor.Samples -lt 5) {
+                throw "The response monitor took only $($monitor.Samples) samples."
+            }
+            if ($monitor.SlowSamples -ge 2 -or $monitor.Timeouts -gt 0) {
+                throw "txt-long had $($monitor.SlowSamples) responses over 500 ms and $($monitor.Timeouts) timeouts."
+            }
+            $report.phases += 'txt-long'
+
+            Back-ToTextGame
+
+            # A missing managed file shows one sentence and no text or commands.
+            Open-TextGuide 'Missing File Guide'
+            [void](Wait-Status $missingMessage)
+            [void](Wait-Name 'ReaderLoadError' $missingMessage)
+            Assert-Absent 'ReaderTextLines'
+            Assert-Absent 'ReaderPlaceholder'
+            Assert-NoReaderCommands 'Missing File Guide'
+            $report.phases += 'txt-missing'
+
+            # A non-TXT guide after TXT guides shows the placeholder again.
+            Back-ToTextGame
+            Open-TextGuide 'Web Page Guide'
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-Name 'ReaderPlaceholder' 'Reading this guide is unavailable in this preview.')
+            Assert-Absent 'ReaderTextLines'
+            Assert-Absent 'ReaderLoadError'
+            $report.phases += 'html-placeholder'
+
+            # Reopening reads the file again.
+            Back-ToTextGame
+            Open-TextGuide 'ASCII Map Guide'
+            Assert-RowNames 'ASCII Map Guide (reopened)' $asciiNames
+            $report.phases += 'txt-reopen'
+        }
     }
     else {
         [void](Wait-Status 'Library ready.')
@@ -1262,7 +1514,7 @@ try {
         [void](Wait-Name 'ReaderHeading' $designGuide)
         [void](Wait-Name 'ReaderGameName' $designGame)
         [void](Wait-Name 'ReaderFormat' 'TXT')
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         [void](Wait-HiddenById 'ShellStatus')
         Assert-HeadingLevel 'ReaderHeading' 1
         Assert-InsideWindow 'ReaderHeading'
@@ -1274,7 +1526,7 @@ try {
         Assert-InsideWindow 'ReaderHeading'
         Assert-InsideWindow 'ReaderBackToGame'
         Assert-InsideWindow 'ReaderFormat'
-        Assert-InsideWindow 'ReaderPlaceholder'
+        Assert-InsideWindow 'ReaderTextLines'
         Assert-NoOverlap 'PART_PaneToggleButton' 'ReaderBackToGame'
         Assert-NoOverlap 'PART_BackButton' 'ReaderBackToGame'
         $report.readerNarrowScreenshot =
@@ -1361,7 +1613,7 @@ try {
 
         Press-Enter (Wait-GuideRow $designGuide)
         [void](Wait-Name 'ReaderHeading' $designGuide)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         [void](Wait-HiddenById 'ShellStatus')
         Assert-ShellForeground
         $report.readerScreenshot = Save-WindowScreenshot "material-$selected-reader"
@@ -1641,7 +1893,7 @@ try {
         # Resume pushes Library -> Game -> Reader; Back walks the same entries.
         Invoke-Element (Wait-Name 'ResumeGuide' 'Resume Beacon Guide')
         [void](Wait-Name 'ReaderHeading' 'Beacon Guide')
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         Go-Back
         [void](Wait-Name 'GameHeading' $beacon)
         [void](Wait-Status 'Game ready.')
@@ -1665,7 +1917,7 @@ try {
         Open-AtlasGame
         Open-GuideFromGame 'Atlas Second Guide'
         [void](Wait-Name 'ReaderHeading' 'Atlas Second Guide')
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         Go-Back
         [void](Wait-Name 'GameHeading' $atlas)
         [void](Wait-SelectedGuide 'Atlas Second Guide')
@@ -2166,7 +2418,7 @@ try {
                     Invoke-Element (Wait-EnabledById 'ImportOpenExisting')
                     [void](Wait-HiddenById 'ImportGuideDialog')
                     [void](Wait-Name 'ReaderHeading' $ExpectedGuideTitle)
-                    [void](Wait-Status 'Guide details ready.')
+                    [void](Wait-Status 'Guide ready.')
                     $report.importOpenExistingScreenshot = Save-WindowScreenshot 'import-open-existing'
                     $report.phases += 'import-open-existing'
                 }
@@ -2186,7 +2438,7 @@ try {
         # with it selected before removing it.
         Open-GuideFromGame $title
         [void](Wait-Name 'ReaderHeading' $title)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Name 'GameHeading' 'Import Test Game')
         [void](Wait-Status 'Game ready.')
@@ -2308,7 +2560,7 @@ try {
             # with it selected before renaming.
             Open-GuideFromGame 'Beta Route Guide'
             [void](Wait-Name 'ReaderHeading' 'Beta Route Guide')
-            [void](Wait-Status 'Guide details ready.')
+            [void](Wait-Status 'Guide ready.')
             Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
             [void](Wait-Name 'GameHeading' $renameTitle)
             [void](Wait-Status 'Game ready.')
@@ -2425,7 +2677,7 @@ try {
             Invoke-Element (Wait-Name 'ResumeGuide' 'Resume Beta Route Guide')
             [void](Wait-Name 'ReaderHeading' 'Beta Route Guide')
             [void](Wait-Name 'ReaderGameName' $renamed)
-            [void](Wait-Status 'Guide details ready.')
+            [void](Wait-Status 'Guide ready.')
             $report.phases += 'persisted-resume'
 
             Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
@@ -2470,7 +2722,7 @@ try {
         [void](Wait-Status 'Library ready.')
         Invoke-Element (Wait-Name 'ResumeGuide' "Resume $target")
         [void](Wait-Name 'ReaderHeading' $target)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Status 'Game ready.')
@@ -2480,7 +2732,7 @@ try {
         $report.phases += 'virtualized-guide-back-focus'
         [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
         [void](Wait-Name 'ReaderHeading' $target)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'virtualized-guide-enter-reopen'
     }
     elseif ($Mode -eq 'switch-game-prepare') {
@@ -2549,7 +2801,7 @@ try {
     elseif ($Mode -eq 'later-guide-result') {
         [void](Wait-Name 'ReaderHeading' 'Blocked Write Guide')
         [void](Wait-Name 'ReaderGameName' 'Route Test Game')
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'later-guide-opened'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
@@ -2844,13 +3096,22 @@ try {
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
         [void](Wait-Name 'ReaderGameName' 'Route Test Game')
         [void](Wait-Name 'ReaderFormat' 'TXT')
-        [void](Wait-Name 'ReaderPlaceholder' `
-            'Reading this guide is unavailable in this preview.')
+        [void](Wait-VisibleById 'ReaderTextLines')
+        [void](Wait-Name 'ReaderTextLines' 'Guide text')
+        $firstLine = (Find-ById 'ReaderTextLines').FindFirst(
+            [System.Windows.Automation.TreeScope]::Descendants,
+            (New-Object System.Windows.Automation.PropertyCondition(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::ListItem)))
+        if (-not $firstLine -or $firstLine.Current.Name -ne 'Test guide.') {
+            throw 'The TXT reader did not show the seeded guide text.'
+        }
+        Assert-Absent 'ReaderPlaceholder'
         $commands = Find-ById 'ReaderCommands'
         if ($commands -and -not $commands.Current.IsOffscreen) {
-            throw 'The preview reader exposed commands without an adapter.'
+            throw 'The TXT reader exposed commands that T08.2 does not provide.'
         }
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         Wait-PaneState 'Navigation pane closed'
         $report.readerScreenshot = Save-WindowScreenshot 'reader'
         $report.phases += 'resume-reader'
@@ -2874,7 +3135,7 @@ try {
         $report.gameScreenshot = Save-WindowScreenshot 'game'
         Invoke-Element $openSelected
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'uia-reopen-selected-guide'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
@@ -2884,7 +3145,7 @@ try {
 
         Click-Element (Wait-SelectedGuide $ExpectedResumeGuide)
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'pointer-reopen-selected-guide'
         Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
@@ -2893,7 +3154,7 @@ try {
         Wait-FocusedGuide $ExpectedResumeGuide
         Activate-SelectedGuide $ExpectedResumeGuide
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'keyboard-reopen-selected-guide'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
@@ -2909,13 +3170,13 @@ try {
         Focus-OtherGuideWithoutSelection $ExpectedResumeGuide $otherGuide
         [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
         [void](Wait-Name 'ReaderHeading' $otherGuide)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'focused-guide-enter'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         Open-GuideFromGame $ExpectedResumeGuide
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'restore-route-guide'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
@@ -2929,7 +3190,7 @@ try {
         [void](Wait-Status 'Game ready.')
         Click-Element (Wait-GuideRow 'Route Test Guide')
         [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         Click-Element (Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Status 'Game ready.')
@@ -2943,7 +3204,7 @@ try {
         [void](Wait-Status 'Game ready.')
         Press-Enter (Wait-GuideRow 'Route Test Guide')
         [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Status 'Game ready.')
@@ -2975,7 +3236,7 @@ try {
         [void](Wait-Status 'Settings ready.')
         Go-Back
         [void](Wait-Name 'ReaderHeading' $rapidGuide)
-        [void](Wait-Status 'Guide details ready.')
+        [void](Wait-Status 'Guide ready.')
         $report.phases += 'rapid-guide-settings-back-reader'
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
@@ -2984,7 +3245,7 @@ try {
         if ($rapidGuide -ne 'Route Test Guide') {
             Open-GuideFromGame 'Route Test Guide'
             [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
-            [void](Wait-Status 'Guide details ready.')
+            [void](Wait-Status 'Guide ready.')
             Go-Back
             [void](Wait-Name 'GameHeading' 'Route Test Game')
             [void](Wait-Status 'Game ready.')

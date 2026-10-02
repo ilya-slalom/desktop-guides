@@ -269,7 +269,9 @@ font-size or window-size change returns near the same text.
   A UTF-8 BOM wins over a stored code page; missing, oversized, unreadable
   or undecodable copies are typed load results (P1 T08.1).
 - **T08.2** Render using a bounded or virtualized native view with monospace
-  preformatted layout by default.
+  preformatted layout by default. A `ListView` over a lazy line list shows
+  Consolas, unwrapped lines; tabs expand to 8-column stops and other C0
+  controls show as a space; a load failure shows one sentence (P1 T08.2).
 - **T08.3** Implement navigation and character-offset/context location APIs.
 - **TR08.1** Whitespace is never collapsed in the default TXT mode.
 - **TR08.2** Rendering and progress storage do not create one persistent WinUI

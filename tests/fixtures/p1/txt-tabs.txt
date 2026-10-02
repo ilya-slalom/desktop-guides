@@ -1,0 +1,4 @@
+Item	Cost	Where
+Potion	50	Item shop
+Elixir	1500	Secret room
+Chapter 2
