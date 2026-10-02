@@ -1,7 +1,10 @@
 # T08.3 TXT commands and position capture/restore design
 
-Status: design approved in brainstorming on 2 October 2026; implementation
-plan to follow in [t08-3-txt-position-plan.md](t08-3-txt-position-plan.md).
+Status: implemented in PR #31; in review. Design approved in brainstorming
+on 2 October 2026; implementation planned in
+[t08-3-txt-position-plan.md](t08-3-txt-position-plan.md) and verified in CI
+run [36957516416](https://github.com/ilya-slalom/desktop-guides/actions/runs/36957516416)
+(see the [verification record](#t083-verification-record)).
 Prerequisites: T08.2 is merged (PR #30, merge commit `1294e4b`); T12.1 is
 merged (M0, PR #3).
 
@@ -254,3 +257,62 @@ fails, following the backup and cleanup rules in
 - Announcing an Approximate or Unavailable restore in the UI: T12.2/T14.3.
   Nothing in T08.3 produces one at runtime.
 - Tall fallback glyphs and a cap for very long lines: deferred T08.2 minors.
+
+## Implementation notes
+
+Where the build differs from the design above:
+
+- **Scrolling uses `ListView.ScrollIntoView(item, Leading)`**, not
+  `ChangeView` to `line * rowHeight`. It lands on the bound row without
+  depending on the list's header and padding offsets.
+- **The resize check uses `Resize-ShellWindow`**, the shell smoke's
+  existing helper, not UIA `TransformPattern`. The window shrinks by half
+  the text area's height: on the CI desktop the list is about 180 px tall,
+  so a fixed 160 px shrink left no rows on screen.
+- **`PageBy` counts from `FirstVisibleIndex`**, not the anchor. After Go to
+  end the anchor is the last line while the top line is about a page above
+  it, so Previous page pages up from the line the reader sees.
+- **Text-size trigger.** `UISettings.TextScaleFactorChanged` reaches a
+  WinUI 3 desktop process: a throwaway listener on `pcsx2-win` saw 1.25
+  after the Settings slider moved and 1 after it was restored. The
+  `XamlRoot.Changed` fallback isn't needed.
+- **The normal-mode shell smoke** still asserted that the TXT reader had no
+  commands (a T08.2 check); it now requires the four TXT commands.
+
+## T08.3 verification record
+
+- **Unit tests.** On `pcsx2-win`, Core passed 397/397 (371 before, plus
+  24 `TextLocatorTests` cases and 2 contract tests). The Production,
+  ReaderToolbarSmoke and ShellSeed builds had 0 warnings.
+- **Installed.** CI run
+  [36957516416](https://github.com/ilya-slalom/desktop-guides/actions/runs/36957516416)
+  on `8a231a0` passed every job:
+  - `reader-toolbar-ui`: Go to start and Go to end dispatch
+    `PageEdgeAction(Start)` and `PageEdgeAction(End)`.
+  - `production-shell-ui`, `txt-reader` in light and dark: the T08.2
+    phases plus `txt-commands`, `txt-resize`, `txt-remeasure` and
+    `txt-switch`.
+
+    | Measure | Light | Dark | Expected |
+    |---|---|---|---|
+    | Page step (rows) | 8 | 8 | 1 to the fully visible rows |
+    | Fully visible rows | 9 | 9 | |
+    | Top line after Go to end | 392 | 392 | `Line 0400` on screen |
+    | Row height after re-measure | 1.47x | 1.47x | 1.3-1.7x |
+    | ASCII horizontal extent after re-measure | 1.50x | 1.50x | 1.3-1.7x |
+
+- **CI fixes.** Run
+  [36955267358](https://github.com/ilya-slalom/desktop-guides/actions/runs/36955267358)
+  failed on the T08.2 no-commands check in normal mode (fixed in
+  `ae7cc40`). Run
+  [36956267049](https://github.com/ilya-slalom/desktop-guides/actions/runs/36956267049)
+  failed `txt-resize` because the 160 px shrink emptied the list (fixed in
+  `8a231a0`).
+- **Not seen.** A real Windows text-size change with the installed app was
+  not run: `pcsx2-win` is used only for the feasibility check and CI
+  failures. CI covers the re-measure through the `TextRemeasure` test hook,
+  and the spike showed the system event arrives. The step between them,
+  the `UISettings` handler posting `Remeasure`, is reviewed, not observed.
+- **Evidence.** ASCII Map Guide with the TXT commands:
+  [light](evidence/t08-3-txt-position/txt-reader-light.png) and
+  [dark](evidence/t08-3-txt-position/txt-reader-dark.png).

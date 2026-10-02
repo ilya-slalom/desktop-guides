@@ -787,6 +787,14 @@ passed the installed `txt-reader` scenario in light and dark, with
 `txt-long` first text at 133–138 ms and at most 56 realized rows. Rows clip
 after a Windows text-size change until the guide is reopened (#29).
 
+T08.3 is in review in PR #31; see the
+[design and verification record](t08-3-txt-position-design.md). TXT guides
+gain Go to start, Previous page, Next page and Go to end, and a Core
+`TextLocator` captures and restores the top line as an offset plus context.
+A resize or a Windows text-size change keeps the top line, and the text-size
+change re-measures the rows (issue #29). CI run 36957516416 passed the
+installed `txt-reader` scenario in light and dark.
+
 ## M4 — progress, completion, and appearance
 
 Exit: two guides retain independent positions across restart; completion
