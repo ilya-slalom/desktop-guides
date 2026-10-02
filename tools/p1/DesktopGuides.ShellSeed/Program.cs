@@ -406,13 +406,15 @@ if (args.Length == 3 && args[0] == "seed-txt-reader")
         Fixture("p0/generated/txt-long.txt"));
     await InsertTextGuideAsync(textPaths, textGame.Id, Guid.NewGuid(), "Legacy Code Page Guide", textNow,
         Fixture("p0/txt-legacy.txt"), codePage: 437);
+    await InsertTextGuideAsync(textPaths, textGame.Id, Guid.NewGuid(), "Numbered Lines Guide", textNow,
+        Fixture("p1/txt-numbered.txt"));
     Guid missingGuideId = Guid.NewGuid();
     await InsertTextGuideAsync(textPaths, textGame.Id, missingGuideId, "Missing File Guide", textNow,
         Fixture("p0/txt-ascii.txt"));
     File.Delete(Path.Combine(textPaths.GetGuideRoot(missingGuideId), "guide.txt"));
     await InsertGuideAsync(textPaths, textGame.Id, Guid.NewGuid(), "Web Page Guide", textNow,
         "Html", "guide.html");
-    Console.WriteLine("Seeded the TXT reader game with six guides.");
+    Console.WriteLine("Seeded the TXT reader game with seven guides.");
     return 0;
 }
 

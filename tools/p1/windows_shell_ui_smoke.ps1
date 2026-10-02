@@ -1269,6 +1269,61 @@ try {
             [void](Wait-Status 'Game ready.')
         }
 
+        # The first row whose middle is inside the list is the top line.
+        function Get-TopRow {
+            $top = (Find-ById 'ReaderTextLines').Current.BoundingRectangle.Top
+            $rows = @(Get-TextRows | Where-Object { -not $_.Current.IsOffscreen } |
+                Sort-Object { $_.Current.BoundingRectangle.Top })
+            foreach ($row in $rows) {
+                $bounds = $row.Current.BoundingRectangle
+                if ($bounds.Top + $bounds.Height / 2 -ge $top) { return $row }
+            }
+            throw 'The TXT reader showed no rows.'
+        }
+
+        function Get-TopLine {
+            $name = (Get-TopRow).Current.Name
+            if ($name -notmatch '^Line (\d{4}) ') { throw "Unexpected top row '$name'." }
+            return [int]$Matches[1]
+        }
+
+        function Wait-TopLine([int] $expected, [string] $step) {
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                $actual = Get-TopLine
+                if ($actual -eq $expected) { return }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            throw "$step left line $actual at the top; expected line $expected."
+        }
+
+        function Wait-TopLineChange([int] $from, [string] $step) {
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                $actual = Get-TopLine
+                if ($actual -ne $from) { Start-Sleep -Milliseconds 300; return Get-TopLine }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            throw "$step did not move the top line from $from."
+        }
+
+        function Get-FullyVisibleRows {
+            $list = (Find-ById 'ReaderTextLines').Current.BoundingRectangle
+            return @(Get-TextRows | Where-Object {
+                $bounds = $_.Current.BoundingRectangle
+                -not $_.Current.IsOffscreen -and
+                    $bounds.Top -ge $list.Top - 1 -and $bounds.Bottom -le $list.Bottom + 1
+            }).Count
+        }
+
+        function Invoke-ReaderCommand([string] $name) {
+            $button = Find-ByName $name
+            if (-not $button -or $button.Current.IsOffscreen) {
+                throw "The TXT reader has no visible '$name' command."
+            }
+            Invoke-Element $button
+        }
+
         # The installer holds this process's TXT load at its test gate between
         # these three modes, so Back runs while the load is still in flight.
         if ($Mode -eq 'txt-load-paused') {
@@ -1302,6 +1357,11 @@ try {
             $report.phases += 'txt-load-released'
         }
         else {
+            # The view re-measures at a larger test font size on this signal.
+            $remeasure = [System.Threading.EventWaitHandle]::new(
+                $false, [System.Threading.EventResetMode]::AutoReset,
+                "Local\DesktopGuides.Preview.TextRemeasure.$($process.Id)")
+            $report.txtPosition = [ordered]@{}
             [void](Wait-Name 'LibraryHeading' 'Library')
             Select-Element $textGame
             [void](Wait-Name 'GameHeading' $textGame)
@@ -1319,7 +1379,12 @@ try {
             }
             Assert-Absent 'ReaderPlaceholder'
             Assert-Absent 'ReaderLoadError'
-            Assert-NoReaderCommands 'ASCII Map Guide'
+            foreach ($name in 'Go to start', 'Previous page', 'Next page', 'Go to end') {
+                $button = Find-ByName $name
+                if (-not $button -or $button.Current.IsOffscreen) {
+                    throw "ASCII Map Guide has no visible '$name' command."
+                }
+            }
             $report.txtReaderScreenshot = Save-WindowScreenshot 'txt-reader'
             $report.phases += 'txt-ascii'
 
@@ -1415,6 +1480,96 @@ try {
             Open-TextGuide 'ASCII Map Guide'
             Assert-RowNames 'ASCII Map Guide (reopened)' $asciiNames
             $report.phases += 'txt-reopen'
+
+            # txt-commands: whole-row pages, Start and End.
+            Back-ToTextGame
+            Open-TextGuide 'Numbered Lines Guide'
+            [void](Wait-Status 'Guide ready.')
+            Wait-FirstTextRow
+            Wait-TopLine 1 'Opening the guide'
+            $visibleRows = Get-FullyVisibleRows
+            Invoke-ReaderCommand 'Next page'
+            $pageStep = (Wait-TopLineChange 1 'Next page') - 1
+            if ($pageStep -lt 1 -or $pageStep -gt $visibleRows) {
+                throw "Next page moved $pageStep rows; $visibleRows rows were fully visible."
+            }
+            Invoke-ReaderCommand 'Next page'
+            Wait-TopLine (1 + 2 * $pageStep) 'A second Next page'
+            Invoke-ReaderCommand 'Previous page'
+            Wait-TopLine (1 + $pageStep) 'Previous page'
+            Invoke-ReaderCommand 'Go to end'
+            $endTop = Wait-TopLineChange (1 + $pageStep) 'Go to end'
+            $last = @(Get-TextRows | Where-Object {
+                -not $_.Current.IsOffscreen -and $_.Current.Name -like 'Line 0400 *' })
+            if ($last.Count -ne 1) { throw 'Go to end did not show Line 0400.' }
+            # Previous after End pages from the real top line.
+            Invoke-ReaderCommand 'Previous page'
+            Wait-TopLine ([Math]::Max(1, $endTop - $pageStep)) 'Previous page after Go to end'
+            Invoke-ReaderCommand 'Go to start'
+            Wait-TopLine 1 'Go to start'
+            $report.txtPosition.pageStep = $pageStep
+            $report.txtPosition.visibleRows = $visibleRows
+            $report.txtPosition.endTopLine = $endTop
+            $report.phases += 'txt-commands'
+
+            # txt-resize: a shorter then restored window keeps the top line.
+            Invoke-ReaderCommand 'Next page'
+            $anchor = Wait-TopLineChange 1 'Next page before resizing'
+            $window = $root.Current.BoundingRectangle
+            Resize-ShellWindow ([int]$window.Width) ([int]($window.Height - 160))
+            Wait-TopLine $anchor 'A shorter window'
+            Resize-ShellWindow ([int]$window.Width) ([int]$window.Height)
+            Wait-TopLine $anchor 'The restored window'
+            $report.phases += 'txt-resize'
+
+            # txt-remeasure (issue #29): larger text grows the rows, keeps the line.
+            $heightBefore = (Get-TopRow).Current.BoundingRectangle.Height
+            [void]$remeasure.Set()
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                Start-Sleep -Milliseconds 100
+                $heightRatio = (Get-TopRow).Current.BoundingRectangle.Height / $heightBefore
+            } while (($heightRatio -lt 1.3 -or $heightRatio -gt 1.7) -and (Get-Date) -lt $deadline)
+            if ($heightRatio -lt 1.3 -or $heightRatio -gt 1.7) {
+                throw "Re-measured rows were $([Math]::Round($heightRatio, 2))x as tall; expected about 1.5x."
+            }
+            Wait-TopLine $anchor 'Re-measuring the rows'
+            $report.txtPosition.heightRatio = $heightRatio
+
+            # The 2,048-column line widens with the text, so it still scrolls fully.
+            Back-ToTextGame
+            Open-TextGuide 'ASCII Map Guide'
+            Assert-RowNames 'ASCII Map Guide (before re-measuring)' $asciiNames
+            # Row rectangles are clipped to the viewport, so compare the
+            # horizontal view size (viewport / extent) instead.
+            $scroll = (Find-ById 'ReaderTextLines').GetCurrentPattern(
+                [System.Windows.Automation.ScrollPattern]::Pattern)
+            $viewBefore = $scroll.Current.HorizontalViewSize
+            [void]$remeasure.Set()
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                Start-Sleep -Milliseconds 100
+                $widthRatio = $viewBefore / $scroll.Current.HorizontalViewSize
+            } while (($widthRatio -lt 1.3 -or $widthRatio -gt 1.7) -and (Get-Date) -lt $deadline)
+            if ($widthRatio -lt 1.3 -or $widthRatio -gt 1.7) {
+                throw "The re-measured extent was $([Math]::Round($widthRatio, 2))x as wide; expected about 1.5x."
+            }
+            $report.txtPosition.widthRatio = $widthRatio
+            $report.phases += 'txt-remeasure'
+
+            # txt-switch: a new guide starts at its first line with normal rows.
+            Back-ToTextGame
+            Open-TextGuide 'Numbered Lines Guide'
+            Wait-FirstTextRow
+            Wait-TopLine 1 'Reopening the Numbered guide'
+            $switchRatio = (Get-TopRow).Current.BoundingRectangle.Height / $heightBefore
+            if ([Math]::Abs($switchRatio - 1) -gt 0.1) {
+                throw "A new TXT session kept the test text size (rows $([Math]::Round($switchRatio, 2))x)."
+            }
+            Invoke-ReaderCommand 'Next page'
+            Wait-TopLine (1 + $pageStep) 'Next page after switching guides'
+            $report.phases += 'txt-switch'
+            $remeasure.Dispose()
         }
     }
     else {
