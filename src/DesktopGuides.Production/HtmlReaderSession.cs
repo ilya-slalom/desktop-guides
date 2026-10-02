@@ -82,36 +82,46 @@ internal sealed class HtmlReaderSession : IReaderSession
         token.ThrowIfCancellationRequested();
         ObjectDisposedException.ThrowIf(disposed, this);
 
-        core = View.CoreWebView2;
-        CoreWebView2Settings settings = core.Settings;
-        settings.IsScriptEnabled = false;
-        settings.IsWebMessageEnabled = false;
-        settings.AreHostObjectsAllowed = false;
-        settings.AreDefaultContextMenusEnabled = false;
-        settings.AreDevToolsEnabled = false;
-        settings.IsStatusBarEnabled = false;
-        settings.IsZoomControlEnabled = false;
-        settings.IsGeneralAutofillEnabled = false;
-        settings.IsPasswordAutosaveEnabled = false;
-        settings.AreBrowserAcceleratorKeysEnabled = false;
-        core.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
-        core.WebResourceRequested += OnWebResourceRequested;
-        core.NavigationStarting += OnNavigationStarting;
-        core.FrameNavigationStarting += OnFrameNavigationStarting;
-        core.NewWindowRequested += OnNewWindowRequested;
-        core.PermissionRequested += OnPermissionRequested;
-        core.DownloadStarting += OnDownloadStarting;
-        core.LaunchingExternalUriScheme += OnLaunchingExternalUriScheme;
-
         TaskCompletionSource<bool> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        void Completed(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
-        {
-            sender.NavigationCompleted -= Completed;
+        void Completed(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args) =>
             completion.TrySetResult(args.IsSuccess);
+        core = View.CoreWebView2;
+        bool success;
+        try
+        {
+            CoreWebView2Settings settings = core.Settings;
+            settings.IsScriptEnabled = false;
+            settings.IsWebMessageEnabled = false;
+            settings.AreHostObjectsAllowed = false;
+            settings.AreDefaultContextMenusEnabled = false;
+            settings.AreDevToolsEnabled = false;
+            settings.IsStatusBarEnabled = false;
+            settings.IsZoomControlEnabled = false;
+            settings.IsGeneralAutofillEnabled = false;
+            settings.IsPasswordAutosaveEnabled = false;
+            settings.AreBrowserAcceleratorKeysEnabled = false;
+            core.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+            core.WebResourceRequested += OnWebResourceRequested;
+            core.NavigationStarting += OnNavigationStarting;
+            core.FrameNavigationStarting += OnFrameNavigationStarting;
+            core.NewWindowRequested += OnNewWindowRequested;
+            core.PermissionRequested += OnPermissionRequested;
+            core.DownloadStarting += OnDownloadStarting;
+            core.LaunchingExternalUriScheme += OnLaunchingExternalUriScheme;
+            core.NavigationCompleted += Completed;
+            core.Navigate(policy.EntryUri.AbsoluteUri);
+            success = await completion.Task.WaitAsync(TimeSpan.FromSeconds(15), token);
         }
-        core.NavigationCompleted += Completed;
-        core.Navigate(policy.EntryUri.AbsoluteUri);
-        bool success = await completion.Task.WaitAsync(TimeSpan.FromSeconds(15), token);
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            // A timeout or a COM failure leaves the guide unreadable, not the app.
+            throw new HtmlGuideLoadException(HtmlGuideLoadError.Changed);
+        }
+        finally
+        {
+            // A closed view raises nothing more, and touching it could throw.
+            if (!disposed) core.NavigationCompleted -= Completed;
+        }
         if (!success || !entryServed)
         {
             throw new HtmlGuideLoadException(HtmlGuideLoadError.Changed);
@@ -143,15 +153,15 @@ internal sealed class HtmlReaderSession : IReaderSession
     private async void OnWebResourceRequested(CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs args)
     {
         Windows.Foundation.Deferral deferral = args.GetDeferral();
+        string context = string.Empty;
         try
         {
-            string context = args.ResourceContext.ToString();
+            context = args.ResourceContext.ToString();
             HtmlRequestDecision decision = policy.Decide(args.Request.Method, args.Request.Uri);
             if (decision is HtmlServe serve)
             {
                 HtmlAssetRead read = await Task.Run(() => reader.Read(serve.Asset));
-                if (disposed || environment is null) return;
-                if (read.Status == HtmlAssetReadStatus.Served)
+                if (read.Status == HtmlAssetReadStatus.Served && !disposed && environment is not null)
                 {
                     diagnostics?.RecordServed(serve.Asset.RequestPath);
                     if (serve.Asset.Kind == GuideAssetKind.EntryHtml) entryServed = true;
@@ -167,9 +177,17 @@ internal sealed class HtmlReaderSession : IReaderSession
             }
             Deny(args, ((HtmlDeny)decision).Reason, context);
         }
-        catch (Exception) when (disposed)
+        catch (Exception)
         {
-            // The view closed while a request was in flight.
+            // An unset response would send the request to the network: deny it instead.
+            try
+            {
+                Deny(args, HtmlDenyReason.Malformed, context);
+            }
+            catch (Exception)
+            {
+                // The view closed while a request was in flight.
+            }
         }
         finally
         {
@@ -177,10 +195,11 @@ internal sealed class HtmlReaderSession : IReaderSession
         }
     }
 
+    // Answers 403 even after dispose; only a live session counts it.
     private void Deny(CoreWebView2WebResourceRequestedEventArgs args, HtmlDenyReason reason, string context)
     {
-        if (disposed || environment is null) return;
-        diagnostics?.RecordDenied(reason, context);
+        if (environment is null) return;
+        if (!disposed) diagnostics?.RecordDenied(reason, context);
         args.Response = environment.CreateWebResourceResponse(
             new MemoryStream().AsRandomAccessStream(), 403, "Forbidden", HtmlRequestPolicy.DeniedHeaders);
     }
