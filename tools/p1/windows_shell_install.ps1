@@ -1041,6 +1041,7 @@ function Run-HtmlReaderScenarios {
     try {
         $canary = Start-HtmlCanary $logPath
         $baseline = @(Get-HtmlCanaryLines $logPath).Count
+        $report.htmlReader.onlineCanaryBaseline = $baseline
         Set-AppThemePreference $true
         Invoke-HtmlReaderPass 'html-reader-online'
         $report.htmlReader.online = Assert-HtmlReaderPass 'online' $cacheRoot $ids $logPath $baseline

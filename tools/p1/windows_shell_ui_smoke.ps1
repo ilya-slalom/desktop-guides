@@ -1422,7 +1422,40 @@ try {
                     if ($element) { return $element }
                     Start-Sleep -Milliseconds 250
                 } while ((Get-Date) -lt $deadline)
-                throw "The guide page did not show '$name'."
+                [void](Save-WindowScreenshot 'html-page-missing')
+                throw "The guide page did not show '$name'. UIA tree: $(Get-PageTreeSummary)"
+            }
+
+            # Names the web content elements so a missing page name can be
+            # told apart from content that never joined the UIA tree.
+            function Get-PageTreeSummary {
+                $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
+                $pending = [System.Collections.Generic.Queue[object]]::new()
+                $pending.Enqueue(@($root, 0))
+                $found = [System.Collections.Generic.List[string]]::new()
+                while ($pending.Count -gt 0 -and $found.Count -lt 80) {
+                    $entry = $pending.Dequeue()
+                    $element = $entry[0]
+                    try {
+                        $current = $element.Current
+                        if ($current.ClassName -match 'WebView|Chrome' -or
+                            $current.FrameworkId -eq 'Chrome' -or $entry[1] -gt 0) {
+                            $found.Add("[$($current.ControlType.ProgrammaticName)|$($current.ClassName)|$($current.FrameworkId)|$($current.Name)]")
+                            $depth = $entry[1] + 1
+                        }
+                        else {
+                            $depth = 0
+                        }
+                        $child = $walker.GetFirstChild($element)
+                        while ($child) {
+                            $pending.Enqueue(@($child, $depth))
+                            $child = $walker.GetNextSibling($child)
+                        }
+                    }
+                    catch [System.Windows.Automation.ElementNotAvailableException] {
+                    }
+                }
+                return ($found -join ' ')
             }
 
             function Assert-NoExternalLinkBar([string] $after) {
