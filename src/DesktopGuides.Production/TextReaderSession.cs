@@ -5,7 +5,7 @@ using DesktopGuides.Core.Text;
 namespace DesktopGuides.Production;
 
 // The Reader's session for one loaded TXT guide. The shell builds it from a
-// document T08.1's loader returned; paging and restore arrive with T08.3.
+// document T08.1's loader returned.
 internal sealed class TextReaderSession : IReaderSession
 {
     private readonly TextGuideDocument document;
@@ -16,15 +16,17 @@ internal sealed class TextReaderSession : IReaderSession
         ArgumentNullException.ThrowIfNull(document);
         this.document = document;
         View = new TextReaderView(new TextLineList(document), maxColumns);
+        View.TopLineChanged += OnTopLineChanged;
     }
 
     public TextReaderView View { get; }
     public GuideFormat Format => GuideFormat.Txt;
-    public ReaderCapabilities Capabilities => ReaderCapabilities.Scroll;
+    public ReaderCapabilities Capabilities =>
+        ReaderCapabilities.Scroll | ReaderCapabilities.PageNavigation;
 
-    // Neither changes during a T08.2 session.
+    // Capabilities don't change during a TXT session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
-    public event EventHandler<LocationChangedEventArgs>? LocationChanged { add { } remove { } }
+    public event EventHandler<LocationChangedEventArgs>? LocationChanged;
 
     public Task OpenAsync(ManagedGuideSource source, CancellationToken token) =>
         throw new NotSupportedException("A TXT session is built from a loaded document.");
@@ -32,17 +34,20 @@ internal sealed class TextReaderSession : IReaderSession
     public Task<ReaderLocation> GetLocationAsync(CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        IReadOnlyList<int> starts = document.LineStarts;
-        int line = Math.Clamp(View.FirstVisibleIndex, 0, starts.Count - 1);
-        TextLocation captured = document.Capture(starts[line]);
-        return Task.FromResult(new ReaderLocation(
-            GuideFormat.Txt, captured.SchemaVersion, captured.ContentSha256,
-            new TextPosition(captured.CharacterOffset, captured.ContextQuote), captured.Fraction));
+        return Task.FromResult(TextLocator.Capture(document, View.FirstVisibleIndex));
     }
 
-    public Task<RestoreOutcome> RestoreLocationAsync(ReaderLocation location, CancellationToken token) =>
-        Task.FromResult(new RestoreOutcome(
-            RestoreKind.Unavailable, "Restoring a reading position isn't available yet."));
+    public Task<RestoreOutcome> RestoreLocationAsync(ReaderLocation location, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(location);
+        TextRestore restore = TextLocator.Restore(document, location);
+        token.ThrowIfCancellationRequested();
+        if (!disposed && restore.Outcome.Kind != RestoreKind.Unavailable)
+        {
+            View.ScrollToLine(restore.Line);
+        }
+        return Task.FromResult(restore.Outcome);
+    }
 
     public Task ApplyAppearanceAsync(ReaderAppearance appearance, CancellationToken token) => Task.CompletedTask;
 
@@ -50,11 +55,20 @@ internal sealed class TextReaderSession : IReaderSession
     {
         ArgumentNullException.ThrowIfNull(action);
         token.ThrowIfCancellationRequested();
-        if (action is not ScrollAction scroll)
+        switch (action)
         {
-            throw new NotSupportedException($"TXT guides don't support {action.Command}.");
+            case ScrollAction scroll:
+                View.ScrollByViewport(scroll.VerticalViewportFraction);
+                break;
+            case PageTurnAction page:
+                View.PageBy(page.Delta);
+                break;
+            case PageEdgeAction edge:
+                View.ScrollToEdge(edge.Edge);
+                break;
+            default:
+                throw new NotSupportedException($"TXT guides don't support {action.Command}.");
         }
-        View.ScrollByViewport(scroll.VerticalViewportFraction);
         return Task.CompletedTask;
     }
 
@@ -63,8 +77,12 @@ internal sealed class TextReaderSession : IReaderSession
         if (!disposed)
         {
             disposed = true;
+            View.TopLineChanged -= OnTopLineChanged;
             View.Clear();
         }
         return ValueTask.CompletedTask;
     }
+
+    private void OnTopLineChanged(object? sender, EventArgs args) =>
+        LocationChanged?.Invoke(this, new LocationChangedEventArgs());
 }

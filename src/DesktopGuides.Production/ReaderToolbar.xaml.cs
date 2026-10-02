@@ -71,13 +71,16 @@ public sealed partial class ReaderToolbar : UserControl
             ? []
             : ReaderCommandPolicy.VisibleCommands(session).ToHashSet();
         bool pages = supported.Contains(ReaderCommand.PageTurn);
+        bool edges = supported.Contains(ReaderCommand.PageEdge);
         bool textSize = supported.Contains(ReaderCommand.TextSize);
         bool zoom = supported.Contains(ReaderCommand.Zoom);
         bool pageJump = supported.Contains(ReaderCommand.PageJump);
         bool fitWidth = supported.Contains(ReaderCommand.FitWidth);
         bool find = supported.Contains(ReaderCommand.Find);
+        PageStart.Visibility = Show(edges);
         PreviousPage.Visibility = Show(pages);
         NextPage.Visibility = Show(pages);
+        PageEnd.Visibility = Show(edges);
         SmallerText.Visibility = Show(textSize);
         LargerText.Visibility = Show(textSize);
         ZoomOut.Visibility = Show(zoom);
@@ -86,7 +89,7 @@ public sealed partial class ReaderToolbar : UserControl
         FitToWidth.Visibility = Show(fitWidth);
         FindInGuide.Visibility = Show(find);
         Commands.Visibility = Show(
-            pages || textSize || zoom || pageJump || fitWidth || find);
+            pages || edges || textSize || zoom || pageJump || fitWidth || find);
     }
 
     private static Visibility Show(bool visible) =>
@@ -173,7 +176,7 @@ public sealed partial class ReaderToolbar : UserControl
             }
             foreach (Control command in new Control[]
             {
-                PreviousPage, NextPage, SmallerText, LargerText,
+                PageStart, PreviousPage, NextPage, PageEnd, SmallerText, LargerText,
                 ZoomOut, ZoomIn, GoToPage, FitToWidth, FindInGuide
             })
             {
@@ -191,6 +194,12 @@ public sealed partial class ReaderToolbar : UserControl
 
     private async void NextPageClicked(object sender, RoutedEventArgs args) =>
         await ExecuteAsync(new PageTurnAction(1), "turn to the next page");
+
+    private async void PageStartClicked(object sender, RoutedEventArgs args) =>
+        await ExecuteAsync(new PageEdgeAction(ReaderEdge.Start), "go to the start");
+
+    private async void PageEndClicked(object sender, RoutedEventArgs args) =>
+        await ExecuteAsync(new PageEdgeAction(ReaderEdge.End), "go to the end");
 
     private async void SmallerTextClicked(object sender, RoutedEventArgs args) =>
         await ExecuteAsync(new TextSizeAction(0.9), "make the text smaller");
