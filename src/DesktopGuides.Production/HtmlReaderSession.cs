@@ -72,7 +72,10 @@ internal sealed class HtmlReaderSession : IReaderSession
         {
             Directory.CreateDirectory(profile);
             environment = await CoreWebView2Environment.CreateWithOptionsAsync(
-                null, profile, new CoreWebView2EnvironmentOptions());
+                null, profile, new CoreWebView2EnvironmentOptions
+                {
+                    AdditionalBrowserArguments = HtmlBrowserEnvironment.Arguments,
+                });
             await View.EnsureCoreWebView2Async(environment);
         }
         catch (Exception error) when (error is not OperationCanceledException)

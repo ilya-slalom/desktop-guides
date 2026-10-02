@@ -1462,8 +1462,8 @@ try {
                 throw "The guide page did not show '$name'. WebView2 processes (pid<-parent): $($webViews -join ', ')."
             }
 
-            # Diagnostic: canary log line counts at each step, to attribute
-            # guide-originated connections.
+            # Non-asserting diagnostic: canary log line counts at each step,
+            # so any guide-originated connection can be attributed to a step.
             $canaryLog = Join-Path (Split-Path -Parent $ResultPath) 'html-canary.log'
             $report.canaryLines = @()
             function Mark-CanaryLines([string] $step) {
@@ -1490,6 +1490,14 @@ try {
             # The meta refresh fires after one second. It isn't
             # user-initiated, so it is cancelled without the bar (R9).
             Mark-CanaryLines 'loaded-a'
+            # Non-asserting diagnostic: the runtime version and whether the
+            # browser process started with the session's proxy arguments.
+            $browser = @(Get-CimInstance Win32_Process -Filter (
+                "ParentProcessId = $ProcessId AND Name = 'msedgewebview2.exe'")) | Select-Object -First 1
+            if ($browser -and $browser.ExecutablePath) {
+                $report.webView2Runtime = (Get-Item -LiteralPath $browser.ExecutablePath).VersionInfo.ProductVersion
+                $report.webView2ProxyArguments = [bool] ($browser.CommandLine -match [regex]::Escape('--proxy-bypass-list=<-loopback>'))
+            }
             Start-Sleep -Seconds 2
             Assert-NoExternalLinkBar 'the meta refresh'
             [void](Wait-PageName 'Canary guide A loaded')
