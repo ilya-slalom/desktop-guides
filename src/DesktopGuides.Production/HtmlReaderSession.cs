@@ -142,7 +142,7 @@ internal sealed class HtmlReaderSession : IReaderSession
 
     private async void OnWebResourceRequested(CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs args)
     {
-        CoreWebView2Deferral deferral = args.GetDeferral();
+        Windows.Foundation.Deferral deferral = args.GetDeferral();
         try
         {
             string context = args.ResourceContext.ToString();
