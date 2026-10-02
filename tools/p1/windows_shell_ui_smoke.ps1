@@ -1516,7 +1516,9 @@ try {
             Invoke-ReaderCommand 'Next page'
             $anchor = Wait-TopLineChange 1 'Next page before resizing'
             $window = $root.Current.BoundingRectangle
-            Resize-ShellWindow ([int]$window.Width) ([int]($window.Height - 160))
+            # Half the list's height: fewer rows fit, but some stay on screen.
+            $shrink = [int]((Find-ById 'ReaderTextLines').Current.BoundingRectangle.Height / 2)
+            Resize-ShellWindow ([int]$window.Width) ([int]($window.Height - $shrink))
             Wait-TopLine $anchor 'A shorter window'
             Resize-ShellWindow ([int]$window.Width) ([int]$window.Height)
             Wait-TopLine $anchor 'The restored window'
