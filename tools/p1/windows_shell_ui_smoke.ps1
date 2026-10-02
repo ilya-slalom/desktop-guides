@@ -1566,42 +1566,19 @@ try {
 
             # txt-resize: near the end, a taller window clamps the top line;
             # shrinking again brings the kept line back.
-            # DIAGNOSTIC (temporary): trace the top line and vertical scroll per step.
-            $report.txtPosition.resizeTrace = [System.Collections.Generic.List[string]]::new()
-            $resizeClock = [System.Diagnostics.Stopwatch]::StartNew()
-            function Trace-Resize([string] $label, [int] $samples = 1) {
-                $vscroll = (Find-ById 'ReaderTextLines').GetCurrentPattern(
-                    [System.Windows.Automation.ScrollPattern]::Pattern)
-                for ($i = 0; $i -lt $samples; $i++) {
-                    if ($i -gt 0) { Start-Sleep -Milliseconds 100 }
-                    $top = try { Get-TopLine } catch { -1 }
-                    $listRect = (Find-ById 'ReaderTextLines').Current.BoundingRectangle
-                    $report.txtPosition.resizeTrace.Add(('{0} t={1} top={2} v%={3:N2} vsize={4:N2} listH={5}' -f
-                        $label, $resizeClock.ElapsedMilliseconds, $top,
-                        $vscroll.Current.VerticalScrollPercent, $vscroll.Current.VerticalViewSize,
-                        [int]$listRect.Height))
-                }
-            }
             $window = $root.Current.BoundingRectangle
             $listHeight = (Find-ById 'ReaderTextLines').Current.BoundingRectangle.Height
             $rowHeight = Get-TopRowHeight
             # Leave about three rows, so the shorter page step ends past the taller window's last top line.
             $shrink = [int]($listHeight - 3.5 * $rowHeight)
-            Trace-Resize 'start'
             Resize-ShellWindow ([int]$window.Width) ([int]($window.Height - $shrink))
-            Trace-Resize 'shrunk'
             Invoke-ReaderCommand 'Go to end'
             $shortEnd = Wait-TopLineChange 1 'Go to end in a shorter window'
-            Trace-Resize 'end'
             Invoke-ReaderCommand 'Previous page'
             $anchor = Wait-TopLineChange $shortEnd 'Previous page in a shorter window'
-            Trace-Resize 'previous'
             Resize-ShellWindow ([int]$window.Width) ([int]$window.Height)
-            Trace-Resize 'grown' 10
             $clamped = Wait-TopLineChange $anchor 'The taller window'
-            Trace-Resize 'clamped'
             Resize-ShellWindow ([int]$window.Width) ([int]($window.Height - $shrink))
-            Trace-Resize 'shrunk-again' 10
             Wait-TopLine $anchor 'A shorter window again'
             $report.txtPosition.resizeTopLines = @($anchor, $clamped)
             Resize-ShellWindow ([int]$window.Width) ([int]$window.Height)
