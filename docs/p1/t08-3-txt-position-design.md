@@ -282,12 +282,16 @@ Where the build differs from the design above:
   now re-measures when `CellProbe` raises `SizeChanged` with a new height,
   which happens only after the new size is in effect. The test hook now
   changes only the probe's font size, so CI exercises that same path.
-- **Resize re-applies only a moved anchor.** `OnSizeChanged` calls
-  `ScrollToLine(anchorLine)` only when `FirstVisibleIndex != anchorLine`,
-  as the design says; the first version re-applied it on every size change.
-  A follow-up check (`txt-horizontal`) showed `ScrollIntoView` keeps the
-  sideways scroll for paging, Go to start and resizing, so the view doesn't
-  restore it.
+- **Resize always re-applies the anchor.** The design's condition
+  (`FirstVisibleIndex != anchorLine`) doesn't work: `SizeChanged` comes
+  before the list's layout clamps its offset, so the top line hasn't moved
+  yet and the guard skips the re-apply. The clamp's `ViewChanged` then
+  overwrites the anchor. CI run
+  [36971561074](https://github.com/ilya-slalom/desktop-guides/actions/runs/36971561074)
+  showed this: with the guard, `txt-resize` came back to line 392 instead
+  of 394. A follow-up check (`txt-horizontal`) showed `ScrollIntoView`
+  keeps the sideways scroll for paging, Go to start and resizing, so the
+  re-apply doesn't need to restore it.
 - **The normal-mode shell smoke** still asserted that the TXT reader had no
   commands (a T08.2 check); it now requires the four TXT commands.
 

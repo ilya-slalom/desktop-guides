@@ -209,9 +209,10 @@ public sealed partial class TextReaderView : UserControl
 
     private void OnSizeChanged(object sender, SizeChangedEventArgs args)
     {
-        // Only a clamped offset moves the top line; re-applying an unmoved
-        // anchor would just scroll again.
-        if (Lines.ItemsSource is not null && FirstVisibleIndex != anchorLine)
+        // Always, even if the top line hasn't moved yet: SizeChanged comes
+        // before the list's layout clamps its offset, and the re-apply holds
+        // the anchor through that clamp.
+        if (Lines.ItemsSource is not null)
         {
             ScrollToLine(anchorLine);
         }
