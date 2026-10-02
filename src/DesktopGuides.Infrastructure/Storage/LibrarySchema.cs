@@ -2,7 +2,7 @@ namespace DesktopGuides.Infrastructure.Storage;
 
 internal static class LibrarySchema
 {
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     public const string Version1 = """
         CREATE TABLE Games (
@@ -91,10 +91,24 @@ internal static class LibrarySchema
         PRAGMA user_version = 3;
         """;
 
+    public const string Version4 = """
+        CREATE TABLE GuideAssets (
+            GuideId TEXT NOT NULL REFERENCES Guides(Id) ON DELETE CASCADE,
+            RequestPath TEXT NOT NULL,
+            RelativePath TEXT NOT NULL,
+            Kind TEXT NOT NULL CHECK (Kind IN ('EntryHtml', 'StyleSheet', 'Image')),
+            ByteCount INTEGER NOT NULL CHECK (ByteCount >= 0),
+            Sha256 TEXT NOT NULL CHECK (length(Sha256) = 64),
+            PRIMARY KEY (GuideId, RequestPath)
+        );
+        PRAGMA user_version = 4;
+        """;
+
     public static readonly (int Version, string Sql)[] Migrations =
     [
         (1, Version1),
         (2, Version2),
-        (3, Version3)
+        (3, Version3),
+        (4, Version4)
     ];
 }

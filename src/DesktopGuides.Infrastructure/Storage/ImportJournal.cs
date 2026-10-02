@@ -1,3 +1,4 @@
+using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
 
 namespace DesktopGuides.Infrastructure.Storage;
@@ -21,4 +22,4 @@ internal interface IImportJournal
 internal sealed record NewImportedGuide(
     Guid OperationId, Guid Id, Guid GameId, string Title, GuideFormat Format,
     string PrimaryRelativePath, string ContentSha256, long ContentBytes,
-    string? SourceLabel, int? TextCodePage);
+    string? SourceLabel, int? TextCodePage, IReadOnlyList<GuideAsset>? Assets = null);

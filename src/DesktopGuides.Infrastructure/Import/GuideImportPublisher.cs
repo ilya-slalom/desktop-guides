@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Paths;
@@ -121,7 +122,8 @@ public sealed class GuideImportPublisher
                 new NewImportedGuide(
                     operationId, guideId, gameId, title, manifest.Format, plan.PrimaryRelativePath,
                     fingerprint, plan.TotalBytes, manifest.Source.FileName,
-                    (manifest as TxtImportManifest)?.CodePage),
+                    (manifest as TxtImportManifest)?.CodePage,
+                    plan.Html?.Manifest.Assets.Select(ToGuideAsset).ToArray() ?? []),
                 () => checkpoint(ImportCheckpoint.InCommit));
             return guideId;
         }
@@ -148,6 +150,17 @@ public sealed class GuideImportPublisher
         checkpoint(point);
         token.ThrowIfCancellationRequested();
     }
+
+    private static GuideAsset ToGuideAsset(StaticAsset asset) => new(
+        asset.RequestRelativePath, asset.RelativePath,
+        asset.Kind switch
+        {
+            StaticAssetKind.EntryHtml => GuideAssetKind.EntryHtml,
+            StaticAssetKind.StyleSheet => GuideAssetKind.StyleSheet,
+            StaticAssetKind.Image => GuideAssetKind.Image,
+            _ => throw new InvalidDataException("An HTML asset has no reader kind.")
+        },
+        asset.ByteCount, asset.Sha256);
 
     private static void CheckNotDuplicate(IImportJournal journal, ImportManifest manifest, Guid gameId)
     {

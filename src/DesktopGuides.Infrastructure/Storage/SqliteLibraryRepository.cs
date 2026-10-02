@@ -1,3 +1,4 @@
+using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Paths;
 using DesktopGuides.Core.Providers;
@@ -345,6 +346,28 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         {
             using SqliteConnection connection = OpenConnection();
             return GetGuide(connection, guideId);
+        }, token);
+
+    public Task<IReadOnlyList<GuideAsset>> GetGuideAssetsAsync(Guid guideId, CancellationToken token = default) =>
+        ReadAsync<IReadOnlyList<GuideAsset>>(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT RequestPath, RelativePath, Kind, ByteCount, Sha256
+                FROM GuideAssets WHERE GuideId = $id ORDER BY RequestPath
+                """;
+            command.Parameters.AddWithValue("$id", guideId.ToString("N"));
+            using SqliteDataReader reader = command.ExecuteReader();
+            List<GuideAsset> assets = [];
+            while (reader.Read())
+            {
+                assets.Add(new GuideAsset(
+                    reader.GetString(0), reader.GetString(1),
+                    Enum.Parse<GuideAssetKind>(reader.GetString(2)),
+                    reader.GetInt64(3), reader.GetString(4)));
+            }
+            return assets;
         }, token);
 
     private static Guide? GetGuide(SqliteConnection connection, Guid guideId)
@@ -890,6 +913,22 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             insert.Parameters.AddWithValue("$codePage", (object?)guide.TextCodePage ?? DBNull.Value);
             insert.Parameters.AddWithValue("$now", owner.clock.GetUtcNow().ToUnixTimeMilliseconds());
             insert.ExecuteNonQuery();
+            foreach (GuideAsset asset in guide.Assets ?? [])
+            {
+                using SqliteCommand row = connection.CreateCommand();
+                row.Transaction = transaction;
+                row.CommandText = """
+                    INSERT INTO GuideAssets (GuideId, RequestPath, RelativePath, Kind, ByteCount, Sha256)
+                    VALUES ($id, $request, $relative, $kind, $bytes, $sha)
+                    """;
+                row.Parameters.AddWithValue("$id", id);
+                row.Parameters.AddWithValue("$request", asset.RequestPath);
+                row.Parameters.AddWithValue("$relative", asset.RelativePath);
+                row.Parameters.AddWithValue("$kind", asset.Kind.ToString());
+                row.Parameters.AddWithValue("$bytes", asset.ByteCount);
+                row.Parameters.AddWithValue("$sha", asset.Sha256);
+                row.ExecuteNonQuery();
+            }
             using SqliteCommand remove = connection.CreateCommand();
             remove.Transaction = transaction;
             remove.CommandText = """
