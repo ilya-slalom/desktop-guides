@@ -1,6 +1,10 @@
 # T08.2 Virtualized TXT view design
 
-Status: design approved in brainstorming on 1 October 2026.
+Status: design approved in brainstorming on 1 October 2026;
+implementation planned in [t08-2-txt-view-plan.md](t08-2-txt-view-plan.md)
+and verified in CI run
+[36946245355](https://github.com/ilya-slalom/desktop-guides/actions/runs/36946245355)
+(see the [verification record](#t082-verification-record)).
 Prerequisite T08.1 is merged (PR #28, merge commit `da1e975`).
 
 ## Intent
@@ -250,3 +254,41 @@ measure is within 20% of its threshold.
 The PR names T08.2, its prerequisite T08.1 (merged, PR #28), and the
 outcome: TXT guides open in a virtualized fixed-width Reader view with
 light and dark screenshots, and the `txt-long` measures beside P0's.
+
+## T08.2 verification record
+
+- **Unit tests.** On `pcsx2-win`, Core 371/371 and Infrastructure 438/438
+  passed, and the Production build had 0 warnings.
+- **Installed.** CI run
+  [36946245355](https://github.com/ilya-slalom/desktop-guides/actions/runs/36946245355)
+  on `0042155` passed every job, `production-shell-ui` included:
+  - `txt-reader`, light and dark: `txt-ascii`, `txt-tabs`, `txt-legacy`,
+    `txt-long`, `txt-missing`, `html-placeholder` and `txt-reopen`. The
+    full 2,064-character row names on txt-ascii matched, so no truncation
+    was seen.
+  - `txt-long` against P0 (902 ms to first text, 98 rows realized):
+
+    | Measure | Light | Dark | Limit |
+    |---|---|---|---|
+    | First text | 133 ms | 138 ms | 3,000 ms |
+    | Rows realized after open | 35 | 26 | 300 |
+    | Rows realized after 8 large scrolls | 56 | 56 | 300 |
+    | Slowest `WM_NULL` response | 3 ms | 0 ms | under 2 over 500 ms |
+    | Response timeouts | 0 | 0 | 0 |
+
+  - Back during a held load: `txt-load-paused`, `txt-back-during-load` and
+    `txt-load-released`. Back reached the Game page while the load was
+    held at the `TextLoad` gate, and the released load reported nothing.
+- **Not seen.** The gated back-during-load modes were never run against
+  the code before `7888504`, so their failure on the old queueing is
+  argued, not observed.
+- **CI fixes.** Run
+  [36885091223](https://github.com/ilya-slalom/desktop-guides/actions/runs/36885091223)
+  failed because the smoke window showed only two or three of the six
+  seeded guides and Tab Table Guide was off screen; `0042155` scrolls each
+  guide into view before opening it.
+- **Evidence.** ASCII Map Guide:
+  [light](evidence/t08-2-txt-view/txt-reader-light.png) and
+  [dark](evidence/t08-2-txt-view/txt-reader-dark.png).
+- **Follow-up.** Rows clip after a Windows text-size change until the
+  guide is reopened: issue #29.
