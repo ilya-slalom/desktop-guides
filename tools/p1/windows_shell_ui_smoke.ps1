@@ -1455,6 +1455,65 @@ try {
                     catch [System.Windows.Automation.ElementNotAvailableException] {
                     }
                 }
+                # Diagnostic: the Chromium windows and what UIA sees from them.
+                try {
+                    Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class DesktopGuidesWindowList
+{
+    private delegate bool EnumProc(IntPtr window, IntPtr data);
+    [DllImport("user32.dll")] private static extern bool EnumWindows(EnumProc proc, IntPtr data);
+    [DllImport("user32.dll")] private static extern bool EnumChildWindows(IntPtr parent, EnumProc proc, IntPtr data);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder name, int count);
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+    [DllImport("user32.dll")] private static extern IntPtr GetParent(IntPtr window);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
+    public static List<string> Describe(out List<IntPtr> handles)
+    {
+        List<string> lines = new List<string>();
+        List<IntPtr> found = new List<IntPtr>();
+        EnumProc child = null;
+        child = (window, data) =>
+        {
+            StringBuilder name = new StringBuilder(256);
+            GetClassName(window, name, 256);
+            uint pid;
+            GetWindowThreadProcessId(window, out pid);
+            string text = name.ToString();
+            if (text.StartsWith("Chrome") || text.Contains("WebView") || text.Contains("Intermediate"))
+            {
+                lines.Add(string.Format("{0}:{1}:pid{2}:parent{3}:vis{4}", window, text, pid, GetParent(window), IsWindowVisible(window)));
+                found.Add(window);
+            }
+            return true;
+        };
+        EnumWindows((window, data) => { child(window, data); EnumChildWindows(window, child, IntPtr.Zero); return true; }, IntPtr.Zero);
+        handles = found;
+        return lines;
+    }
+}
+'@ -ErrorAction SilentlyContinue
+                    $handles = $null
+                    $lines = [DesktopGuidesWindowList]::Describe([ref] $handles)
+                    $found.Add("HWNDS: $($lines -join ' ; ')")
+                    foreach ($handle in $handles) {
+                        try {
+                            $element = [System.Windows.Automation.AutomationElement]::FromHandle($handle)
+                            $all = $element.FindAll($scope, [System.Windows.Automation.Condition]::TrueCondition)
+                            $names = @($all | Select-Object -First 15 | ForEach-Object { $_.Current.Name } | Where-Object { $_ })
+                            $found.Add("FROM $handle count=$($all.Count) names=$($names -join '|')")
+                        }
+                        catch {
+                            $found.Add("FROM $handle error=$($_.Exception.Message)")
+                        }
+                    }
+                }
+                catch {
+                    $found.Add("HWND diagnostic failed: $($_.Exception.Message)")
+                }
                 return ($found -join ' ')
             }
 
