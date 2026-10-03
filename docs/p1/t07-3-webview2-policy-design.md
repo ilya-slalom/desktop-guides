@@ -365,7 +365,8 @@ launches matched). The WebView2 runtime on the runner was 153.0.4234.48.
 - **`base href`.** Ignored under `base-uri 'none'`; local files were served at
   the guide's own origin.
 - **Served sets.** Guide A served `guide.html`, `images/a.png` and
-  `style.css`. Guide B served `guide.html`, `images/b.png` and `style.css`,
+  `style.css`. Guide B (before its title-derived rename, below) served
+  `guide.html`, `images/b.png` and `style.css`,
   with nothing denied. `external-launches.json` held only
   `https://example.com/desktop-guides-canary`; the `target=_blank` link to
   `example.org` was dismissed.
@@ -392,6 +393,14 @@ launches matched). The WebView2 runtime on the runner was 153.0.4234.48.
   (Fandom, IGN, GameFAQs), so without the proxy real imports would likely
   have leaked TCP connects when online. This is an expectation, not a
   measurement of those sites.
+- **Title-derived names.** Canary guide B is now a Save Page As layout named
+  after its page title: `Canary Guide B (PS1) - Walkthrough's 100% Café – v2.html`
+  beside its `_files` companion. The `%` makes the import alias the
+  entry to `guide.html`; the companion keeps its source name. Navigation
+  matches the entry by decoded path (scheme, host, port and query unchanged),
+  because Chromium can report `( ) '` literal where `EntryUri` escapes them.
+  Run 37081967040 passed; both passes served B's two `_files` assets and
+  `guide.html`, and the canary log stayed at 1.
 
 ## Verification
 
