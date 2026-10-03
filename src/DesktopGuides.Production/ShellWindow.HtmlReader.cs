@@ -40,6 +40,7 @@ public sealed partial class ShellWindow
         // The next render disposes it if this one is cancelled.
         readerSession = session;
         session.ExternalLinkRequested += OnExternalLinkRequested;
+        session.Failed += OnReaderSessionFailed;
         ShowReaderSurface(placeholder: false, view: session.View);
         try
         {
@@ -73,8 +74,27 @@ public sealed partial class ShellWindow
     private void ShowHtmlLoadError(HtmlGuideLoadError error)
     {
         string message = HtmlGuideLoadMessages.For(error);
-        ShowReaderSurface(placeholder: false, error: message);
+        ShowReaderSurface(placeholder: false, error: message, action: HtmlGuideLoadMessages.ActionFor(error));
         ShowWarningStatus(message);
+    }
+
+    // A late event from a session that a newer render replaced is ignored.
+    private async void OnReaderSessionFailed(object? sender, HtmlGuideLoadError error)
+    {
+        await RunNavigationAsync(async () =>
+        {
+            if (!ReferenceEquals(sender, readerSession))
+            {
+                return;
+            }
+            IReaderSession failed = readerSession!;
+            readerSession = null;
+            ReaderActions.SetSession(null);
+            HideExternalLinkBar();
+            ShowReaderSurface(placeholder: false);
+            await failed.DisposeAsync();
+            ShowHtmlLoadError(error);
+        });
     }
 
     // A newer link replaces the URL in an open bar.
@@ -102,7 +122,15 @@ public sealed partial class ShellWindow
     {
         Uri? uri = pendingExternalLink;
         HideExternalLinkBar();
-        if (uri is null || cacheRoot is null)
+        if (uri is not null)
+        {
+            await LaunchExternalAsync(uri);
+        }
+    }
+
+    private async Task LaunchExternalAsync(Uri uri)
+    {
+        if (cacheRoot is null)
         {
             return;
         }
@@ -118,6 +146,28 @@ public sealed partial class ShellWindow
         if (!launched)
         {
             ShowWarningStatus("This link couldn't be opened.");
+        }
+    }
+
+    private async void ReaderLoadErrorActionClicked(object sender, RoutedEventArgs args)
+    {
+        int generation = readerErrorGeneration;
+        switch (readerErrorAction)
+        {
+            case HtmlGuideLoadAction.GetRuntime:
+                await LaunchExternalAsync(new Uri(HtmlGuideLoadMessages.RuntimeDownloadUrl));
+                break;
+            case HtmlGuideLoadAction.Reopen:
+                // A click queued behind a navigation away does nothing.
+                await RunNavigationAsync(async () =>
+                {
+                    if (generation != renderGeneration || navigator.Current is not ReaderRoute)
+                    {
+                        return;
+                    }
+                    await RenderCurrentAsync();
+                });
+                break;
         }
     }
 

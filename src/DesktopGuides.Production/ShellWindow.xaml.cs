@@ -1,3 +1,4 @@
+using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Navigation;
@@ -52,6 +53,8 @@ public sealed partial class ShellWindow : Window
     private bool libraryFocusPending;
     private int libraryFocusGeneration = -1;
     private int renderGeneration;
+    private HtmlGuideLoadAction readerErrorAction;
+    private int readerErrorGeneration;
     private long gameGuideIntentVersion;
     private long statusSequence;
     private bool settingGuideSelection;
@@ -274,6 +277,9 @@ public sealed partial class ShellWindow : Window
                 AppDataRoot.HasPackageIdentity(),
                 () => ApplicationData.Current.LocalCacheFolder.Path,
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+            // The library lease is held, so no live session owns a profile here.
+            string sweptRoot = cacheRoot;
+            await Task.Run(() => WebView2ProfileSweeper.Sweep(sweptRoot));
             providers = new ProviderServices(dataRoot);
             await ProviderSettings.InitializeAsync(providers);
             importer = providers.CreateImporter(repository, artwork);
@@ -1245,12 +1251,23 @@ public sealed partial class ShellWindow : Window
     private bool IsSupersededGameGuideIntent(long? intentVersion) =>
         intentVersion is long version && version != gameGuideIntentVersion;
 
-    private void ShowReaderSurface(bool placeholder, string? error = null, UIElement? view = null)
+    private void ShowReaderSurface(
+        bool placeholder, string? error = null, UIElement? view = null,
+        HtmlGuideLoadAction action = HtmlGuideLoadAction.None)
     {
         ReaderPlaceholder.Visibility = placeholder ? Visibility.Visible : Visibility.Collapsed;
         ReaderLoadError.Text = error ?? string.Empty;
         ReaderLoadError.Visibility = error is null ? Visibility.Collapsed : Visibility.Visible;
+        readerErrorAction = error is null ? HtmlGuideLoadAction.None : action;
+        readerErrorGeneration = renderGeneration;
+        ReaderLoadErrorAction.Content = readerErrorAction == HtmlGuideLoadAction.None
+            ? null
+            : HtmlGuideLoadMessages.ActionLabel(readerErrorAction);
+        ReaderLoadErrorAction.Visibility = readerErrorAction == HtmlGuideLoadAction.None
+            ? Visibility.Collapsed
+            : Visibility.Visible;
         ReaderSurface.Content = view;
+        ReaderSurface.Visibility = view is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     // A render holds the navigation queue while its TXT guide loads, so a
