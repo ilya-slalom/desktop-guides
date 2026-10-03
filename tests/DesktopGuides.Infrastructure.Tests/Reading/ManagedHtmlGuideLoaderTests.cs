@@ -59,13 +59,57 @@ public sealed class ManagedHtmlGuideLoaderTests
     }
 
     [Fact]
-    public async Task MissingEntryIsChanged()
+    public async Task MissingEntryIsMissing()
     {
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         Guide guide = await PublishAsync(harness);
         File.Delete(harness.Paths.ResolveExistingGuideFile(guide.Id, "guide.html"));
 
+        Assert.Equal(HtmlGuideLoadError.Missing, await FailedAsync(harness, guide));
+    }
+
+    [Fact]
+    public async Task DeletedGuideFolderIsMissing()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        Guide guide = await PublishAsync(harness);
+        Directory.Delete(harness.Paths.GetGuideRoot(guide.Id), recursive: true);
+
+        Assert.Equal(HtmlGuideLoadError.Missing, await FailedAsync(harness, guide));
+    }
+
+    [Fact]
+    public async Task EntryThatIsAFolderIsChanged()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        Guide guide = await PublishAsync(harness);
+        string entry = harness.Paths.ResolveExistingGuideFile(guide.Id, "guide.html");
+        File.Delete(entry);
+        Directory.CreateDirectory(entry);
+
         Assert.Equal(HtmlGuideLoadError.Changed, await FailedAsync(harness, guide));
+    }
+
+    [Fact]
+    public async Task GuideFolderThatIsALinkIsChanged()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        Guide guide = await PublishAsync(harness);
+        string root = harness.Paths.GetGuideRoot(guide.Id);
+        string elsewhere = Path.Combine(Path.GetTempPath(), "desktop-guides-link-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.Move(root, elsewhere);
+            RemovalLibrary.CreateJunction(root, elsewhere);
+
+            Assert.Equal(HtmlGuideLoadError.Changed, await FailedAsync(harness, guide));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root);
+            if (Directory.Exists(elsewhere)) Directory.Delete(elsewhere, recursive: true);
+        }
     }
 
     [Fact]

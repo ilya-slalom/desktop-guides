@@ -956,7 +956,7 @@ function Get-HtmlCanaryLines([string] $logPath) {
     return @(Get-Content -LiteralPath $logPath)
 }
 
-function Invoke-HtmlReaderPass([string] $resultName) {
+function Invoke-HtmlReaderPass([string] $resultName, [string] $mode = 'html-reader', [switch] $NoRuntime) {
     Start-InstalledShell
     $processId = $report.launchedProcessId
     $diagnosticsGate = [System.Threading.EventWaitHandle]::new(
@@ -965,11 +965,19 @@ function Invoke-HtmlReaderPass([string] $resultName) {
     $launchGate = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
         "Local\DesktopGuides.Preview.ExternalLaunch.$processId")
+    # Points the runtime probe at an empty folder, as on a PC without WebView2.
+    $runtimeGate = $null
+    if ($NoRuntime) {
+        $runtimeGate = [System.Threading.EventWaitHandle]::new(
+            $false, [System.Threading.EventResetMode]::ManualReset,
+            "Local\DesktopGuides.Preview.WebView2Missing.$processId")
+    }
     try {
-        $report.htmlReader[$resultName] = Run-ShellSmoke 'html-reader' -ResultName $resultName
+        $report.htmlReader[$resultName] = Run-ShellSmoke $mode -ResultName $resultName
         Close-InstalledShell
     }
     finally {
+        if ($runtimeGate) { $runtimeGate.Dispose() }
         $launchGate.Dispose()
         $diagnosticsGate.Dispose()
     }
@@ -983,47 +991,46 @@ function Save-HtmlDiagnostics([string] $resultName, [string] $cacheRoot) {
     }
 }
 
-function Assert-HtmlReaderPass([string] $pass, [string] $cacheRoot, $ids, [string] $logPath, [int] $baseline) {
-    # R19: isolation is shown by exactly what each guide served. Deny counts
-    # are kept as evidence only, because the CSP can stop a reference before
-    # the request handler sees it.
+function Assert-HtmlReaderPass(
+    [string] $pass, [string] $cacheRoot, $expectedSessions, [string[]] $expectedLaunches,
+    [string] $logPath, [int] $baseline) {
+    # R19: isolation is shown by exactly what each session served. Deny
+    # counts are kept as evidence only, because the CSP can stop a
+    # reference before the request handler sees it.
     $diagnostics = Join-Path $cacheRoot 'diagnostics'
-    # Guide B is a Save Page As export named after its page title. The '%'
-    # makes the import alias its entry to guide.html; its companion folder
-    # keeps the source name. Non-ASCII characters are built so this file
-    # stays ASCII.
-    $titleB = "Canary Guide B (PS1) - Walkthrough's 100% Caf" + [char]0x00E9 + ' ' + [char]0x2013 + ' v2'
-    $expected = @{
-        $ids.guideA = 'guide.html,images/a.png,style.css'
-        $ids.guideB = "${titleB}_files/b.png,${titleB}_files/style.css,guide.html"
-    }
+    $remaining = [System.Collections.ArrayList]::new()
+    foreach ($expected in $expectedSessions) { [void]$remaining.Add($expected) }
     $files = @(Get-ChildItem -LiteralPath $diagnostics -Filter 'html-session-*.json' -ErrorAction SilentlyContinue)
-    if ($files.Count -ne 2) {
-        throw "The $pass pass wrote $($files.Count) HTML session diagnostics; expected 2."
+    if ($files.Count -ne $remaining.Count) {
+        throw "The $pass pass wrote $($files.Count) HTML session diagnostics; expected $($remaining.Count)."
     }
     $sessions = @()
     foreach ($file in $files) {
         $session = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json
-        if (-not $expected.ContainsKey($session.guideId)) {
-            throw "The $pass pass wrote diagnostics for an unexpected or repeated guide $($session.guideId)."
-        }
         $served = @($session.served) -join ','
-        if ($served -cne $expected[$session.guideId]) {
-            throw "Guide $($session.guideId) served '$served' in the $pass pass; expected '$($expected[$session.guideId])'."
+        $match = $null
+        foreach ($candidate in $remaining) {
+            if ($candidate.guideId -eq $session.guideId -and $candidate.served -ceq $served) {
+                $match = $candidate
+                break
+            }
         }
-        $expected.Remove($session.guideId)
+        if (-not $match) {
+            throw "Guide $($session.guideId) served '$served' in the $pass pass, which matches no expected session."
+        }
+        $remaining.Remove($match)
         $sessions += $session
     }
 
     $launchesPath = Join-Path $diagnostics 'external-launches.json'
-    if (-not (Test-Path -LiteralPath $launchesPath)) {
-        throw "The $pass pass recorded no external launch."
+    $launches = @()
+    if (Test-Path -LiteralPath $launchesPath) {
+        # Two statements, so Windows PowerShell doesn't wrap the parsed array.
+        $launches = Get-Content -LiteralPath $launchesPath -Raw | ConvertFrom-Json
+        $launches = @($launches)
     }
-    # Two statements, so Windows PowerShell doesn't wrap the parsed array.
-    $launches = Get-Content -LiteralPath $launchesPath -Raw | ConvertFrom-Json
-    $launches = @($launches)
-    if ($launches.Count -ne 1 -or $launches[0] -cne 'https://example.com/desktop-guides-canary') {
-        throw "The $pass pass launched '$($launches -join ', ')'; expected only https://example.com/desktop-guides-canary."
+    if (($launches -join "`n") -cne ($expectedLaunches -join "`n")) {
+        throw "The $pass pass launched '$($launches -join ', ')'; expected '$($expectedLaunches -join ', ')'."
     }
 
     $newLines = @(Get-HtmlCanaryLines $logPath | Select-Object -Skip $baseline)
@@ -1038,8 +1045,9 @@ function Assert-HtmlReaderPass([string] $pass, [string] $cacheRoot, $ids, [strin
 }
 
 function Run-HtmlReaderScenarios {
-    # Each canary guide opens once with the loopback canary listening (light)
-    # and once with it stopped (dark): TR07.1-TR07.3.
+    # Each canary guide opens with the loopback canary listening (light) and
+    # stopped (dark): TR07.1-TR07.3. Both passes stop Guide B's renderer and
+    # reopen it. A third pass has no runtime and a deleted entry: TR09.2-TR09.3.
     $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
     $ids = Invoke-ShellSeed @('seed-html-reader', $dataRoot, $fixtureRoot) | ConvertFrom-Json
     $cacheRoot = Get-HtmlCacheRoot
@@ -1049,6 +1057,28 @@ function Run-HtmlReaderScenarios {
     Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
     $report.htmlReader = [ordered]@{ guideA = $ids.guideA; guideB = $ids.guideB }
+
+    # Guide B is a Save Page As export named after its page title. The '%'
+    # makes the import alias its entry to guide.html; its companion folder
+    # keeps the source name. Non-ASCII characters are built so this file
+    # stays ASCII.
+    $titleB = "Canary Guide B (PS1) - Walkthrough's 100% Caf" + [char]0x00E9 + ' ' + [char]0x2013 + ' v2'
+    $servedA = 'guide.html,images/a.png,style.css'
+    $servedB = "${titleB}_files/b.png,${titleB}_files/style.css,guide.html"
+    # html-crash: Guide B's stopped session and its reopened one.
+    $readerSessions = @(
+        @{ guideId = $ids.guideA; served = $servedA },
+        @{ guideId = $ids.guideB; served = $servedB },
+        @{ guideId = $ids.guideB; served = $servedB })
+    $readerLaunches = @('https://example.com/desktop-guides-canary')
+
+    # html-profile-sweep: startup removes a leftover profile and nothing else.
+    $profiles = Join-Path $cacheRoot 'WebView2'
+    $leftover = Join-Path $profiles ([Guid]::NewGuid().ToString('N'))
+    $keep = Join-Path $profiles 'keep-me'
+    New-Item -ItemType Directory -Force -Path $leftover, $keep | Out-Null
+    Set-Content -LiteralPath (Join-Path $leftover 'leftover.txt') -Value 'leftover' -Encoding ASCII
+
     $originalTheme = Get-AppThemePreference
     $canary = $null
     try {
@@ -1057,7 +1087,14 @@ function Run-HtmlReaderScenarios {
         Set-AppThemePreference $true
         Invoke-HtmlReaderPass 'html-reader-online'
         Save-HtmlDiagnostics 'html-reader-online' $cacheRoot
-        $report.htmlReader.online = Assert-HtmlReaderPass 'online' $cacheRoot $ids $logPath $baseline
+        if (Test-Path -LiteralPath $leftover) {
+            throw 'Startup left a leftover WebView2 profile in place.'
+        }
+        if (-not (Test-Path -LiteralPath $keep)) {
+            throw 'The profile sweep removed a folder that is not a profile.'
+        }
+        $report.htmlReader.profileSweep = 'removed'
+        $report.htmlReader.online = Assert-HtmlReaderPass 'online' $cacheRoot $readerSessions $readerLaunches $logPath $baseline
 
         Stop-HtmlCanary $canary
         $canary = $null
@@ -1069,10 +1106,24 @@ function Run-HtmlReaderScenarios {
         Set-AppThemePreference $false
         Invoke-HtmlReaderPass 'html-reader-offline'
         Save-HtmlDiagnostics 'html-reader-offline' $cacheRoot
-        $report.htmlReader.offline = Assert-HtmlReaderPass 'offline' $cacheRoot $ids $logPath $baseline
+        $report.htmlReader.offline = Assert-HtmlReaderPass 'offline' $cacheRoot $readerSessions $readerLaunches $logPath $baseline
+
+        # The loader runs before WebView2, so Guide B reports its deleted
+        # entry; Guide A's session fails at the runtime probe and serves nothing.
+        Remove-Item -LiteralPath $ids.guideBEntry -Force
+        Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
+        $canary = Start-HtmlCanary $logPath
+        $baseline = @(Get-HtmlCanaryLines $logPath).Count
+        Invoke-HtmlReaderPass 'html-runtime-missing' 'html-runtime-missing' -NoRuntime
+        Save-HtmlDiagnostics 'html-runtime-missing' $cacheRoot
+        $report.htmlReader.runtimeMissing = Assert-HtmlReaderPass 'runtime-missing' $cacheRoot `
+            @(@{ guideId = $ids.guideA; served = '' }) `
+            @('https://developer.microsoft.com/microsoft-edge/webview2/') $logPath $baseline
     }
     finally {
         Stop-HtmlCanary $canary
+        Remove-Item -LiteralPath $keep -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath (Join-Path $cacheRoot 'missing-runtime-test') -Recurse -Force -ErrorAction SilentlyContinue
         Restore-AppThemePreference $originalTheme
     }
 }

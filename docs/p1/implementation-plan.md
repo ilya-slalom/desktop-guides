@@ -796,7 +796,8 @@ A resize or a Windows text-size change keeps the top line, and the text-size
 change re-measures the rows (issue #29). CI run 36957516416 passed the
 installed `txt-reader` scenario in light and dark.
 
-T07.3 is in review in PR #34; see the
+T07.3 was merged through PR #34 on 3 October 2026 (merge commit `3339fc7`;
+final-HEAD CI run 37084631667); see the
 [design and verification record](t07-3-webview2-policy-design.md). Static
 HTML guides open in the Reader in a WebView2 at a per-guide
 `https://g<id>.guide.invalid` origin that serves only the import's saved
@@ -805,6 +806,12 @@ permissions, downloads and navigation away from the entry are denied; a
 website link is shown in a Reader bar and opens only through **Open in
 browser**. CI run 37058200440 passed the installed `html-reader` canary with
 the loopback canary listening and stopped, with zero recorded connections.
+
+T09.1 is in review in PR #35; see the
+[design and implementation notes](t09-1-html-adapter-design.md). It sweeps
+leftover WebView2 profiles at startup, tells a missing runtime, a failed
+start, a crash, a missing entry and a changed file apart, and offers
+**Get WebView2 Runtime** or **Reopen** where they help.
 
 ## M4 — progress, completion, and appearance
 

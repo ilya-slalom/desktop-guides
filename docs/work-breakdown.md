@@ -292,6 +292,8 @@ an explicit browser action. Resume works after reflow or theme/font changes,
 with a visible approximate fallback if the document changed.
 
 - **T09.1** Embed a restricted WebView2 reader for managed local content.
+  Implemented in PR #35; see
+  [p1/t09-1-html-adapter-design.md](p1/t09-1-html-adapter-design.md).
 - **T09.2** Apply host-owned theme/font styling without requiring page scripts.
 - **T09.3** Capture and restore document-relative path, visible text/element
   context, and scroll-ratio fallback.

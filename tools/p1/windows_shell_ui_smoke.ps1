@@ -12,7 +12,8 @@ param(
         'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
         'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted', 'txt-reader',
-        'txt-load-paused', 'txt-back-during-load', 'txt-load-released', 'html-reader')]
+        'txt-load-paused', 'txt-back-during-load', 'txt-load-released', 'html-reader',
+        'html-runtime-missing')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -1187,8 +1188,8 @@ try {
         # These modes continue a shell left on Reader, Game, or Library.
     }
     elseif ($Mode -in @('txt-reader', 'txt-load-paused', 'txt-back-during-load',
-        'txt-load-released', 'html-reader')) {
-        $textGame = if ($Mode -eq 'html-reader') { 'Web Reader Game' } else { 'Text Reader Game' }
+        'txt-load-released', 'html-reader', 'html-runtime-missing')) {
+        $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' } else { 'Text Reader Game' }
         $missingMessage = "This guide's file is missing from the library."
         $listItem = New-Object System.Windows.Automation.PropertyCondition(
             [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
@@ -1573,10 +1574,75 @@ try {
             Assert-NoExternalLinkBar 'opening Canary Guide B'
             $report.phases += 'html-canary-b'
 
+            # html-crash: a stopped renderer shows an error with Reopen,
+            # not a blank page, and Reopen opens the guide again.
+            Mark-CanaryLines 'before-crash'
+            $browsers = @(Get-CimInstance Win32_Process -Filter (
+                "ParentProcessId = $ProcessId AND Name = 'msedgewebview2.exe'") |
+                ForEach-Object { $_.ProcessId })
+            $renderers = @(foreach ($browser in $browsers) {
+                Get-CimInstance Win32_Process -Filter (
+                    "ParentProcessId = $browser AND Name = 'msedgewebview2.exe'") |
+                    Where-Object { $_.CommandLine -match '--type=renderer' }
+            })
+            if ($renderers.Count -eq 0) {
+                throw 'Canary Guide B has no WebView2 renderer to stop.'
+            }
+            foreach ($renderer in $renderers) {
+                Stop-Process -Id $renderer.ProcessId -Force -ErrorAction SilentlyContinue
+            }
+            [void](Wait-Name 'ReaderLoadError' 'This guide stopped responding.')
+            [void](Wait-Name 'ReaderLoadErrorAction' 'Reopen')
+            Assert-NoReaderCommands 'Canary Guide B (stopped)'
+            $report.htmlCrashScreenshot = Save-WindowScreenshot 'html-crash'
+            Invoke-Element (Find-ById 'ReaderLoadErrorAction')
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PageName 'Canary guide B loaded')
+            Assert-Absent 'ReaderLoadError'
+            Assert-Absent 'ReaderLoadErrorAction'
+            $report.phases += 'html-crash'
+
             Mark-CanaryLines 'opened-b'
             # Back closes the session, which writes its diagnostics.
             Back-ToTextGame
             Mark-CanaryLines 'closed-b'
+        }
+        elseif ($Mode -eq 'html-runtime-missing') {
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            Select-Element $textGame
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+
+            # html-runtime-missing: the guide names the missing runtime and
+            # offers Microsoft's page; the click goes to the test launcher.
+            Open-TextGuide 'Canary Guide A'
+            $runtimeMessage = 'Web page guides need the Microsoft Edge WebView2 Runtime.'
+            [void](Wait-Name 'ReaderLoadError' $runtimeMessage)
+            [void](Wait-Name 'ReaderLoadErrorAction' 'Get WebView2 Runtime')
+            Assert-NoReaderCommands 'Canary Guide A (no runtime)'
+            $report.htmlRuntimeMissingScreenshot = Save-WindowScreenshot 'html-runtime-missing'
+            Invoke-Element (Find-ById 'ReaderLoadErrorAction')
+            Start-Sleep -Seconds 1
+            [void](Wait-Name 'ReaderLoadError' $runtimeMessage)
+            $report.phases += 'html-runtime-missing'
+
+            # html-missing-entry: the loader runs before WebView2, so a
+            # deleted entry still says it is missing, with no action.
+            Back-ToTextGame
+            Open-TextGuide 'Canary Guide B'
+            [void](Wait-Name 'ReaderLoadError' $missingMessage)
+            Assert-Absent 'ReaderLoadErrorAction'
+            $report.phases += 'html-missing-entry'
+
+            # TXT guides still open, and show no HTML action.
+            Back-ToTextGame
+            Open-TextGuide 'Plain Text Guide'
+            [void](Wait-Status 'Guide ready.')
+            Assert-RowNames 'Plain Text Guide' $asciiNames
+            Assert-Absent 'ReaderLoadError'
+            Assert-Absent 'ReaderLoadErrorAction'
+            $report.phases += 'html-runtime-missing-txt'
+            Back-ToTextGame
         }
         else {
             # The view re-measures at a larger test font size on this signal.

@@ -468,10 +468,17 @@ if (args.Length == 3 && args[0] == "seed-html-reader")
 
         Guid guideB = await PublishCanaryAsync("b", "Canary Guide B", null);
         Guid guideA = await PublishCanaryAsync("a", "Canary Guide A", guideB);
+        // The runtime-missing pass checks that TXT guides still open.
+        await InsertTextGuideAsync(htmlPaths, htmlGame.Id, Guid.NewGuid(), "Plain Text Guide",
+            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            File.ReadAllBytes(Path.Combine(Path.GetFullPath(args[2]), "p0", "txt-ascii.txt")));
+        Guide seededB = (await htmlRepository.GetGuideAsync(guideB))!;
         Console.WriteLine(JsonSerializer.Serialize(new
         {
             guideA = guideA.ToString("N"),
             guideB = guideB.ToString("N"),
+            // The runtime-missing pass deletes it to show the Missing error.
+            guideBEntry = htmlPaths.ResolveExistingGuideFile(guideB, seededB.PrimaryRelativePath),
         }));
     }
     finally

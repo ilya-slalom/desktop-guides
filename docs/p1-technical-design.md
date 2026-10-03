@@ -673,6 +673,11 @@ project uses a provisional package identity until T17.1 sets the public one.
   cache profile that is disposed and later swept if WebView2 holds a lock.
   Refuse a missing/mismatched managed asset instead of falling back to a
   source path or network URL. TXT and PDF still open if WebView2 is missing.
+  See the [T09.1 design](p1/t09-1-html-adapter-design.md). The profile sweep
+  runs once at startup, after the library lease is held, and never per open.
+  `HtmlGuideLoadMessages` maps each error to its action: RuntimeMissing to
+  **Get WebView2 Runtime**; RuntimeFailed and Crashed to **Reopen**; Missing,
+  NoManifest and Changed to none.
 - **T09.2** Apply a fixed app-owned local style for system/light/dark theme
   and bounded per-guide text scale; never download fonts or theme assets.
   Preserve the source's static structure where possible and use high
