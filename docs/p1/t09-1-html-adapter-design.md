@@ -1,6 +1,6 @@
 # T09.1 Managed-guide HTML adapter design
 
-Status: implemented in PR #PRNUM; CI run 37124656045 passed the installed
+Status: implemented in PR #35; CI run 37125967628 passed the installed
 `html-reader` and `html-runtime-missing` scenarios.
 Prerequisites: T06.3 is merged (PR #19, merge commit `494cb02`); T07.3 is
 merged (PR #34, merge commit `3339fc7`).
@@ -341,7 +341,7 @@ Execution notes:
 
 ## Verification
 
-CI run 37124656045 passed `core-tests` and the installed `production-shell-ui`
+CI run 37125967628 passed `core-tests` and the installed `production-shell-ui`
 scenarios. Screenshots of the Reader error surface:
 
 - [Crash, light](evidence/t09-1-html-adapter/html-crash-light.png)
