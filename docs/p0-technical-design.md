@@ -307,6 +307,10 @@ the canary or any external origin, while local CSS/images and internal anchors
 still work. If WebView2 itself makes an unrelated runtime connection, record
 it separately rather than attributing it to the guide.
 
+P1 note: the P1 reader also starts every HTML session with a dead browser
+proxy, because Chromium preconnect sockets bypass the request handler and
+CSP; see the [T07.3 design](p1/t07-3-webview2-policy-design.md#implementation-notes).
+
 **T02.3 done when:** local assets display; the hostile fixture cannot fetch,
 redirect, open a new window, or escape the mapped root; and the static fixture
 restores to the same paragraph after reflow.

@@ -444,6 +444,11 @@ project uses a provisional package identity until T17.1 sets the public one.
   permissions/downloads, disabled document scripts/host objects/web messages,
   and fresh-profile canary tests remain mandatory. Fixed host DOM scripts
   check the current origin and validate returned JSON before storage.
+  Every HTML session also launches WebView2 with
+  `--proxy-server=http://0.0.0.0:9 --proxy-bypass-list=<-loopback>`, so
+  Chromium's own preconnect and predictor sockets fail at a dead proxy; the
+  CSP and `WebResourceRequested` never see them. See the T07.3
+  [Implementation notes](p1/t07-3-webview2-policy-design.md#implementation-notes).
 - Service errors have stable codes (`UnsupportedFormat`, `MissingSource`,
   `EncodingChoiceRequired`, `UnsafeAsset`, `MissingManagedFile`,
   `StorageUnavailable`, `PasswordRequired`, `PdfTextUnavailable`). UI copy
@@ -608,7 +613,11 @@ project uses a provisional package identity until T17.1 sets the public one.
   disable document scripts, host objects, and web messages. Internal
   fragments remain in the view. An external URL is canceled and shown in an
   app-owned confirmation bar; only its explicit Open action invokes the
-  system browser. A fresh-profile canary test covers HTML attributes,
+  system browser. The response
+  CSP stops most subresource references in the renderer before
+  `WebResourceRequested` runs, so the handler's deny counts are not the
+  isolation evidence; the served sets are (T07.3 design, R19). A
+  fresh-profile canary test covers HTML attributes,
   CSS imports, redirects, and attempted cross-guide URLs with zero
   guide-originated network requests.
 

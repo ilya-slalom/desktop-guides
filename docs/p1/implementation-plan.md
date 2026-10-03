@@ -787,13 +787,24 @@ passed the installed `txt-reader` scenario in light and dark, with
 `txt-long` first text at 133–138 ms and at most 56 realized rows. Rows clip
 after a Windows text-size change until the guide is reopened (#29).
 
-T08.3 is in review in PR #31; see the
+T08.3 was merged through PR #31 on 2 October 2026, merge commit `3157a19`,
+with follow-ups in PR #33, merge commit `e447597`; see the
 [design and verification record](t08-3-txt-position-design.md). TXT guides
 gain Go to start, Previous page, Next page and Go to end, and a Core
 `TextLocator` captures and restores the top line as an offset plus context.
 A resize or a Windows text-size change keeps the top line, and the text-size
 change re-measures the rows (issue #29). CI run 36957516416 passed the
 installed `txt-reader` scenario in light and dark.
+
+T07.3 is in review in PR #34; see the
+[design and verification record](t07-3-webview2-policy-design.md). Static
+HTML guides open in the Reader in a WebView2 at a per-guide
+`https://g<id>.guide.invalid` origin that serves only the import's saved
+`GuideAssets` rows, re-hashed on every request. Scripts, frames,
+permissions, downloads and navigation away from the entry are denied; a
+website link is shown in a Reader bar and opens only through **Open in
+browser**. CI run 37058200440 passed the installed `html-reader` canary with
+the loopback canary listening and stopped, with zero recorded connections.
 
 ## M4 — progress, completion, and appearance
 

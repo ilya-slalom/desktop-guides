@@ -1,7 +1,7 @@
 # T07.3 WebView2 manifest responder and deny rules design
 
-Status: design approved in brainstorming on 2 October 2026; implementation
-not yet planned.
+Status: implemented in PR #34; CI run 37058200440 passed
+`production-shell-ui`.
 Prerequisites: T06.3 is merged (PR #19, merge commit `494cb02`); T07.2 is
 merged (PR #10, merge commit `72f4378`); T11.2 is merged (M0).
 
@@ -299,14 +299,109 @@ loaded guide.
   media (unsupported in P1).
 - PDF reading (T10).
 
+## Planning rulings
+
+Rulings from [the plan](t07-3-webview2-policy-plan.md) that refine the spec.
+R4 and R19 change spec wording.
+
+- **R1.** Queries are ignored for lookup, not denied; a query never changes which file is served.
+- **R2.** No "no `%` after decoding" rule; a single decode of `%252e` matches no row.
+- **R3.** Portable cache root is `%LOCALAPPDATA%\DesktopGuides\Cache`; packaged uses `LocalCacheFolder`.
+- **R4.** The seeded "Web Page Guide" stays rowless as a pre-v4 import, phase `html-no-manifest`. **Changes spec wording:** replaces "ShellSeed writes rows for every HTML guide".
+- **R5.** Canary guides are seeded through the real `GuideImportPublisher` (`seed-html-reader`).
+- **R6.** Serving uses `ManagedPathResolver.ResolveExistingGuideFile`; the P0 `HtmlAssetPolicy` is unchanged.
+- **R7.** `GuideAssets` adds CHECK constraints on `Kind` and `length(Sha256)`.
+- **R8.** `GetGuideAssetsAsync` lives only on `SqliteLibraryRepository`.
+- **R9.** External navigation must be user-initiated; otherwise it is denied silently.
+- **R10.** External URLs with user info are denied.
+- **R11.** `IsGuideHost` also matches the bare P0 host `guide.invalid`.
+- **R12.** `FileMissing` is a separate deny reason from `HashMismatch`.
+- **R13.** Fragments are ignored by `Decide`.
+- **R14.** `System.Uri` normalization is accepted; `%2e%2e` and `%5c` stay encoded until the single decode and are then rejected.
+- **R15.** One smoke mode `html-reader` covers canary A, canary B and the external-link checks, as separate phases.
+- **R16.** Diagnostics files are named `html-session-<pid>-<n>.json` so online and offline launches don't collide.
+- **R17.** "This link couldn't be opened." is new warning copy for a launcher that returns false or throws.
+- **R18.** Load failures inside `OpenAsync` surface as `HtmlGuideLoadException` and map through `HtmlGuideLoadMessages.For`.
+- **R19.** The installed check proves cross-guide isolation by served sets, not deny counts. **Changes spec wording:** the spec's "diagnostics show the cross-guide image denied" no longer holds, because the CSP stops it first.
+
+Execution rulings:
+
+- **Task 5.** The CI gate for Task 5 is Task 6's `production-shell-ui` run; the shell has no unit-test project.
+- **Task 6.** Route every Chromium-made connection, loopback included, to a dead proxy (`--proxy-server=http://0.0.0.0:9 --proxy-bypass-list=<-loopback>`) to stop preconnect and predictor sockets. Cost if wrong: one extra browser argument. The fallback is feature disables.
+- **Task 6.** Accept reading page UI Automation from the `msedgewebview2` browser window. Cost: the smoke depends on Chromium window class names.
+- **Task 6.** `Mark-CanaryLines` stays as a permanent non-asserting diagnostic (per-step canary counts in the report).
+
 ## Implementation notes
 
-These are engine behaviors to confirm in CI rather than assume:
+What CI showed in run 37058200440 (attempt 2; the online and offline
+launches matched). The WebView2 runtime on the runner was 153.0.4234.48.
 
-- Whether WebView2 raises `NavigationStarting` for a same-document fragment
-  link. If it doesn't, `SameDocument` stays as a guard and the smoke checks
-  only that the link scrolls without a bar or a denial.
-- Whether a `rel=icon` or prefetch load reaches `WebResourceRequested`. The
-  connection-counting canary is the backstop either way.
-- Whether `ping` is sent for a cancelled navigation. The canary is again the
-  backstop.
+- **Fragment link.** It scrolled in-page to `#details`, opened no bar and
+  recorded no denial. `HtmlReaderSession` lets a `SameDocument` navigation
+  through if `NavigationStarting` is raised for it, but no diagnostic records
+  that event, so whether WebView2 raises it was not observed directly.
+- **`rel=icon`, `prefetch`, `preload`.** None reached `WebResourceRequested`
+  (no `Image` or `Stylesheet` denials) and the canary logged no GET, so the
+  CSP stopped them first. The same holds for every loopback subresource:
+  `img` `src`/`srcset`, `picture` `source`, `input type=image`, `video
+  poster`, `object`, `embed`, `iframe` and the CSS `url()` references.
+- **`ping`.** Not sent (no `GET /ping`).
+- **`IsUserInitiated`.** A pointer click on the external anchor and on the
+  `target=_blank` anchor opened the bar, so both were user-initiated. The
+  `meta refresh` to `http://127.0.0.1:8765/redirect` was cancelled with no
+  bar (R9). In the code, a user click on an external anchor goes through
+  `NavigationStarting` and `target=_blank` through `NewWindowRequested`.
+- **Canary A, by layer.**
+  - Loopback references and the cross-guide image: stopped by the CSP. No
+    handler entry and no canary line.
+  - The cross-guide anchor (a link into guide B's origin): cancelled by
+    `NavigationStarting` as `Deny`, with no bar. The diagnostics also hold a
+    `CrossGuide`/`Document` x1 entry. Only the handler writes diagnostics, so
+    that request reached it too; the order of the two events was not
+    observed.
+  - `External`/`Document` x2 in the handler: the `meta refresh` and the
+    external link click. Navigation then cancelled the refresh silently and
+    showed the click in the bar.
+- **`base href`.** Ignored under `base-uri 'none'`; local files were served at
+  the guide's own origin.
+- **Served sets.** Guide A served `guide.html`, `images/a.png` and
+  `style.css`. Guide B served `guide.html`, `images/b.png` and `style.css`,
+  with nothing denied. `external-launches.json` held only
+  `https://example.com/desktop-guides-canary`; the `target=_blank` link to
+  `example.org` was dismissed.
+- **Page UI Automation.** The WebView2 page's tree is not in the shell
+  window's tree, which shows an empty `Microsoft.UI.Xaml.Controls.WebView2`
+  pane. It is in a top-level `Chrome_WidgetWin_1` /
+  `Chrome_RenderWidgetHostHWND` window owned by the `msedgewebview2` browser
+  process, a child of the app. The smoke reads it from there.
+- **Preconnect and the network predictor (differs from the starting
+  approach).** Before the fix, run 37049094122 showed the canary's accepted
+  connections at 1 (before A), 3 (A loaded), 5 (after refresh) and 5 to the
+  end. These four bare TCP connections carried no request line. They came
+  from `preconnect`/`dns-prefetch` hints and from the `meta refresh` target
+  before `NavigationStarting` cancelled it. Neither the CSP nor
+  `WebResourceRequested` sees them. Every HTML session's environment now sets
+  `AdditionalBrowserArguments` to `HtmlBrowserEnvironment.Arguments`
+  (`--proxy-server=http://0.0.0.0:9 --proxy-bypass-list=<-loopback>`), so
+  Chromium's own connections, loopback included, go to a dead proxy. Content
+  served by `WebResourceRequested` never reaches the network, so it is
+  unaffected. After the fix every step counts 1, the install script's health
+  check. The canary now mostly guards against losing the proxy, and the
+  served sets are the main isolation evidence (R19). Preconnect and
+  dns-prefetch hints are common in saved pages from major guide sites
+  (Fandom, IGN, GameFAQs), so without the proxy real imports would likely
+  have leaked TCP connects when online. This is an expectation, not a
+  measurement of those sites.
+
+## Verification
+
+Run 37058200440 (merge-base `e447597`), attempt 2, passed every job. In both
+`html-reader-online` (light, canary listening) and `html-reader-offline`
+(dark, canary stopped) the phases `html-canary-a`, `html-external-links` and
+`html-canary-b` passed. `html-canary.log` holds one `ACCEPT` line, the
+install script's health check, and nothing after the baseline in either
+pass.
+
+`production-shell-ui` has two known flakes, each cleared by one rerun and
+unrelated to T07.3: "Interactive launch did not write launch.json" and the
+TXT "no rows" check in `txt-reader-light`.
