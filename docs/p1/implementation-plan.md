@@ -807,7 +807,8 @@ website link is shown in a Reader bar and opens only through **Open in
 browser**. CI run 37058200440 passed the installed `html-reader` canary with
 the loopback canary listening and stopped, with zero recorded connections.
 
-T09.1 is in review in PR #35; see the
+T09.1 was merged through PR #35 on 3 October 2026 (merge commit `9f2ad26`;
+final-HEAD CI run 37127070994); see the
 [design and implementation notes](t09-1-html-adapter-design.md). It sweeps
 leftover WebView2 profiles at startup, tells a missing runtime, a failed
 start, a crash, a missing entry and a changed file apart, and offers
