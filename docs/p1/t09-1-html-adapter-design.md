@@ -1,6 +1,7 @@
 # T09.1 Managed-guide HTML adapter design
 
-Status: design approved in chat; spec under review.
+Status: implemented in PR #PRNUM; CI run 37124656045 passed the installed
+`html-reader` and `html-runtime-missing` scenarios.
 Prerequisites: T06.3 is merged (PR #19, merge commit `494cb02`); T07.3 is
 merged (PR #34, merge commit `3339fc7`).
 
@@ -309,3 +310,40 @@ surface with the action button.
 - Retrying a locked profile within the same run.
 - Detecting a too-old runtime separately from a failed start. A runtime
   that lacks an API this app needs shows as `RuntimeFailed`.
+
+## Implementation notes
+
+Planning rulings, from the
+[implementation plan](t09-1-html-adapter-plan.md):
+
+- **R1. The crash phase runs in both the online and offline passes.** Each
+  `html-reader` pass expects sessions A, B, B, and the two passes give the
+  light and dark screenshots of the error surface with Reopen. The
+  runtime-missing pass adds a dark screenshot with Get WebView2 Runtime.
+- **R2. The shell handles `Failed` inside the navigation queue.** A render
+  holding the queue finishes first, so a crash just after `OpenAsync`
+  returns is still torn down, and no render interleaves with the teardown.
+- **R3. `ReaderSurface` is collapsed when it has no view**, so an empty
+  `ContentControl` never sits over the action button.
+- **R4. The loader checks the planned entry path before reading it.**
+  `ManagedHtmlAssetReader.Read` returns `Missing` for link and access errors
+  too, so its status alone can't tell missing from changed.
+
+Execution notes:
+
+- The installed smoke checks the sweep through the report field
+  `htmlReader.profileSweep` (`removed`), not a separate phase.
+- `seed-html-reader` adds a TXT guide, "Plain Text Guide", to the Web Reader
+  Game for the runtime-missing pass.
+- RED was observed in separate CI runs per task, because a compile error in
+  one test project stops the other from building. No local .NET toolchain
+  was used.
+
+## Verification
+
+CI run 37124656045 passed `core-tests` and the installed `production-shell-ui`
+scenarios. Screenshots of the Reader error surface:
+
+- [Crash, light](evidence/t09-1-html-adapter/html-crash-light.png)
+- [Crash, dark](evidence/t09-1-html-adapter/html-crash-dark.png)
+- [Missing runtime, dark](evidence/t09-1-html-adapter/html-runtime-missing-dark.png)
