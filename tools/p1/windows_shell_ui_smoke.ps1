@@ -1462,6 +1462,24 @@ try {
                 throw "The guide page did not show '$name'. WebView2 processes (pid<-parent): $($webViews -join ', ')."
             }
 
+            # The page viewport grows back after the link bar closes, so a
+            # link can be found while it is still below the visible area.
+            function Wait-PageVisible([string] $name) {
+                $deadline = (Get-Date).AddSeconds(5)
+                do {
+                    $element = Wait-PageName $name
+                    try {
+                        if (-not $element.Current.IsOffscreen) { return $element }
+                    }
+                    catch [System.Windows.Automation.ElementNotAvailableException] {
+                        # The page tree was rebuilt; find the link again.
+                    }
+                    Start-Sleep -Milliseconds 250
+                } while ((Get-Date) -lt $deadline)
+                [void](Save-WindowScreenshot 'html-page-offscreen')
+                throw "The guide page showed '$name' only off-screen."
+            }
+
             # Non-asserting diagnostic: canary log line counts at each step,
             # so any guide-originated connection can be attributed to a step.
             $canaryLog = Join-Path (Split-Path -Parent $ResultPath) 'html-canary.log'
@@ -1506,7 +1524,7 @@ try {
             # html-external-links: another guide's origin is denied
             # silently; website links go to the bar; a fragment scrolls.
             Mark-CanaryLines 'after-refresh'
-            Click-Element (Wait-PageName 'Open canary guide B')
+            Click-Element (Wait-PageVisible 'Open canary guide B')
             Start-Sleep -Seconds 1
             Assert-NoExternalLinkBar 'a link into another guide'
             [void](Wait-PageName 'Canary guide A loaded')
@@ -1515,7 +1533,7 @@ try {
             }
 
             Mark-CanaryLines 'after-cross-guide-link'
-            Click-Element (Wait-PageName 'External canary link')
+            Click-Element (Wait-PageVisible 'External canary link')
             [void](Wait-VisibleById 'ReaderExternalLinkBar')
             [void](Wait-Name 'ReaderExternalLinkUrl' 'https://example.com/desktop-guides-canary')
             $report.htmlExternalLinkScreenshot = Save-WindowScreenshot 'html-external-link'
@@ -1524,14 +1542,14 @@ try {
             [void](Wait-PageName 'Canary guide A loaded')
 
             Mark-CanaryLines 'after-external-link'
-            Click-Element (Wait-PageName 'New window canary link')
+            Click-Element (Wait-PageVisible 'New window canary link')
             [void](Wait-VisibleById 'ReaderExternalLinkBar')
             [void](Wait-Name 'ReaderExternalLinkUrl' 'https://example.org/desktop-guides-canary-blank')
             Invoke-Element (Find-ById 'ReaderExternalLinkDismiss')
             Wait-HiddenById 'ReaderExternalLinkBar'
 
             Mark-CanaryLines 'after-blank-link'
-            Click-Element (Wait-PageName 'Jump to details')
+            Click-Element (Wait-PageVisible 'Jump to details')
             $details = Wait-PageName 'Canary details'
             $deadline = (Get-Date).AddSeconds(5)
             while ($details.Current.IsOffscreen -and (Get-Date) -lt $deadline) {
