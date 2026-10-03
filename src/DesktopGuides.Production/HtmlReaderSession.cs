@@ -158,7 +158,9 @@ internal sealed class HtmlReaderSession : IReaderSession
         }
         if (!success || !entryServed)
         {
-            throw new HtmlGuideLoadException(HtmlGuideLoadError.Changed);
+            // A dying renderer can fail the navigation before ProcessFailed
+            // reaches the completion source.
+            throw new HtmlGuideLoadException(failed ? HtmlGuideLoadError.Crashed : HtmlGuideLoadError.Changed);
         }
     }
 
