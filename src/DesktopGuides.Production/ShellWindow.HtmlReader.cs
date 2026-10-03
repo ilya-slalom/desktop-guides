@@ -1,5 +1,6 @@
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Navigation;
 using DesktopGuides.Core.Reading;
 using DesktopGuides.Infrastructure.Reading;
 using Microsoft.UI.Xaml;
