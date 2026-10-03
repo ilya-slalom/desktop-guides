@@ -449,7 +449,8 @@ if (args.Length == 3 && args[0] == "seed-html-reader")
                 Directory.CreateDirectory(Path.GetDirectoryName(copy)!);
                 File.Copy(file, copy);
             }
-            string entry = Path.Combine(target, "guide.html");
+            // Guide B is a "Save Page As, Complete" export named after its page title.
+            string entry = Directory.GetFiles(target, "*.html").Single();
             if (otherGuide is Guid other)
             {
                 File.WriteAllText(entry, File.ReadAllText(entry).Replace(

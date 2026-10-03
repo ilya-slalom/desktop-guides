@@ -25,6 +25,54 @@ public sealed class HtmlNavigationPolicyTests
         Assert.Equal(HtmlNavigationKind.Deny, Kind(Entry.AbsoluteUri + "#details", navigated: false));
     }
 
+    // A "Save Page As, Complete" export is named after the page title.
+    private const string Title = "Canary Guide B (PS1) - Walkthrough's 100% Caf\u00E9 \u2013 v2";
+    private static readonly Uri TitledEntry = GuideWebOrigin.EntryUri(Id, Title + ".html");
+
+    // Chromium resolves a relative self-link with these sub-delims left literal.
+    private static string LiteralSubDelims(Uri uri) =>
+        uri.AbsoluteUri.Replace("%28", "(").Replace("%29", ")").Replace("%27", "'");
+
+    private static HtmlNavigationKind TitledKind(string uri, bool navigated) =>
+        HtmlNavigationPolicy.Classify(uri, TitledEntry, navigated, userInitiated: false).Kind;
+
+    [Fact]
+    public void TitledEntryIsRecognisedInItsEscapedForm()
+    {
+        Assert.Equal(HtmlNavigationKind.Entry, TitledKind(TitledEntry.AbsoluteUri, navigated: false));
+        Assert.Equal(HtmlNavigationKind.SameDocument, TitledKind(TitledEntry.AbsoluteUri + "#sec", navigated: true));
+    }
+
+    [Fact]
+    public void TitledEntryIsRecognisedWithLiteralSubDelims()
+    {
+        string literal = LiteralSubDelims(TitledEntry);
+        Assert.Contains("(PS1)", literal, StringComparison.Ordinal);
+        Assert.Contains("Walkthrough's", literal, StringComparison.Ordinal);
+        Assert.Equal(HtmlNavigationKind.Entry, TitledKind(literal, navigated: false));
+        Assert.Equal(HtmlNavigationKind.SameDocument, TitledKind(literal + "#sec", navigated: true));
+        Assert.Equal(HtmlNavigationKind.Deny, TitledKind(literal, navigated: true));
+        Assert.Equal(HtmlNavigationKind.Deny, TitledKind(literal + "#sec", navigated: false));
+        Assert.Equal(HtmlNavigationKind.Deny, TitledKind(literal + "?page=2", navigated: false));
+    }
+
+    [Theory]
+    [InlineData("Canary Guide B (PS1) - Walkthrough's 100% Caf\u00E8 \u2013 v2.html")]
+    [InlineData("Canary Guide B (PS1) - Walkthrough's 100% Caf\u00E9 \u2014 v2.html")]
+    [InlineData("Canary Guide B [PS1) - Walkthrough's 100% Caf\u00E9 \u2013 v2.html")]
+    public void SiblingFileDifferingByOneEscapedCharacterIsNotTheEntry(string sibling)
+    {
+        Uri other = GuideWebOrigin.EntryUri(Id, sibling);
+        Assert.Equal(HtmlNavigationKind.Deny, TitledKind(other.AbsoluteUri, navigated: false));
+        Assert.Equal(HtmlNavigationKind.Deny, TitledKind(LiteralSubDelims(other), navigated: false));
+        Assert.Equal(HtmlNavigationKind.Deny, TitledKind(other.AbsoluteUri + "#sec", navigated: true));
+    }
+
+    [Fact]
+    public void DoubleEncodedTitledEntryIsNotTheEntry() =>
+        Assert.Equal(HtmlNavigationKind.Deny,
+            TitledKind(TitledEntry.AbsoluteUri.Replace("%28", "%2528"), navigated: false));
+
     [Fact]
     public void UserInitiatedWebsiteLinksAreExternal()
     {

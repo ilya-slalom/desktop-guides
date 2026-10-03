@@ -988,9 +988,14 @@ function Assert-HtmlReaderPass([string] $pass, [string] $cacheRoot, $ids, [strin
     # are kept as evidence only, because the CSP can stop a reference before
     # the request handler sees it.
     $diagnostics = Join-Path $cacheRoot 'diagnostics'
+    # Guide B is a Save Page As export named after its page title. The '%'
+    # makes the import alias its entry to guide.html; its companion folder
+    # keeps the source name. Non-ASCII characters are built so this file
+    # stays ASCII.
+    $titleB = "Canary Guide B (PS1) - Walkthrough's 100% Caf" + [char]0x00E9 + ' ' + [char]0x2013 + ' v2'
     $expected = @{
         $ids.guideA = 'guide.html,images/a.png,style.css'
-        $ids.guideB = 'guide.html,images/b.png,style.css'
+        $ids.guideB = "${titleB}_files/b.png,${titleB}_files/style.css,guide.html"
     }
     $files = @(Get-ChildItem -LiteralPath $diagnostics -Filter 'html-session-*.json' -ErrorAction SilentlyContinue)
     if ($files.Count -ne 2) {

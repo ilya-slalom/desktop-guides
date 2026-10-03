@@ -9,6 +9,9 @@ public sealed class HtmlCanaryFixtureTests
     private static readonly string CanaryRoot =
         Path.Combine(Path.GetDirectoryName(P0Fixtures.Root)!, "p1", "html-canary");
 
+    // Guide B is a "Save Page As, Complete" export named after its page title.
+    private const string TitleB = "Canary Guide B (PS1) - Walkthrough's 100% Caf\u00E9 \u2013 v2";
+
     [Fact]
     public async Task CanaryGuidesPublishOnlyTheirOwnLocalFiles()
     {
@@ -19,7 +22,9 @@ public sealed class HtmlCanaryFixtureTests
             harness.Publisher(), await harness.InspectAsync(CopyCanary(harness, "a", b)));
 
         Assert.Equal(new[] { "guide.html", "images/a.png", "style.css" }, await RequestPathsAsync(harness, a));
-        Assert.Equal(new[] { "guide.html", "images/b.png", "style.css" }, await RequestPathsAsync(harness, b));
+        Assert.Equal(
+            new[] { TitleB + "_files/b.png", TitleB + "_files/style.css", "guide.html" },
+            await RequestPathsAsync(harness, b));
         string entry = File.ReadAllText(harness.Paths.ResolveExistingGuideFile(a, "guide.html"));
         Assert.Contains(GuideWebOrigin.OriginFor(b).Host, entry, StringComparison.Ordinal);
         Assert.DoesNotContain("__GUIDE_B_ORIGIN__", entry, StringComparison.Ordinal);
@@ -43,6 +48,7 @@ public sealed class HtmlCanaryFixtureTests
             }
             harness.Sources.Write($"{guide}/{relative}", bytes);
         }
-        return Path.Combine(harness.Sources.Root, guide, "guide.html");
+        string entry = Assert.Single(Directory.GetFiles(source, "*.html"));
+        return Path.Combine(harness.Sources.Root, guide, Path.GetFileName(entry));
     }
 }

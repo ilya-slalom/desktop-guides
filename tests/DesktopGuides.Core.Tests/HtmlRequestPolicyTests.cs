@@ -60,6 +60,45 @@ public sealed class HtmlRequestPolicyTests
     public void PercentNamedCompanionFolderServesTheManagedFile(string path) =>
         Assert.Equal("__desktop_guides_files/map.png", Served(Origin + path).Asset.RelativePath);
 
+    // A "Save Page As, Complete" export is named after the page title.
+    private const string Title = "Canary Guide B (PS1) - Walkthrough's 100% Caf\u00E9 \u2013 v2";
+
+    private static readonly GuideAsset[] TitledAssets =
+    [
+        new(Title + ".html", "guide.html", GuideAssetKind.EntryHtml, 10, Hash),
+        new(Title + "_files/b.png", "__desktop_guides_files/b.png", GuideAssetKind.Image, 10, Hash),
+    ];
+
+    private static string LiteralSubDelims(string uri) =>
+        uri.Replace("%28", "(").Replace("%29", ")").Replace("%27", "'");
+
+    [Fact]
+    public void TitledEntryIsServedInEscapedAndLiteralForms()
+    {
+        HtmlRequestPolicy policy = new(Id, TitledAssets);
+        foreach (string uri in new[] { policy.EntryUri.AbsoluteUri, LiteralSubDelims(policy.EntryUri.AbsoluteUri) })
+        {
+            Assert.Equal("guide.html", Assert.IsType<HtmlServe>(policy.Decide("GET", uri)).Asset.RelativePath);
+        }
+    }
+
+    [Theory]
+    [InlineData("/Canary%20Guide%20B%20%28PS1%29%20-%20Walkthrough%27s%20100%25%20Caf%C3%A9%20%E2%80%93%20v2_files/b.png")]
+    [InlineData("/Canary%20Guide%20B%20(PS1)%20-%20Walkthrough's%20100%25%20Caf%C3%A9%20%E2%80%93%20v2_files/b.png")]
+    [InlineData("/Canary%20Guide%20B%20(PS1)%20-%20Walkthrough's%20100%%20Caf%C3%A9%20%E2%80%93%20v2_files/b.png")]
+    public void TitledCompanionAssetIsServedInEscapedAndLiteralForms(string path)
+    {
+        HtmlRequestPolicy policy = new(Id, TitledAssets);
+        HtmlServe serve = Assert.IsType<HtmlServe>(policy.Decide("GET", Origin + path));
+        Assert.Equal("__desktop_guides_files/b.png", serve.Asset.RelativePath);
+        Assert.Equal(Title + "_files/b.png", serve.Asset.RequestPath);
+    }
+
+    [Fact]
+    public void TitledCompanionAssetDifferingByOneCharacterIsNotInTheManifest() =>
+        Assert.IsType<HtmlDeny>(new HtmlRequestPolicy(Id, TitledAssets).Decide("GET",
+            Origin + "/Canary%20Guide%20B%20(PS1)%20-%20Walkthrough's%20100%25%20Caf%C3%A8%20%E2%80%93%20v2_files/b.png"));
+
     [Fact]
     public void DoubleEncodedCompanionFolderIsNotInTheManifest() =>
         Assert.Equal(HtmlDenyReason.NotInManifest, Denied(Origin + "/100%2525%20Completion%20Guide_files/map.png"));
