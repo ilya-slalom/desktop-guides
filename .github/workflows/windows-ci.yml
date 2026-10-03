@@ -101,6 +101,9 @@ jobs:
       - name: Check test-owned scheduled task cleanup
         shell: pwsh
         run: ./tools/p1/test_windows_shell_task_cleanup.ps1
+      - name: Check loopback canary
+        shell: pwsh
+        run: python -m unittest discover -s tools/p0 -p "test_*.py" -v
       - name: Upload test result
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -323,6 +326,7 @@ jobs:
           path: |
             artifacts/production-shell/installed/*.json
             artifacts/production-shell/installed/*.png
+            artifacts/production-shell/installed/*.log
           if-no-files-found: warn
 
   reader-toolbar-ui:

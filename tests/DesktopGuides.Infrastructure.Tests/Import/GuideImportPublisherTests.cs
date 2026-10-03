@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Infrastructure.Import;
@@ -527,6 +528,94 @@ public sealed class GuideImportPublisherTests
 
         Assert.Equal(ImportIssue.Changed, error.Issue);
         harness.AssertNothingLeft();
+    }
+
+    [Fact]
+    public async Task PublishesTheHtmlManifestAsAssetRows()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        string entry = CopyHtmlStatic(harness, "guide.html");
+
+        Guid id = await harness.PublishAsync(harness.Publisher(), await harness.InspectAsync(entry));
+
+        IReadOnlyList<GuideAsset> assets = await harness.Repository.GetGuideAssetsAsync(id);
+        Assert.Equal(
+            ["guide.html", "images/map.png", "styles/main.css", "styles/palette.css"],
+            assets.Select(asset => asset.RequestPath));
+        Assert.Equal(
+            [GuideAssetKind.EntryHtml, GuideAssetKind.Image, GuideAssetKind.StyleSheet, GuideAssetKind.StyleSheet],
+            assets.Select(asset => asset.Kind));
+        foreach (GuideAsset asset in assets)
+        {
+            byte[] bytes = File.ReadAllBytes(harness.Paths.ResolveExistingGuideFile(id, asset.RelativePath));
+            Assert.Equal(bytes.LongLength, asset.ByteCount);
+            Assert.Equal(Convert.ToHexStringLower(SHA256.HashData(bytes)), asset.Sha256);
+        }
+    }
+
+    [Fact]
+    public async Task AFailureInsideTheCommitLeavesNoAssetRows()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        string entry = CopyHtmlStatic(harness, "guide.html");
+        GuideImportPublisher publisher = harness.Publisher(checkpoint: point =>
+        {
+            if (point == ImportCheckpoint.InCommit) throw new IOException("Injected inside the commit.");
+        });
+
+        await Assert.ThrowsAnyAsync<Exception>(
+            async () => await harness.PublishAsync(publisher, await harness.InspectAsync(entry)));
+
+        Assert.Equal(0, harness.Count("GuideAssets"));
+        harness.AssertNothingLeft();
+    }
+
+    [Theory]
+    [InlineData("txt-utf8.txt", "notes.txt")]
+    [InlineData("pdf-short.pdf", "short.pdf")]
+    public async Task TextAndPdfGuidesPublishNoAssetRows(string fixture, string name)
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        ImportManifest manifest = await harness.InspectAsync(harness.Sources.Copy(fixture, name));
+
+        Guid id = await harness.PublishAsync(harness.Publisher(), manifest);
+
+        Assert.Empty(await harness.Repository.GetGuideAssetsAsync(id));
+    }
+
+    [Theory]
+    [InlineData("100% Completion Guide_files")]
+    [InlineData("100%25 Completion Guide_files")]
+    [InlineData("100%25%20Completion%20Guide_files")]
+    public async Task PercentNamedCompanionRowsUseTheSourceFolderName(string referencedFolder)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        harness.Sources.Copy("html-static/images/map.png", "100% Completion Guide_files/map.png");
+        string entry = harness.Sources.Write(
+            "100% Completion Guide.html", $"<p>Guide</p><img src=\"{referencedFolder}/map.png\">");
+
+        Guid id = await harness.PublishAsync(harness.Publisher(), await harness.InspectAsync(entry));
+
+        GuideAsset image = Assert.Single(
+            await harness.Repository.GetGuideAssetsAsync(id), asset => asset.Kind == GuideAssetKind.Image);
+        Assert.Equal("100% Completion Guide_files/map.png", image.RequestPath);
+        Assert.Equal("__desktop_guides_files/map.png", image.RelativePath);
+    }
+
+    [Fact]
+    public async Task RequestPathKeepsTheReferenceCasing()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        harness.Sources.Copy("html-static/images/map.png", "images/map.png");
+        string entry = harness.Sources.Write("guide.html", "<p>Guide</p><img src=\"IMAGES/Map.png\">");
+
+        Guid id = await harness.PublishAsync(harness.Publisher(), await harness.InspectAsync(entry));
+
+        GuideAsset image = Assert.Single(
+            await harness.Repository.GetGuideAssetsAsync(id), asset => asset.Kind == GuideAssetKind.Image);
+        Assert.Equal("IMAGES/Map.png", image.RequestPath);
     }
 
     private static string CopyHtmlStatic(PublisherHarness harness, string entryName)

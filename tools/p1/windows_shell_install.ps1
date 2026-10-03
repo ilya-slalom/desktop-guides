@@ -705,7 +705,7 @@ function Run-ShellSmoke(
         -Principal $principal -Force | Out-Null
     Start-ScheduledTask -TaskName $smokeTask
     $timeoutSeconds = if ($mode -like 'provider-*') { 240 }
-        elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*') { 120 }
+        elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*') { 120 }
         else { 60 }
     $deadline = (Get-Date).AddSeconds($timeoutSeconds)
     do {
@@ -907,6 +907,173 @@ function Assert-TxtBackDuringLoad {
         $resume.Set() | Out-Null
         $resume.Dispose()
         $reached.Dispose()
+    }
+}
+
+function Get-HtmlCacheRoot {
+    # Matches AppCacheRoot: portable uses %LOCALAPPDATA%\DesktopGuides\Cache,
+    # packaged uses the package's LocalCache beside LocalState.
+    if ($portable) { return Join-Path $dataRoot 'Cache' }
+    return Join-Path (Split-Path -Parent $dataRoot) 'LocalCache'
+}
+
+function Test-HtmlCanaryListening {
+    try {
+        Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8765/health' -TimeoutSec 2 | Out-Null
+        return $true
+    }
+    catch {
+        return $false
+    }
+}
+
+function Start-HtmlCanary([string] $logPath) {
+    $script = (Resolve-Path (Join-Path $PSScriptRoot '..\p0\http_canary.py')).Path
+    $python = (Get-Command python -ErrorAction Stop).Source
+    $process = Start-Process -FilePath $python -PassThru -WindowStyle Hidden -ArgumentList @(
+        ('"' + $script + '"'), '--log', ('"' + $logPath + '"'), '--port', '8765')
+    $deadline = (Get-Date).AddSeconds(15)
+    do {
+        if ($process.HasExited) {
+            throw "The loopback canary exited with code $($process.ExitCode)."
+        }
+        if (Test-HtmlCanaryListening) { return $process }
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $deadline)
+    Stop-HtmlCanary $process
+    throw 'The loopback canary did not answer its health check.'
+}
+
+function Stop-HtmlCanary($process) {
+    if ($process -and -not $process.HasExited) {
+        Stop-Process -Id $process.Id -Force
+        $process.WaitForExit(5000) | Out-Null
+    }
+}
+
+function Get-HtmlCanaryLines([string] $logPath) {
+    if (-not (Test-Path -LiteralPath $logPath)) { return @() }
+    return @(Get-Content -LiteralPath $logPath)
+}
+
+function Invoke-HtmlReaderPass([string] $resultName) {
+    Start-InstalledShell
+    $processId = $report.launchedProcessId
+    $diagnosticsGate = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::ManualReset,
+        "Local\DesktopGuides.Preview.HtmlDiagnostics.$processId")
+    $launchGate = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::ManualReset,
+        "Local\DesktopGuides.Preview.ExternalLaunch.$processId")
+    try {
+        $report.htmlReader[$resultName] = Run-ShellSmoke 'html-reader' -ResultName $resultName
+        Close-InstalledShell
+    }
+    finally {
+        $launchGate.Dispose()
+        $diagnosticsGate.Dispose()
+    }
+}
+
+function Save-HtmlDiagnostics([string] $resultName, [string] $cacheRoot) {
+    # Keeps each pass's diagnostics with the evidence, even when a check fails.
+    $diagnostics = Join-Path $cacheRoot 'diagnostics'
+    foreach ($file in @(Get-ChildItem -LiteralPath $diagnostics -Filter '*.json' -ErrorAction SilentlyContinue)) {
+        Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $ResultDirectory "$resultName.$($file.Name)")
+    }
+}
+
+function Assert-HtmlReaderPass([string] $pass, [string] $cacheRoot, $ids, [string] $logPath, [int] $baseline) {
+    # R19: isolation is shown by exactly what each guide served. Deny counts
+    # are kept as evidence only, because the CSP can stop a reference before
+    # the request handler sees it.
+    $diagnostics = Join-Path $cacheRoot 'diagnostics'
+    # Guide B is a Save Page As export named after its page title. The '%'
+    # makes the import alias its entry to guide.html; its companion folder
+    # keeps the source name. Non-ASCII characters are built so this file
+    # stays ASCII.
+    $titleB = "Canary Guide B (PS1) - Walkthrough's 100% Caf" + [char]0x00E9 + ' ' + [char]0x2013 + ' v2'
+    $expected = @{
+        $ids.guideA = 'guide.html,images/a.png,style.css'
+        $ids.guideB = "${titleB}_files/b.png,${titleB}_files/style.css,guide.html"
+    }
+    $files = @(Get-ChildItem -LiteralPath $diagnostics -Filter 'html-session-*.json' -ErrorAction SilentlyContinue)
+    if ($files.Count -ne 2) {
+        throw "The $pass pass wrote $($files.Count) HTML session diagnostics; expected 2."
+    }
+    $sessions = @()
+    foreach ($file in $files) {
+        $session = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json
+        if (-not $expected.ContainsKey($session.guideId)) {
+            throw "The $pass pass wrote diagnostics for an unexpected or repeated guide $($session.guideId)."
+        }
+        $served = @($session.served) -join ','
+        if ($served -cne $expected[$session.guideId]) {
+            throw "Guide $($session.guideId) served '$served' in the $pass pass; expected '$($expected[$session.guideId])'."
+        }
+        $expected.Remove($session.guideId)
+        $sessions += $session
+    }
+
+    $launchesPath = Join-Path $diagnostics 'external-launches.json'
+    if (-not (Test-Path -LiteralPath $launchesPath)) {
+        throw "The $pass pass recorded no external launch."
+    }
+    # Two statements, so Windows PowerShell doesn't wrap the parsed array.
+    $launches = Get-Content -LiteralPath $launchesPath -Raw | ConvertFrom-Json
+    $launches = @($launches)
+    if ($launches.Count -ne 1 -or $launches[0] -cne 'https://example.com/desktop-guides-canary') {
+        throw "The $pass pass launched '$($launches -join ', ')'; expected only https://example.com/desktop-guides-canary."
+    }
+
+    $newLines = @(Get-HtmlCanaryLines $logPath | Select-Object -Skip $baseline)
+    if ($newLines.Count -ne 0) {
+        throw "The canary recorded guide-originated traffic in the $pass pass: $($newLines -join '; ')."
+    }
+    return [ordered]@{
+        sessions = $sessions
+        externalLaunches = $launches
+        canaryLinesBefore = $baseline
+    }
+}
+
+function Run-HtmlReaderScenarios {
+    # Each canary guide opens once with the loopback canary listening (light)
+    # and once with it stopped (dark): TR07.1-TR07.3.
+    $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
+    $ids = Invoke-ShellSeed @('seed-html-reader', $dataRoot, $fixtureRoot) | ConvertFrom-Json
+    $cacheRoot = Get-HtmlCacheRoot
+    $diagnostics = Join-Path $cacheRoot 'diagnostics'
+    $logPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath(
+        (Join-Path $ResultDirectory 'html-canary.log'))
+    Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
+    $report.htmlReader = [ordered]@{ guideA = $ids.guideA; guideB = $ids.guideB }
+    $originalTheme = Get-AppThemePreference
+    $canary = $null
+    try {
+        $canary = Start-HtmlCanary $logPath
+        $baseline = @(Get-HtmlCanaryLines $logPath).Count
+        Set-AppThemePreference $true
+        Invoke-HtmlReaderPass 'html-reader-online'
+        Save-HtmlDiagnostics 'html-reader-online' $cacheRoot
+        $report.htmlReader.online = Assert-HtmlReaderPass 'online' $cacheRoot $ids $logPath $baseline
+
+        Stop-HtmlCanary $canary
+        $canary = $null
+        if (Test-HtmlCanaryListening) {
+            throw 'The loopback canary still answered after it was stopped.'
+        }
+        Remove-Item -LiteralPath $diagnostics -Recurse -Force
+        $baseline = @(Get-HtmlCanaryLines $logPath).Count
+        Set-AppThemePreference $false
+        Invoke-HtmlReaderPass 'html-reader-offline'
+        Save-HtmlDiagnostics 'html-reader-offline' $cacheRoot
+        $report.htmlReader.offline = Assert-HtmlReaderPass 'offline' $cacheRoot $ids $logPath $baseline
+    }
+    finally {
+        Stop-HtmlCanary $canary
+        Restore-AppThemePreference $originalTheme
     }
 }
 
@@ -1499,6 +1666,9 @@ try {
     Run-LibrarySearchScenarios
     Run-StableNavigationScenarios
     Run-TxtReaderScenarios
+
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    Run-HtmlReaderScenarios
 
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-ImportScenarios

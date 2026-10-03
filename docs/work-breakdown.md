@@ -244,7 +244,8 @@ reader activity. Supported local nested CSS imports remain inside the guide.
 - **T07.2** Enforce the selected import root, reject traversal and symlink
   escape, and warn about missing or unsupported assets before confirmation.
 - **T07.3** Configure WebView2 navigation/resource restrictions and explicit
-  external-link handling; test nested CSS URLs.
+  external-link handling; test nested CSS URLs. Implemented in PR #34; see
+  p1/t07-3-webview2-policy-design.md.
 - **TR07.1** Only the guide's managed root can serve embedded content. Absolute
   paths and parent-directory escapes never resolve to user files.
 - **TR07.2** Page JavaScript, host objects, web messages, and unsolicited new

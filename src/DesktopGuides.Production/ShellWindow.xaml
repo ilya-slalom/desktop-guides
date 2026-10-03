@@ -441,8 +441,41 @@
                     </Border>
                 </Grid>
 
-                <local:ReaderToolbar x:Name="ReaderActions"
-                                     Grid.Row="2" />
+                <StackPanel Grid.Row="2">
+                    <local:ReaderToolbar x:Name="ReaderActions" />
+                    <!-- Collapsed while closed, so the Reader's layout is unchanged without a link. -->
+                    <InfoBar x:Name="ReaderExternalLinkBar"
+                             Margin="0,12,0,0"
+                             Visibility="Collapsed"
+                             IsOpen="False"
+                             IsClosable="True"
+                             Severity="Informational"
+                             Title="This link leaves Desktop Guides"
+                             Closed="ReaderExternalLinkBarClosed"
+                             AutomationProperties.AutomationId="ReaderExternalLinkBar">
+                        <InfoBar.Content>
+                            <StackPanel Spacing="{StaticResource DesktopGuidesSpacing12}"
+                                        Margin="0,0,0,12">
+                                <TextBlock x:Name="ReaderExternalLinkUrl"
+                                           TextWrapping="Wrap"
+                                           IsTextSelectionEnabled="True"
+                                           AutomationProperties.AutomationId="ReaderExternalLinkUrl" />
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="{StaticResource DesktopGuidesSpacing8}">
+                                    <Button x:Name="ReaderExternalLinkOpen"
+                                            Content="Open in browser"
+                                            Style="{StaticResource AccentButtonStyle}"
+                                            Click="ReaderExternalLinkOpenClicked"
+                                            AutomationProperties.AutomationId="ReaderExternalLinkOpen" />
+                                    <Button x:Name="ReaderExternalLinkDismiss"
+                                            Content="Dismiss"
+                                            Click="ReaderExternalLinkDismissClicked"
+                                            AutomationProperties.AutomationId="ReaderExternalLinkDismiss" />
+                                </StackPanel>
+                            </StackPanel>
+                        </InfoBar.Content>
+                    </InfoBar>
+                </StackPanel>
 
                 <Border Grid.Row="3"
                         Style="{StaticResource DesktopGuidesElevatedSurfaceStyle}"

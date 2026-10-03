@@ -12,7 +12,7 @@ param(
         'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
         'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted', 'txt-reader',
-        'txt-load-paused', 'txt-back-during-load', 'txt-load-released')]
+        'txt-load-paused', 'txt-back-during-load', 'txt-load-released', 'html-reader')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -1187,8 +1187,8 @@ try {
         # These modes continue a shell left on Reader, Game, or Library.
     }
     elseif ($Mode -in @('txt-reader', 'txt-load-paused', 'txt-back-during-load',
-        'txt-load-released')) {
-        $textGame = 'Text Reader Game'
+        'txt-load-released', 'html-reader')) {
+        $textGame = if ($Mode -eq 'html-reader') { 'Web Reader Game' } else { 'Text Reader Game' }
         $missingMessage = "This guide's file is missing from the library."
         $listItem = New-Object System.Windows.Automation.PropertyCondition(
             [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
@@ -1407,6 +1407,177 @@ try {
             Assert-RowNames 'ASCII Map Guide (after a cancelled load)' $asciiNames
             $report.phases += 'txt-load-released'
         }
+        elseif ($Mode -eq 'html-reader') {
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            Select-Element $textGame
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+
+            # WebView2 content sits in a top-level Chromium window owned by
+            # the shell's WebView2 browser process, so its UI Automation tree
+            # is read from that window rather than from the shell window.
+            function Get-PageRoots {
+                $browsers = @(Get-CimInstance Win32_Process -Filter (
+                    "ParentProcessId = $ProcessId AND Name = 'msedgewebview2.exe'") |
+                    ForEach-Object { [uint32] $_.ProcessId })
+                if ($browsers.Count -eq 0) { return @() }
+                $pages = @()
+                foreach ($window in [DesktopGuidesForegroundProbe]::FindWindows(
+                    'Chrome_RenderWidgetHostHWND', [uint32[]] $browsers)) {
+                    try {
+                        $pages += [System.Windows.Automation.AutomationElement]::FromHandle($window)
+                    }
+                    catch [System.Windows.Automation.ElementNotAvailableException] {
+                        # The window closed after it was listed.
+                    }
+                }
+                return $pages
+            }
+
+            function Find-PageByName([string] $name) {
+                $condition = [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::NameProperty, $name)
+                foreach ($page in Get-PageRoots) {
+                    try {
+                        $element = $page.FindFirst($scope, $condition)
+                        if ($element) { return $element }
+                    }
+                    catch [System.Windows.Automation.ElementNotAvailableException] {
+                        # A closing session's window can vanish mid-search.
+                    }
+                }
+                return $null
+            }
+
+            function Wait-PageName([string] $name) {
+                $deadline = (Get-Date).AddSeconds(15)
+                do {
+                    $element = Find-PageByName $name
+                    if ($element) { return $element }
+                    Start-Sleep -Milliseconds 250
+                } while ((Get-Date) -lt $deadline)
+                [void](Save-WindowScreenshot 'html-page-missing')
+                $webViews = @(Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'" |
+                    ForEach-Object { "$($_.ProcessId)<-$($_.ParentProcessId)" })
+                throw "The guide page did not show '$name'. WebView2 processes (pid<-parent): $($webViews -join ', ')."
+            }
+
+            # The page viewport grows back after the link bar closes, so a
+            # link can be found while it is still below the visible area.
+            function Wait-PageVisible([string] $name) {
+                $deadline = (Get-Date).AddSeconds(5)
+                do {
+                    $element = Wait-PageName $name
+                    try {
+                        if (-not $element.Current.IsOffscreen) { return $element }
+                    }
+                    catch [System.Windows.Automation.ElementNotAvailableException] {
+                        # The page tree was rebuilt; find the link again.
+                    }
+                    Start-Sleep -Milliseconds 250
+                } while ((Get-Date) -lt $deadline)
+                [void](Save-WindowScreenshot 'html-page-offscreen')
+                throw "The guide page showed '$name' only off-screen."
+            }
+
+            # Non-asserting diagnostic: canary log line counts at each step,
+            # so any guide-originated connection can be attributed to a step.
+            $canaryLog = Join-Path (Split-Path -Parent $ResultPath) 'html-canary.log'
+            $report.canaryLines = @()
+            function Mark-CanaryLines([string] $step) {
+                $count = if (Test-Path -LiteralPath $canaryLog) { @(Get-Content -LiteralPath $canaryLog).Count } else { 0 }
+                $report.canaryLines += "$step=$count"
+            }
+
+            function Assert-NoExternalLinkBar([string] $after) {
+                $bar = Find-ById 'ReaderExternalLinkBar'
+                if ($bar -and -not $bar.Current.IsOffscreen) {
+                    throw "The external-link bar opened after $after."
+                }
+            }
+
+            # html-canary-a: the guide renders at its own origin with no
+            # commands and no load error.
+            Mark-CanaryLines 'before-a'
+            Open-TextGuide 'Canary Guide A'
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PageName 'Canary guide A loaded')
+            Assert-NoReaderCommands 'Canary Guide A'
+            Assert-Absent 'ReaderLoadError'
+            Assert-Absent 'ReaderPlaceholder'
+            # The meta refresh fires after one second. It isn't
+            # user-initiated, so it is cancelled without the bar (R9).
+            Mark-CanaryLines 'loaded-a'
+            # Non-asserting diagnostic: the runtime version and whether the
+            # browser process started with the session's proxy arguments.
+            $browser = @(Get-CimInstance Win32_Process -Filter (
+                "ParentProcessId = $ProcessId AND Name = 'msedgewebview2.exe'")) | Select-Object -First 1
+            if ($browser -and $browser.ExecutablePath) {
+                $report.webView2Runtime = (Get-Item -LiteralPath $browser.ExecutablePath).VersionInfo.ProductVersion
+                $report.webView2ProxyArguments = [bool] ($browser.CommandLine -match [regex]::Escape('--proxy-bypass-list=<-loopback>'))
+            }
+            Start-Sleep -Seconds 2
+            Assert-NoExternalLinkBar 'the meta refresh'
+            [void](Wait-PageName 'Canary guide A loaded')
+            $report.phases += 'html-canary-a'
+
+            # html-external-links: another guide's origin is denied
+            # silently; website links go to the bar; a fragment scrolls.
+            Mark-CanaryLines 'after-refresh'
+            Click-Element (Wait-PageVisible 'Open canary guide B')
+            Start-Sleep -Seconds 1
+            Assert-NoExternalLinkBar 'a link into another guide'
+            [void](Wait-PageName 'Canary guide A loaded')
+            if (Find-PageByName 'Canary guide B loaded') {
+                throw 'A link into another guide loaded that guide.'
+            }
+
+            Mark-CanaryLines 'after-cross-guide-link'
+            Click-Element (Wait-PageVisible 'External canary link')
+            [void](Wait-VisibleById 'ReaderExternalLinkBar')
+            [void](Wait-Name 'ReaderExternalLinkUrl' 'https://example.com/desktop-guides-canary')
+            $report.htmlExternalLinkScreenshot = Save-WindowScreenshot 'html-external-link'
+            Invoke-Element (Find-ById 'ReaderExternalLinkOpen')
+            Wait-HiddenById 'ReaderExternalLinkBar'
+            [void](Wait-PageName 'Canary guide A loaded')
+
+            Mark-CanaryLines 'after-external-link'
+            Click-Element (Wait-PageVisible 'New window canary link')
+            [void](Wait-VisibleById 'ReaderExternalLinkBar')
+            [void](Wait-Name 'ReaderExternalLinkUrl' 'https://example.org/desktop-guides-canary-blank')
+            Invoke-Element (Find-ById 'ReaderExternalLinkDismiss')
+            Wait-HiddenById 'ReaderExternalLinkBar'
+
+            Mark-CanaryLines 'after-blank-link'
+            Click-Element (Wait-PageVisible 'Jump to details')
+            $details = Wait-PageName 'Canary details'
+            $deadline = (Get-Date).AddSeconds(5)
+            while ($details.Current.IsOffscreen -and (Get-Date) -lt $deadline) {
+                Start-Sleep -Milliseconds 250
+            }
+            if ($details.Current.IsOffscreen) {
+                throw 'The fragment link did not scroll to its section.'
+            }
+            Assert-NoExternalLinkBar 'a fragment link'
+            [void](Wait-PageName 'Canary guide A loaded')
+            $report.phases += 'html-external-links'
+
+            # html-canary-b: the second guide renders at its own origin.
+            Back-ToTextGame
+            Mark-CanaryLines 'after-links'
+            Open-TextGuide 'Canary Guide B'
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PageName 'Canary guide B loaded')
+            Assert-NoReaderCommands 'Canary Guide B'
+            Assert-Absent 'ReaderLoadError'
+            Assert-NoExternalLinkBar 'opening Canary Guide B'
+            $report.phases += 'html-canary-b'
+
+            Mark-CanaryLines 'opened-b'
+            # Back closes the session, which writes its diagnostics.
+            Back-ToTextGame
+            Mark-CanaryLines 'closed-b'
+        }
         else {
             # The view re-measures at a larger test font size on this signal.
             $remeasure = [System.Threading.EventWaitHandle]::new(
@@ -1517,14 +1688,16 @@ try {
             Assert-NoReaderCommands 'Missing File Guide'
             $report.phases += 'txt-missing'
 
-            # A non-TXT guide after TXT guides shows the placeholder again.
+            # A Web Page Guide with no saved asset rows (imported before
+            # schema v4) asks to be re-imported.
             Back-ToTextGame
             Open-TextGuide 'Web Page Guide'
-            [void](Wait-Status 'Guide ready.')
-            [void](Wait-Name 'ReaderPlaceholder' 'Reading this guide is unavailable in this preview.')
+            [void](Wait-Status 'Re-import this guide to read it.')
+            [void](Wait-Name 'ReaderLoadError' 'Re-import this guide to read it.')
             Assert-Absent 'ReaderTextLines'
-            Assert-Absent 'ReaderLoadError'
-            $report.phases += 'html-placeholder'
+            Assert-Absent 'ReaderPlaceholder'
+            Assert-NoReaderCommands 'Web Page Guide'
+            $report.phases += 'html-no-manifest'
 
             # Reopening reads the file again.
             Back-ToTextGame

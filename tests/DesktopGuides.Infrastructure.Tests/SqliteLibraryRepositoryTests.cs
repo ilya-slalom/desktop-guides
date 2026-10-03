@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Providers;
 using DesktopGuides.Infrastructure.Artwork;
@@ -58,7 +59,7 @@ public sealed class SqliteLibraryRepositoryTests
         using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
         using SqliteCommand version = connection.CreateCommand();
         version.CommandText = "PRAGMA user_version";
-        Assert.Equal(3L, (long)version.ExecuteScalar()!);
+        Assert.Equal(4L, (long)version.ExecuteScalar()!);
         using SqliteCommand index = connection.CreateCommand();
         index.CommandText = """
             SELECT name FROM sqlite_schema
@@ -251,7 +252,7 @@ public sealed class SqliteLibraryRepositoryTests
 
         using SqliteCommand version = active.CreateCommand();
         version.CommandText = "PRAGMA user_version";
-        Assert.Equal(3L, (long)version.ExecuteScalar()!);
+        Assert.Equal(4L, (long)version.ExecuteScalar()!);
         using SqliteCommand index = active.CreateCommand();
         index.CommandText = """
             SELECT name FROM sqlite_schema
@@ -694,7 +695,7 @@ public sealed class SqliteLibraryRepositoryTests
         Game game = Assert.Single(await repository.ListGamesAsync());
         Assert.Equal(gameId, game.Id);
         Assert.Null(game.Link);
-        Assert.Equal(3L, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.Equal(4L, ReadUserVersion(directory.Paths.DatabasePath));
         Assert.Single(Directory.GetFiles(directory.Paths.RecoveryRoot, "*.sqlite"));
     }
 
@@ -886,6 +887,123 @@ public sealed class SqliteLibraryRepositoryTests
         Assert.Null(game.Metadata);
         Assert.NotNull(game.Link);
         Assert.Equal(id, (await repository.GetGameAsync(id))!.Id);
+    }
+
+    [Fact]
+    public async Task UpgradesPopulatedVersionThreeWithAnEmptyAssetTable()
+    {
+        using TestLibrary directory = new();
+        Guid gameId = Guid.NewGuid();
+        Guid guideId = Guid.NewGuid();
+        CreatePopulatedVersionThree(directory, gameId, guideId);
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+
+        Assert.Equal(4L, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.NotNull(await repository.GetGuideAsync(guideId));
+        Assert.Empty(await repository.GetGuideAssetsAsync(guideId));
+    }
+
+    [Fact]
+    public async Task FailedVersionFourMigrationStaysAtVersionThree()
+    {
+        using TestLibrary directory = new();
+        CreatePopulatedVersionThree(directory, Guid.NewGuid(), Guid.NewGuid());
+
+        await using (SqliteLibraryRepository failing = new(directory.Paths, null, version =>
+        {
+            if (version == 4) throw new IOException("Injected after the v4 table was created.");
+        }))
+        {
+            await Assert.ThrowsAsync<InvalidDataException>(() => failing.InitializeAsync());
+        }
+
+        Assert.Equal(3L, ReadUserVersion(directory.Paths.DatabasePath));
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand table = connection.CreateCommand();
+        table.CommandText = "SELECT count(*) FROM sqlite_master WHERE name = 'GuideAssets'";
+        Assert.Equal(0L, (long)table.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public async Task GuideAssetsRoundTripInOrdinalOrderAndCascadeWithTheGuide()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Assets", null, null);
+        Guid guideId = Guid.NewGuid();
+        InsertGuide(directory.Paths.DatabasePath, guideId, game.Id);
+        InsertAsset(directory.Paths.DatabasePath, guideId, "styles/main.css", "StyleSheet");
+        InsertAsset(directory.Paths.DatabasePath, guideId, "Images/map.png", "Image");
+        InsertAsset(directory.Paths.DatabasePath, guideId, "guide.html", "EntryHtml");
+
+        IReadOnlyList<GuideAsset> assets = await repository.GetGuideAssetsAsync(guideId);
+
+        Assert.Equal(["Images/map.png", "guide.html", "styles/main.css"], assets.Select(a => a.RequestPath));
+        Assert.Equal(
+            new GuideAsset("guide.html", "guide.html", GuideAssetKind.EntryHtml, 1, new string('b', 64)),
+            assets[1]);
+
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        using (SqliteCommand delete = connection.CreateCommand())
+        {
+            delete.CommandText = "DELETE FROM Guides WHERE Id = $id";
+            delete.Parameters.AddWithValue("$id", guideId.ToString("N"));
+            delete.ExecuteNonQuery();
+        }
+        Assert.Empty(await repository.GetGuideAssetsAsync(guideId));
+    }
+
+    [Theory]
+    [InlineData("Other", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")]
+    [InlineData("Image", "abc")]
+    public async Task GuideAssetChecksRejectBadKindsAndHashes(string kind, string hash)
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Checks", null, null);
+        Guid guideId = Guid.NewGuid();
+        InsertGuide(directory.Paths.DatabasePath, guideId, game.Id);
+
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO GuideAssets (GuideId, RequestPath, RelativePath, Kind, ByteCount, Sha256)
+            VALUES ($guide, 'a.png', 'a.png', $kind, 1, $hash)
+            """;
+        command.Parameters.AddWithValue("$guide", guideId.ToString("N"));
+        command.Parameters.AddWithValue("$kind", kind);
+        command.Parameters.AddWithValue("$hash", hash);
+        Assert.Throws<SqliteException>(() => command.ExecuteNonQuery());
+    }
+
+    private static void CreatePopulatedVersionThree(TestLibrary directory, Guid gameId, Guid guideId)
+    {
+        CreatePopulatedVersionTwo(directory, gameId);
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = LibrarySchema.Version3;
+        command.ExecuteNonQuery();
+        connection.Close();
+        InsertGuide(directory.Paths.DatabasePath, guideId, gameId);
+    }
+
+    private static void InsertAsset(string databasePath, Guid guideId, string requestPath, string kind)
+    {
+        using SqliteConnection connection = OpenWithForeignKeys(databasePath);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO GuideAssets (GuideId, RequestPath, RelativePath, Kind, ByteCount, Sha256)
+            VALUES ($guide, $request, $request, $kind, 1, $hash)
+            """;
+        command.Parameters.AddWithValue("$guide", guideId.ToString("N"));
+        command.Parameters.AddWithValue("$request", requestPath);
+        command.Parameters.AddWithValue("$kind", kind);
+        command.Parameters.AddWithValue("$hash", new string('b', 64));
+        command.ExecuteNonQuery();
     }
 
     private static void CreatePopulatedVersionTwo(TestLibrary directory, Guid gameId)
