@@ -31,6 +31,8 @@ internal sealed class HtmlReaderSession : IReaderSession
     private bool entryNavigated;
     private bool entryServed;
     private bool disposed;
+    private TaskCompletionSource<bool>? pendingNavigation;
+    private bool failed;
 
     public HtmlReaderSession(HtmlGuideLoaded loaded, string cacheRoot, HtmlSessionDiagnostics? diagnostics)
     {
@@ -53,10 +55,20 @@ internal sealed class HtmlReaderSession : IReaderSession
     // T09.3 adds position tracking.
     public event EventHandler<LocationChangedEventArgs>? LocationChanged { add { } remove { } }
     public event EventHandler<Uri>? ExternalLinkRequested;
+    // Raised once, with Crashed, when the browser or the page's renderer
+    // dies after the guide opened.
+    public event EventHandler<HtmlGuideLoadError>? Failed;
 
     public static HtmlSessionDiagnostics? DiagnosticsForTest() =>
         TestGate.IsOpen($@"Local\DesktopGuides.Preview.HtmlDiagnostics.{Environment.ProcessId}")
             ? new HtmlSessionDiagnostics()
+            : null;
+
+    // The installed smoke points the probe at an empty folder, so it fails
+    // the way it does on a PC without WebView2.
+    private static string? MissingRuntimeFolderForTest(string cacheRoot) =>
+        TestGate.IsOpen($@"Local\DesktopGuides.Preview.WebView2Missing.{Environment.ProcessId}")
+            ? Path.Combine(cacheRoot, "missing-runtime-test")
             : null;
 
     public async Task OpenAsync(ManagedGuideSource source, CancellationToken token)
@@ -68,11 +80,26 @@ internal sealed class HtmlReaderSession : IReaderSession
         }
         ObjectDisposedException.ThrowIf(disposed, this);
         contentSha256 = source.Guide.ContentSha256;
+        string? browserFolder = MissingRuntimeFolderForTest(cacheRoot);
+        string? version;
+        try
+        {
+            if (browserFolder is not null) Directory.CreateDirectory(browserFolder);
+            version = CoreWebView2Environment.GetAvailableBrowserVersionString(browserFolder);
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            throw new HtmlGuideLoadException(HtmlGuideLoadError.RuntimeMissing);
+        }
+        if (string.IsNullOrEmpty(version))
+        {
+            throw new HtmlGuideLoadException(HtmlGuideLoadError.RuntimeMissing);
+        }
         try
         {
             Directory.CreateDirectory(profile);
             environment = await CoreWebView2Environment.CreateWithOptionsAsync(
-                null, profile, new CoreWebView2EnvironmentOptions
+                browserFolder, profile, new CoreWebView2EnvironmentOptions
                 {
                     AdditionalBrowserArguments = HtmlBrowserEnvironment.Arguments,
                 });
@@ -80,7 +107,8 @@ internal sealed class HtmlReaderSession : IReaderSession
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
-            throw new HtmlGuideLoadException(HtmlGuideLoadError.RuntimeMissing);
+            // The runtime is installed but didn't start.
+            throw new HtmlGuideLoadException(HtmlGuideLoadError.RuntimeFailed);
         }
         token.ThrowIfCancellationRequested();
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -111,19 +139,22 @@ internal sealed class HtmlReaderSession : IReaderSession
             core.PermissionRequested += OnPermissionRequested;
             core.DownloadStarting += OnDownloadStarting;
             core.LaunchingExternalUriScheme += OnLaunchingExternalUriScheme;
+            core.ProcessFailed += OnProcessFailed;
             core.NavigationCompleted += Completed;
+            pendingNavigation = completion;
             core.Navigate(policy.EntryUri.AbsoluteUri);
             success = await completion.Task.WaitAsync(TimeSpan.FromSeconds(15), token);
         }
-        catch (Exception error) when (error is not OperationCanceledException)
+        catch (Exception error) when (error is not OperationCanceledException and not HtmlGuideLoadException)
         {
             // A timeout or a COM failure leaves the guide unreadable, not the app.
             throw new HtmlGuideLoadException(HtmlGuideLoadError.Changed);
         }
         finally
         {
-            // A closed view raises nothing more, and touching it could throw.
-            if (!disposed) core.NavigationCompleted -= Completed;
+            pendingNavigation = null;
+            // A closed or crashed view raises nothing more, and touching it could throw.
+            if (!disposed && !failed) core.NavigationCompleted -= Completed;
         }
         if (!success || !entryServed)
         {
@@ -252,21 +283,51 @@ internal sealed class HtmlReaderSession : IReaderSession
     private static void OnLaunchingExternalUriScheme(
         CoreWebView2 sender, CoreWebView2LaunchingExternalUriSchemeEventArgs args) => args.Cancel = true;
 
+    // Chromium restarts GPU, utility and frame processes by itself; only a
+    // lost browser or page renderer leaves the guide unreadable.
+    private void OnProcessFailed(CoreWebView2 sender, CoreWebView2ProcessFailedEventArgs args)
+    {
+        if (disposed || failed || args.ProcessFailedKind is not (
+                CoreWebView2ProcessFailedKind.BrowserProcessExited or
+                CoreWebView2ProcessFailedKind.RenderProcessExited or
+                CoreWebView2ProcessFailedKind.RenderProcessUnresponsive))
+        {
+            return;
+        }
+        failed = true;
+        if (pendingNavigation?.TrySetException(new HtmlGuideLoadException(HtmlGuideLoadError.Crashed)) == true)
+        {
+            return;
+        }
+        Failed?.Invoke(this, HtmlGuideLoadError.Crashed);
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (disposed) return;
         disposed = true;
         ExternalLinkRequested = null;
+        Failed = null;
         WriteDiagnostics();
         if (core is not null)
         {
-            core.WebResourceRequested -= OnWebResourceRequested;
-            core.NavigationStarting -= OnNavigationStarting;
-            core.FrameNavigationStarting -= OnFrameNavigationStarting;
-            core.NewWindowRequested -= OnNewWindowRequested;
-            core.PermissionRequested -= OnPermissionRequested;
-            core.DownloadStarting -= OnDownloadStarting;
-            core.LaunchingExternalUriScheme -= OnLaunchingExternalUriScheme;
+            try
+            {
+                core.WebResourceRequested -= OnWebResourceRequested;
+                core.NavigationStarting -= OnNavigationStarting;
+                core.FrameNavigationStarting -= OnFrameNavigationStarting;
+                core.NewWindowRequested -= OnNewWindowRequested;
+                core.PermissionRequested -= OnPermissionRequested;
+                core.DownloadStarting -= OnDownloadStarting;
+                core.LaunchingExternalUriScheme -= OnLaunchingExternalUriScheme;
+                core.ProcessFailed -= OnProcessFailed;
+            }
+            catch (Exception error) when (error is System.Runtime.InteropServices.COMException or
+                                              InvalidOperationException)
+            {
+                // A crashed browser leaves a view that can't be touched; the
+                // handlers check disposed anyway.
+            }
         }
         if (environment is not null)
         {
@@ -280,7 +341,7 @@ internal sealed class HtmlReaderSession : IReaderSession
         {
             View.Close();
         }
-        // T09.1 sweeps profiles a crash or a slow exit leaves behind.
+        // A profile still locked here is removed by the next startup's sweep.
         try
         {
             if (Directory.Exists(profile)) Directory.Delete(profile, recursive: true);
