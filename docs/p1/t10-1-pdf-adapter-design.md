@@ -1,6 +1,7 @@
 # T10.1 PDF reader adapter design
 
-Status: design approved; implementation not started.
+Status: implemented in PR #PRNUM; CI run 37167095989 passed the installed
+`pdf-reader` scenario in light and dark.
 Prerequisites: T06.3 is merged (PR #19, merge commit `494cb02`); T10.0's
 [decision](pdf-decision.md) selected the native hybrid; T11.2's reader
 contract is merged.
@@ -363,3 +364,59 @@ error surface.
 - OCR for scanned pages (P2).
 - Prefetching neighboring pages.
 - The T10.0 probes under `src/DesktopGuides.App/Probes/` stay as they are.
+
+## Implementation notes
+
+Planning rulings, from the
+[implementation plan](t10-1-pdf-adapter-plan.md):
+
+- **R1.** `PdfGuideLoadMessages.ActionFor` returns the existing
+  `HtmlGuideLoadAction`, so the Reader error surface and its Reopen button
+  are shared rather than duplicated.
+- **R2.** `PdfLocationRules` validates the decoded locator itself; the
+  session holds no codec logic.
+- **R3.** `CancellableReadStream` has a settable `Token`, so each text
+  extraction can be cancelled through the import's stream wrapper.
+- **R4.** The loader reuses the import's `%PDF` header check.
+- **R5.** Diagnostics are a Core record (`PdfSessionDiagnostics`) with a
+  unit-tested JSON shape.
+- **R6.** The narrow layout is switched in code-behind, not with
+  `VisualStateManager`; no XAML in the repo uses visual states yet.
+- **R7.** Production has no unit test host, so its RED step is the
+  installed smoke (Task 7), made GREEN by the view and the session
+  (Task 8).
+
+Execution notes:
+
+- The session is `PdfReaderSession`, not the `PdfReaderAdapter` named in
+  the P1 technical design; it implements `IReaderSession` like the TXT and
+  HTML sessions.
+- RED was observed in CI, as for T09.1. No local .NET toolchain was used.
+- `Apply` never throws. The scheduler stalls if its apply callback throws,
+  so an exception from `ShowPage` counts as a failed page.
+- On a second open, `PdfReaderSession.OpenAsync` maps a file that vanished
+  between load and open to `Missing`, and other IO and access errors to
+  `Unreadable`. This is in addition to the spec's `Damaged` and
+  `PasswordProtected`.
+- The 96 MiB cap counts cached images only. The image on screen stays alive
+  after it is evicted, so real image memory can briefly reach the cap plus
+  one page raster.
+
+## Verification
+
+CI run 37167095989 passed `core-tests` and the installed `production-shell-ui`
+`pdf-reader` scenario in light and dark. The light pass's `pdf-long`
+diagnostics after three sweeps: `requests` 602, `loads` 126, `staleResults`
+100, `peakCacheBytes` 82568192 of 100663296, `cachedPagesAtClose` 98,
+`peakTextPages` 8, `disposedCleanly` true
+([light](evidence/t10-1-pdf-adapter/pdf-reader-light.pdf-long.json),
+[dark](evidence/t10-1-pdf-adapter/pdf-reader-dark.pdf-long.json)).
+
+Screenshots:
+
+- [Side by side, light](evidence/t10-1-pdf-adapter/pdf-reader-light.png)
+- [Side by side, dark](evidence/t10-1-pdf-adapter/pdf-reader-dark.png)
+- [Narrow, light](evidence/t10-1-pdf-adapter/pdf-reader-narrow-light.png)
+- [Narrow, dark](evidence/t10-1-pdf-adapter/pdf-reader-narrow-dark.png)
+- [Damaged, light](evidence/t10-1-pdf-adapter/pdf-error-light.png)
+- [Damaged, dark](evidence/t10-1-pdf-adapter/pdf-error-dark.png)

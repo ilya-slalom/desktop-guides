@@ -814,6 +814,14 @@ leftover WebView2 profiles at startup, tells a missing runtime, a failed
 start, a crash, a missing entry and a changed file apart, and offers
 **Get WebView2 Runtime** or **Reopen** where they help.
 
+T10.1 is in review in PR #PRNUM (CI run 37167095989); see the
+[design and implementation notes](t10-1-pdf-adapter-design.md). PDF guides
+open in the Reader as a `Windows.Data.Pdf` preview beside the same page's
+PdfPig text in a read-only text box with a UI Automation `TextPattern`.
+Rendered pages are cached by measured bytes under 96 MiB, page loads run
+one at a time with the newest request winning, and damaged, missing,
+changed, unreadable and encrypted managed copies show typed errors.
+
 ## M4 — progress, completion, and appearance
 
 Exit: two guides retain independent positions across restart; completion
