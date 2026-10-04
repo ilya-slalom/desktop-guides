@@ -46,7 +46,12 @@ public sealed partial class PdfReaderView : UserControl
         new(PreviewScroller.VerticalOffset, Preview.ActualHeight, PreviewScroller.ViewportHeight);
 
     public void ScrollTo(double offset) =>
-        PreviewScroller.ChangeView(null, offset, null, disableAnimation: true);
+        LastChangeView = PreviewScroller.ChangeView(null, offset, null, disableAnimation: true);
+
+    // TEMP T10.3 debug trace.
+    public bool LastChangeView { get; private set; }
+    public string DebugScroll =>
+        $"e{PreviewScroller.ExtentHeight:F1} s{PreviewScroller.ScrollableHeight:F1} w{PreviewScroller.ActualWidth:F1} iw{Preview.ActualWidth:F1}";
 
     public void ShowPage(int index, int count, ImageSource? image, PdfPageText? text)
     {

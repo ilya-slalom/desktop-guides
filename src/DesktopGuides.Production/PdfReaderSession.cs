@@ -296,7 +296,7 @@ internal sealed class PdfReaderSession : IReaderSession
         if (disposed) return;
         PdfPreviewLayout layout = View.PreviewLayout;
         bool moved = position.Scrolled(layout.Offset, layout.ImageHeight, layout.ViewportHeight);
-        Trace($"scrolled p{position.Page} o{layout.Offset:F1} i{layout.ImageHeight:F1} v{layout.ViewportHeight:F1} moved={moved} f{position.Fraction:F4}");
+        Trace($"scrolled p{position.Page} o{layout.Offset:F1} i{layout.ImageHeight:F1} v{layout.ViewportHeight:F1} moved={moved} f{position.Fraction:F4} {View.DebugScroll}");
         if (moved)
         {
             RaiseLocationChanged();
@@ -307,8 +307,8 @@ internal sealed class PdfReaderSession : IReaderSession
     {
         PdfPreviewLayout layout = View.PreviewLayout;
         double offset = position.OffsetFor(layout.ImageHeight, layout.ViewportHeight);
-        Trace($"apply {caller} p{position.Page} f{position.Fraction:F4} o{layout.Offset:F1} i{layout.ImageHeight:F1} v{layout.ViewportHeight:F1} -> {offset:F1}");
         View.ScrollTo(offset);
+        Trace($"apply {caller} p{position.Page} f{position.Fraction:F4} o{layout.Offset:F1} i{layout.ImageHeight:F1} v{layout.ViewportHeight:F1} {View.DebugScroll} -> {offset:F1} cv={View.LastChangeView}");
     }
 
     // TEMP T10.3 debug trace.
