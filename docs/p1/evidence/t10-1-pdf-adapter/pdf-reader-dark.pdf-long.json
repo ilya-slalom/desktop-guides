@@ -1,1 +1,1 @@
-{"requests":602,"loads":115,"staleResults":96,"peakCacheBytes":79869440,"maxCacheBytes":100663296,"cachedPagesAtClose":95,"peakTextPages":8,"peakTextCharacters":280,"disposedCleanly":true}
+{"requests":602,"loads":281,"staleResults":69,"peakCacheBytes":100602880,"maxCacheBytes":100663296,"cachedPagesAtClose":121,"peakTextPages":8,"peakTextCharacters":280,"disposedCleanly":true,"evictions":112}

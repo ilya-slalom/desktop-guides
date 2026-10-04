@@ -1,6 +1,6 @@
 # T10.1 PDF reader adapter design
 
-Status: implemented in PR #PRNUM; CI run 37167095989 passed the installed
+Status: implemented in PR #PRNUM; CI run 37169058467 passed the installed
 `pdf-reader` scenario in light and dark.
 Prerequisites: T06.3 is merged (PR #19, merge commit `494cb02`); T10.0's
 [decision](pdf-decision.md) selected the native hybrid; T11.2's reader
@@ -255,7 +255,7 @@ The gate is the named event
 `<cacheRoot>\diagnostics\pdf-<guideId>.json` with counts only:
 `requests`, `loads`, `staleResults`, `peakCacheBytes`, `maxCacheBytes`,
 `cachedPagesAtClose`, `peakTextPages`, `peakTextCharacters`,
-`disposedCleanly`. No guide text and no paths. A write failure never
+`disposedCleanly`, `evictions`. No guide text and no paths. A write failure never
 affects closing the guide.
 
 ## Logging and untrusted input
@@ -333,8 +333,10 @@ A new `pdf-reader` scenario runs with the diagnostics gate open:
    `PdfPageStatus` is "Page 200 of 200", the preview is named
    "Page 200 of 200 preview", and the text contains
    "page 200 of 200". Start and End reach pages 1 and 200 with matching
-   text. Two more full Next sweeps follow. After closing the guide, the
-   diagnostics file shows `peakCacheBytes <= 100663296`,
+   text. A second full sweep is rapid; the third invokes Next once per
+   page and waits for every page to load, so the 200 previews exceed the
+   cap. After closing the guide, the diagnostics file shows `evictions > 0`,
+   `peakCacheBytes <= 100663296`,
    `cachedPagesAtClose < 200`, `staleResults > 0` or `loads < requests`,
    `peakTextPages <= 8`, and `disposedCleanly` true.
 4. Damaged: the `Damaged` message with no action. Missing: the `Missing`
@@ -398,19 +400,35 @@ Execution notes:
   between load and open to `Missing`, and other IO and access errors to
   `Unreadable`. This is in addition to the spec's `Damaged` and
   `PasswordProtected`.
+- Task 6 ruling. An IO or access error on the planned-path check maps to
+  `Changed`, mirroring `ManagedHtmlGuideLoader`, although the error table
+  says `Unreadable`.
+- Known limit. Text extraction checks cancellation only when PdfPig reads
+  the file, so closing a guide waits for a running page extraction to
+  finish. A pathologically slow page delays Back until it does. A bounded
+  close is left for T10.2.
+- Known limit. Process memory on large publisher PDFs (100 MB to 1 GiB) was
+  not measured. T10.1 bounds the render cache and page text, and PdfPig
+  reads lazily from the stream. A large-file working-set measurement is
+  left for T10.2's installed cases.
 - The 96 MiB cap counts cached images only. The image on screen stays alive
   after it is evicted, so real image memory can briefly reach the cap plus
   one page raster.
 
 ## Verification
 
-CI run 37167095989 passed `core-tests` and the installed `production-shell-ui`
-`pdf-reader` scenario in light and dark. The light pass's `pdf-long`
-diagnostics after three sweeps: `requests` 602, `loads` 126, `staleResults`
-100, `peakCacheBytes` 82568192 of 100663296, `cachedPagesAtClose` 98,
-`peakTextPages` 8, `disposedCleanly` true
-([light](evidence/t10-1-pdf-adapter/pdf-reader-light.pdf-long.json),
-[dark](evidence/t10-1-pdf-adapter/pdf-reader-dark.pdf-long.json)).
+CI run 37169058467 passed `core-tests` and the installed `production-shell-ui`
+`pdf-reader` scenario in light and dark. The `pdf-long` diagnostics after
+three sweeps, the third waiting on every page:
+
+| Pass | `requests` | `loads` | `staleResults` | `evictions` | `peakCacheBytes` (cap 100663296) | `cachedPagesAtClose` | `peakTextPages` | `disposedCleanly` |
+|---|---|---|---|---|---|---|---|---|
+| [Light](evidence/t10-1-pdf-adapter/pdf-reader-light.pdf-long.json) | 602 | 294 | 76 | 118 | 100620800 | 121 | 8 | true |
+| [Dark](evidence/t10-1-pdf-adapter/pdf-reader-dark.pdf-long.json) | 602 | 281 | 69 | 112 | 100602880 | 121 | 8 | true |
+
+The cache reached its cap and evicted, so the bound was exercised in the
+real app. The installed PDF smoke ran on x64 only; ARM64 PDF behaviour is
+untested.
 
 Screenshots:
 

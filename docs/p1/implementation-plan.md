@@ -814,7 +814,7 @@ leftover WebView2 profiles at startup, tells a missing runtime, a failed
 start, a crash, a missing entry and a changed file apart, and offers
 **Get WebView2 Runtime** or **Reopen** where they help.
 
-T10.1 is in review in PR #PRNUM (CI run 37167095989); see the
+T10.1 is in review in PR #PRNUM (CI run 37169058467); see the
 [design and implementation notes](t10-1-pdf-adapter-design.md). PDF guides
 open in the Reader as a `Windows.Data.Pdf` preview beside the same page's
 PdfPig text in a read-only text box with a UI Automation `TextPattern`.
