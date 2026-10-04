@@ -823,7 +823,7 @@ Rendered pages are cached by measured bytes under 96 MiB, page loads run
 one at a time with the newest request winning, and damaged, missing,
 changed, unreadable and encrypted managed copies show typed errors.
 
-T10.3 is in review in PR #PRNUM (CI run 37178208319); see the
+T10.3 is in review in PR #37 (CI run 37178208319); see the
 [design and implementation notes](t10-3-pdf-locator-design.md). A PDF
 position is now a page and the share of the page above the viewport. It
 survives narrow, medium and wide windows on `pdf-long` and resets to the

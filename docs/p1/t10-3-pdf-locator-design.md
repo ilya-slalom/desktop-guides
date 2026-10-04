@@ -1,6 +1,6 @@
 # T10.3 PDF locator and restore design
 
-Status: implemented in PR #PRNUM; CI run 37178208319 passed the installed
+Status: implemented in PR #37; CI run 37178208319 passed the installed
 `pdf-resize` phase in light and dark.
 Prerequisites: T10.1 is merged (PR #36, merge commit `e2b9b8c`); T12.1's
 locator codec is merged (PR #3).
