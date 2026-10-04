@@ -40,6 +40,8 @@ internal sealed class PdfReaderSession : IReaderSession
     private CancellationTokenSource? resizeDelay;
     private int target;
     private readonly PdfPagePosition position = new();
+    // TEMP T10.3 debug trace.
+    private readonly List<string> trace = new();
     private int appliedWidth;
     private double appliedAspect = double.NaN;
     private int failedPages;
@@ -253,6 +255,7 @@ internal sealed class PdfReaderSession : IReaderSession
     {
         if (disposed || failed) return;
         position.Shown(index);
+        Trace($"shown p{index} w{result.RasterWidth} f{position.Fraction:F4}");
         appliedWidth = result.RasterWidth;
         appliedAspect = result.Aspect;
         bool shown = true;
@@ -292,16 +295,37 @@ internal sealed class PdfReaderSession : IReaderSession
     {
         if (disposed) return;
         PdfPreviewLayout layout = View.PreviewLayout;
-        if (position.Scrolled(layout.Offset, layout.ImageHeight, layout.ViewportHeight))
+        bool moved = position.Scrolled(layout.Offset, layout.ImageHeight, layout.ViewportHeight);
+        Trace($"scrolled p{position.Page} o{layout.Offset:F1} i{layout.ImageHeight:F1} v{layout.ViewportHeight:F1} moved={moved} f{position.Fraction:F4}");
+        if (moved)
         {
             RaiseLocationChanged();
         }
     }
 
-    private void ScrollToPoint()
+    private void ScrollToPoint([System.Runtime.CompilerServices.CallerMemberName] string caller = "")
     {
         PdfPreviewLayout layout = View.PreviewLayout;
-        View.ScrollTo(position.OffsetFor(layout.ImageHeight, layout.ViewportHeight));
+        double offset = position.OffsetFor(layout.ImageHeight, layout.ViewportHeight);
+        Trace($"apply {caller} p{position.Page} f{position.Fraction:F4} o{layout.Offset:F1} i{layout.ImageHeight:F1} v{layout.ViewportHeight:F1} -> {offset:F1}");
+        View.ScrollTo(offset);
+    }
+
+    // TEMP T10.3 debug trace.
+    private void Trace(string line)
+    {
+        if (!writeDiagnostics) return;
+        trace.Add($"{Environment.TickCount64} {line}");
+        if (trace.Count > 400) trace.RemoveAt(0);
+        try
+        {
+            string folder = Path.Combine(cacheRoot, "diagnostics");
+            Directory.CreateDirectory(folder);
+            File.WriteAllLines(Path.Combine(folder, "pdf-trace.txt"), trace);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     private void RaiseLocationChanged()

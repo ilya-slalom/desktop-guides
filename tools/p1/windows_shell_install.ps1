@@ -1139,6 +1139,9 @@ function Invoke-PdfReaderPass([string] $resultName) {
     }
     finally {
         $diagnosticsGate.Dispose()
+        # TEMP T10.3 debug trace.
+        $tracePath = Join-Path (Join-Path (Get-HtmlCacheRoot) 'diagnostics') 'pdf-trace.txt'
+        Copy-Item -LiteralPath $tracePath -Destination (Join-Path $ResultDirectory "$resultName.pdf-trace.txt") -ErrorAction SilentlyContinue
     }
 }
 
