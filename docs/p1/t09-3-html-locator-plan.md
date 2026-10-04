@@ -62,7 +62,7 @@ commit `2746175`).
 - Scroll poll: **500 ms**; movement threshold: more than **1** CSS px in any of
   `scrollY`, `scrollHeight`, `innerHeight`.
 - Resize settle: **300 ms** without another `SizeChanged`.
-- Image wait after a restore scroll: up to **2 s**, polled every **100 ms**.
+- ~~Image wait after a restore scroll~~: dropped in Task 5. With page scripts off, lazy images load eagerly and the open waits for them (see the design's `Restore`).
 - Script call timeout: **5 s**.
 - `HtmlAssetDelay` gate: image responses are delayed by **1 s**.
 - Text walk: the body's text nodes in document order, skipping any node

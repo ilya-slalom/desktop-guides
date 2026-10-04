@@ -1377,7 +1377,7 @@ try {
             }
             $position = [ordered]@{
                 locator = $file.locator; offset = $null; quote = $null
-                kind = $file.kind; step = $file.step; reason = $file.reason; pending = $file.pending
+                kind = $file.kind; step = $file.step; reason = $file.reason
             }
             if ($file.locator) {
                 $payload = ($file.locator | ConvertFrom-Json).payload
@@ -1841,9 +1841,10 @@ try {
             Back-ToTextGame
             $report.phases += 'position-restore-exact'
 
-            # position-restore-late-images: images answer 1 s late, so the
-            # lazy route map above the target is still loading after the
-            # first scroll; the second scroll puts the line back on top.
+            # position-restore-late-images: images answer 1 s late. With
+            # scripts off the lazy route map above the target loads eagerly,
+            # and the restore runs only after the page's load, so the line
+            # is still on top.
             $delay = [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::ManualReset,
                 "Local\DesktopGuides.Preview.HtmlAssetDelay.$ProcessId")
@@ -1854,9 +1855,6 @@ try {
                 $delay.Dispose()
             }
             Assert-Restore $delayed 'Exact' 'Exact' '' 'a restore with late images'
-            if ($null -eq $delayed.pending -or [int] $delayed.pending -lt 1) {
-                throw "A restore with late images met no loading image (pending=$($delayed.pending)), so the image wait went untested."
-            }
             if ($delayed.offset -ne $target.offset) {
                 throw "A restore with late images captured offset $($delayed.offset); expected $($target.offset)."
             }

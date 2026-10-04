@@ -149,9 +149,12 @@ helpers). Host values enter only as `JsonSerializer` literals.
   offset 0, no quote and the fraction.
 - `Restore(plan)` applies the plan's steps in order and scrolls so the
   target character's line box is at the viewport top, clamped to the
-  scroll range. It then waits for images that are still loading, up to
-  2 s, re-resolves the same step and scrolls again. It returns the step and
-  the offset it used.
+  scroll range. It returns the step and the offset it used. No image is
+  still loading at that point: with page scripts off, Chromium ignores
+  `loading="lazy"` and loads every image eagerly, and the session restores
+  only after the entry's load event, which waits for them. (A CI probe of
+  the delayed-image run showed the lazy route map already complete at the
+  first scroll.) A resize during the restore scrolls to the target again.
 
 **Clobbering.** Page scripts can't run, but named elements can still
 shadow `document` and `window` properties (`<form name="querySelectorAll">`).
@@ -259,8 +262,8 @@ Named-event gates in the existing `TestGate` pattern:
 2. Resize to 600, 1100 and 1500 px. After each, the same line is at the
    top and the offset is unchanged.
 3. Reopen with that locator in the restore file: `Exact`, line at the top.
-   Again with `HtmlAssetDelay` open: `Exact`, line at the top after the
-   image loads.
+   Again with `HtmlAssetDelay` open: `Exact`, line at the top; the open
+   waited for the late images.
 4. Open `html-long-changed` with the same locator: `Approximate` from the
    context step with the changed reason; the same line is at the top.
 5. A malformed restore file: `Unavailable`; the page is at its start.

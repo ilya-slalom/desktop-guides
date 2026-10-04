@@ -117,8 +117,6 @@ internal static class HtmlPositionScripts
         })()
         """;
 
-    public const string PendingImages = "(() => {" + Prelude + "return pending(); })()";
-
     // Whether the quote is at the saved offset, and the quote's occurrences
     // nearest it: inside the id's element and in the whole walk.
     public static string Find(string argsJson) => "(() => {" + Prelude + "const args = " + argsJson + ";" + """

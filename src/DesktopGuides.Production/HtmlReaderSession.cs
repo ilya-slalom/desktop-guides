@@ -50,8 +50,6 @@ internal sealed class HtmlReaderSession : IReaderSession
     // Bumped by every size change: a capture or baseline taken across one
     // is from a page mid-reflow and is dropped.
     private int generation;
-    private static readonly TimeSpan ImageWait = TimeSpan.FromSeconds(2);
-    private static readonly TimeSpan ImagePoll = TimeSpan.FromMilliseconds(100);
     private readonly TaskCompletionSource<bool> entryLoad = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly SemaphoreSlim restoreTurn = new(1, 1);
     private readonly string? restoreFileForTest;
@@ -59,7 +57,6 @@ internal sealed class HtmlReaderSession : IReaderSession
     private bool restoring;
     private RestoreOutcome? lastOutcome;
     private HtmlRestoreStep? lastStep;
-    private int? lastPending;
 
     public HtmlReaderSession(
         HtmlGuideLoaded loaded, string dataRoot, string cacheRoot, HtmlSessionDiagnostics? diagnostics)
@@ -387,23 +384,23 @@ internal sealed class HtmlReaderSession : IReaderSession
     // Puts the target character's box at the viewport top. An offset whose
     // text has no box (hidden since capture) falls back to the fraction, and
     // the returned target says so. Null when no script replied.
-    private async Task<(HtmlRestoreTarget Target, int Pending)?> ScrollToTargetAsync(HtmlRestoreTarget target)
+    private async Task<HtmlRestoreTarget?> ScrollToTargetAsync(HtmlRestoreTarget target)
     {
         if (target.Step != HtmlRestoreStep.Fraction &&
-            HtmlLocationRules.ParsePending(await RunScriptAsync(HtmlPositionScripts.ScrollToOffset(target.Offset))) is int pending)
+            HtmlLocationRules.ParsePending(await RunScriptAsync(HtmlPositionScripts.ScrollToOffset(target.Offset))) is not null)
         {
-            return (target, pending);
+            return target;
         }
         HtmlRestoreTarget fraction = target with { Step = HtmlRestoreStep.Fraction };
-        return HtmlLocationRules.ParsePending(await RunScriptAsync(HtmlPositionScripts.ScrollToFraction(fraction.Fraction))) is int left
-            ? (fraction, left)
+        return HtmlLocationRules.ParsePending(await RunScriptAsync(HtmlPositionScripts.ScrollToFraction(fraction.Fraction))) is not null
+            ? fraction
             : null;
     }
 
     // Core plans the steps and picks the target; the scripts only measure
-    // and scroll. An image above the target that is still loading would push
-    // it down, so once images load (or after 2 s) the target goes to the top
-    // again, and again after any resize during the restore.
+    // and scroll. No image is still loading here: with scripts off Chromium
+    // loads lazy images eagerly, and the entry's load waited for all of them.
+    // A resize during the restore scrolls to the target again.
     private async Task<RestoreOutcome> RestoreAsync(LocationDecodeResult decoded)
     {
         await restoreTurn.WaitAsync();
@@ -418,21 +415,16 @@ internal sealed class HtmlReaderSession : IReaderSession
                     await RunScriptAsync(HtmlPositionScripts.Find(HtmlLocationRules.FindArgs(position))));
             }
             HtmlRestoreTarget? target = HtmlLocationRules.Resolve(plan, find);
-            int? pending = null;
             if (target is not null)
             {
                 int started = generation;
-                (HtmlRestoreTarget Target, int Pending)? first = await ScrollToTargetAsync(target);
-                target = first?.Target;
-                pending = first?.Pending;
-                if (first is { Pending: > 0 }) await WaitForImagesAsync();
-                while (target is not null && !disposed)
+                target = await ScrollToTargetAsync(target);
+                while (target is not null && started != generation && !disposed)
                 {
-                    target = (await ScrollToTargetAsync(target))?.Target ?? target;
-                    if (started == generation) break;
                     // The window was resized during the restore.
                     started = generation;
                     await Task.Delay(ResizeSettle);
+                    target = await ScrollToTargetAsync(target) ?? target;
                 }
             }
             RestoreOutcome outcome = HtmlLocationRules.Outcome(plan, target);
@@ -444,7 +436,6 @@ internal sealed class HtmlReaderSession : IReaderSession
             diagnostics?.RecordRestore(outcome.Kind);
             lastOutcome = outcome;
             lastStep = outcome.Kind == RestoreKind.Unavailable ? null : target?.Step;
-            lastPending = pending;
             bool moved = capture is not null && capture != current;
             if (capture is not null) current = capture;
             WritePositionForTest();
@@ -455,20 +446,6 @@ internal sealed class HtmlReaderSession : IReaderSession
         {
             restoring = false;
             restoreTurn.Release();
-        }
-    }
-
-    // Polls until no image above the viewport's bottom is loading, or 2 s.
-    private async Task WaitForImagesAsync()
-    {
-        DateTime deadline = DateTime.UtcNow + ImageWait;
-        while (DateTime.UtcNow < deadline && !disposed)
-        {
-            await Task.Delay(ImagePoll);
-            if (HtmlLocationRules.ParsePending(await RunScriptAsync(HtmlPositionScripts.PendingImages)) is not > 0)
-            {
-                return;
-            }
         }
     }
 
@@ -716,8 +693,7 @@ internal sealed class HtmlReaderSession : IReaderSession
                 locator,
                 kind = lastOutcome?.Kind.ToString(),
                 step = lastStep?.ToString(),
-                reason = lastOutcome?.Reason,
-                pending = lastPending
+                reason = lastOutcome?.Reason
             });
             string folder = Path.Combine(cacheRoot, "diagnostics");
             Directory.CreateDirectory(folder);
