@@ -60,8 +60,6 @@ internal sealed class HtmlReaderSession : IReaderSession
     private RestoreOutcome? lastOutcome;
     private HtmlRestoreStep? lastStep;
     private int? lastPending;
-    private string? probeForTest;
-    private const string ProbeImages = "JSON.stringify(Array.from(document.images).map(i => [i.getAttribute('src'), i.loading, i.complete, i.naturalWidth, Math.round(i.getBoundingClientRect().top), Math.round(i.getBoundingClientRect().height)]).concat([[innerHeight, scrollY]]))";
 
     public HtmlReaderSession(
         HtmlGuideLoaded loaded, string dataRoot, string cacheRoot, HtmlSessionDiagnostics? diagnostics)
@@ -427,9 +425,6 @@ internal sealed class HtmlReaderSession : IReaderSession
                 (HtmlRestoreTarget Target, int Pending)? first = await ScrollToTargetAsync(target);
                 target = first?.Target;
                 pending = first?.Pending;
-                string? probeNow = await RunScriptAsync(ProbeImages);
-                await Task.Delay(300);
-                probeForTest = "now=" + probeNow + " later=" + await RunScriptAsync(ProbeImages);
                 if (first is { Pending: > 0 }) await WaitForImagesAsync();
                 while (target is not null && !disposed)
                 {
@@ -722,8 +717,7 @@ internal sealed class HtmlReaderSession : IReaderSession
                 kind = lastOutcome?.Kind.ToString(),
                 step = lastStep?.ToString(),
                 reason = lastOutcome?.Reason,
-                pending = lastPending,
-                probe = probeForTest
+                pending = lastPending
             });
             string folder = Path.Combine(cacheRoot, "diagnostics");
             Directory.CreateDirectory(folder);
