@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl x:Class="DesktopGuides.Production.PdfReaderView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition x:Name="TextColumn" Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition x:Name="TextRow" Height="0" />
+        </Grid.RowDefinitions>
+        <TextBlock x:Name="PageStatus"
+                   Grid.ColumnSpan="2"
+                   Margin="0,0,0,12"
+                   AutomationProperties.AutomationId="PdfPageStatus"
+                   Style="{StaticResource DesktopGuidesBodyStyle}"
+                   Foreground="{ThemeResource DesktopGuidesPrimaryTextBrush}" />
+        <Grid x:Name="PreviewPane" Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock x:Name="PreviewStatus"
+                       Visibility="Collapsed"
+                       Margin="0,0,0,12"
+                       TextWrapping="Wrap"
+                       AutomationProperties.AutomationId="PdfPreviewStatus"
+                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                       Foreground="{ThemeResource DesktopGuidesSecondaryTextBrush}" />
+            <ScrollViewer x:Name="PreviewScroller"
+                          Grid.Row="1"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+                <Image x:Name="Preview"
+                       AutomationProperties.AutomationId="PdfPreviewImage"
+                       Stretch="Uniform"
+                       VerticalAlignment="Top" />
+            </ScrollViewer>
+        </Grid>
+        <Grid x:Name="TextPane" Grid.Row="1" Grid.Column="1" Margin="16,0,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock x:Name="TextStatus"
+                       Visibility="Collapsed"
+                       Margin="0,0,0,12"
+                       TextWrapping="Wrap"
+                       AutomationProperties.AutomationId="PdfTextStatus"
+                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                       Foreground="{ThemeResource DesktopGuidesSecondaryTextBrush}" />
+            <TextBox x:Name="DocumentText"
+                     Grid.Row="1"
+                     IsReadOnly="True"
+                     TextWrapping="Wrap"
+                     AcceptsReturn="True"
+                     IsSpellCheckEnabled="False"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     AutomationProperties.AutomationId="PdfDocumentText" />
+        </Grid>
+    </Grid>
+</UserControl>
