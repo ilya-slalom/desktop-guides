@@ -833,7 +833,8 @@ top, keeps the point as `Approximate` when the bytes changed, and opens at
 the first page for a malformed, wrong-format or future-version locator.
 Saving it and restoring on reopen remain T12.2.
 
-T09.3 is in review in PR #39 (CI run 37206866197); see the
+T09.3 was merged through PR #39 on 5 October 2026 (merge commit `dee44e4`;
+final-HEAD CI run 37209771443); see the
 [design and implementation notes](t09-3-html-locator-design.md). An HTML
 position is now a character offset in the entry document with a text
 quote, the nearest element id and the scroll fraction. It survives narrow,
