@@ -48,8 +48,8 @@ public static class HtmlLocationRules
             !OptionalText(root.GetProperty("quote"), MaxQuote, out string? quote) ||
             !OptionalText(root.GetProperty("id"), MaxElementId, out string? id) ||
             !Fraction(root.GetProperty("fraction"), out double fraction) ||
-            root.GetProperty("href").ValueKind != JsonValueKind.String ||
-            !Uri.TryCreate(root.GetProperty("href").GetString(), UriKind.Absolute, out Uri? page) ||
+            !Text(root.GetProperty("href"), out string href) ||
+            !Uri.TryCreate(href, UriKind.Absolute, out Uri? page) ||
             !HtmlNavigationPolicy.IsEntryDocument(page, entry))
         {
             return null;
@@ -277,9 +277,25 @@ public static class HtmlLocationRules
     {
         value = null;
         if (element.ValueKind == JsonValueKind.Null) return true;
-        if (element.ValueKind != JsonValueKind.String) return false;
-        value = element.GetString()!;
+        if (!Text(element, out string text)) return false;
+        value = text;
         return value.Length <= limit && !value.Contains('\0');
+    }
+
+    private static bool Text(JsonElement element, out string value)
+    {
+        value = "";
+        if (element.ValueKind != JsonValueKind.String) return false;
+        try
+        {
+            value = element.GetString()!;
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            // Half a surrogate pair can't become a string.
+            return false;
+        }
     }
 
     private static bool Fraction(JsonElement element, out double value)
