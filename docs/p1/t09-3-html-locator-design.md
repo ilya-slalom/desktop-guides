@@ -47,7 +47,8 @@ Decisions made during brainstorming:
   until T12.2.
 - **Unimported links are reported** in an informational Reader bar, the
   design's "reported as unavailable"; they stay denied.
-- **Approach A:** fixed host scripts run through `ExecuteScriptAsync`;
+- **Approach A:** fixed host scripts run through the DevTools protocol's
+  `Runtime.evaluate` with `userGesture: false`;
   every decision and every check of their replies lives in Core; a light
   poll tracks movement. T07.3's policy is unchanged: page scripts, web
   messages and host objects stay off. Pushing scroll events over web
@@ -270,9 +271,16 @@ Named-event gates in the existing `TestGate` pattern:
 Screenshots: the unavailable bar and the restored page, light and dark.
 
 **Early check.** The plan's first installed run includes a minimal
-capture, to confirm that `ExecuteScriptAsync` runs under T07.3's
+capture, to confirm that `Runtime.evaluate` runs under T07.3's
 `script-src 'none'` page CSP with page scripts off. If it doesn't, work
 stops for a revised approach.
+
+The first early check used `ExecuteScriptAsync`. Its scripts ran under the
+CSP, but they ran with a user gesture: with the 500 ms poll running, the
+canary's one-second meta refresh reached the navigation policy as a
+person's click and raised the external-link bar. `Runtime.evaluate` with
+no gesture keeps page-initiated navigations page-initiated. It works with
+`AreDevToolsEnabled` off, since that setting only hides the DevTools UI.
 
 ## Docs
 

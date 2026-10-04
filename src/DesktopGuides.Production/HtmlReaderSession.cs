@@ -212,12 +212,31 @@ internal sealed class HtmlReaderSession : IReaderSession
             {
                 return null;
             }
-            return await core.ExecuteScriptAsync(script).AsTask().WaitAsync(ScriptTimeout);
+            string reply = await core.CallDevToolsProtocolMethodAsync("Runtime.evaluate", EvaluateParams(script))
+                .AsTask().WaitAsync(ScriptTimeout);
+            return EvaluateValue(reply);
         }
         catch (Exception)
         {
             return null;
         }
+    }
+
+    // ExecuteScriptAsync runs with a user gesture, which makes the page's
+    // own refreshes and redirects look like a person's click to the
+    // navigation policy. Runtime.evaluate without one keeps them page-initiated.
+    private static string EvaluateParams(string script) =>
+        JsonSerializer.Serialize(new { expression = script, returnByValue = true, userGesture = false });
+
+    // The value as JSON, as ExecuteScriptAsync would give it; null when the
+    // script threw.
+    private static string? EvaluateValue(string reply)
+    {
+        using JsonDocument json = JsonDocument.Parse(reply);
+        if (json.RootElement.TryGetProperty("exceptionDetails", out _)) return null;
+        return json.RootElement.GetProperty("result").TryGetProperty("value", out JsonElement value)
+            ? value.GetRawText()
+            : "null";
     }
 
     private async Task<HtmlCapture?> CaptureAsync()

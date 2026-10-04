@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace DesktopGuides.Production;
 
-// Fixed scripts the HTML session runs through ExecuteScriptAsync. They only
+// Fixed scripts the HTML session runs through Runtime.evaluate. They only
 // measure and scroll; every decision is Core's (HtmlLocationRules). Page
 // scripts stay off, but named elements can still shadow document and form
 // properties, so DOM members are reached through their prototypes. Host
