@@ -1888,6 +1888,49 @@ try {
             }
             Back-ToTextGame
             $report.phases += 'position-restore-invalid'
+
+            # position-unimported-link: a link to a page that wasn't imported
+            # shows the unavailable bar, and the point stays where it was.
+            $unavailable = "This link goes to a page that isn't part of the imported guide."
+            Open-TextGuide 'Long Web Guide'
+            $report.sessionsOpened++
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PageName 'Long Web Guide')
+            Click-Element (Wait-PageVisible 'Jump to MARK-0420')
+            $here = Wait-HtmlPosition { param($p) $p.quote -like 'MARK-0420 *' } 'the MARK-0420 line'
+            [void](Wait-TopMark 420 'the fragment link')
+            Click-Element (Wait-PageVisible 'Part 2 of this guide')
+            $report.unimportedClicks++
+            [void](Wait-VisibleById 'ReaderUnavailableLinkBar')
+            [void](Wait-Name 'ReaderUnavailableLinkBar' $unavailable)
+            # The bar makes the page shorter; the resize re-apply keeps the
+            # point. One second covers the 300 ms settle and a 500 ms poll.
+            Start-Sleep -Seconds 1
+            [void](Wait-TopMark 420 'an unimported link')
+            $after = Read-HtmlPosition
+            if ($after.offset -ne $here.offset) {
+                throw "An unimported link moved the point from offset $($here.offset) to $($after.offset)."
+            }
+            $report.htmlUnavailableLinkScreenshot = Save-WindowScreenshot 'html-unavailable-link'
+
+            # Showing either link bar hides the other.
+            Click-Element (Wait-PageVisible 'the website')
+            [void](Wait-VisibleById 'ReaderExternalLinkBar')
+            Wait-HiddenById 'ReaderUnavailableLinkBar'
+            Click-Element (Wait-PageVisible 'Part 2 of this guide')
+            $report.unimportedClicks++
+            [void](Wait-VisibleById 'ReaderUnavailableLinkBar')
+            Wait-HiddenById 'ReaderExternalLinkBar'
+            Back-ToTextGame
+
+            # A new session starts without the bar.
+            Open-TextGuide 'Long Web Guide'
+            $report.sessionsOpened++
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PageName 'Long Web Guide')
+            Wait-HiddenById 'ReaderUnavailableLinkBar'
+            Back-ToTextGame
+            $report.phases += 'position-unimported-link'
         }
         elseif ($Mode -eq 'pdf-reader') {
             [void](Wait-Name 'LibraryHeading' 'Library')
