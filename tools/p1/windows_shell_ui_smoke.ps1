@@ -1735,7 +1735,8 @@ try {
                     }
                     $held = $false
                     Start-Sleep -Milliseconds 100
-                } while ((Get-Date) -lt $deadline)
+                    # A hold always gets its re-read, even past the deadline.
+                } while ($held -or (Get-Date) -lt $deadline)
                 throw ("$context left the page at fraction $([Math]::Round($fraction, 3)); " +
                     "expected $([Math]::Round($expected, 3)) +/- 0.1.")
             }
