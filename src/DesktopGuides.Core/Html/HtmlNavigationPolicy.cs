@@ -1,6 +1,6 @@
 namespace DesktopGuides.Core.Html;
 
-public enum HtmlNavigationKind { Entry, SameDocument, External, Deny }
+public enum HtmlNavigationKind { Entry, SameDocument, External, Deny, Unavailable }
 
 public sealed record HtmlNavigation(HtmlNavigationKind Kind, Uri? ExternalUri = null);
 
@@ -23,6 +23,13 @@ public static class HtmlNavigationPolicy
             target.UserInfo.Length == 0 && !GuideWebOrigin.IsGuideHost(target.Host))
         {
             return new(HtmlNavigationKind.External, target);
+        }
+        // Another page of this guide's origin wasn't imported. A person is
+        // told; anything else is cancelled silently.
+        if (target.Scheme is "http" or "https" && userInitiated && target.UserInfo.Length == 0 &&
+            string.Equals(target.Host, entry.Host, StringComparison.OrdinalIgnoreCase))
+        {
+            return new(HtmlNavigationKind.Unavailable);
         }
         return Denied;
     }
