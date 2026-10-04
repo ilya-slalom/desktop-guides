@@ -3,9 +3,6 @@ namespace DesktopGuides.Infrastructure.Import;
 // PdfPig ignores cancellation tokens and reads lazily, so the token is
 // checked on every read. Token is settable so a long-lived document can
 // honor each caller's token in turn. Doesn't own the inner stream.
-// PdfPig ignores cancellation tokens and reads lazily, so the token is
-// checked on every read. Token is settable so a long-lived document can
-// honor each caller's token in turn. Doesn't own the inner stream.
 internal sealed class CancellableReadStream(Stream inner, CancellationToken token) : Stream
 {
     public CancellationToken Token { get; set; } = token;
