@@ -42,8 +42,11 @@ public sealed partial class PdfReaderView : UserControl
     // The width a preview fills, in effective pixels; 0 before layout.
     public double PreviewWidth => PreviewScroller.ActualWidth;
 
+    // The scroller holds only the page image, so its extent is the image
+    // height. The image's ActualHeight lags: the scroller's clamp after a
+    // shrink comes to rest before the image's SizeChanged.
     public PdfPreviewLayout PreviewLayout =>
-        new(PreviewScroller.VerticalOffset, Preview.ActualHeight, PreviewScroller.ViewportHeight);
+        new(PreviewScroller.VerticalOffset, PreviewScroller.ExtentHeight, PreviewScroller.ViewportHeight);
 
     public void ScrollTo(double offset) =>
         PreviewScroller.ChangeView(null, offset, null, disableAnimation: true);
