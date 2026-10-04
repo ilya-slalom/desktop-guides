@@ -1377,7 +1377,7 @@ try {
             }
             $position = [ordered]@{
                 locator = $file.locator; offset = $null; quote = $null
-                kind = $file.kind; step = $file.step; reason = $file.reason
+                kind = $file.kind; step = $file.step; reason = $file.reason; pending = $file.pending
             }
             if ($file.locator) {
                 $payload = ($file.locator | ConvertFrom-Json).payload
@@ -1399,12 +1399,11 @@ try {
             throw "The HTML position never showed $what. Last: offset=$($position.offset) kind=$($position.kind) step=$($position.step)."
         }
 
-        # The line at the page's top-left, read through Chromium's own
-        # UI Automation text, independently of the app's capture.
         # The page's tree has no TextPattern, and a point hit-test stops at
         # WinUI's content bridge, so the top line comes from the page tree:
         # each fixture line is its own span, and the on-screen line whose box
-        # crosses the page's top edge (or is first below it) is the top line.
+        # crosses the page's top edge (or starts just below it) is the top
+        # line; none near the edge means the page's top isn't a mark line.
         $script:topLineNote = 'no page'
         $onScreen = [System.Windows.Automation.PropertyCondition]::new(
             [System.Windows.Automation.AutomationElement]::IsOffscreenProperty, $false)
@@ -1422,7 +1421,7 @@ try {
                         $box = $element.Current.BoundingRectangle
                         if ($box.Height -lt 1 -or $box.Height -gt 60) { continue }
                         $count++
-                        if ($box.Bottom -le $rect.Top + 2 -or $box.Top -ge $rect.Bottom) { continue }
+                        if ($box.Bottom -le $rect.Top + 2 -or $box.Top -ge $rect.Top + 30) { continue }
                         if (-not $best -or $box.Top -lt $best.Top) {
                             $best = [pscustomobject]@{ Top = $box.Top; Name = $name.Trim() }
                         }
@@ -1456,6 +1455,44 @@ try {
             } while ((Get-Date) -lt $deadline)
             [void](Save-WindowScreenshot "html-top-$step")
             throw "After $step the page's top line was $seen; expected MARK-$('{0:D4}' -f $mark) within one line ($script:topLineNote)."
+        }
+
+        function Set-HtmlRestore([string] $json) {
+            $folder = Join-Path $AppDataRoot 'test'
+            [void](New-Item -ItemType Directory -Force -Path $folder)
+            [System.IO.File]::WriteAllText((Join-Path $folder 'html-restore.json'), $json)
+        }
+
+        function Clear-HtmlRestore {
+            Remove-Item -LiteralPath (Join-Path $AppDataRoot 'test\html-restore.json') -Force -ErrorAction SilentlyContinue
+        }
+
+        function Clear-HtmlPosition {
+            Remove-Item -LiteralPath (Join-Path $AppCacheRoot "diagnostics\html-position-$ProcessId.json") `
+                -Force -ErrorAction SilentlyContinue
+        }
+
+        function Open-RestoredGuide([string] $guide, [string] $restore) {
+            Clear-HtmlPosition
+            Set-HtmlRestore $restore
+            try {
+                Open-TextGuide $guide
+                $report.sessionsOpened++
+                [void](Wait-Status 'Guide ready.')
+                return Wait-HtmlPosition { param($p) $p.kind } 'a restore outcome'
+            }
+            finally {
+                Clear-HtmlRestore
+            }
+        }
+
+        # Pass '' for a step or reason that must be null.
+        function Assert-Restore($position, [string] $kind, [string] $step, [string] $reason, [string] $what) {
+            if ([string] $position.kind -cne $kind -or [string] $position.step -cne $step -or
+                [string] $position.reason -cne $reason) {
+                throw "After $what the restore was kind=$($position.kind) step=$($position.step) reason=$($position.reason); expected kind=$kind step=$step reason=$reason."
+            }
+            $report.restoreKinds += $kind
         }
 
         # A row can be recycled or not yet realized mid-read; retry briefly,
@@ -1758,6 +1795,7 @@ try {
             [void](Wait-Status 'Game ready.')
             $report.sessionsOpened = 0
             $report.unimportedClicks = 0
+            $report.restoreKinds = @()
 
             # position-fragment: a fragment link moves the page, the next
             # poll captures it, and the captured line is the visible one.
@@ -1787,7 +1825,71 @@ try {
             }
             $report.phases += 'position-resize'
 
+            $saved = (Read-HtmlPosition).locator
             Back-ToTextGame
+
+            # position-restore-exact: the saved locator in a new session, at
+            # another width than the capture's, puts the same line on top.
+            Resize-ShellWindow 1100 720
+            $restored = Open-RestoredGuide 'Long Web Guide' $saved
+            Assert-Restore $restored 'Exact' 'Exact' '' 'an exact restore'
+            if ($restored.offset -ne $target.offset) {
+                throw "An exact restore captured offset $($restored.offset); expected $($target.offset)."
+            }
+            [void](Wait-TopMark 420 'an exact restore')
+            $report.htmlRestoreScreenshot = Save-WindowScreenshot 'html-restore'
+            Back-ToTextGame
+            $report.phases += 'position-restore-exact'
+
+            # position-restore-late-images: images answer 1 s late, so the
+            # lazy route map above the target is still loading after the
+            # first scroll; the second scroll puts the line back on top.
+            $delay = [System.Threading.EventWaitHandle]::new(
+                $false, [System.Threading.EventResetMode]::ManualReset,
+                "Local\DesktopGuides.Preview.HtmlAssetDelay.$ProcessId")
+            try {
+                $delayed = Open-RestoredGuide 'Long Web Guide' $saved
+            }
+            finally {
+                $delay.Dispose()
+            }
+            Assert-Restore $delayed 'Exact' 'Exact' '' 'a restore with late images'
+            if ($null -eq $delayed.pending -or [int] $delayed.pending -lt 1) {
+                throw "A restore with late images met no loading image (pending=$($delayed.pending)), so the image wait went untested."
+            }
+            if ($delayed.offset -ne $target.offset) {
+                throw "A restore with late images captured offset $($delayed.offset); expected $($target.offset)."
+            }
+            [void](Wait-TopMark 420 'a restore with late images')
+            Back-ToTextGame
+            $report.phases += 'position-restore-late-images'
+
+            # position-restore-changed: in changed bytes the quote is found
+            # by context; the text inserted above moved every offset.
+            $changed = Open-RestoredGuide 'Changed Long Web Guide' $saved
+            Assert-Restore $changed 'Approximate' 'Context' `
+                'The guide changed, so this is an approximate position.' 'a restore in changed bytes'
+            if ($changed.offset -le $target.offset) {
+                throw "A restore in changed bytes captured offset $($changed.offset); expected more than $($target.offset)."
+            }
+            [void](Wait-TopMark 420 'a restore in changed bytes')
+            Back-ToTextGame
+            $report.phases += 'position-restore-changed'
+
+            # position-restore-invalid: a malformed locator is Unavailable
+            # and the page stays at its start.
+            $invalid = Open-RestoredGuide 'Long Web Guide' '{"format":"Html","schemaVersion":1,"payload":'
+            Assert-Restore $invalid 'Unavailable' '' `
+                "This reading position can't be used with this guide." 'a malformed locator'
+            if ([string] $invalid.quote -notlike 'Long Web Guide*') {
+                throw "After a malformed locator the position was not the page's start."
+            }
+            $top = Get-PageTopLine
+            if ($top -match '^MARK-') {
+                throw "After a malformed locator the page's top line was $top."
+            }
+            Back-ToTextGame
+            $report.phases += 'position-restore-invalid'
         }
         elseif ($Mode -eq 'pdf-reader') {
             [void](Wait-Name 'LibraryHeading' 'Library')

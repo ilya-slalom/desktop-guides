@@ -1182,6 +1182,23 @@ function Assert-HtmlPositionPass([string] $pass, [string] $diagnostics, $result)
     if ($unimported -ne [int] $result.unimportedClicks) {
         throw "The $pass pass denied $unimported unimported pages; the smoke clicked $($result.unimportedClicks)."
     }
+    # Each restore the smoke saw was counted once, by kind, in diagnostics.
+    $counted = @{}
+    foreach ($session in $sessions) {
+        if (-not $session.restores) { continue }
+        foreach ($kind in @($session.restores.PSObject.Properties)) {
+            $counted[$kind.Name] = [int] $counted[$kind.Name] + [int] $kind.Value
+        }
+    }
+    $seen = @{}
+    foreach ($kind in @($result.restoreKinds)) {
+        if ($kind) { $seen[$kind] = [int] $seen[$kind] + 1 }
+    }
+    $countedText = (@($counted.Keys) | Sort-Object | ForEach-Object { "$_=$($counted[$_])" }) -join ','
+    $seenText = (@($seen.Keys) | Sort-Object | ForEach-Object { "$_=$($seen[$_])" }) -join ','
+    if ($countedText -cne $seenText) {
+        throw "The $pass pass counted restores '$countedText'; the smoke saw '$seenText'."
+    }
     return $sessions
 }
 
