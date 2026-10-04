@@ -1401,28 +1401,35 @@ try {
 
         # The line at the page's top-left, read through Chromium's own
         # UI Automation text, independently of the app's capture.
-        # The page's tree has no TextPattern, so the top line is hit-tested:
-        # each fixture line is its own span, and the first text element down
-        # the page's top edge is the top line.
+        # The page's tree has no TextPattern, and a point hit-test stops at
+        # WinUI's content bridge, so the top line comes from the page tree:
+        # each fixture line is its own span, and the on-screen line whose box
+        # crosses the page's top edge (or is first below it) is the top line.
         $script:topLineNote = 'no page'
+        $onScreen = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::IsOffscreenProperty, $false)
         function Get-PageTopLine {
             foreach ($page in Get-PageRoots) {
                 try {
                     $rect = $page.Current.BoundingRectangle
                     if ($page.Current.IsOffscreen -or $rect.Width -lt 1 -or $rect.Height -lt 1) { continue }
-                    $hits = @()
-                    for ($y = 2; $y -le 120; $y += 3) {
-                        $hit = [System.Windows.Automation.AutomationElement]::FromPoint(
-                            [System.Windows.Point]::new($rect.Left + 50, $rect.Top + $y))
-                        if ($hit -and $hit.Current.ControlType -eq [System.Windows.Automation.ControlType]::Text) {
-                            return $hit.Current.Name.Trim()
-                        }
-                        if ($hit -and $y % 30 -eq 2) {
-                            $name = $hit.Current.Name
-                            $hits += "y$y=$($hit.Current.ControlType.ProgrammaticName)/$($hit.Current.ClassName)/pid$($hit.Current.ProcessId)/'$($name.Substring(0, [Math]::Min(24, $name.Length)))'"
+                    $started = Get-Date
+                    $best = $null
+                    $count = 0
+                    foreach ($element in $page.FindAll($scope, $onScreen)) {
+                        $name = $element.Current.Name
+                        if ($name -notmatch '^MARK-\d{4}\b') { continue }
+                        $box = $element.Current.BoundingRectangle
+                        if ($box.Height -lt 1 -or $box.Height -gt 60) { continue }
+                        $count++
+                        if ($box.Bottom -le $rect.Top + 2 -or $box.Top -ge $rect.Bottom) { continue }
+                        if (-not $best -or $box.Top -lt $best.Top) {
+                            $best = [pscustomobject]@{ Top = $box.Top; Name = $name.Trim() }
                         }
                     }
-                    $script:topLineNote = "no text near the top; page $([int]$rect.Left),$([int]$rect.Top),$([int]$rect.Width),$([int]$rect.Height) $($page.Current.ControlType.ProgrammaticName); $($hits -join ' ')" -replace "[`r`n]", ' '
+                    $elapsed = [int]((Get-Date) - $started).TotalMilliseconds
+                    $script:topLineNote = "page top $([int]$rect.Top); $count mark lines on screen in $elapsed ms"
+                    if ($best) { return $best.Name }
                 }
                 catch [System.Windows.Automation.ElementNotAvailableException] {
                     # The page tree was rebuilt; try the next window.
