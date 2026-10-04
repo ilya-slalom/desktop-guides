@@ -11,7 +11,7 @@ public static class HtmlNavigationPolicy
     public static HtmlNavigation Classify(string uri, Uri entry, bool entryNavigated, bool userInitiated)
     {
         if (!Uri.TryCreate(uri, UriKind.Absolute, out Uri? target)) return Denied;
-        if (IsEntry(target, entry))
+        if (IsEntryDocument(target, entry))
         {
             bool fragment = target.Fragment.Length > 0;
             if (!entryNavigated && !fragment) return new(HtmlNavigationKind.Entry);
@@ -29,7 +29,8 @@ public static class HtmlNavigationPolicy
 
     // Chromium may report a self-link with sub-delims such as ( ) ' left
     // literal, so paths are compared decoded, as the request policy does.
-    private static bool IsEntry(Uri target, Uri entry) =>
+    // The fragment is ignored.
+    public static bool IsEntryDocument(Uri target, Uri entry) =>
         Uri.Compare(target, entry, UriComponents.SchemeAndServer,
             UriFormat.UriEscaped, StringComparison.Ordinal) == 0 &&
         string.Equals(target.Query, entry.Query, StringComparison.Ordinal) &&
