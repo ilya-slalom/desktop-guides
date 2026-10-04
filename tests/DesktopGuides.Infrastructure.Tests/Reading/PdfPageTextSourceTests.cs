@@ -169,6 +169,42 @@ public sealed class PdfPageTextSourceTests
         source.Dispose();
     }
 
+    [Fact]
+    public void DisposeOnTheCallersThreadDoesNotDeadlockAnInFlightExtraction()
+    {
+        GatedStream file = new(File.ReadAllBytes(P0Fixtures.Resolve(Long)));
+        PdfPageTextSource source = PdfPageTextSource.Open(file, CancellationToken.None);
+        file.Hold();
+        using ManualResetEventSlim done = new();
+        bool started = false;
+
+        // Stands in for the UI thread: continuations posted to it run only when it pumps.
+        Thread ui = new(() =>
+        {
+            SingleThreadContext context = new();
+            SynchronizationContext.SetSynchronizationContext(context);
+            _ = source.GetPageTextAsync(150, CancellationToken.None);
+            started = file.ReadSeen.Wait(TimeSpan.FromSeconds(5));
+            file.Release();
+            source.Dispose();
+            done.Set();
+        })
+        { IsBackground = true };
+        ui.Start();
+
+        Assert.True(done.Wait(TimeSpan.FromSeconds(10)), "Dispose on the caller's thread deadlocked.");
+        Assert.True(started, "Extraction never read the file.");
+        Assert.True(file.Disposed);
+    }
+
+    // Posted work is queued and never runs, as when the owning thread is blocked.
+    private sealed class SingleThreadContext : SynchronizationContext
+    {
+        public override void Post(SendOrPostCallback d, object? state)
+        {
+        }
+    }
+
     // Blocks reads while held, so a test can pause an extraction mid-page.
     private sealed class GatedStream(byte[] bytes) : Stream
     {
