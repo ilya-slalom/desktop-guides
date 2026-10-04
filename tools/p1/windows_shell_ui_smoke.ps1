@@ -1415,7 +1415,15 @@ try {
                     $text = $document.GetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern)
                     $range = $text.RangeFromPoint([System.Windows.Point]::new($rect.Left + 40, $rect.Top + 3))
                     $range.ExpandToEnclosingUnit([System.Windows.Automation.Text.TextUnit]::Line)
-                    return $range.GetText(200).Trim()
+                    $line = $range.GetText(200).Trim()
+                    if ($line) { return $line }
+                    # The point can land in the page's margin; the first
+                    # visible range starts at the first line on screen.
+                    $visible = $text.GetVisibleRanges()
+                    if ($visible.Length -gt 0) {
+                        return (($visible[0].GetText(400) -split "`n" | Where-Object { $_.Trim() }) | Select-Object -First 1)
+                    }
+                    return $null
                 }
                 catch [System.Windows.Automation.ElementNotAvailableException] {
                     # The page tree was rebuilt; try the next window.
@@ -1441,7 +1449,44 @@ try {
                 Start-Sleep -Milliseconds 250
             } while ((Get-Date) -lt $deadline)
             [void](Save-WindowScreenshot "html-top-$step")
-            throw "After $step the page's top line was $seen; expected MARK-$('{0:D4}' -f $mark) within one line."
+            throw "After $step the page's top line was $seen; expected MARK-$('{0:D4}' -f $mark) within one line. Probe: $(Get-PageTopProbe)"
+        }
+
+        # What the UIA read saw, for a failure message: the fixture's text only.
+        function Get-PageTopProbe {
+            $documentType = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::Document)
+            $notes = @()
+            foreach ($page in Get-PageRoots) {
+                try {
+                    $documents = $page.FindAll($scope, $documentType)
+                    $notes += "documents=$($documents.Count)"
+                    foreach ($document in $documents) {
+                        $rect = $document.Current.BoundingRectangle
+                        $note = "offscreen=$($document.Current.IsOffscreen) rect=$([int]$rect.Left),$([int]$rect.Top),$([int]$rect.Width),$([int]$rect.Height)"
+                        try {
+                            $text = $document.GetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern)
+                            $range = $text.RangeFromPoint([System.Windows.Point]::new($rect.Left + 40, $rect.Top + 3))
+                            $raw = $range.GetText(80)
+                            $range.ExpandToEnclosingUnit([System.Windows.Automation.Text.TextUnit]::Line)
+                            $note += " point=[$raw] line=[$($range.GetText(80))]"
+                            $visible = $text.GetVisibleRanges()
+                            $note += " visible=$($visible.Length)"
+                            if ($visible.Length -gt 0) { $note += " first=[$($visible[0].GetText(80))]" }
+                            $note += " all=$($text.DocumentRange.GetText(-1).Length)"
+                        }
+                        catch {
+                            $note += " text-error=$($_.Exception.GetType().Name)"
+                        }
+                        $notes += $note
+                    }
+                }
+                catch {
+                    $notes += "page-error=$($_.Exception.GetType().Name)"
+                }
+            }
+            return ($notes -join '; ') -replace "[`r`n]", ' '
         }
 
         # A row can be recycled or not yet realized mid-read; retry briefly,
@@ -1755,6 +1800,7 @@ try {
             [void](Wait-TopMark 420 'the fragment link')
             $report.htmlPositionOffset = $target.offset
             $report.phases += 'position-fragment'
+
 
             Back-ToTextGame
         }
