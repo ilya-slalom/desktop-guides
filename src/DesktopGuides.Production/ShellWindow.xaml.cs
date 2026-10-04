@@ -1283,6 +1283,7 @@ public sealed partial class ShellWindow : Window
     private async Task CloseReaderSessionAsync()
     {
         HideExternalLinkBar();
+        HideUnavailableLinkBar();
         readerLoad?.Cancel();
         readerLoad?.Dispose();
         readerLoad = null;

@@ -88,6 +88,9 @@ internal sealed class HtmlReaderSession : IReaderSession
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
     public event EventHandler<LocationChangedEventArgs>? LocationChanged;
     public event EventHandler<Uri>? ExternalLinkRequested;
+    // A person's link to a page of this guide that wasn't imported. It
+    // carries nothing: the shell never shows the target.
+    public event EventHandler? UnavailableLinkRequested;
     // Raised once, with Crashed, when the browser or the page's renderer
     // dies after the guide opened.
     public event EventHandler<HtmlGuideLoadError>? Failed;
@@ -555,6 +558,10 @@ internal sealed class HtmlReaderSession : IReaderSession
                 args.Cancel = true;
                 ExternalLinkRequested?.Invoke(this, navigation.ExternalUri!);
                 break;
+            case HtmlNavigationKind.Unavailable:
+                args.Cancel = true;
+                RaiseUnavailableLink();
+                break;
             default:
                 args.Cancel = true;
                 break;
@@ -573,6 +580,18 @@ internal sealed class HtmlReaderSession : IReaderSession
         {
             ExternalLinkRequested?.Invoke(this, navigation.ExternalUri!);
         }
+        else if (navigation.Kind == HtmlNavigationKind.Unavailable)
+        {
+            RaiseUnavailableLink();
+        }
+    }
+
+    // Counted as a denied navigation; nothing is requested or served.
+    private void RaiseUnavailableLink()
+    {
+        if (disposed) return;
+        diagnostics?.RecordDenied(HtmlDenyReason.UnimportedPage, "Navigation");
+        UnavailableLinkRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private static void OnPermissionRequested(CoreWebView2 sender, CoreWebView2PermissionRequestedEventArgs args) =>
@@ -617,6 +636,7 @@ internal sealed class HtmlReaderSession : IReaderSession
         resizeDelay = null;
         entryLoad.TrySetResult(false);
         ExternalLinkRequested = null;
+        UnavailableLinkRequested = null;
         Failed = null;
         WriteDiagnostics();
         if (core is not null)

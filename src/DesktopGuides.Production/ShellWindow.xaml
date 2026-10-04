@@ -475,6 +475,17 @@
                             </StackPanel>
                         </InfoBar.Content>
                     </InfoBar>
+                    <!-- A fixed message: never the link's target or the page's text. -->
+                    <InfoBar x:Name="ReaderUnavailableLinkBar"
+                             Margin="0,12,0,0"
+                             Visibility="Collapsed"
+                             IsOpen="False"
+                             IsClosable="True"
+                             Severity="Informational"
+                             Message="This link goes to a page that isn't part of the imported guide."
+                             Closed="ReaderUnavailableLinkBarClosed"
+                             AutomationProperties.Name="This link goes to a page that isn't part of the imported guide."
+                             AutomationProperties.AutomationId="ReaderUnavailableLinkBar" />
                 </StackPanel>
 
                 <Border Grid.Row="3"
