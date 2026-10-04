@@ -8,13 +8,17 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $ResultDirectory,
 
+    # Pass at most one *Only switch to run a single scenario group against a
+    # fresh install. With none, every group runs in the order listed below.
+    [switch] $CoreOnly,
     [switch] $DesignOnly,
-
-    [switch] $ProviderOnly,
-
     [switch] $CatalogOnly,
+    [switch] $TxtOnly,
+    [switch] $HtmlOnly,
+    [switch] $PdfOnly,
     [switch] $ImportOnly,
     [switch] $GameActionsOnly,
+    [switch] $ProviderOnly,
 
     # Paths only. The values are read in memory and never passed on.
     [string] $IgdbCredentialFile = 'E:\work\igdb_credentials.txt',
@@ -28,6 +32,23 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+# Scenario groups in run order; CI's shell-scope input uses these names.
+$scenarioGroups = [ordered]@{
+    'core' = $CoreOnly.IsPresent
+    'design' = $DesignOnly.IsPresent
+    'catalog' = $CatalogOnly.IsPresent
+    'txt' = $TxtOnly.IsPresent
+    'html' = $HtmlOnly.IsPresent
+    'pdf' = $PdfOnly.IsPresent
+    'import' = $ImportOnly.IsPresent
+    'game-actions' = $GameActionsOnly.IsPresent
+    'provider' = $ProviderOnly.IsPresent
+}
+$selectedGroups = @($scenarioGroups.Keys | Where-Object { $scenarioGroups[$_] })
+if ($selectedGroups.Count -gt 1) {
+    throw "Pass at most one *Only switch; got $($selectedGroups.Count)."
+}
+$scenarioScope = if ($selectedGroups.Count -eq 1) { $selectedGroups[0] } else { 'all' }
 $targetSessionId = [System.Diagnostics.Process]::GetCurrentProcess().SessionId
 if ($targetSessionId -eq 0 -or
     -not @(Get-Process explorer -ErrorAction SilentlyContinue |
@@ -79,6 +100,8 @@ $report = [ordered]@{
     cpuArchitecture = $env:PROCESSOR_ARCHITECTURE
     # Portable runs are not evidence for the signed-install gates.
     mode = if ($portable) { 'portable' } else { 'signed-msix' }
+    scenarioScope = $scenarioScope
+    scenarioGroupsRun = [System.Collections.Generic.List[string]]::new()
     success = $false
 }
 $certificate = $null
@@ -1705,7 +1728,66 @@ try {
     Register-ScheduledTask -TaskName $launchTask -Action $launchAction `
         -Principal $principal -Force | Out-Null
 
-    if ($DesignOnly) {
+    # Each group after the first starts from an empty data root, so a single
+    # group run against a fresh install sees what the full run gives it.
+    function Enter-ScenarioGroup([string] $name) {
+        if ($scenarioScope -ne 'all' -and $scenarioScope -ne $name) { return $false }
+        if ($report.scenarioGroupsRun.Count -gt 0) {
+            Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+        }
+        $report.scenarioGroupsRun.Add($name)
+        return $true
+    }
+
+    if (Enter-ScenarioGroup 'core') {
+        Start-InstalledShell
+        $report.empty = Run-ShellSmoke 'empty' -ExitDelayMilliseconds 2000
+        $report.emptyAfterDelayedTask = Run-ShellSmoke 'empty'
+        Assert-SingleInstance
+        $report.emptyAfterSecondLaunch = Run-ShellSmoke 'empty'
+        $report.gameEditor = Run-ShellSmoke 'game-editor'
+        Close-InstalledShell
+        Start-InstalledShell
+        $report.gameEditorPersisted = Run-ShellSmoke 'game-editor-persisted'
+
+        Stop-InstalledShell
+        dotnet run --project $seedProject -c Release --no-restore -- seed $dataRoot
+        if ($LASTEXITCODE -ne 0) { throw 'Could not seed shell route metadata.' }
+        Start-InstalledShell
+        $report.gameEditorClosePrepared =
+            Run-ShellSmoke 'prepare-game-editor-close'
+        Assert-GameEditorDoesNotOpenDuringClose
+        $report.normal = Run-ShellSmoke 'normal'
+        Assert-RelaunchDuringClose
+        Assert-ClosingTargetRedirect
+        Assert-QueuedActivationClose
+        Assert-LateGuideAfterClose
+        Assert-LaterGuideWins
+        Assert-AcceptedThenClose
+        Assert-FailedLaterGuideDoesNotSaveEarlier
+        Assert-ReaderRenderErrorDoesNotSaveResume
+
+        Stop-InstalledShell
+        dotnet run --project $seedProject -c Release --no-restore -- stale $dataRoot
+        if ($LASTEXITCODE -ne 0) { throw 'Could not set stale last-guide ID.' }
+        Start-InstalledShell
+        $report.stale = Run-ShellSmoke 'stale'
+        Close-InstalledShell
+
+        dotnet run --project $seedProject -c Release --no-restore -- seed-long $dataRoot
+        if ($LASTEXITCODE -ne 0) { throw 'Could not seed the long guide list.' }
+        Start-InstalledShell
+        $report.longList = Run-ShellSmoke 'long-list'
+        Close-InstalledShell
+
+        dotnet run --project $seedProject -c Release --no-restore -- seed-second $dataRoot
+        if ($LASTEXITCODE -ne 0) { throw 'Could not seed the second game.' }
+        Start-InstalledShell
+        Assert-GameSwitchClearsWhileLoading
+        Close-InstalledShell
+    }
+
+    if (Enter-ScenarioGroup 'design') {
         dotnet run --project $seedProject -c Release --no-restore -- `
             seed-design $dataRoot
         if ($LASTEXITCODE -ne 0) {
@@ -1713,120 +1795,31 @@ try {
         }
         Run-DesignLanguageScenarios
         Run-MaterialScenarios
-        $report.success = $true
-        return
     }
 
-    if ($ProviderOnly) {
-        Run-ProviderScenarios
-        $report.success = $true
-        return
-    }
-
-    if ($CatalogOnly) {
+    if (Enter-ScenarioGroup 'catalog') {
         Run-CatalogScenarios
         Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
         Run-CatalogFactsScenarios
         Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
         Run-LibrarySearchScenarios
         Run-StableNavigationScenarios
-        $report.success = $true
-        return
     }
 
-    if ($ImportOnly) {
+    if (Enter-ScenarioGroup 'txt') { Run-TxtReaderScenarios }
+
+    if (Enter-ScenarioGroup 'html') { Run-HtmlReaderScenarios }
+
+    if (Enter-ScenarioGroup 'pdf') { Run-PdfReaderScenarios }
+
+    if (Enter-ScenarioGroup 'import') {
         Run-ImportScenarios
         Run-RemovalScenarios
-        $report.success = $true
-        return
     }
 
-    if ($GameActionsOnly) {
-        Run-GameActionsScenarios
-        $report.success = $true
-        return
-    }
+    if (Enter-ScenarioGroup 'game-actions') { Run-GameActionsScenarios }
 
-    Start-InstalledShell
-    $report.empty = Run-ShellSmoke 'empty' -ExitDelayMilliseconds 2000
-    $report.emptyAfterDelayedTask = Run-ShellSmoke 'empty'
-    Assert-SingleInstance
-    $report.emptyAfterSecondLaunch = Run-ShellSmoke 'empty'
-    $report.gameEditor = Run-ShellSmoke 'game-editor'
-    Close-InstalledShell
-    Start-InstalledShell
-    $report.gameEditorPersisted = Run-ShellSmoke 'game-editor-persisted'
-
-    Stop-InstalledShell
-    dotnet run --project $seedProject -c Release --no-restore -- seed $dataRoot
-    if ($LASTEXITCODE -ne 0) { throw 'Could not seed shell route metadata.' }
-    Start-InstalledShell
-    $report.gameEditorClosePrepared =
-        Run-ShellSmoke 'prepare-game-editor-close'
-    Assert-GameEditorDoesNotOpenDuringClose
-    $report.normal = Run-ShellSmoke 'normal'
-    Assert-RelaunchDuringClose
-    Assert-ClosingTargetRedirect
-    Assert-QueuedActivationClose
-    Assert-LateGuideAfterClose
-    Assert-LaterGuideWins
-    Assert-AcceptedThenClose
-    Assert-FailedLaterGuideDoesNotSaveEarlier
-    Assert-ReaderRenderErrorDoesNotSaveResume
-
-    Stop-InstalledShell
-    dotnet run --project $seedProject -c Release --no-restore -- stale $dataRoot
-    if ($LASTEXITCODE -ne 0) { throw 'Could not set stale last-guide ID.' }
-    Start-InstalledShell
-    $report.stale = Run-ShellSmoke 'stale'
-    Close-InstalledShell
-
-    dotnet run --project $seedProject -c Release --no-restore -- seed-long $dataRoot
-    if ($LASTEXITCODE -ne 0) { throw 'Could not seed the long guide list.' }
-    Start-InstalledShell
-    $report.longList = Run-ShellSmoke 'long-list'
-    Close-InstalledShell
-
-    dotnet run --project $seedProject -c Release --no-restore -- seed-second $dataRoot
-    if ($LASTEXITCODE -ne 0) { throw 'Could not seed the second game.' }
-    Start-InstalledShell
-    Assert-GameSwitchClearsWhileLoading
-    Close-InstalledShell
-
-    Get-ChildItem -LiteralPath $dataRoot -Force |
-        Remove-Item -Recurse -Force
-    dotnet run --project $seedProject -c Release --no-restore -- `
-        seed-design $dataRoot
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Could not seed the design-language metadata.'
-    }
-    Run-DesignLanguageScenarios
-    Run-MaterialScenarios
-
-    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
-    Run-CatalogScenarios
-    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
-    Run-CatalogFactsScenarios
-    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
-    Run-LibrarySearchScenarios
-    Run-StableNavigationScenarios
-    Run-TxtReaderScenarios
-
-    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
-    Run-HtmlReaderScenarios
-
-    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
-    Run-PdfReaderScenarios
-
-    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
-    Run-ImportScenarios
-    Run-RemovalScenarios
-
-    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
-    Run-GameActionsScenarios
-
-    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
-    Run-ProviderScenarios
+    if (Enter-ScenarioGroup 'provider') { Run-ProviderScenarios }
 
     $report.success = $true
 }
