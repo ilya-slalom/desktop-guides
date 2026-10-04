@@ -1751,6 +1751,8 @@ try {
                 throw 'html-position needs -AppDataRoot and -AppCacheRoot.'
             }
             [void](Wait-Name 'LibraryHeading' 'Library')
+            # A known width first, so each resize below is a real change.
+            Resize-ShellWindow 1500 720
             Select-Element $textGame
             [void](Wait-Name 'GameHeading' $textGame)
             [void](Wait-Status 'Game ready.')
@@ -1770,6 +1772,20 @@ try {
             $report.htmlPositionOffset = $target.offset
             $report.phases += 'position-fragment'
 
+            # position-resize: the <pre> lines rewrap at each width; the same
+            # line stays on top and the saved offset doesn't move.
+            $report.htmlResizeMarks = @()
+            foreach ($width in @(600, 1100, 1500)) {
+                Resize-ShellWindow $width 720
+                # Past the 300 ms settle, the re-apply and two polls.
+                Start-Sleep -Milliseconds 1500
+                $report.htmlResizeMarks += Wait-TopMark 420 "a resize to $width px"
+                $after = Read-HtmlPosition
+                if (-not $after -or $after.offset -ne $target.offset) {
+                    throw "After a resize to $width px the position offset was $($after.offset); expected $($target.offset)."
+                }
+            }
+            $report.phases += 'position-resize'
 
             Back-ToTextGame
         }
