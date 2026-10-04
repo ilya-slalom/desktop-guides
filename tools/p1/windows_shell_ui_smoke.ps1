@@ -13,7 +13,7 @@ param(
         'remove-guide-cancel', 'remove-guide',
         'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted', 'txt-reader',
         'txt-load-paused', 'txt-back-during-load', 'txt-load-released', 'html-reader',
-        'html-runtime-missing', 'pdf-reader')]
+        'html-runtime-missing', 'pdf-reader', 'html-position')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -57,7 +57,12 @@ param(
     # The provider failure Refresh and search should report: no saved
     # credentials, or credentials saved while the network is blocked.
     [ValidateSet('NotConfigured', 'Unavailable')]
-    [string] $ExpectedProviderFailure = 'NotConfigured'
+    [string] $ExpectedProviderFailure = 'NotConfigured',
+
+    # The app's LocalState and LocalCache folders, for HTML position gates.
+    [string] $AppDataRoot = '',
+
+    [string] $AppCacheRoot = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -1188,8 +1193,9 @@ try {
         # These modes continue a shell left on Reader, Game, or Library.
     }
     elseif ($Mode -in @('txt-reader', 'txt-load-paused', 'txt-back-during-load',
-        'txt-load-released', 'html-reader', 'html-runtime-missing', 'pdf-reader')) {
+        'txt-load-released', 'html-reader', 'html-runtime-missing', 'pdf-reader', 'html-position')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
+            elseif ($Mode -eq 'html-position') { 'Web Position Game' }
             elseif ($Mode -eq 'pdf-reader') { 'PDF Reader Game' }
             else { 'Text Reader Game' }
         $missingMessage = "This guide's file is missing from the library."
@@ -1289,6 +1295,153 @@ try {
             Go-Back
             [void](Wait-Name 'GameHeading' $textGame)
             [void](Wait-Status 'Game ready.')
+        }
+
+        # WebView2 content sits in a top-level Chromium window owned by
+        # the shell's WebView2 browser process, so its UI Automation tree
+        # is read from that window rather than from the shell window.
+        function Get-PageRoots {
+            $browsers = @(Get-CimInstance Win32_Process -Filter (
+                "ParentProcessId = $ProcessId AND Name = 'msedgewebview2.exe'") |
+                ForEach-Object { [uint32] $_.ProcessId })
+            if ($browsers.Count -eq 0) { return @() }
+            $pages = @()
+            foreach ($window in [DesktopGuidesForegroundProbe]::FindWindows(
+                'Chrome_RenderWidgetHostHWND', [uint32[]] $browsers)) {
+                try {
+                    $pages += [System.Windows.Automation.AutomationElement]::FromHandle($window)
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                    # The window closed after it was listed.
+                }
+            }
+            return $pages
+        }
+
+        function Find-PageByName([string] $name) {
+            $condition = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::NameProperty, $name)
+            foreach ($page in Get-PageRoots) {
+                try {
+                    $element = $page.FindFirst($scope, $condition)
+                    if ($element) { return $element }
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                    # A closing session's window can vanish mid-search.
+                }
+            }
+            return $null
+        }
+
+        function Wait-PageName([string] $name) {
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $element = Find-PageByName $name
+                if ($element) { return $element }
+                Start-Sleep -Milliseconds 250
+            } while ((Get-Date) -lt $deadline)
+            [void](Save-WindowScreenshot 'html-page-missing')
+            $webViews = @(Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'" |
+                ForEach-Object { "$($_.ProcessId)<-$($_.ParentProcessId)" })
+            throw "The guide page did not show '$name'. WebView2 processes (pid<-parent): $($webViews -join ', ')."
+        }
+
+        # The page viewport grows back after the link bar closes, so a
+        # link can be found while it is still below the visible area.
+        function Wait-PageVisible([string] $name) {
+            $deadline = (Get-Date).AddSeconds(5)
+            do {
+                $element = Wait-PageName $name
+                try {
+                    if (-not $element.Current.IsOffscreen) { return $element }
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                    # The page tree was rebuilt; find the link again.
+                }
+                Start-Sleep -Milliseconds 250
+            } while ((Get-Date) -lt $deadline)
+            [void](Save-WindowScreenshot 'html-page-offscreen')
+            throw "The guide page showed '$name' only off-screen."
+        }
+
+        # The app's own view of the position, written only while the
+        # HtmlPosition gate is open. The locator is the T12.1 codec JSON.
+        function Read-HtmlPosition {
+            $path = Join-Path $AppCacheRoot "diagnostics\html-position-$ProcessId.json"
+            if (-not (Test-Path -LiteralPath $path)) { return $null }
+            try {
+                $file = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+            }
+            catch {
+                return $null
+            }
+            $position = [ordered]@{
+                locator = $file.locator; offset = $null; quote = $null
+                kind = $file.kind; step = $file.step; reason = $file.reason
+            }
+            if ($file.locator) {
+                $payload = ($file.locator | ConvertFrom-Json).payload
+                $position.offset = [int] $payload.textOffset
+                $position.quote = [string] $payload.textQuote
+            }
+            return [pscustomobject] $position
+        }
+
+        function Wait-HtmlPosition([scriptblock] $until, [string] $what) {
+            $deadline = (Get-Date).AddSeconds(10)
+            $position = $null
+            do {
+                $position = Read-HtmlPosition
+                if ($position -and (& $until $position)) { return $position }
+                Start-Sleep -Milliseconds 250
+            } while ((Get-Date) -lt $deadline)
+            [void](Save-WindowScreenshot 'html-position-timeout')
+            throw "The HTML position never showed $what. Last: offset=$($position.offset) kind=$($position.kind) step=$($position.step)."
+        }
+
+        # The line at the page's top-left, read through Chromium's own
+        # UI Automation text, independently of the app's capture.
+        function Get-PageTopLine {
+            $documentType = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::Document)
+            foreach ($page in Get-PageRoots) {
+                try {
+                    $document = if ($page.Current.ControlType -eq [System.Windows.Automation.ControlType]::Document) { $page }
+                        else { $page.FindFirst($scope, $documentType) }
+                    if (-not $document -or $document.Current.IsOffscreen) { continue }
+                    $rect = $document.Current.BoundingRectangle
+                    if ($rect.Width -lt 1 -or $rect.Height -lt 1) { continue }
+                    $text = $document.GetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern)
+                    $range = $text.RangeFromPoint([System.Windows.Point]::new($rect.Left + 40, $rect.Top + 3))
+                    $range.ExpandToEnclosingUnit([System.Windows.Automation.Text.TextUnit]::Line)
+                    return $range.GetText(200).Trim()
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                    # The page tree was rebuilt; try the next window.
+                }
+            }
+            return $null
+        }
+
+        # The fixture's lines start MARK-<4 digits>. "Within one line" allows
+        # the neighbor on either side, for rounding at a line boundary.
+        function Wait-TopMark([int] $mark, [string] $step) {
+            $deadline = (Get-Date).AddSeconds(10)
+            $seen = 'nothing'
+            do {
+                $line = Get-PageTopLine
+                if ($line -match '^MARK-(\d{4})\b') {
+                    $seen = "MARK-$($Matches[1])"
+                    if ([Math]::Abs([int] $Matches[1] - $mark) -le 1) { return [int] $Matches[1] }
+                }
+                elseif ($line) {
+                    $seen = 'a line without a mark'
+                }
+                Start-Sleep -Milliseconds 250
+            } while ((Get-Date) -lt $deadline)
+            [void](Save-WindowScreenshot "html-top-$step")
+            throw "After $step the page's top line was $seen; expected MARK-$('{0:D4}' -f $mark) within one line."
         }
 
         # A row can be recycled or not yet realized mid-read; retry briefly,
@@ -1415,73 +1568,6 @@ try {
             Select-Element $textGame
             [void](Wait-Name 'GameHeading' $textGame)
             [void](Wait-Status 'Game ready.')
-
-            # WebView2 content sits in a top-level Chromium window owned by
-            # the shell's WebView2 browser process, so its UI Automation tree
-            # is read from that window rather than from the shell window.
-            function Get-PageRoots {
-                $browsers = @(Get-CimInstance Win32_Process -Filter (
-                    "ParentProcessId = $ProcessId AND Name = 'msedgewebview2.exe'") |
-                    ForEach-Object { [uint32] $_.ProcessId })
-                if ($browsers.Count -eq 0) { return @() }
-                $pages = @()
-                foreach ($window in [DesktopGuidesForegroundProbe]::FindWindows(
-                    'Chrome_RenderWidgetHostHWND', [uint32[]] $browsers)) {
-                    try {
-                        $pages += [System.Windows.Automation.AutomationElement]::FromHandle($window)
-                    }
-                    catch [System.Windows.Automation.ElementNotAvailableException] {
-                        # The window closed after it was listed.
-                    }
-                }
-                return $pages
-            }
-
-            function Find-PageByName([string] $name) {
-                $condition = [System.Windows.Automation.PropertyCondition]::new(
-                    [System.Windows.Automation.AutomationElement]::NameProperty, $name)
-                foreach ($page in Get-PageRoots) {
-                    try {
-                        $element = $page.FindFirst($scope, $condition)
-                        if ($element) { return $element }
-                    }
-                    catch [System.Windows.Automation.ElementNotAvailableException] {
-                        # A closing session's window can vanish mid-search.
-                    }
-                }
-                return $null
-            }
-
-            function Wait-PageName([string] $name) {
-                $deadline = (Get-Date).AddSeconds(15)
-                do {
-                    $element = Find-PageByName $name
-                    if ($element) { return $element }
-                    Start-Sleep -Milliseconds 250
-                } while ((Get-Date) -lt $deadline)
-                [void](Save-WindowScreenshot 'html-page-missing')
-                $webViews = @(Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'" |
-                    ForEach-Object { "$($_.ProcessId)<-$($_.ParentProcessId)" })
-                throw "The guide page did not show '$name'. WebView2 processes (pid<-parent): $($webViews -join ', ')."
-            }
-
-            # The page viewport grows back after the link bar closes, so a
-            # link can be found while it is still below the visible area.
-            function Wait-PageVisible([string] $name) {
-                $deadline = (Get-Date).AddSeconds(5)
-                do {
-                    $element = Wait-PageName $name
-                    try {
-                        if (-not $element.Current.IsOffscreen) { return $element }
-                    }
-                    catch [System.Windows.Automation.ElementNotAvailableException] {
-                        # The page tree was rebuilt; find the link again.
-                    }
-                    Start-Sleep -Milliseconds 250
-                } while ((Get-Date) -lt $deadline)
-                [void](Save-WindowScreenshot 'html-page-offscreen')
-                throw "The guide page showed '$name' only off-screen."
-            }
 
             # Non-asserting diagnostic: canary log line counts at each step,
             # so any guide-originated connection can be attributed to a step.
@@ -1644,6 +1730,32 @@ try {
             Assert-Absent 'ReaderLoadError'
             Assert-Absent 'ReaderLoadErrorAction'
             $report.phases += 'html-runtime-missing-txt'
+            Back-ToTextGame
+        }
+        elseif ($Mode -eq 'html-position') {
+            if (-not $AppCacheRoot -or -not $AppDataRoot) {
+                throw 'html-position needs -AppDataRoot and -AppCacheRoot.'
+            }
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            Select-Element $textGame
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+            $report.sessionsOpened = 0
+            $report.unimportedClicks = 0
+
+            # position-fragment: a fragment link moves the page, the next
+            # poll captures it, and the captured line is the visible one.
+            Open-TextGuide 'Long Web Guide'
+            $report.sessionsOpened++
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PageName 'Long Web Guide')
+            [void](Wait-HtmlPosition { param($p) $p.locator } 'a first capture')
+            Click-Element (Wait-PageVisible 'Jump to MARK-0420')
+            $target = Wait-HtmlPosition { param($p) $p.quote -like 'MARK-0420 *' } 'the MARK-0420 line'
+            [void](Wait-TopMark 420 'the fragment link')
+            $report.htmlPositionOffset = $target.offset
+            $report.phases += 'position-fragment'
+
             Back-ToTextGame
         }
         elseif ($Mode -eq 'pdf-reader') {
