@@ -1,7 +1,9 @@
+using System.Text.Json;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Reading;
 using DesktopGuides.Infrastructure.Reading;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
 
@@ -33,6 +35,13 @@ internal sealed class HtmlReaderSession : IReaderSession
     private bool disposed;
     private TaskCompletionSource<bool>? pendingNavigation;
     private bool failed;
+    private static readonly TimeSpan ScriptTimeout = TimeSpan.FromSeconds(5);
+    private static readonly HtmlCapture Start = new(0, null, null, 0);
+    private readonly bool positionForTest;
+    private readonly DispatcherQueueTimer tracker;
+    private HtmlCapture? current;
+    private HtmlScroll? lastScroll;
+    private bool ticking;
 
     public HtmlReaderSession(HtmlGuideLoaded loaded, string cacheRoot, HtmlSessionDiagnostics? diagnostics)
     {
@@ -44,6 +53,11 @@ internal sealed class HtmlReaderSession : IReaderSession
         this.diagnostics = diagnostics;
         profile = Path.Combine(cacheRoot, "WebView2", Guid.NewGuid().ToString("N"));
         View = new WebView2();
+        positionForTest = TestGate.IsOpen($@"Local\DesktopGuides.Preview.HtmlPosition.{Environment.ProcessId}");
+        tracker = View.DispatcherQueue.CreateTimer();
+        tracker.Interval = TimeSpan.FromMilliseconds(500);
+        tracker.IsRepeating = true;
+        tracker.Tick += OnTrackerTick;
     }
 
     public WebView2 View { get; }
@@ -52,8 +66,7 @@ internal sealed class HtmlReaderSession : IReaderSession
 
     // Capabilities don't change during an HTML session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
-    // T09.3 adds position tracking.
-    public event EventHandler<LocationChangedEventArgs>? LocationChanged { add { } remove { } }
+    public event EventHandler<LocationChangedEventArgs>? LocationChanged;
     public event EventHandler<Uri>? ExternalLinkRequested;
     // Raised once, with Crashed, when the browser or the page's renderer
     // dies after the guide opened.
@@ -162,15 +175,16 @@ internal sealed class HtmlReaderSession : IReaderSession
             // reaches the completion source.
             throw new HtmlGuideLoadException(failed ? HtmlGuideLoadError.Crashed : HtmlGuideLoadError.Changed);
         }
+        tracker.Start();
     }
 
-    public Task<ReaderLocation> GetLocationAsync(CancellationToken token)
+    // A capture that fails or is rejected keeps the last good point.
+    public async Task<ReaderLocation> GetLocationAsync(CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        // T09.3 captures the real position; until then the entry's top.
-        return Task.FromResult(new ReaderLocation(
-            GuideFormat.Html, 1, contentSha256 ?? string.Empty,
-            new HtmlPosition(policy.Entry.RequestPath, null, null, 0, 0), 0));
+        if (await CaptureAsync() is HtmlCapture capture) current = capture;
+        token.ThrowIfCancellationRequested();
+        return HtmlLocationRules.Capture(contentSha256 ?? string.Empty, policy.Entry.RequestPath, current ?? Start);
     }
 
     public Task<RestoreOutcome> RestoreLocationAsync(ReaderLocation location, CancellationToken token)
@@ -185,6 +199,74 @@ internal sealed class HtmlReaderSession : IReaderSession
 
     public Task ExecuteAsync(ReaderAction action, CancellationToken token) =>
         throw new NotSupportedException("HTML guides have no reader commands yet.");
+
+    // Runs a fixed host script in the entry document only. Any failure,
+    // including a page that navigated away or a renderer that died, is null.
+    private async Task<string?> RunScriptAsync(string script)
+    {
+        if (disposed || failed || core is null) return null;
+        try
+        {
+            if (!Uri.TryCreate(core.Source, UriKind.Absolute, out Uri? source) ||
+                !HtmlNavigationPolicy.IsEntryDocument(source, policy.EntryUri))
+            {
+                return null;
+            }
+            return await core.ExecuteScriptAsync(script).AsTask().WaitAsync(ScriptTimeout);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private async Task<HtmlCapture?> CaptureAsync()
+    {
+        string? reply = await RunScriptAsync(HtmlPositionScripts.Capture);
+        if (disposed) return null;
+        HtmlCapture? capture = HtmlLocationRules.ParseCapture(reply, policy.EntryUri);
+        if (capture is null) diagnostics?.RecordRejectedCapture();
+        return capture;
+    }
+
+    // A cheap scroll read every tick; a capture only after a move.
+    private async void OnTrackerTick(DispatcherQueueTimer sender, object args)
+    {
+        if (ticking || disposed) return;
+        ticking = true;
+        try
+        {
+            HtmlScroll? scroll = HtmlLocationRules.ParseScroll(await RunScriptAsync(HtmlPositionScripts.ReadScroll));
+            if (scroll is null || disposed || !HtmlLocationRules.Moved(lastScroll, scroll)) return;
+            HtmlCapture? capture = await CaptureAsync();
+            if (capture is null || disposed) return;
+            lastScroll = scroll;
+            if (capture == current) return;
+            current = capture;
+            WritePositionForTest();
+            RaiseLocationChanged();
+        }
+        catch (Exception)
+        {
+            // A tick must never take down the app.
+        }
+        finally
+        {
+            ticking = false;
+        }
+    }
+
+    private void RaiseLocationChanged()
+    {
+        try
+        {
+            LocationChanged?.Invoke(this, new LocationChangedEventArgs());
+        }
+        catch (Exception)
+        {
+            // A throwing handler must not escape into the timer.
+        }
+    }
 
     private async void OnWebResourceRequested(CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs args)
     {
@@ -308,6 +390,9 @@ internal sealed class HtmlReaderSession : IReaderSession
     {
         if (disposed) return;
         disposed = true;
+        tracker.Stop();
+        tracker.Tick -= OnTrackerTick;
+        LocationChanged = null;
         ExternalLinkRequested = null;
         Failed = null;
         WriteDiagnostics();
@@ -368,6 +453,35 @@ internal sealed class HtmlReaderSession : IReaderSession
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
             // Test diagnostics must never affect closing a guide.
+        }
+    }
+
+    // Test gate only: the current point as the codec writes it. Written to
+    // a temporary file and moved, so the smoke never reads half a file.
+    private void WritePositionForTest()
+    {
+        if (!positionForTest || disposed) return;
+        try
+        {
+            string? locator = current is null ? null : ReaderLocationCodec.Serialize(
+                HtmlLocationRules.Capture(contentSha256 ?? string.Empty, policy.Entry.RequestPath, current));
+            string json = JsonSerializer.Serialize(new
+            {
+                locator,
+                kind = (string?)null,
+                step = (string?)null,
+                reason = (string?)null
+            });
+            string folder = Path.Combine(cacheRoot, "diagnostics");
+            Directory.CreateDirectory(folder);
+            string path = Path.Combine(folder, $"html-position-{Environment.ProcessId}.json");
+            string temporary = path + ".tmp";
+            File.WriteAllText(temporary, json);
+            File.Move(temporary, path, overwrite: true);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            // Test diagnostics must never affect reading.
         }
     }
 }
