@@ -1139,9 +1139,6 @@ function Invoke-PdfReaderPass([string] $resultName) {
     }
     finally {
         $diagnosticsGate.Dispose()
-        # TEMP T10.3 debug trace.
-        $tracePath = Join-Path (Join-Path (Get-HtmlCacheRoot) 'diagnostics') 'pdf-trace.txt'
-        Copy-Item -LiteralPath $tracePath -Destination (Join-Path $ResultDirectory "$resultName.pdf-trace.log") -ErrorAction SilentlyContinue
     }
 }
 
@@ -1815,12 +1812,11 @@ try {
     Run-StableNavigationScenarios
     Run-TxtReaderScenarios
 
-    # TEMP T10.3 debug: PDF before HTML.
-    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
-    Run-PdfReaderScenarios
-
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-HtmlReaderScenarios
+
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    Run-PdfReaderScenarios
 
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-ImportScenarios
