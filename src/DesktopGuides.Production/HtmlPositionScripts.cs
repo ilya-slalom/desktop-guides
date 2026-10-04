@@ -25,6 +25,7 @@ internal static class HtmlPositionScripts
         const completeOf = getter(HTMLImageElement.prototype, 'complete');
         const contains = Node.prototype.contains;
         const elementRect = Element.prototype.getBoundingClientRect;
+        const elementRects = Element.prototype.getClientRects;
         const skipped = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT']);
         const walk = () => {
           const body = bodyOf.call(document);
@@ -53,17 +54,22 @@ internal static class HtmlPositionScripts
           return lo;
         };
         const range = Document.prototype.createRange.call(document);
-        // A line break or a zero-width character has no box of its own; the
-        // next character with a box, up to 64 on, stands in for it.
+        // The first character at or after the offset with a box of its own.
+        // Line breaks, collapsed spaces and zero-width characters have none,
+        // and neither has text CSS hides, which can run for thousands of
+        // characters: a node whose element has no boxes is skipped whole.
         const boxAt = (w, offset) => {
-          for (let o = offset; o < Math.min(w.length, offset + 64); o++) {
-            const i = locate(w, o), node = w.nodes[i], local = o - w.starts[i];
-            const ch = dataOf.call(node)[local];
-            if (ch === '\n' || ch === '\r') continue;
-            range.setStart(node, local);
-            range.setEnd(node, local + 1);
-            const r = range.getBoundingClientRect();
-            if (r.width > 0 && r.height > 0) return { offset: o, top: r.top, bottom: r.bottom };
+          for (let i = offset < w.length ? locate(w, offset) : w.nodes.length; i < w.nodes.length; i++) {
+            const node = w.nodes[i], data = dataOf.call(node);
+            if (elementRects.call(parentOf.call(node)).length === 0) continue;
+            for (let local = Math.max(0, offset - w.starts[i]); local < data.length; local++) {
+              const ch = data[local];
+              if (ch === '\n' || ch === '\r') continue;
+              range.setStart(node, local);
+              range.setEnd(node, local + 1);
+              const r = range.getBoundingClientRect();
+              if (r.width > 0 && r.height > 0) return { offset: w.starts[i] + local, top: r.top, bottom: r.bottom };
+            }
           }
           return null;
         };
@@ -98,7 +104,8 @@ internal static class HtmlPositionScripts
     // top. Boxes go down the page in walk order, so a binary search finds it.
     public const string Capture = "(() => {" + Prelude + """
         const w = walk();
-        const below = (o) => { const b = boxAt(w, o); return b !== null && b.bottom > 1; };
+        // No box left counts as below, so the search stays monotonic.
+        const below = (o) => { const b = boxAt(w, o); return b === null || b.bottom > 1; };
         let lo = 0, hi = w.length;
         while (lo < hi) {
           const mid = (lo + hi) >> 1;
@@ -113,7 +120,11 @@ internal static class HtmlPositionScripts
           const value = idOf.call(p);
           if (value) { id = value.length > 128 ? null : value; break; }
         }
-        return { offset: box.offset, quote: slice(w, box.offset, 160), id, fraction: fraction(), href: location.href };
+        // The cut must not leave half a surrogate pair.
+        let quote = slice(w, box.offset, 160);
+        const last = quote.charCodeAt(quote.length - 1);
+        if (last >= 0xD800 && last <= 0xDBFF) quote = quote.substring(0, quote.length - 1);
+        return { offset: box.offset, quote, id, fraction: fraction(), href: location.href };
         })()
         """;
 
