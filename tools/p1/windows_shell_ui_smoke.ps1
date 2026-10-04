@@ -13,7 +13,7 @@ param(
         'remove-guide-cancel', 'remove-guide',
         'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted', 'txt-reader',
         'txt-load-paused', 'txt-back-during-load', 'txt-load-released', 'html-reader',
-        'html-runtime-missing', 'pdf-reader')]
+        'html-runtime-missing', 'pdf-reader', 'html-position')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -57,7 +57,12 @@ param(
     # The provider failure Refresh and search should report: no saved
     # credentials, or credentials saved while the network is blocked.
     [ValidateSet('NotConfigured', 'Unavailable')]
-    [string] $ExpectedProviderFailure = 'NotConfigured'
+    [string] $ExpectedProviderFailure = 'NotConfigured',
+
+    # The app's LocalState and LocalCache folders, for HTML position gates.
+    [string] $AppDataRoot = '',
+
+    [string] $AppCacheRoot = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -1188,8 +1193,9 @@ try {
         # These modes continue a shell left on Reader, Game, or Library.
     }
     elseif ($Mode -in @('txt-reader', 'txt-load-paused', 'txt-back-during-load',
-        'txt-load-released', 'html-reader', 'html-runtime-missing', 'pdf-reader')) {
+        'txt-load-released', 'html-reader', 'html-runtime-missing', 'pdf-reader', 'html-position')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
+            elseif ($Mode -eq 'html-position') { 'Web Position Game' }
             elseif ($Mode -eq 'pdf-reader') { 'PDF Reader Game' }
             else { 'Text Reader Game' }
         $missingMessage = "This guide's file is missing from the library."
@@ -1289,6 +1295,204 @@ try {
             Go-Back
             [void](Wait-Name 'GameHeading' $textGame)
             [void](Wait-Status 'Game ready.')
+        }
+
+        # WebView2 content sits in a top-level Chromium window owned by
+        # the shell's WebView2 browser process, so its UI Automation tree
+        # is read from that window rather than from the shell window.
+        function Get-PageRoots {
+            $browsers = @(Get-CimInstance Win32_Process -Filter (
+                "ParentProcessId = $ProcessId AND Name = 'msedgewebview2.exe'") |
+                ForEach-Object { [uint32] $_.ProcessId })
+            if ($browsers.Count -eq 0) { return @() }
+            $pages = @()
+            foreach ($window in [DesktopGuidesForegroundProbe]::FindWindows(
+                'Chrome_RenderWidgetHostHWND', [uint32[]] $browsers)) {
+                try {
+                    $pages += [System.Windows.Automation.AutomationElement]::FromHandle($window)
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                    # The window closed after it was listed.
+                }
+            }
+            return $pages
+        }
+
+        function Find-PageByName([string] $name) {
+            $condition = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::NameProperty, $name)
+            foreach ($page in Get-PageRoots) {
+                try {
+                    $element = $page.FindFirst($scope, $condition)
+                    if ($element) { return $element }
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                    # A closing session's window can vanish mid-search.
+                }
+            }
+            return $null
+        }
+
+        function Wait-PageName([string] $name) {
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $element = Find-PageByName $name
+                if ($element) { return $element }
+                Start-Sleep -Milliseconds 250
+            } while ((Get-Date) -lt $deadline)
+            [void](Save-WindowScreenshot 'html-page-missing')
+            $webViews = @(Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'" |
+                ForEach-Object { "$($_.ProcessId)<-$($_.ParentProcessId)" })
+            throw "The guide page did not show '$name'. WebView2 processes (pid<-parent): $($webViews -join ', ')."
+        }
+
+        # The page viewport grows back after the link bar closes, so a
+        # link can be found while it is still below the visible area.
+        function Wait-PageVisible([string] $name) {
+            $deadline = (Get-Date).AddSeconds(5)
+            do {
+                $element = Wait-PageName $name
+                try {
+                    if (-not $element.Current.IsOffscreen) { return $element }
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                    # The page tree was rebuilt; find the link again.
+                }
+                Start-Sleep -Milliseconds 250
+            } while ((Get-Date) -lt $deadline)
+            [void](Save-WindowScreenshot 'html-page-offscreen')
+            throw "The guide page showed '$name' only off-screen."
+        }
+
+        # The app's own view of the position, written only while the
+        # HtmlPosition gate is open. The locator is the T12.1 codec JSON.
+        function Read-HtmlPosition {
+            $path = Join-Path $AppCacheRoot "diagnostics\html-position-$ProcessId.json"
+            if (-not (Test-Path -LiteralPath $path)) { return $null }
+            try {
+                $file = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+            }
+            catch {
+                return $null
+            }
+            $position = [ordered]@{
+                locator = $file.locator; offset = $null; quote = $null
+                kind = $file.kind; step = $file.step; reason = $file.reason
+            }
+            if ($file.locator) {
+                $payload = ($file.locator | ConvertFrom-Json).payload
+                $position.offset = [int] $payload.textOffset
+                $position.quote = [string] $payload.textQuote
+            }
+            return [pscustomobject] $position
+        }
+
+        function Wait-HtmlPosition([scriptblock] $until, [string] $what) {
+            $deadline = (Get-Date).AddSeconds(10)
+            $position = $null
+            do {
+                $position = Read-HtmlPosition
+                if ($position -and (& $until $position)) { return $position }
+                Start-Sleep -Milliseconds 250
+            } while ((Get-Date) -lt $deadline)
+            [void](Save-WindowScreenshot 'html-position-timeout')
+            throw "The HTML position never showed $what. Last: offset=$($position.offset) kind=$($position.kind) step=$($position.step)."
+        }
+
+        # The page's tree has no TextPattern, and a point hit-test stops at
+        # WinUI's content bridge, so the top line comes from the page tree:
+        # each fixture line is its own span, and the on-screen line whose box
+        # crosses the page's top edge (or starts just below it) is the top
+        # line; none near the edge means the page's top isn't a mark line.
+        $script:topLineNote = 'no page'
+        $onScreen = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::IsOffscreenProperty, $false)
+        function Get-PageTopLine {
+            foreach ($page in Get-PageRoots) {
+                try {
+                    $rect = $page.Current.BoundingRectangle
+                    if ($page.Current.IsOffscreen -or $rect.Width -lt 1 -or $rect.Height -lt 1) { continue }
+                    $started = Get-Date
+                    $best = $null
+                    $count = 0
+                    foreach ($element in $page.FindAll($scope, $onScreen)) {
+                        $name = $element.Current.Name
+                        if ($name -notmatch '^MARK-\d{4}\b') { continue }
+                        $box = $element.Current.BoundingRectangle
+                        if ($box.Height -lt 1 -or $box.Height -gt 60) { continue }
+                        $count++
+                        if ($box.Bottom -le $rect.Top + 2 -or $box.Top -ge $rect.Top + 30) { continue }
+                        if (-not $best -or $box.Top -lt $best.Top) {
+                            $best = [pscustomobject]@{ Top = $box.Top; Name = $name.Trim() }
+                        }
+                    }
+                    $elapsed = [int]((Get-Date) - $started).TotalMilliseconds
+                    $script:topLineNote = "page top $([int]$rect.Top); $count mark lines on screen in $elapsed ms"
+                    if ($best) { return $best.Name }
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                    # The page tree was rebuilt; try the next window.
+                }
+            }
+            return $null
+        }
+
+        # The fixture's lines start MARK-<4 digits>. "Within one line" allows
+        # the neighbor on either side, for rounding at a line boundary.
+        function Wait-TopMark([int] $mark, [string] $step) {
+            $deadline = (Get-Date).AddSeconds(10)
+            $seen = 'nothing'
+            do {
+                $line = Get-PageTopLine
+                if ($line -match '^MARK-(\d{4})\b') {
+                    $seen = "MARK-$($Matches[1])"
+                    if ([Math]::Abs([int] $Matches[1] - $mark) -le 1) { return [int] $Matches[1] }
+                }
+                elseif ($line) {
+                    $seen = "a line without a mark ('$($line.Substring(0, [Math]::Min(40, $line.Length)))')"
+                }
+                Start-Sleep -Milliseconds 250
+            } while ((Get-Date) -lt $deadline)
+            [void](Save-WindowScreenshot "html-top-$step")
+            throw "After $step the page's top line was $seen; expected MARK-$('{0:D4}' -f $mark) within one line ($script:topLineNote)."
+        }
+
+        function Set-HtmlRestore([string] $json) {
+            $folder = Join-Path $AppDataRoot 'test'
+            [void](New-Item -ItemType Directory -Force -Path $folder)
+            [System.IO.File]::WriteAllText((Join-Path $folder 'html-restore.json'), $json)
+        }
+
+        function Clear-HtmlRestore {
+            Remove-Item -LiteralPath (Join-Path $AppDataRoot 'test\html-restore.json') -Force -ErrorAction SilentlyContinue
+        }
+
+        function Clear-HtmlPosition {
+            Remove-Item -LiteralPath (Join-Path $AppCacheRoot "diagnostics\html-position-$ProcessId.json") `
+                -Force -ErrorAction SilentlyContinue
+        }
+
+        function Open-RestoredGuide([string] $guide, [string] $restore) {
+            Clear-HtmlPosition
+            Set-HtmlRestore $restore
+            try {
+                Open-TextGuide $guide
+                $report.sessionsOpened++
+                [void](Wait-Status 'Guide ready.')
+                return Wait-HtmlPosition { param($p) $p.kind } 'a restore outcome'
+            }
+            finally {
+                Clear-HtmlRestore
+            }
+        }
+
+        # Pass '' for a step or reason that must be null.
+        function Assert-Restore($position, [string] $kind, [string] $step, [string] $reason, [string] $what) {
+            if ([string] $position.kind -cne $kind -or [string] $position.step -cne $step -or
+                [string] $position.reason -cne $reason) {
+                throw "After $what the restore was kind=$($position.kind) step=$($position.step) reason=$($position.reason); expected kind=$kind step=$step reason=$reason."
+            }
+            $report.restoreKinds += $kind
         }
 
         # A row can be recycled or not yet realized mid-read; retry briefly,
@@ -1415,73 +1619,6 @@ try {
             Select-Element $textGame
             [void](Wait-Name 'GameHeading' $textGame)
             [void](Wait-Status 'Game ready.')
-
-            # WebView2 content sits in a top-level Chromium window owned by
-            # the shell's WebView2 browser process, so its UI Automation tree
-            # is read from that window rather than from the shell window.
-            function Get-PageRoots {
-                $browsers = @(Get-CimInstance Win32_Process -Filter (
-                    "ParentProcessId = $ProcessId AND Name = 'msedgewebview2.exe'") |
-                    ForEach-Object { [uint32] $_.ProcessId })
-                if ($browsers.Count -eq 0) { return @() }
-                $pages = @()
-                foreach ($window in [DesktopGuidesForegroundProbe]::FindWindows(
-                    'Chrome_RenderWidgetHostHWND', [uint32[]] $browsers)) {
-                    try {
-                        $pages += [System.Windows.Automation.AutomationElement]::FromHandle($window)
-                    }
-                    catch [System.Windows.Automation.ElementNotAvailableException] {
-                        # The window closed after it was listed.
-                    }
-                }
-                return $pages
-            }
-
-            function Find-PageByName([string] $name) {
-                $condition = [System.Windows.Automation.PropertyCondition]::new(
-                    [System.Windows.Automation.AutomationElement]::NameProperty, $name)
-                foreach ($page in Get-PageRoots) {
-                    try {
-                        $element = $page.FindFirst($scope, $condition)
-                        if ($element) { return $element }
-                    }
-                    catch [System.Windows.Automation.ElementNotAvailableException] {
-                        # A closing session's window can vanish mid-search.
-                    }
-                }
-                return $null
-            }
-
-            function Wait-PageName([string] $name) {
-                $deadline = (Get-Date).AddSeconds(15)
-                do {
-                    $element = Find-PageByName $name
-                    if ($element) { return $element }
-                    Start-Sleep -Milliseconds 250
-                } while ((Get-Date) -lt $deadline)
-                [void](Save-WindowScreenshot 'html-page-missing')
-                $webViews = @(Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'" |
-                    ForEach-Object { "$($_.ProcessId)<-$($_.ParentProcessId)" })
-                throw "The guide page did not show '$name'. WebView2 processes (pid<-parent): $($webViews -join ', ')."
-            }
-
-            # The page viewport grows back after the link bar closes, so a
-            # link can be found while it is still below the visible area.
-            function Wait-PageVisible([string] $name) {
-                $deadline = (Get-Date).AddSeconds(5)
-                do {
-                    $element = Wait-PageName $name
-                    try {
-                        if (-not $element.Current.IsOffscreen) { return $element }
-                    }
-                    catch [System.Windows.Automation.ElementNotAvailableException] {
-                        # The page tree was rebuilt; find the link again.
-                    }
-                    Start-Sleep -Milliseconds 250
-                } while ((Get-Date) -lt $deadline)
-                [void](Save-WindowScreenshot 'html-page-offscreen')
-                throw "The guide page showed '$name' only off-screen."
-            }
 
             # Non-asserting diagnostic: canary log line counts at each step,
             # so any guide-originated connection can be attributed to a step.
@@ -1645,6 +1782,155 @@ try {
             Assert-Absent 'ReaderLoadErrorAction'
             $report.phases += 'html-runtime-missing-txt'
             Back-ToTextGame
+        }
+        elseif ($Mode -eq 'html-position') {
+            if (-not $AppCacheRoot -or -not $AppDataRoot) {
+                throw 'html-position needs -AppDataRoot and -AppCacheRoot.'
+            }
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            # A known width first, so each resize below is a real change.
+            Resize-ShellWindow 1500 720
+            Select-Element $textGame
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+            $report.sessionsOpened = 0
+            $report.unimportedClicks = 0
+            $report.restoreKinds = @()
+
+            # position-fragment: a fragment link moves the page, the next
+            # poll captures it, and the captured line is the visible one.
+            Open-TextGuide 'Long Web Guide'
+            $report.sessionsOpened++
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PageName 'Long Web Guide')
+            [void](Wait-HtmlPosition { param($p) $p.locator } 'a first capture')
+            Click-Element (Wait-PageVisible 'Jump to MARK-0420')
+            $target = Wait-HtmlPosition { param($p) $p.quote -like 'MARK-0420 *' } 'the MARK-0420 line'
+            [void](Wait-TopMark 420 'the fragment link')
+            $report.htmlPositionOffset = $target.offset
+            $report.phases += 'position-fragment'
+
+            # position-resize: the <pre> lines rewrap at each width; the same
+            # line stays on top and the saved offset doesn't move.
+            $report.htmlResizeMarks = @()
+            foreach ($width in @(600, 1100, 1500)) {
+                Resize-ShellWindow $width 720
+                # Past the 300 ms settle, the re-apply and two polls.
+                Start-Sleep -Milliseconds 1500
+                $report.htmlResizeMarks += Wait-TopMark 420 "a resize to $width px"
+                $after = Read-HtmlPosition
+                if (-not $after -or $after.offset -ne $target.offset) {
+                    throw "After a resize to $width px the position offset was $($after.offset); expected $($target.offset)."
+                }
+            }
+            $report.phases += 'position-resize'
+
+            $saved = (Read-HtmlPosition).locator
+            Back-ToTextGame
+
+            # position-restore-exact: the saved locator in a new session, at
+            # another width than the capture's, puts the same line on top.
+            Resize-ShellWindow 1100 720
+            $restored = Open-RestoredGuide 'Long Web Guide' $saved
+            Assert-Restore $restored 'Exact' 'Exact' '' 'an exact restore'
+            if ($restored.offset -ne $target.offset) {
+                throw "An exact restore captured offset $($restored.offset); expected $($target.offset)."
+            }
+            [void](Wait-TopMark 420 'an exact restore')
+            $report.htmlRestoreScreenshot = Save-WindowScreenshot 'html-restore'
+            Back-ToTextGame
+            $report.phases += 'position-restore-exact'
+
+            # position-restore-late-images: images answer 1 s late. With
+            # scripts off the lazy route map above the target loads eagerly,
+            # and the restore runs only after the page's load, so the line
+            # is still on top.
+            $delay = [System.Threading.EventWaitHandle]::new(
+                $false, [System.Threading.EventResetMode]::ManualReset,
+                "Local\DesktopGuides.Preview.HtmlAssetDelay.$ProcessId")
+            try {
+                $delayed = Open-RestoredGuide 'Long Web Guide' $saved
+            }
+            finally {
+                $delay.Dispose()
+            }
+            Assert-Restore $delayed 'Exact' 'Exact' '' 'a restore with late images'
+            if ($delayed.offset -ne $target.offset) {
+                throw "A restore with late images captured offset $($delayed.offset); expected $($target.offset)."
+            }
+            [void](Wait-TopMark 420 'a restore with late images')
+            Back-ToTextGame
+            $report.phases += 'position-restore-late-images'
+
+            # position-restore-changed: in changed bytes the quote is found
+            # by context; the text inserted above moved every offset.
+            $changed = Open-RestoredGuide 'Changed Long Web Guide' $saved
+            Assert-Restore $changed 'Approximate' 'Context' `
+                'The guide changed, so this is an approximate position.' 'a restore in changed bytes'
+            if ($changed.offset -le $target.offset) {
+                throw "A restore in changed bytes captured offset $($changed.offset); expected more than $($target.offset)."
+            }
+            [void](Wait-TopMark 420 'a restore in changed bytes')
+            Back-ToTextGame
+            $report.phases += 'position-restore-changed'
+
+            # position-restore-invalid: a malformed locator is Unavailable
+            # and the page stays at its start.
+            $invalid = Open-RestoredGuide 'Long Web Guide' '{"format":"Html","schemaVersion":1,"payload":'
+            Assert-Restore $invalid 'Unavailable' '' `
+                "This reading position can't be used with this guide." 'a malformed locator'
+            if ([string] $invalid.quote -notlike 'Long Web Guide*') {
+                throw "After a malformed locator the position was not the page's start."
+            }
+            $top = Get-PageTopLine
+            if ($top -match '^MARK-') {
+                throw "After a malformed locator the page's top line was $top."
+            }
+            Back-ToTextGame
+            $report.phases += 'position-restore-invalid'
+
+            # position-unimported-link: a link to a page that wasn't imported
+            # shows the unavailable bar, and the point stays where it was.
+            $unavailable = "This link goes to a page that isn't part of the imported guide."
+            Open-TextGuide 'Long Web Guide'
+            $report.sessionsOpened++
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PageName 'Long Web Guide')
+            Click-Element (Wait-PageVisible 'Jump to MARK-0420')
+            $here = Wait-HtmlPosition { param($p) $p.quote -like 'MARK-0420 *' } 'the MARK-0420 line'
+            [void](Wait-TopMark 420 'the fragment link')
+            Click-Element (Wait-PageVisible 'Part 2 of this guide')
+            $report.unimportedClicks++
+            [void](Wait-VisibleById 'ReaderUnavailableLinkBar')
+            [void](Wait-Name 'ReaderUnavailableLinkBar' $unavailable)
+            # The bar makes the page shorter; the resize re-apply keeps the
+            # point. One second covers the 300 ms settle and a 500 ms poll.
+            Start-Sleep -Seconds 1
+            [void](Wait-TopMark 420 'an unimported link')
+            $after = Read-HtmlPosition
+            if ($after.offset -ne $here.offset) {
+                throw "An unimported link moved the point from offset $($here.offset) to $($after.offset)."
+            }
+            $report.htmlUnavailableLinkScreenshot = Save-WindowScreenshot 'html-unavailable-link'
+
+            # Showing either link bar hides the other.
+            Click-Element (Wait-PageVisible 'the website')
+            [void](Wait-VisibleById 'ReaderExternalLinkBar')
+            Wait-HiddenById 'ReaderUnavailableLinkBar'
+            Click-Element (Wait-PageVisible 'Part 2 of this guide')
+            $report.unimportedClicks++
+            [void](Wait-VisibleById 'ReaderUnavailableLinkBar')
+            Wait-HiddenById 'ReaderExternalLinkBar'
+            Back-ToTextGame
+
+            # A new session starts without the bar.
+            Open-TextGuide 'Long Web Guide'
+            $report.sessionsOpened++
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PageName 'Long Web Guide')
+            Wait-HiddenById 'ReaderUnavailableLinkBar'
+            Back-ToTextGame
+            $report.phases += 'position-unimported-link'
         }
         elseif ($Mode -eq 'pdf-reader') {
             [void](Wait-Name 'LibraryHeading' 'Library')

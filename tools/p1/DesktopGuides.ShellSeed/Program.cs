@@ -488,6 +488,40 @@ if (args.Length == 3 && args[0] == "seed-html-reader")
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "seed-html-position")
+{
+    ManagedPathResolver positionPaths = new(args[1]);
+    await using SqliteLibraryRepository positionRepository = new(positionPaths);
+    await positionRepository.InitializeAsync();
+    if ((await positionRepository.ListGamesAsync()).Count != 0)
+    {
+        throw new InvalidOperationException("The HTML position seed needs an empty library.");
+    }
+    string fixtures = Path.Combine(Path.GetFullPath(args[2]), "p1");
+    Game positionGame = await positionRepository.AddGameAsync("Web Position Game", null, null);
+    GuideImportValidator positionValidator = new();
+    GuideImportPublisher positionPublisher = new(positionRepository, positionPaths);
+    async Task<Guid> PublishLongAsync(string folder, string title)
+    {
+        ImportInspection inspection = await positionValidator.InspectAsync(
+            Path.Combine(fixtures, folder, "guide.html"), CancellationToken.None);
+        if (inspection is not ImportReady ready)
+        {
+            throw new InvalidOperationException($"The {folder} guide failed the import preview: {inspection}.");
+        }
+        return await positionPublisher.PublishAsync(
+            ready.Manifest, positionGame.Id, title, false, null, CancellationToken.None);
+    }
+    Guid guideLong = await PublishLongAsync("html-long", "Long Web Guide");
+    Guid guideChanged = await PublishLongAsync("html-long-changed", "Changed Long Web Guide");
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        guideLong = guideLong.ToString("N"),
+        guideChanged = guideChanged.ToString("N")
+    }));
+    return 0;
+}
+
 if (args.Length == 3 && args[0] == "seed-pdf-reader")
 {
     ManagedPathResolver pdfPaths = new(args[1]);
@@ -547,7 +581,7 @@ if (args.Length != 2 ||
         "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-search|seed-import|seed-actions|seed-navigation " +
         "<app-data-root> " +
         "or seed-linked-game|describe-providers|describe-import|describe-actions <app-data-root> " +
-        "or seed-txt-reader|seed-html-reader|seed-pdf-reader <app-data-root> <fixtures-root> " +
+        "or seed-txt-reader|seed-html-reader|seed-html-position|seed-pdf-reader <app-data-root> <fixtures-root> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
         "or invalidate-blocked-guide <app-data-root> " +
         "or corrupt-reader-guide|restore-reader-guide <app-data-root> " +

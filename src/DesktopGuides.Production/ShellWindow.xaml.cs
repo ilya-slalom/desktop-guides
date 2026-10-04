@@ -77,6 +77,7 @@ public sealed partial class ShellWindow : Window
     private ManagedHtmlGuideLoader? htmlLoader;
     private ManagedPdfGuideLoader? pdfLoader;
     private string? cacheRoot;
+    private string? dataRoot;
     private CancellationTokenSource? readerLoad;
     private IReaderSession? readerSession;
     private bool gameRemoveRequested;
@@ -261,6 +262,7 @@ public sealed partial class ShellWindow : Window
                 AppDataRoot.HasPackageIdentity(),
                 () => ApplicationData.Current.LocalFolder.Path,
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+            this.dataRoot = dataRoot;
             ShowBusyStatus("Waiting for previous window...");
             libraryLease = await LibrarySessionLease.AcquireAsync(
                 dataRoot, leaseWait.Token);
@@ -1281,6 +1283,7 @@ public sealed partial class ShellWindow : Window
     private async Task CloseReaderSessionAsync()
     {
         HideExternalLinkBar();
+        HideUnavailableLinkBar();
         readerLoad?.Cancel();
         readerLoad?.Dispose();
         readerLoad = null;

@@ -689,7 +689,9 @@ function Run-ShellSmoke(
     [string] $IgdbCredentialFile = '',
     [string] $SteamGridDbCredentialFile = '',
     [string] $ExpectedProviderFailure = '',
-    [string] $ExpectedGuideTitle = '') {
+    [string] $ExpectedGuideTitle = '',
+    [string] $AppDataRoot = '',
+    [string] $AppCacheRoot = '') {
     $resultPath = Join-Path $ResultDirectory "$ResultName.json"
     Clear-ShellSmokeResult $resultPath
     $invocationId = [Guid]::NewGuid().ToString('N')
@@ -721,6 +723,12 @@ function Run-ShellSmoke(
     }
     if ($ExpectedGuideTitle) {
         $arguments += ' -ExpectedGuideTitle "' + $ExpectedGuideTitle + '"'
+    }
+    if ($AppDataRoot) {
+        $arguments += ' -AppDataRoot "' + $AppDataRoot + '"'
+    }
+    if ($AppCacheRoot) {
+        $arguments += ' -AppCacheRoot "' + $AppCacheRoot + '"'
     }
     $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
         -Argument $arguments -WorkingDirectory $PSScriptRoot
@@ -1148,6 +1156,104 @@ function Run-HtmlReaderScenarios {
         Remove-Item -LiteralPath $keep -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath (Join-Path $cacheRoot 'missing-runtime-test') -Recurse -Force -ErrorAction SilentlyContinue
         Restore-AppThemePreference $originalTheme
+    }
+}
+
+function Invoke-HtmlPositionPass([string] $resultName) {
+    Start-InstalledShell
+    $processId = $report.launchedProcessId
+    $gates = @(
+        foreach ($name in @('HtmlDiagnostics', 'HtmlPosition')) {
+            [System.Threading.EventWaitHandle]::new(
+                $false, [System.Threading.EventResetMode]::ManualReset,
+                "Local\DesktopGuides.Preview.$name.$processId")
+        })
+    try {
+        $result = Run-ShellSmoke 'html-position' -ResultName $resultName `
+            -AppDataRoot $dataRoot -AppCacheRoot (Get-HtmlCacheRoot)
+        Close-InstalledShell
+        return $result
+    }
+    finally {
+        foreach ($gate in $gates) { $gate.Dispose() }
+    }
+}
+
+function Assert-HtmlPositionPass([string] $pass, [string] $diagnostics, $result) {
+    # Every session served the entry and the eager map, the lazy route map
+    # only when the reader got near it, and nothing else; each unimported
+    # click was denied once, as a navigation.
+    $files = @(Get-ChildItem -LiteralPath $diagnostics -Filter 'html-session-*.json' -ErrorAction SilentlyContinue)
+    if ($files.Count -ne [int] $result.sessionsOpened) {
+        throw "The $pass pass wrote $($files.Count) HTML session diagnostics; the smoke opened $($result.sessionsOpened)."
+    }
+    $unimported = 0
+    $sessions = @()
+    foreach ($file in $files) {
+        $session = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json
+        $served = @($session.served) -join ','
+        if ($served -cne 'guide.html,images/map.png' -and $served -cne 'guide.html,images/map.png,images/route.png') {
+            throw "Guide $($session.guideId) served '$served' in the $pass pass."
+        }
+        foreach ($deny in @($session.denied)) {
+            if ($deny.reason -eq 'UnimportedPage' -and $deny.context -eq 'Navigation') {
+                $unimported += [int] $deny.count
+            }
+        }
+        $sessions += $session
+    }
+    if ($unimported -ne [int] $result.unimportedClicks) {
+        throw "The $pass pass denied $unimported unimported pages; the smoke clicked $($result.unimportedClicks)."
+    }
+    # Each restore the smoke saw was counted once, by kind, in diagnostics.
+    $counted = @{}
+    foreach ($session in $sessions) {
+        if (-not $session.restores) { continue }
+        foreach ($kind in @($session.restores.PSObject.Properties)) {
+            $counted[$kind.Name] = [int] $counted[$kind.Name] + [int] $kind.Value
+        }
+    }
+    $seen = @{}
+    foreach ($kind in @($result.restoreKinds)) {
+        if ($kind) { $seen[$kind] = [int] $seen[$kind] + 1 }
+    }
+    $countedText = (@($counted.Keys) | Sort-Object | ForEach-Object { "$_=$($counted[$_])" }) -join ','
+    $seenText = (@($seen.Keys) | Sort-Object | ForEach-Object { "$_=$($seen[$_])" }) -join ','
+    if ($countedText -cne $seenText) {
+        throw "The $pass pass counted restores '$countedText'; the smoke saw '$seenText'."
+    }
+    return $sessions
+}
+
+function Run-HtmlPositionScenarios {
+    # TR09.1-TR09.2: capture, resize, restore and unimported links on a
+    # long <pre> guide. Light then dark.
+    $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
+    $ids = Invoke-ShellSeed @('seed-html-position', $dataRoot, $fixtureRoot) | ConvertFrom-Json
+    $diagnostics = Join-Path (Get-HtmlCacheRoot) 'diagnostics'
+    $report.htmlPosition = [ordered]@{ guideLong = $ids.guideLong; guideChanged = $ids.guideChanged }
+    $originalTheme = Get-AppThemePreference
+    try {
+        foreach ($pass in @(
+            @{ name = 'html-position-light'; light = $true },
+            @{ name = 'html-position-dark'; light = $false })) {
+            Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath (Join-Path $dataRoot 'test') -Recurse -Force -ErrorAction SilentlyContinue
+            Set-AppThemePreference $pass.light
+            try {
+                $result = Invoke-HtmlPositionPass $pass.name
+                $report.htmlPosition[$pass.name] = $result
+            }
+            finally {
+                Save-HtmlDiagnostics $pass.name (Get-HtmlCacheRoot)
+            }
+            $report.htmlPosition["$($pass.name)-sessions"] = Assert-HtmlPositionPass $pass.name $diagnostics $result
+        }
+    }
+    finally {
+        Restore-AppThemePreference $originalTheme
+        Remove-Item -LiteralPath (Join-Path $dataRoot 'test') -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -1808,7 +1914,11 @@ try {
 
     if (Enter-ScenarioGroup 'txt') { Run-TxtReaderScenarios }
 
-    if (Enter-ScenarioGroup 'html') { Run-HtmlReaderScenarios }
+    if (Enter-ScenarioGroup 'html') {
+        Run-HtmlReaderScenarios
+        Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+        Run-HtmlPositionScenarios
+    }
 
     if (Enter-ScenarioGroup 'pdf') { Run-PdfReaderScenarios }
 

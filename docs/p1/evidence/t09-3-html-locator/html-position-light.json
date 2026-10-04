@@ -1,0 +1,35 @@
+{
+    "mode":  "html-position",
+    "invocationId":  "75b111f1a73f4e4bafa3914d07ddb952",
+    "observedAt":  "2026-10-04T14:03:42.8146752Z",
+    "processId":  1780,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "position-fragment",
+                   "position-resize",
+                   "position-restore-exact",
+                   "position-restore-late-images",
+                   "position-restore-changed",
+                   "position-restore-invalid",
+                   "position-unimported-link"
+               ],
+    "sessionsOpened":  7,
+    "unimportedClicks":  2,
+    "restoreKinds":  [
+                         "Exact",
+                         "Exact",
+                         "Approximate",
+                         "Unavailable"
+                     ],
+    "htmlPositionOffset":  29056,
+    "htmlResizeMarks":  [
+                            420,
+                            420,
+                            420
+                        ],
+    "htmlRestoreScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\html-position-light.html-restore.png",
+    "htmlUnavailableLinkScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\html-position-light.html-unavailable-link.png"
+}

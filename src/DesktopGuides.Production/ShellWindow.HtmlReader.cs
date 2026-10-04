@@ -37,10 +37,11 @@ public sealed partial class ShellWindow
             return true;
         }
         HtmlGuideLoaded loaded = (HtmlGuideLoaded)load;
-        HtmlReaderSession session = new(loaded, cacheRoot!, HtmlReaderSession.DiagnosticsForTest());
+        HtmlReaderSession session = new(loaded, dataRoot!, cacheRoot!, HtmlReaderSession.DiagnosticsForTest());
         // The next render disposes it if this one is cancelled.
         readerSession = session;
         session.ExternalLinkRequested += OnExternalLinkRequested;
+        session.UnavailableLinkRequested += OnUnavailableLinkRequested;
         session.Failed += OnReaderSessionFailed;
         ShowReaderSurface(placeholder: false, view: session.View);
         try
@@ -92,6 +93,7 @@ public sealed partial class ShellWindow
             readerSession = null;
             ReaderActions.SetSession(null);
             HideExternalLinkBar();
+            HideUnavailableLinkBar();
             ShowReaderSurface(placeholder: false);
             await failed.DisposeAsync();
             ShowHtmlLoadError(error);
@@ -105,6 +107,7 @@ public sealed partial class ShellWindow
         {
             return;
         }
+        HideUnavailableLinkBar();
         pendingExternalLink = uri;
         ReaderExternalLinkUrl.Text = uri.AbsoluteUri;
         ReaderExternalLinkBar.Visibility = Visibility.Visible;
@@ -117,6 +120,24 @@ public sealed partial class ShellWindow
         ReaderExternalLinkBar.IsOpen = false;
         ReaderExternalLinkBar.Visibility = Visibility.Collapsed;
         ReaderExternalLinkUrl.Text = string.Empty;
+    }
+
+    // Showing either link bar hides the other.
+    private void OnUnavailableLinkRequested(object? sender, EventArgs args)
+    {
+        if (!ReferenceEquals(sender, readerSession))
+        {
+            return;
+        }
+        HideExternalLinkBar();
+        ReaderUnavailableLinkBar.Visibility = Visibility.Visible;
+        ReaderUnavailableLinkBar.IsOpen = true;
+    }
+
+    private void HideUnavailableLinkBar()
+    {
+        ReaderUnavailableLinkBar.IsOpen = false;
+        ReaderUnavailableLinkBar.Visibility = Visibility.Collapsed;
     }
 
     private async void ReaderExternalLinkOpenClicked(object sender, RoutedEventArgs args)
@@ -182,4 +203,8 @@ public sealed partial class ShellWindow
             HideExternalLinkBar();
         }
     }
+
+    // Collapsed once closed, so the Reader's layout returns to normal.
+    private void ReaderUnavailableLinkBarClosed(InfoBar sender, InfoBarClosedEventArgs args) =>
+        ReaderUnavailableLinkBar.Visibility = Visibility.Collapsed;
 }

@@ -1,7 +1,10 @@
+using System.Text.Json;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Reading;
 using DesktopGuides.Infrastructure.Reading;
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
 
@@ -33,10 +36,33 @@ internal sealed class HtmlReaderSession : IReaderSession
     private bool disposed;
     private TaskCompletionSource<bool>? pendingNavigation;
     private bool failed;
+    private static readonly TimeSpan ScriptTimeout = TimeSpan.FromSeconds(5);
+    private static readonly HtmlCapture Start = new(0, null, null, 0);
+    private readonly bool positionForTest;
+    private readonly DispatcherQueueTimer tracker;
+    private HtmlCapture? current;
+    private HtmlScroll? lastScroll;
+    private bool ticking;
+    private static readonly TimeSpan ResizeSettle = TimeSpan.FromMilliseconds(300);
+    private CancellationTokenSource? resizeDelay;
+    private bool opened;
+    private bool resizing;
+    // Bumped by every size change: a capture or baseline taken across one
+    // is from a page mid-reflow and is dropped.
+    private int generation;
+    private readonly TaskCompletionSource<bool> entryLoad = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly SemaphoreSlim restoreTurn = new(1, 1);
+    private readonly string? restoreFileForTest;
+    private readonly bool delayImagesForTest;
+    private bool restoring;
+    private RestoreOutcome? lastOutcome;
+    private HtmlRestoreStep? lastStep;
 
-    public HtmlReaderSession(HtmlGuideLoaded loaded, string cacheRoot, HtmlSessionDiagnostics? diagnostics)
+    public HtmlReaderSession(
+        HtmlGuideLoaded loaded, string dataRoot, string cacheRoot, HtmlSessionDiagnostics? diagnostics)
     {
         ArgumentNullException.ThrowIfNull(loaded);
+        ArgumentException.ThrowIfNullOrEmpty(dataRoot);
         ArgumentException.ThrowIfNullOrEmpty(cacheRoot);
         policy = loaded.Policy;
         reader = loaded.Reader;
@@ -44,6 +70,14 @@ internal sealed class HtmlReaderSession : IReaderSession
         this.diagnostics = diagnostics;
         profile = Path.Combine(cacheRoot, "WebView2", Guid.NewGuid().ToString("N"));
         View = new WebView2();
+        positionForTest = TestGate.IsOpen($@"Local\DesktopGuides.Preview.HtmlPosition.{Environment.ProcessId}");
+        restoreFileForTest = positionForTest ? Path.Combine(dataRoot, "test", "html-restore.json") : null;
+        delayImagesForTest = TestGate.IsOpen($@"Local\DesktopGuides.Preview.HtmlAssetDelay.{Environment.ProcessId}");
+        tracker = View.DispatcherQueue.CreateTimer();
+        tracker.Interval = TimeSpan.FromMilliseconds(500);
+        tracker.IsRepeating = true;
+        tracker.Tick += OnTrackerTick;
+        View.SizeChanged += OnViewSizeChanged;
     }
 
     public WebView2 View { get; }
@@ -52,9 +86,11 @@ internal sealed class HtmlReaderSession : IReaderSession
 
     // Capabilities don't change during an HTML session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
-    // T09.3 adds position tracking.
-    public event EventHandler<LocationChangedEventArgs>? LocationChanged { add { } remove { } }
+    public event EventHandler<LocationChangedEventArgs>? LocationChanged;
     public event EventHandler<Uri>? ExternalLinkRequested;
+    // A person's link to a page of this guide that wasn't imported. It
+    // carries nothing: the shell never shows the target.
+    public event EventHandler? UnavailableLinkRequested;
     // Raised once, with Crashed, when the browser or the page's renderer
     // dies after the guide opened.
     public event EventHandler<HtmlGuideLoadError>? Failed;
@@ -71,7 +107,28 @@ internal sealed class HtmlReaderSession : IReaderSession
             ? Path.Combine(cacheRoot, "missing-runtime-test")
             : null;
 
+    // A saved point can be restored only once the entry has loaded;
+    // RestoreLocationAsync waits on entryLoad.
     public async Task OpenAsync(ManagedGuideSource source, CancellationToken token)
+    {
+        bool entryLoaded = false;
+        try
+        {
+            await OpenEntryAsync(source, token);
+            entryLoaded = true;
+        }
+        finally
+        {
+            entryLoad.TrySetResult(entryLoaded);
+        }
+        if (RestoreRequestForTest() is LocationDecodeResult request) await RestoreAsync(request);
+        token.ThrowIfCancellationRequested();
+        if (disposed) return;
+        opened = true;
+        tracker.Start();
+    }
+
+    private async Task OpenEntryAsync(ManagedGuideSource source, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(source);
         if (source.Guide.Id != policy.GuideId)
@@ -164,27 +221,268 @@ internal sealed class HtmlReaderSession : IReaderSession
         }
     }
 
-    public Task<ReaderLocation> GetLocationAsync(CancellationToken token)
+    // A capture that fails or is rejected keeps the last good point.
+    public async Task<ReaderLocation> GetLocationAsync(CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        // T09.3 captures the real position; until then the entry's top.
-        return Task.FromResult(new ReaderLocation(
-            GuideFormat.Html, 1, contentSha256 ?? string.Empty,
-            new HtmlPosition(policy.Entry.RequestPath, null, null, 0, 0), 0));
+        // Mid-reflow or mid-restore, the page's top isn't the reader's point.
+        if (!resizing && !restoring && await CaptureAsync() is HtmlCapture capture) current = capture;
+        token.ThrowIfCancellationRequested();
+        return HtmlLocationRules.Capture(contentSha256 ?? string.Empty, policy.Entry.RequestPath, current ?? Start);
     }
 
-    public Task<RestoreOutcome> RestoreLocationAsync(ReaderLocation location, CancellationToken token)
+    public async Task<RestoreOutcome> RestoreLocationAsync(ReaderLocation location, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(location);
         token.ThrowIfCancellationRequested();
-        return Task.FromResult(new RestoreOutcome(
-            RestoreKind.Unavailable, "HTML positions are restored in a later preview."));
+        if (!await entryLoad.Task.WaitAsync(token) || disposed || contentSha256 is null)
+        {
+            return new RestoreOutcome(RestoreKind.Unavailable, HtmlLocationRules.UnavailableReason);
+        }
+        return await RestoreAsync(HtmlLocationRules.Decode(location, contentSha256, policy.Entry.RequestPath));
     }
 
     public Task ApplyAppearanceAsync(ReaderAppearance appearance, CancellationToken token) => Task.CompletedTask;
 
     public Task ExecuteAsync(ReaderAction action, CancellationToken token) =>
         throw new NotSupportedException("HTML guides have no reader commands yet.");
+
+    // Runs a fixed host script in the entry document only. Any failure,
+    // including a page that navigated away or a renderer that died, is null.
+    private async Task<string?> RunScriptAsync(string script)
+    {
+        if (disposed || failed || core is null) return null;
+        try
+        {
+            if (!Uri.TryCreate(core.Source, UriKind.Absolute, out Uri? source) ||
+                !HtmlNavigationPolicy.IsEntryDocument(source, policy.EntryUri))
+            {
+                return null;
+            }
+            string reply = await core.CallDevToolsProtocolMethodAsync("Runtime.evaluate", EvaluateParams(script))
+                .AsTask().WaitAsync(ScriptTimeout);
+            return EvaluateValue(reply);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    // ExecuteScriptAsync runs with a user gesture, which makes the page's
+    // own refreshes and redirects look like a person's click to the
+    // navigation policy. Runtime.evaluate without one keeps them page-initiated.
+    private static string EvaluateParams(string script) =>
+        JsonSerializer.Serialize(new { expression = script, returnByValue = true, userGesture = false });
+
+    // The value as JSON, as ExecuteScriptAsync would give it; null when the
+    // script threw.
+    private static string? EvaluateValue(string reply)
+    {
+        using JsonDocument json = JsonDocument.Parse(reply);
+        if (json.RootElement.TryGetProperty("exceptionDetails", out _)) return null;
+        return json.RootElement.GetProperty("result").TryGetProperty("value", out JsonElement value)
+            ? value.GetRawText()
+            : "null";
+    }
+
+    private async Task<HtmlCapture?> CaptureAsync()
+    {
+        string? reply = await RunScriptAsync(HtmlPositionScripts.Capture);
+        if (disposed) return null;
+        HtmlCapture? capture = HtmlLocationRules.ParseCapture(reply, policy.EntryUri);
+        if (capture is null) diagnostics?.RecordRejectedCapture();
+        return capture;
+    }
+
+    // A cheap scroll read every tick; a capture only after a move.
+    private async void OnTrackerTick(DispatcherQueueTimer sender, object args)
+    {
+        if (ticking || disposed || restoring) return;
+        ticking = true;
+        try
+        {
+            int started = generation;
+            HtmlScroll? scroll = HtmlLocationRules.ParseScroll(await RunScriptAsync(HtmlPositionScripts.ReadScroll));
+            if (scroll is null || disposed || started != generation ||
+                !HtmlLocationRules.Moved(lastScroll, scroll))
+            {
+                return;
+            }
+            HtmlCapture? capture = await CaptureAsync();
+            if (capture is null || disposed || started != generation) return;
+            lastScroll = scroll;
+            if (capture == current) return;
+            current = capture;
+            WritePositionForTest();
+            RaiseLocationChanged();
+        }
+        catch (Exception)
+        {
+            // A tick must never take down the app.
+        }
+        finally
+        {
+            ticking = false;
+        }
+    }
+
+    // Tracking pauses while the size changes; 300 ms after the last change
+    // the current point goes back to the top and the scroll it leaves is the
+    // new baseline. Chromium's own scroll change during the reflow is never
+    // taken as the reader's move.
+    private async void OnViewSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        if (!opened || disposed) return;
+        generation++;
+        resizing = true;
+        tracker.Stop();
+        resizeDelay?.Cancel();
+        resizeDelay?.Dispose();
+        CancellationTokenSource delay = new();
+        resizeDelay = delay;
+        try
+        {
+            await Task.Delay(ResizeSettle, delay.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        try
+        {
+            await ReapplyAsync();
+        }
+        catch (Exception)
+        {
+            // A failed re-apply leaves the page where the reflow put it.
+        }
+        finally
+        {
+            if (resizeDelay == delay && !disposed)
+            {
+                resizeDelay = null;
+                delay.Dispose();
+                resizing = false;
+                tracker.Start();
+            }
+        }
+    }
+
+    private async Task ReapplyAsync()
+    {
+        // A restore in progress scrolls to its own target again.
+        if (restoring) return;
+        int started = generation;
+        if (current is HtmlCapture point)
+        {
+            // A page with no text has only its fraction.
+            HtmlRestoreStep step = point.Quote is null ? HtmlRestoreStep.Fraction : HtmlRestoreStep.Exact;
+            await ScrollToTargetAsync(new HtmlRestoreTarget(step, point.Offset, point.Fraction));
+        }
+        HtmlScroll? scroll = HtmlLocationRules.ParseScroll(await RunScriptAsync(HtmlPositionScripts.ReadScroll));
+        if (scroll is not null && started == generation && !disposed) lastScroll = scroll;
+    }
+
+    // Puts the target character's box at the viewport top. An offset whose
+    // text has no box (hidden since capture) falls back to the fraction, and
+    // the returned target says so. Null when no script replied.
+    private async Task<HtmlRestoreTarget?> ScrollToTargetAsync(HtmlRestoreTarget target)
+    {
+        if (target.Step != HtmlRestoreStep.Fraction &&
+            HtmlLocationRules.ParsePending(await RunScriptAsync(HtmlPositionScripts.ScrollToOffset(target.Offset))) is not null)
+        {
+            return target;
+        }
+        HtmlRestoreTarget fraction = target with { Step = HtmlRestoreStep.Fraction };
+        return HtmlLocationRules.ParsePending(await RunScriptAsync(HtmlPositionScripts.ScrollToFraction(fraction.Fraction))) is not null
+            ? fraction
+            : null;
+    }
+
+    // Core plans the steps and picks the target; the scripts only measure
+    // and scroll. No image is still loading here: with scripts off Chromium
+    // loads lazy images eagerly, and the entry's load waited for all of them.
+    // A resize during the restore scrolls to the target again.
+    private async Task<RestoreOutcome> RestoreAsync(LocationDecodeResult decoded)
+    {
+        await restoreTurn.WaitAsync();
+        restoring = true;
+        try
+        {
+            HtmlRestorePlan plan = HtmlLocationRules.PlanRestore(decoded);
+            HtmlFindResult? find = null;
+            if (plan.NeedsFind && plan.Position is HtmlPosition position)
+            {
+                find = HtmlLocationRules.ParseFind(
+                    await RunScriptAsync(HtmlPositionScripts.Find(HtmlLocationRules.FindArgs(position))));
+            }
+            HtmlRestoreTarget? target = HtmlLocationRules.Resolve(plan, find);
+            if (target is not null)
+            {
+                int started = generation;
+                target = await ScrollToTargetAsync(target);
+                while (target is not null && started != generation && !disposed)
+                {
+                    // The window was resized during the restore.
+                    started = generation;
+                    await Task.Delay(ResizeSettle);
+                    target = await ScrollToTargetAsync(target) ?? target;
+                }
+            }
+            RestoreOutcome outcome = HtmlLocationRules.Outcome(plan, target);
+            if (disposed) return outcome;
+            HtmlScroll? scroll = HtmlLocationRules.ParseScroll(await RunScriptAsync(HtmlPositionScripts.ReadScroll));
+            if (scroll is not null) lastScroll = scroll;
+            HtmlCapture? capture = await CaptureAsync();
+            if (disposed) return outcome;
+            diagnostics?.RecordRestore(outcome.Kind);
+            lastOutcome = outcome;
+            lastStep = outcome.Kind == RestoreKind.Unavailable ? null : target?.Step;
+            bool moved = capture is not null && capture != current;
+            if (capture is not null) current = capture;
+            WritePositionForTest();
+            if (moved) RaiseLocationChanged();
+            return outcome;
+        }
+        finally
+        {
+            restoring = false;
+            restoreTurn.Release();
+        }
+    }
+
+    // Test gate only: stands in for T12.2's reopen. The file is untrusted
+    // and goes through the codec like a stored locator.
+    private LocationDecodeResult? RestoreRequestForTest()
+    {
+        if (restoreFileForTest is null || contentSha256 is null) return null;
+        try
+        {
+            FileInfo file = new(restoreFileForTest);
+            if (!file.Exists) return null;
+            if (file.Length > ReaderLocationCodec.MaxBytes) return new(LocationDecodeStatus.Invalid, null);
+            return ReaderLocationCodec.Deserialize(
+                File.ReadAllText(restoreFileForTest), GuideFormat.Html,
+                contentSha256.ToLowerInvariant(), policy.Entry.RequestPath);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    private void RaiseLocationChanged()
+    {
+        try
+        {
+            LocationChanged?.Invoke(this, new LocationChangedEventArgs());
+        }
+        catch (Exception)
+        {
+            // A throwing handler must not escape into the timer.
+        }
+    }
 
     private async void OnWebResourceRequested(CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs args)
     {
@@ -196,6 +494,11 @@ internal sealed class HtmlReaderSession : IReaderSession
             HtmlRequestDecision decision = policy.Decide(args.Request.Method, args.Request.Uri);
             if (decision is HtmlServe serve)
             {
+                // Test gate only: images answer late, as from a slow disk.
+                if (delayImagesForTest && serve.Asset.Kind == GuideAssetKind.Image)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+                }
                 HtmlAssetRead read = await Task.Run(() => reader.Read(serve.Asset));
                 if (read.Status == HtmlAssetReadStatus.Served && !disposed && environment is not null)
                 {
@@ -255,6 +558,10 @@ internal sealed class HtmlReaderSession : IReaderSession
                 args.Cancel = true;
                 ExternalLinkRequested?.Invoke(this, navigation.ExternalUri!);
                 break;
+            case HtmlNavigationKind.Unavailable:
+                args.Cancel = true;
+                RaiseUnavailableLink();
+                break;
             default:
                 args.Cancel = true;
                 break;
@@ -273,6 +580,18 @@ internal sealed class HtmlReaderSession : IReaderSession
         {
             ExternalLinkRequested?.Invoke(this, navigation.ExternalUri!);
         }
+        else if (navigation.Kind == HtmlNavigationKind.Unavailable)
+        {
+            RaiseUnavailableLink();
+        }
+    }
+
+    // Counted as a denied navigation; nothing is requested or served.
+    private void RaiseUnavailableLink()
+    {
+        if (disposed) return;
+        diagnostics?.RecordDenied(HtmlDenyReason.UnimportedPage, "Navigation");
+        UnavailableLinkRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private static void OnPermissionRequested(CoreWebView2 sender, CoreWebView2PermissionRequestedEventArgs args) =>
@@ -308,7 +627,16 @@ internal sealed class HtmlReaderSession : IReaderSession
     {
         if (disposed) return;
         disposed = true;
+        tracker.Stop();
+        tracker.Tick -= OnTrackerTick;
+        LocationChanged = null;
+        View.SizeChanged -= OnViewSizeChanged;
+        resizeDelay?.Cancel();
+        resizeDelay?.Dispose();
+        resizeDelay = null;
+        entryLoad.TrySetResult(false);
         ExternalLinkRequested = null;
+        UnavailableLinkRequested = null;
         Failed = null;
         WriteDiagnostics();
         if (core is not null)
@@ -368,6 +696,35 @@ internal sealed class HtmlReaderSession : IReaderSession
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
             // Test diagnostics must never affect closing a guide.
+        }
+    }
+
+    // Test gate only: the current point as the codec writes it. Written to
+    // a temporary file and moved, so the smoke never reads half a file.
+    private void WritePositionForTest()
+    {
+        if (!positionForTest || disposed) return;
+        try
+        {
+            string? locator = current is null ? null : ReaderLocationCodec.Serialize(
+                HtmlLocationRules.Capture(contentSha256 ?? string.Empty, policy.Entry.RequestPath, current));
+            string json = JsonSerializer.Serialize(new
+            {
+                locator,
+                kind = lastOutcome?.Kind.ToString(),
+                step = lastStep?.ToString(),
+                reason = lastOutcome?.Reason
+            });
+            string folder = Path.Combine(cacheRoot, "diagnostics");
+            Directory.CreateDirectory(folder);
+            string path = Path.Combine(folder, $"html-position-{Environment.ProcessId}.json");
+            string temporary = path + ".tmp";
+            File.WriteAllText(temporary, json);
+            File.Move(temporary, path, overwrite: true);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            // Test diagnostics must never affect reading.
         }
     }
 }

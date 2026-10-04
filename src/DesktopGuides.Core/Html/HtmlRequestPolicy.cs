@@ -2,7 +2,8 @@ namespace DesktopGuides.Core.Html;
 
 public enum HtmlDenyReason
 {
-    Method, CrossGuide, External, OtherScheme, Malformed, NotInManifest, UnsupportedType, HashMismatch, FileMissing
+    Method, CrossGuide, External, OtherScheme, Malformed, NotInManifest, UnsupportedType, HashMismatch, FileMissing,
+    UnimportedPage
 }
 
 public abstract record HtmlRequestDecision;

@@ -823,7 +823,8 @@ Rendered pages are cached by measured bytes under 96 MiB, page loads run
 one at a time with the newest request winning, and damaged, missing,
 changed, unreadable and encrypted managed copies show typed errors.
 
-T10.3 is in review in PR #37 (CI run 37178208319); see the
+T10.3 was merged through PR #37 on 4 October 2026 (merge commit
+`541c245`; CI run 37178208319); see the
 [design and implementation notes](t10-3-pdf-locator-design.md). A PDF
 position is now a page and the share of the page above the viewport. It
 survives narrow, medium and wide windows on `pdf-long` and resets to the
@@ -831,6 +832,17 @@ top on a page turn. A restore clamps a missing page to the nearest page's
 top, keeps the point as `Approximate` when the bytes changed, and opens at
 the first page for a malformed, wrong-format or future-version locator.
 Saving it and restoring on reopen remain T12.2.
+
+T09.3 is in review in PR #39 (CI run 37206866197); see the
+[design and implementation notes](t09-3-html-locator-design.md). An HTML
+position is now a character offset in the entry document with a text
+quote, the nearest element id and the scroll fraction. It survives narrow,
+medium and wide windows on `html-long`. A restore is `Exact` in the same
+bytes, also when images above the point answer late; `Approximate` through
+the text context in changed bytes; and `Unavailable`, at the page's start,
+for a malformed locator. A link to a page that wasn't imported shows an
+informational bar and leaves the point where it was. Saving it and
+restoring on reopen remain T12.2.
 
 ## M4 — progress, completion, and appearance
 
