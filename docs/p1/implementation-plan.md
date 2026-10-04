@@ -807,11 +807,20 @@ website link is shown in a Reader bar and opens only through **Open in
 browser**. CI run 37058200440 passed the installed `html-reader` canary with
 the loopback canary listening and stopped, with zero recorded connections.
 
-T09.1 is in review in PR #35; see the
+T09.1 was merged through PR #35 on 3 October 2026 (merge commit `9f2ad26`;
+final-HEAD CI run 37127070994); see the
 [design and implementation notes](t09-1-html-adapter-design.md). It sweeps
 leftover WebView2 profiles at startup, tells a missing runtime, a failed
 start, a crash, a missing entry and a changed file apart, and offers
 **Get WebView2 Runtime** or **Reopen** where they help.
+
+T10.1 is in review in PR #36 (CI run 37169058467); see the
+[design and implementation notes](t10-1-pdf-adapter-design.md). PDF guides
+open in the Reader as a `Windows.Data.Pdf` preview beside the same page's
+PdfPig text in a read-only text box with a UI Automation `TextPattern`.
+Rendered pages are cached by measured bytes under 96 MiB, page loads run
+one at a time with the newest request winning, and damaged, missing,
+changed, unreadable and encrypted managed copies show typed errors.
 
 ## M4 — progress, completion, and appearance
 

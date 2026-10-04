@@ -488,6 +488,56 @@ if (args.Length == 3 && args[0] == "seed-html-reader")
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "seed-pdf-reader")
+{
+    ManagedPathResolver pdfPaths = new(args[1]);
+    await using SqliteLibraryRepository pdfRepository = new(pdfPaths);
+    await pdfRepository.InitializeAsync();
+    if ((await pdfRepository.ListGamesAsync()).Count != 0)
+    {
+        throw new InvalidOperationException("The PDF reader seed needs an empty library.");
+    }
+    string pdfFixtures = Path.Combine(Path.GetFullPath(args[2]), "p0");
+    Game pdfGame = await pdfRepository.AddGameAsync("PDF Reader Game", null, null);
+    GuideImportValidator pdfValidator = new();
+    GuideImportPublisher pdfPublisher = new(pdfRepository, pdfPaths);
+
+    // Imports a P0 fixture as a user would. The Reader opens the managed copy.
+    async Task<Guid> PublishPdfAsync(string fixture, string title, bool allowDuplicate)
+    {
+        ImportInspection inspection = await pdfValidator.InspectAsync(
+            Path.Combine(pdfFixtures, fixture), CancellationToken.None);
+        if (inspection is not ImportReady ready)
+        {
+            throw new InvalidOperationException($"The {fixture} fixture failed the import preview: {inspection}.");
+        }
+        return await pdfPublisher.PublishAsync(
+            ready.Manifest, pdfGame.Id, title, allowDuplicate, null, CancellationToken.None);
+    }
+
+    async Task<string> ManagedCopyAsync(Guid id) =>
+        pdfPaths.ResolveExistingGuideFile(id, (await pdfRepository.GetGuideAsync(id))!.PrimaryRelativePath);
+
+    await PublishPdfAsync("pdf-access.pdf", "Tagged PDF Guide", false);
+    await PublishPdfAsync("pdf-scan.pdf", "Scanned PDF Guide", false);
+    Guid pdfLong = await PublishPdfAsync(Path.Combine("generated", "pdf-long.pdf"), "Long PDF Guide", false);
+    Guid damaged = await PublishPdfAsync("pdf-short.pdf", "Damaged PDF Guide", false);
+    Guid missing = await PublishPdfAsync("pdf-short.pdf", "Missing PDF Guide", true);
+    // Cuts the managed copy before its cross-reference table, as a failed
+    // copy might.
+    using (FileStream copy = new(await ManagedCopyAsync(damaged), FileMode.Open, FileAccess.Write))
+    {
+        copy.SetLength(400);
+    }
+    File.Delete(await ManagedCopyAsync(missing));
+    // TXT guides still open after the PDF errors.
+    await InsertTextGuideAsync(pdfPaths, pdfGame.Id, Guid.NewGuid(), "Plain Text Guide",
+        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+        File.ReadAllBytes(Path.Combine(pdfFixtures, "txt-ascii.txt")));
+    Console.WriteLine(JsonSerializer.Serialize(new { pdfLong = pdfLong.ToString("N") }));
+    return 0;
+}
+
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second" or
         "seed-design" or "seed-catalog" or "seed-facts" or "seed-search" or "seed-import" or
@@ -497,7 +547,7 @@ if (args.Length != 2 ||
         "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-search|seed-import|seed-actions|seed-navigation " +
         "<app-data-root> " +
         "or seed-linked-game|describe-providers|describe-import|describe-actions <app-data-root> " +
-        "or seed-txt-reader|seed-html-reader <app-data-root> <fixtures-root> " +
+        "or seed-txt-reader|seed-html-reader|seed-pdf-reader <app-data-root> <fixtures-root> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
         "or invalidate-blocked-guide <app-data-root> " +
         "or corrupt-reader-guide|restore-reader-guide <app-data-root> " +

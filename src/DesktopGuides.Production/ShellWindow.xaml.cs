@@ -75,6 +75,7 @@ public sealed partial class ShellWindow : Window
     private GameRemover? gameRemover;
     private ManagedTextGuideLoader? textLoader;
     private ManagedHtmlGuideLoader? htmlLoader;
+    private ManagedPdfGuideLoader? pdfLoader;
     private string? cacheRoot;
     private CancellationTokenSource? readerLoad;
     private IReaderSession? readerSession;
@@ -273,6 +274,7 @@ public sealed partial class ShellWindow : Window
             gameRemover = new GameRemover(repository, paths, artwork);
             textLoader = new ManagedTextGuideLoader(paths);
             htmlLoader = new ManagedHtmlGuideLoader(repository, paths);
+            pdfLoader = new ManagedPdfGuideLoader(paths);
             cacheRoot = AppCacheRoot.Resolve(
                 AppDataRoot.HasPackageIdentity(),
                 () => ApplicationData.Current.LocalCacheFolder.Path,
@@ -1670,10 +1672,12 @@ public sealed partial class ShellWindow : Window
                         }
                         break;
                     }
-                    // PDF keeps the placeholder until T10.
-                    if (guide.Format != GuideFormat.Txt)
+                    if (guide.Format == GuideFormat.Pdf)
                     {
-                        ShowTransientStatus("Guide ready.");
+                        if (!await OpenPdfGuideAsync(guide, generation))
+                        {
+                            return false;
+                        }
                         break;
                     }
                     ShowReaderSurface(placeholder: false);

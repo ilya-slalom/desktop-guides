@@ -706,6 +706,11 @@ project uses a provisional package identity until T17.1 sets the public one.
   fingerprint/page/render width, and ignore stale render generations after
   rapid navigation or zoom. Dispose page/text handles on close. Test 200-page
   turns and a long session without retaining every page.
+  See the [T10.1 design](p1/t10-1-pdf-adapter-design.md). The adapter ships
+  as `PdfReaderSession : IReaderSession`, the shipped name for the
+  `PdfReaderAdapter` above; Core holds the cache, raster budget
+  and latest-wins scheduler, and Infrastructure holds the managed-copy loader
+  and PdfPig text.
 - **T10.2** Provide page count, validated page-number entry, Previous/Next,
   fit-width, zoom, and visible matching keyboard commands. Keep toolbar
   focus and reading focus separate so a page turn does not strand Narrator.

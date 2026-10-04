@@ -13,7 +13,7 @@ param(
         'remove-guide-cancel', 'remove-guide',
         'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted', 'txt-reader',
         'txt-load-paused', 'txt-back-during-load', 'txt-load-released', 'html-reader',
-        'html-runtime-missing')]
+        'html-runtime-missing', 'pdf-reader')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -1188,8 +1188,10 @@ try {
         # These modes continue a shell left on Reader, Game, or Library.
     }
     elseif ($Mode -in @('txt-reader', 'txt-load-paused', 'txt-back-during-load',
-        'txt-load-released', 'html-reader', 'html-runtime-missing')) {
-        $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' } else { 'Text Reader Game' }
+        'txt-load-released', 'html-reader', 'html-runtime-missing', 'pdf-reader')) {
+        $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
+            elseif ($Mode -eq 'pdf-reader') { 'PDF Reader Game' }
+            else { 'Text Reader Game' }
         $missingMessage = "This guide's file is missing from the library."
         $listItem = New-Object System.Windows.Automation.PropertyCondition(
             [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
@@ -1642,6 +1644,149 @@ try {
             Assert-Absent 'ReaderLoadError'
             Assert-Absent 'ReaderLoadErrorAction'
             $report.phases += 'html-runtime-missing-txt'
+            Back-ToTextGame
+        }
+        elseif ($Mode -eq 'pdf-reader') {
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            Resize-ShellWindow 1500 720
+            Select-Element $textGame
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+
+            # The page text through TextPattern, as a screen reader reads it;
+            # null while the text box is not shown.
+            function Get-PdfText {
+                $box = Find-ById 'PdfDocumentText'
+                if (-not $box -or $box.Current.IsOffscreen) { return $null }
+                return $box.GetCurrentPattern(
+                    [System.Windows.Automation.TextPattern]::Pattern).DocumentRange.GetText(-1)
+            }
+
+            # An empty status line is collapsed.
+            function Get-PdfStatus([string] $id) {
+                $status = Find-ById $id
+                if (-not $status -or $status.Current.IsOffscreen) { return '' }
+                return $status.Current.Name
+            }
+
+            # Waits until the page status, the preview's name and the text all
+            # show one page.
+            function Wait-PdfPage([int] $page, [int] $count, [string] $text, [int] $seconds = 15) {
+                $label = "Page $page of $count"
+                $deadline = (Get-Date).AddSeconds($seconds)
+                do {
+                    try {
+                        $status = Find-ById 'PdfPageStatus'
+                        $preview = Find-ById 'PdfPreviewImage'
+                        if ($status -and $preview -and $status.Current.Name -eq $label -and
+                            $preview.Current.Name -eq "$label preview") {
+                            $read = Get-PdfText
+                            if ($read -and $read.Contains($text)) { return $preview }
+                        }
+                    }
+                    catch [System.Windows.Automation.ElementNotAvailableException] {
+                        # The view replaced the element mid-read.
+                    }
+                    Start-Sleep -Milliseconds 100
+                } while ((Get-Date) -lt $deadline)
+                throw "Expected $label with its preview, and text containing '$text'."
+            }
+
+            function Invoke-NextPages([int] $count) {
+                $next = Find-ByName 'Next page'
+                if (-not $next -or $next.Current.IsOffscreen) {
+                    throw "The PDF reader has no visible 'Next page' command."
+                }
+                # No waiting between turns: superseded pages must be dropped.
+                for ($i = 0; $i -lt $count; $i++) { Invoke-Element $next }
+            }
+
+            # Tagged text is readable through UI Automation beside its preview.
+            Open-TextGuide 'Tagged PDF Guide'
+            [void](Wait-Status 'Guide ready.')
+            $preview = Wait-PdfPage 1 1 'Tagged guide paragraph for Narrator'
+            $bounds = $preview.Current.BoundingRectangle
+            if ($bounds.Width -lt 1 -or $bounds.Height -lt 1) {
+                throw 'The PDF page preview has no visible size.'
+            }
+            $textStatus = Get-PdfStatus 'PdfTextStatus'
+            if ($textStatus) { throw "Expected no text status for tagged text; saw '$textStatus'." }
+            $previewStatus = Get-PdfStatus 'PdfPreviewStatus'
+            if ($previewStatus) { throw "Expected no preview status; saw '$previewStatus'." }
+            Assert-Absent 'ReaderPlaceholder'
+            Assert-Absent 'ReaderLoadError'
+            $report.pdfReaderScreenshot = Save-WindowScreenshot 'pdf-reader'
+
+            # Narrow windows stack the text under the preview; both stay shown.
+            Resize-ShellWindow 600 720
+            [void](Wait-PdfPage 1 1 'Tagged guide paragraph for Narrator')
+            $report.pdfReaderNarrowScreenshot = Save-WindowScreenshot 'pdf-reader-narrow'
+            Resize-ShellWindow 1500 720
+            $report.phases += 'pdf-access'
+
+            # An image-only page says so and claims no text.
+            Back-ToTextGame
+            Open-TextGuide 'Scanned PDF Guide'
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-Name 'PdfPageStatus' 'Page 1 of 1')
+            [void](Wait-Name 'PdfTextStatus' 'Image-only page; OCR is unavailable')
+            $scanText = Get-PdfText
+            if ($scanText) { throw "Expected no text for an image-only page; read '$scanText'." }
+            $report.phases += 'pdf-scan'
+
+            # 199 rapid turns end on page 200 with its own preview and text,
+            # then Start and End, then a second rapid sweep and a third sweep that
+            # waits on every page.
+            Back-ToTextGame
+            Open-TextGuide 'Long PDF Guide'
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PdfPage 1 200 'page 1 of 200')
+            Invoke-NextPages 199
+            [void](Wait-PdfPage 200 200 'page 200 of 200' 60)
+            Invoke-ReaderCommand 'Go to start'
+            [void](Wait-PdfPage 1 200 'page 1 of 200')
+            Invoke-ReaderCommand 'Go to end'
+            [void](Wait-PdfPage 200 200 'page 200 of 200')
+            Invoke-ReaderCommand 'Go to start'
+            [void](Wait-PdfPage 1 200 'page 1 of 200')
+            Invoke-NextPages 199
+            [void](Wait-PdfPage 200 200 'page 200 of 200' 60)
+            # Sweep 3 waits on every page, so all 200 previews load and the
+            # render cache must evict to stay under its cap.
+            Invoke-ReaderCommand 'Go to start'
+            [void](Wait-PdfPage 1 200 'page 1 of 200')
+            for ($p = 2; $p -le 200; $p++) {
+                Invoke-NextPages 1
+                [void](Wait-PdfPage $p 200 "page $p of 200")
+            }
+            $report.phases += 'pdf-long'
+
+            # Going back closes the session, which writes the diagnostics.
+            Back-ToTextGame
+            $damaged = "This PDF is damaged, so it can't be opened. Re-import it from the original file."
+            Open-TextGuide 'Damaged PDF Guide'
+            [void](Wait-Status $damaged)
+            [void](Wait-Name 'ReaderLoadError' $damaged)
+            Assert-Absent 'ReaderLoadErrorAction'
+            Assert-Absent 'PdfDocumentText'
+            $report.pdfErrorScreenshot = Save-WindowScreenshot 'pdf-error'
+            $report.phases += 'pdf-damaged'
+
+            Back-ToTextGame
+            Open-TextGuide 'Missing PDF Guide'
+            [void](Wait-Status $missingMessage)
+            [void](Wait-Name 'ReaderLoadError' $missingMessage)
+            Assert-Absent 'ReaderLoadErrorAction'
+            Assert-Absent 'PdfDocumentText'
+            $report.phases += 'pdf-missing'
+
+            # TXT guides still open after the PDF errors.
+            Back-ToTextGame
+            Open-TextGuide 'Plain Text Guide'
+            [void](Wait-Status 'Guide ready.')
+            Assert-RowNames 'Plain Text Guide' $asciiNames
+            Assert-Absent 'ReaderLoadError'
+            $report.phases += 'pdf-txt'
             Back-ToTextGame
         }
         else {
