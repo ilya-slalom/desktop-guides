@@ -70,12 +70,12 @@ public sealed class PdfPageTextSource : IDisposable
         ObjectDisposedException.ThrowIf(disposed, this);
         ArgumentOutOfRangeException.ThrowIfNegative(pageIndex);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(pageIndex, PageCount);
-        await gate.WaitAsync(token);
+        await gate.WaitAsync(token).ConfigureAwait(false);
         try
         {
             ObjectDisposedException.ThrowIf(disposed, this);
             if (TakeRecent(pageIndex) is PdfPageText hit) return hit;
-            PdfPageText text = await Task.Run(() => Extract(pageIndex, token), token);
+            PdfPageText text = await Task.Run(() => Extract(pageIndex, token), token).ConfigureAwait(false);
             Remember(pageIndex, text);
             return text;
         }
