@@ -64,6 +64,10 @@ public sealed class HtmlLocationRulesTests
     [InlineData("quote", "\"a\\u0000b\"")]
     [InlineData("id", "false")]
     [InlineData("id", "\"a\\u0000b\"")]
+    // A cut through a surrogate pair leaves a lone half in the JSON text.
+    [InlineData("quote", "\"ab\\ud83d\"")]
+    [InlineData("id", "\"\\udc00x\"")]
+    [InlineData("href", "\"https://example.invalid/\\ud83d\"")]
     [InlineData("fraction", "-0.01")]
     [InlineData("fraction", "1.01")]
     [InlineData("fraction", "null")]
