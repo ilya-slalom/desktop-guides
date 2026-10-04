@@ -1,6 +1,6 @@
 # T09.3 HTML locator and restore design
 
-Status: implemented; CI run 37203750673 passed the installed `html-position`
+Status: implemented; CI run 37206866197 passed the installed `html-position`
 mode in light and dark.
 Prerequisites: T09.1 is merged (PR #35, merge commit `9f2ad26`); T12.1's
 locator codec is merged (PR #3); T07.3's WebView2 policy is merged (PR #34).
@@ -363,6 +363,15 @@ Planning refinements, from the
   image wait was dropped. `position-restore-late-images` stays as the check
   that a restore after late images is `Exact` with the line on top. The
   scroll scripts' pending count remains only as their reply.
+- **Hidden text.** Text that CSS hides is in the walk but has no boxes,
+  and a saved wiki page's tab panels and navboxes can hide thousands of
+  characters. The box lookup skips a text node whose element has no boxes,
+  and the capture counts "no box left" as below the viewport top, so the
+  binary search stays monotonic. `html-long` has a 1000-character hidden
+  panel under the target line (final review).
+- **Quote cut.** The capture drops a trailing high surrogate, so the
+  160-unit cut never sends half a pair; Core also rejects a reply with one
+  instead of throwing. `html-long`'s hidden panel puts an emoji at the cut.
 - **Diagnostics.** The installer saves each `html-position` pass's
   diagnostics in a `finally`, so a failing pass still leaves them.
 
@@ -374,7 +383,7 @@ Planning refinements, from the
   every outcome row. `HtmlNavigationPolicyTests` and
   `HtmlSessionDiagnosticsTests` cover the `Unavailable` kind and the new
   counts.
-- CI run 37203750673, `html-position` on `html-long`, light [dark]:
+- CI run 37206866197, `html-position` on `html-long`, light [dark]:
 
   | Phase | Result |
   | --- | --- |
