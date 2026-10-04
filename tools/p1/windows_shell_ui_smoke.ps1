@@ -1701,6 +1701,45 @@ try {
                 for ($i = 0; $i -lt $count; $i++) { Invoke-Element $next }
             }
 
+            function Get-PdfScroll {
+                $scroller = Find-ById 'PdfPreviewScroller'
+                if (-not $scroller) { throw 'The PDF preview has no scroller.' }
+                return $scroller.GetCurrentPattern(
+                    [System.Windows.Automation.ScrollPattern]::Pattern)
+            }
+
+            # The share of the page above the top of the viewport. The
+            # scroller holds only the page image, so its extent is the page.
+            # A page that can't scroll reads -1 percent at a 100% view: 0.
+            function Get-PdfFraction {
+                $scroll = Get-PdfScroll
+                return $scroll.Current.VerticalScrollPercent / 100 *
+                    (1 - $scroll.Current.VerticalViewSize / 100)
+            }
+
+            # Waits for the point to sit within 0.1 of $wanted, or of the
+            # lowest point this window can scroll to if that is higher up,
+            # and to stay there through the debounced re-render.
+            function Wait-PdfFraction([double] $wanted, [string] $context) {
+                $deadline = (Get-Date).AddSeconds(5)
+                $held = $false
+                do {
+                    $scroll = Get-PdfScroll
+                    $expected = [Math]::Min($wanted, 1 - $scroll.Current.VerticalViewSize / 100)
+                    $fraction = Get-PdfFraction
+                    if ([Math]::Abs($fraction - $expected) -le 0.1) {
+                        if ($held) { return $fraction }
+                        $held = $true
+                        Start-Sleep -Milliseconds 1000
+                        continue
+                    }
+                    $held = $false
+                    Start-Sleep -Milliseconds 100
+                } while ((Get-Date) -lt $deadline)
+                throw ("$context left the page at fraction $([Math]::Round($fraction, 3)); " +
+                    "expected $([Math]::Round($expected, 3)) +/- 0.1.")
+            }
+
             # Tagged text is readable through UI Automation beside its preview.
             Open-TextGuide 'Tagged PDF Guide'
             [void](Wait-Status 'Guide ready.')
@@ -1760,6 +1799,44 @@ try {
                 [void](Wait-PdfPage $p 200 "page $p of 200")
             }
             $report.phases += 'pdf-long'
+
+            # pdf-resize (T10.3): a point 30% down portrait page 121 survives
+            # narrow, medium and wide windows; a page turn starts at the top.
+            Invoke-ReaderCommand 'Go to start'
+            [void](Wait-PdfPage 1 200 'page 1 of 200')
+            Invoke-NextPages 120
+            [void](Wait-PdfPage 121 200 'page 121 of 200' 60)
+            $scroll = Get-PdfScroll
+            $room = 1 - $scroll.Current.VerticalViewSize / 100
+            if (-not $scroll.Current.VerticallyScrollable -or $room -lt 0.3) {
+                throw "Page 121 scrolls only $([Math]::Round($room, 3)) of its height; pdf-resize needs 0.3."
+            }
+            $scroll.SetScrollPercent(
+                [System.Windows.Automation.ScrollPattern]::NoScroll, 0.3 / $room * 100)
+            Start-Sleep -Milliseconds 300
+            $set = Get-PdfFraction
+            if ([Math]::Abs($set - 0.3) -gt 0.02) {
+                throw "Scrolling page 121 reached fraction $([Math]::Round($set, 3)); expected 0.3."
+            }
+            $report.pdfPosition = [ordered]@{ set = $set }
+            # 1500 last: the page was scrolled there, so 0.3 itself must return
+            # even if 1100 px clamped it.
+            foreach ($size in @(@(600, 'narrow'), @(1100, 'medium'), @(1500, 'wide'))) {
+                Resize-ShellWindow $size[0] 720
+                $report.pdfPosition[$size[1]] = Wait-PdfFraction 0.3 "Resizing to $($size[0]) px"
+                [void](Wait-PdfPage 121 200 'page 121 of 200')
+            }
+            $report.pdfResizeScreenshot = Save-WindowScreenshot 'pdf-resize'
+            # Page 122 is landscape and may not scroll; 123 is portrait.
+            Invoke-NextPages 2
+            [void](Wait-PdfPage 123 200 'page 123 of 200')
+            Start-Sleep -Milliseconds 300
+            $nextPage = Get-PdfFraction
+            if ($nextPage -ge 0.02) {
+                throw "Page 123 opened at fraction $([Math]::Round($nextPage, 3)); expected its top."
+            }
+            $report.pdfPosition.nextPage = $nextPage
+            $report.phases += 'pdf-resize'
 
             # Going back closes the session, which writes the diagnostics.
             Back-ToTextGame
