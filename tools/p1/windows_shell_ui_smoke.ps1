@@ -1401,29 +1401,23 @@ try {
 
         # The line at the page's top-left, read through Chromium's own
         # UI Automation text, independently of the app's capture.
+        # The page's tree has no TextPattern, so the top line is hit-tested:
+        # each fixture line is its own span, and the first text element down
+        # the page's top edge is the top line.
+        $script:topLineNote = 'no page'
         function Get-PageTopLine {
-            $documentType = [System.Windows.Automation.PropertyCondition]::new(
-                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
-                [System.Windows.Automation.ControlType]::Document)
             foreach ($page in Get-PageRoots) {
                 try {
-                    $document = if ($page.Current.ControlType -eq [System.Windows.Automation.ControlType]::Document) { $page }
-                        else { $page.FindFirst($scope, $documentType) }
-                    if (-not $document -or $document.Current.IsOffscreen) { continue }
-                    $rect = $document.Current.BoundingRectangle
-                    if ($rect.Width -lt 1 -or $rect.Height -lt 1) { continue }
-                    $text = $document.GetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern)
-                    $range = $text.RangeFromPoint([System.Windows.Point]::new($rect.Left + 40, $rect.Top + 3))
-                    $range.ExpandToEnclosingUnit([System.Windows.Automation.Text.TextUnit]::Line)
-                    $line = $range.GetText(200).Trim()
-                    if ($line) { return $line }
-                    # The point can land in the page's margin; the first
-                    # visible range starts at the first line on screen.
-                    $visible = $text.GetVisibleRanges()
-                    if ($visible.Length -gt 0) {
-                        return (($visible[0].GetText(400) -split "`n" | Where-Object { $_.Trim() }) | Select-Object -First 1)
+                    $rect = $page.Current.BoundingRectangle
+                    if ($page.Current.IsOffscreen -or $rect.Width -lt 1 -or $rect.Height -lt 1) { continue }
+                    $script:topLineNote = 'no text near the top'
+                    for ($y = 2; $y -le 120; $y += 3) {
+                        $hit = [System.Windows.Automation.AutomationElement]::FromPoint(
+                            [System.Windows.Point]::new($rect.Left + 50, $rect.Top + $y))
+                        if ($hit -and $hit.Current.ControlType -eq [System.Windows.Automation.ControlType]::Text) {
+                            return $hit.Current.Name.Trim()
+                        }
                     }
-                    return $null
                 }
                 catch [System.Windows.Automation.ElementNotAvailableException] {
                     # The page tree was rebuilt; try the next window.
@@ -1444,49 +1438,12 @@ try {
                     if ([Math]::Abs([int] $Matches[1] - $mark) -le 1) { return [int] $Matches[1] }
                 }
                 elseif ($line) {
-                    $seen = 'a line without a mark'
+                    $seen = "a line without a mark ('$($line.Substring(0, [Math]::Min(40, $line.Length)))')"
                 }
                 Start-Sleep -Milliseconds 250
             } while ((Get-Date) -lt $deadline)
             [void](Save-WindowScreenshot "html-top-$step")
-            throw "After $step the page's top line was $seen; expected MARK-$('{0:D4}' -f $mark) within one line. Probe: $(Get-PageTopProbe)"
-        }
-
-        # What the UIA read saw, for a failure message: the fixture's text only.
-        function Get-PageTopProbe {
-            $documentType = [System.Windows.Automation.PropertyCondition]::new(
-                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
-                [System.Windows.Automation.ControlType]::Document)
-            $notes = @()
-            foreach ($page in Get-PageRoots) {
-                try {
-                    $documents = $page.FindAll($scope, $documentType)
-                    $notes += "documents=$($documents.Count)"
-                    foreach ($document in $documents) {
-                        $rect = $document.Current.BoundingRectangle
-                        $note = "offscreen=$($document.Current.IsOffscreen) rect=$([int]$rect.Left),$([int]$rect.Top),$([int]$rect.Width),$([int]$rect.Height)"
-                        try {
-                            $text = $document.GetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern)
-                            $range = $text.RangeFromPoint([System.Windows.Point]::new($rect.Left + 40, $rect.Top + 3))
-                            $raw = $range.GetText(80)
-                            $range.ExpandToEnclosingUnit([System.Windows.Automation.Text.TextUnit]::Line)
-                            $note += " point=[$raw] line=[$($range.GetText(80))]"
-                            $visible = $text.GetVisibleRanges()
-                            $note += " visible=$($visible.Length)"
-                            if ($visible.Length -gt 0) { $note += " first=[$($visible[0].GetText(80))]" }
-                            $note += " all=$($text.DocumentRange.GetText(-1).Length)"
-                        }
-                        catch {
-                            $note += " text-error=$($_.Exception.GetType().Name)"
-                        }
-                        $notes += $note
-                    }
-                }
-                catch {
-                    $notes += "page-error=$($_.Exception.GetType().Name)"
-                }
-            }
-            return ($notes -join '; ') -replace "[`r`n]", ' '
+            throw "After $step the page's top line was $seen; expected MARK-$('{0:D4}' -f $mark) within one line ($script:topLineNote)."
         }
 
         # A row can be recycled or not yet realized mid-read; retry briefly,
