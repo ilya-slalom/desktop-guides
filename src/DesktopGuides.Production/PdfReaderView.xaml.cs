@@ -6,9 +6,12 @@ using Microsoft.UI.Xaml.Media;
 
 namespace DesktopGuides.Production;
 
+// The preview's vertical scroll state, in effective pixels.
+public readonly record struct PdfPreviewLayout(double Offset, double ImageHeight, double ViewportHeight);
+
 // One PDF page: its preview beside its text, or the text under the preview
-// below 720 effective pixels. The session decides what to show; a new page
-// never moves keyboard focus.
+// below 720 effective pixels. The session decides what to show and where on
+// the page to scroll; a new page never moves keyboard focus.
 public sealed partial class PdfReaderView : UserControl
 {
     private const double NarrowWidth = 720;
@@ -18,13 +21,32 @@ public sealed partial class PdfReaderView : UserControl
     {
         InitializeComponent();
         SizeChanged += OnSizeChanged;
-        PreviewScroller.SizeChanged += (_, _) => PreviewSizeChanged?.Invoke(this, EventArgs.Empty);
+        PreviewScroller.SizeChanged += (_, _) =>
+        {
+            PreviewSizeChanged?.Invoke(this, EventArgs.Empty);
+            PreviewLayoutChanged?.Invoke(this, EventArgs.Empty);
+        };
+        Preview.SizeChanged += (_, _) => PreviewLayoutChanged?.Invoke(this, EventArgs.Empty);
+        PreviewScroller.ViewChanged += (_, args) =>
+        {
+            if (!args.IsIntermediate) PreviewScrolled?.Invoke(this, EventArgs.Empty);
+        };
     }
 
     public event EventHandler? PreviewSizeChanged;
+    // The page image or its viewport changed height.
+    public event EventHandler? PreviewLayoutChanged;
+    // A scroll of the preview, the user's or the app's, came to rest.
+    public event EventHandler? PreviewScrolled;
 
     // The width a preview fills, in effective pixels; 0 before layout.
     public double PreviewWidth => PreviewScroller.ActualWidth;
+
+    public PdfPreviewLayout PreviewLayout =>
+        new(PreviewScroller.VerticalOffset, Preview.ActualHeight, PreviewScroller.ViewportHeight);
+
+    public void ScrollTo(double offset) =>
+        PreviewScroller.ChangeView(null, offset, null, disableAnimation: true);
 
     public void ShowPage(int index, int count, ImageSource? image, PdfPageText? text)
     {
@@ -42,7 +64,6 @@ public sealed partial class PdfReaderView : UserControl
             { Truncated: true } => "Page text is shortened; it's too long to show in full.",
             _ => null,
         });
-        PreviewScroller.ChangeView(null, 0, null, disableAnimation: true);
     }
 
     public void Clear()
