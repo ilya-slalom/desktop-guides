@@ -1,6 +1,7 @@
 # T10.3 PDF locator and restore design
 
-Status: designed; not yet implemented.
+Status: implemented in PR #PRNUM; CI run 37178208319 passed the installed
+`pdf-resize` phase in light and dark.
 Prerequisites: T10.1 is merged (PR #36, merge commit `e2b9b8c`); T12.1's
 locator codec is merged (PR #3).
 
@@ -202,3 +203,59 @@ differs from it.
 - Fit-width and zoom, and keeping the point across a zoom change (T10.2).
 - The progress percentage shown to users and its approximate label (T12.3).
 - OCR for `pdf-scan`.
+
+## Implementation notes
+
+Planning refinements, from the
+[implementation plan](t10-3-pdf-locator-plan.md):
+
+- **P1.** `PdfPagePosition.Scrolled` also ignores a scroll whose image or
+  viewport height differs by more than 1 px from the last applied offset's.
+  A shrinking window makes the scroller clamp its own offset; that clamp is
+  not a user scroll, and the layout event that follows re-applies the point.
+- **P2.** The session applies the point straight after `ShowPage`, instead
+  of the view raising `PreviewLayoutChanged` from `ShowPage`. A new image
+  of the same height raises no `SizeChanged`.
+- **P3.** A restore or edge command for the page already shown applies its
+  point at once. A page turn clamped at either end does nothing.
+- **P4.** The smoke resizes to 600, then 1100, then 1500 px.
+  - At each width it expects the lower of 0.3 and the lowest point that
+    width can scroll to.
+  - The last check, at the 1500 px width where 0.3 was set, expects 0.3
+    itself.
+  - The next-page check turns two pages, to portrait page 123.
+- The view reports the scroller's `ExtentHeight` as the page height, not
+  the image's `ActualHeight` as the plan proposed. On a shrink the scroller
+  clamps its offset and comes to rest while `ActualHeight` still holds the
+  old height, so that clamp matched the last applied layout and counted as
+  a user scroll to the top (first CI attempt, run 37174149475). The extent
+  is current at both events, and it is what the smoke's `ScrollPattern`
+  measures.
+
+## Verification
+
+- `PdfLocationRulesTests` cover:
+  - capture, the estimate and fraction rejection;
+  - every restore row;
+  - a decoded `ContentChanged` locator.
+
+  `PdfPagePositionTests` cover the tracker rules, including the echo, the
+  layout guard, the bottom clamp and bad heights.
+- CI run 37178208319, `pdf-resize` on `pdf-long` page 121, light [dark]:
+
+  | Step | Page fraction |
+  | --- | --- |
+  | Scrolled to 0.3 at 1500 px | 0.300 [0.300] |
+  | 600 px | 0.300 [0.300] |
+  | 1100 px | 0.300 [0.300] |
+  | Back to 1500 px | 0.300 [0.300] |
+  | Two pages on, page 123 | 0.000 [0.000] |
+
+  The values are from
+  [light](evidence/t10-3-pdf-locator/pdf-position-light.json) and
+  [dark](evidence/t10-3-pdf-locator/pdf-position-dark.json). The page status
+  and text named page 121 after each resize.
+  Screenshots: [light](evidence/t10-3-pdf-locator/pdf-resize-light.png),
+  [dark](evidence/t10-3-pdf-locator/pdf-resize-dark.png).
+- Not covered: restoring on reopen and showing restore reasons (T12.2); zoom
+  (T10.2).

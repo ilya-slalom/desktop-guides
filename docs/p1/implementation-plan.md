@@ -814,13 +814,23 @@ leftover WebView2 profiles at startup, tells a missing runtime, a failed
 start, a crash, a missing entry and a changed file apart, and offers
 **Get WebView2 Runtime** or **Reopen** where they help.
 
-T10.1 is in review in PR #36 (CI run 37169058467); see the
+T10.1 was merged through PR #36 on 4 October 2026 (merge commit `e2b9b8c`;
+CI run 37169058467); see the
 [design and implementation notes](t10-1-pdf-adapter-design.md). PDF guides
 open in the Reader as a `Windows.Data.Pdf` preview beside the same page's
 PdfPig text in a read-only text box with a UI Automation `TextPattern`.
 Rendered pages are cached by measured bytes under 96 MiB, page loads run
 one at a time with the newest request winning, and damaged, missing,
 changed, unreadable and encrypted managed copies show typed errors.
+
+T10.3 is in review in PR #PRNUM (CI run 37178208319); see the
+[design and implementation notes](t10-3-pdf-locator-design.md). A PDF
+position is now a page and the share of the page above the viewport. It
+survives narrow, medium and wide windows on `pdf-long` and resets to the
+top on a page turn. A restore clamps a missing page to the nearest page's
+top, keeps the point as `Approximate` when the bytes changed, and opens at
+the first page for a malformed, wrong-format or future-version locator.
+Saving it and restoring on reopen remain T12.2.
 
 ## M4 — progress, completion, and appearance
 
