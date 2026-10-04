@@ -1410,14 +1410,19 @@ try {
                 try {
                     $rect = $page.Current.BoundingRectangle
                     if ($page.Current.IsOffscreen -or $rect.Width -lt 1 -or $rect.Height -lt 1) { continue }
-                    $script:topLineNote = 'no text near the top'
+                    $hits = @()
                     for ($y = 2; $y -le 120; $y += 3) {
                         $hit = [System.Windows.Automation.AutomationElement]::FromPoint(
                             [System.Windows.Point]::new($rect.Left + 50, $rect.Top + $y))
                         if ($hit -and $hit.Current.ControlType -eq [System.Windows.Automation.ControlType]::Text) {
                             return $hit.Current.Name.Trim()
                         }
+                        if ($hit -and $y % 30 -eq 2) {
+                            $name = $hit.Current.Name
+                            $hits += "y$y=$($hit.Current.ControlType.ProgrammaticName)/$($hit.Current.ClassName)/pid$($hit.Current.ProcessId)/'$($name.Substring(0, [Math]::Min(24, $name.Length)))'"
+                        }
                     }
+                    $script:topLineNote = "no text near the top; page $([int]$rect.Left),$([int]$rect.Top),$([int]$rect.Width),$([int]$rect.Height) $($page.Current.ControlType.ProgrammaticName); $($hits -join ' ')" -replace "[`r`n]", ' '
                 }
                 catch [System.Windows.Automation.ElementNotAvailableException] {
                     # The page tree was rebuilt; try the next window.
