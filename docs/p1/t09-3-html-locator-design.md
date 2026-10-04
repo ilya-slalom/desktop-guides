@@ -1,6 +1,6 @@
 # T09.3 HTML locator and restore design
 
-Status: implemented; CI run 37206866197 passed the installed `html-position`
+Status: implemented in PR #39; CI run 37206866197 passed the installed `html-position`
 mode in light and dark.
 Prerequisites: T09.1 is merged (PR #35, merge commit `9f2ad26`); T12.1's
 locator codec is merged (PR #3); T07.3's WebView2 policy is merged (PR #34).
