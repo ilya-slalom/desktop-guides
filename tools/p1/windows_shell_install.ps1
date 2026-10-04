@@ -1150,22 +1150,41 @@ function Assert-PdfDiagnostics([string] $pass, [string] $diagnostics, [string] $
     }
     Copy-Item -LiteralPath $path -Destination (Join-Path $ResultDirectory "$pass.pdf-long.json")
     $counts = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
-    if ($counts.maxCacheBytes -ne 100663296) {
-        throw "The $pass pass used a $($counts.maxCacheBytes)-byte render cap; expected 100663296."
+    foreach ($f in @('requests', 'loads', 'staleResults', 'peakCacheBytes', 'maxCacheBytes',
+        'cachedPagesAtClose', 'peakTextPages', 'peakTextCharacters', 'disposedCleanly')) {
+        if ($counts.PSObject.Properties.Name -notcontains $f) {
+            throw "The $pass pass diagnostics have no '$f'."
+        }
     }
-    if ($counts.peakCacheBytes -gt 100663296) {
-        throw "The $pass pass cached $($counts.peakCacheBytes) bytes of page images, over the cap."
+    [long] $requests = $counts.requests
+    [long] $loads = $counts.loads
+    [long] $staleResults = $counts.staleResults
+    [long] $peakCacheBytes = $counts.peakCacheBytes
+    [long] $maxCacheBytes = $counts.maxCacheBytes
+    [long] $cachedPagesAtClose = $counts.cachedPagesAtClose
+    [long] $peakTextPages = $counts.peakTextPages
+    if ($maxCacheBytes -ne 100663296) {
+        throw "The $pass pass used a $maxCacheBytes-byte render cap; expected 100663296."
     }
-    if ($counts.cachedPagesAtClose -ge 200) {
-        throw "The $pass pass still held $($counts.cachedPagesAtClose) page images at close."
+    if ($requests -lt 199) {
+        throw "The $pass pass recorded only $requests page requests."
     }
-    if ($counts.staleResults -le 0 -and $counts.loads -ge $counts.requests) {
-        throw "The $pass pass dropped no superseded page: $($counts.loads) loads for $($counts.requests) requests."
+    if ($peakCacheBytes -le 0) {
+        throw "The $pass pass cached no page images."
     }
-    if ($counts.peakTextPages -gt 8) {
-        throw "The $pass pass kept the text of $($counts.peakTextPages) pages; expected at most 8."
+    if ($peakCacheBytes -gt 100663296) {
+        throw "The $pass pass cached $peakCacheBytes bytes of page images, over the cap."
     }
-    if (-not $counts.disposedCleanly) {
+    if ($cachedPagesAtClose -ge 200) {
+        throw "The $pass pass still held $cachedPagesAtClose page images at close."
+    }
+    if ($staleResults -le 0 -and $loads -ge $requests) {
+        throw "The $pass pass dropped no superseded page: $loads loads for $requests requests."
+    }
+    if ($peakTextPages -gt 8) {
+        throw "The $pass pass kept the text of $peakTextPages pages; expected at most 8."
+    }
+    if ($counts.disposedCleanly -isnot [bool] -or $counts.disposedCleanly -ne $true) {
         throw "The $pass pass did not close the long PDF guide cleanly."
     }
     return $counts
