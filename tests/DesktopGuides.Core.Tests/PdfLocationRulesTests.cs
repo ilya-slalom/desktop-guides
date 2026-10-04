@@ -27,10 +27,11 @@ public sealed class PdfLocationRulesTests
     [Fact]
     public void CapturedLocationsSurviveTheCodec()
     {
-        ReaderLocation location = PdfLocationRules.Capture(Sha, 199, 200);
+        string sha = new('a', 64);
+        ReaderLocation location = PdfLocationRules.Capture(sha, 199, 200);
 
         LocationDecodeResult decoded = ReaderLocationCodec.Deserialize(
-            ReaderLocationCodec.Serialize(location), GuideFormat.Pdf, Sha);
+            ReaderLocationCodec.Serialize(location), GuideFormat.Pdf, sha);
 
         Assert.Equal(LocationDecodeStatus.Valid, decoded.Status);
         Assert.Equal(new PdfPosition(199, 0), decoded.Location!.Payload);
