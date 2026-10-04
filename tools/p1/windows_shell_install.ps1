@@ -704,7 +704,7 @@ function Run-ShellSmoke(
     Register-ScheduledTask -TaskName $smokeTask -Action $action `
         -Principal $principal -Force | Out-Null
     Start-ScheduledTask -TaskName $smokeTask
-    $timeoutSeconds = if ($mode -like 'provider-*') { 240 }
+    $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*') { 240 }
         elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*') { 120 }
         else { 60 }
     $deadline = (Get-Date).AddSeconds($timeoutSeconds)
@@ -1124,6 +1124,76 @@ function Run-HtmlReaderScenarios {
         Stop-HtmlCanary $canary
         Remove-Item -LiteralPath $keep -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath (Join-Path $cacheRoot 'missing-runtime-test') -Recurse -Force -ErrorAction SilentlyContinue
+        Restore-AppThemePreference $originalTheme
+    }
+}
+
+function Invoke-PdfReaderPass([string] $resultName) {
+    Start-InstalledShell
+    $diagnosticsGate = [System.Threading.EventWaitHandle]::new(
+        $false, [System.Threading.EventResetMode]::ManualReset,
+        "Local\DesktopGuides.Preview.PdfDiagnostics.$($report.launchedProcessId)")
+    try {
+        $report.pdfReader[$resultName] = Run-ShellSmoke 'pdf-reader' -ResultName $resultName
+        Close-InstalledShell
+    }
+    finally {
+        $diagnosticsGate.Dispose()
+    }
+}
+
+function Assert-PdfDiagnostics([string] $pass, [string] $diagnostics, [string] $guideId) {
+    # Counts only; the file holds no guide text and no paths.
+    $path = Join-Path $diagnostics "pdf-$guideId.json"
+    if (-not (Test-Path -LiteralPath $path)) {
+        throw "The $pass pass wrote no diagnostics for the long PDF guide."
+    }
+    Copy-Item -LiteralPath $path -Destination (Join-Path $ResultDirectory "$pass.pdf-long.json")
+    $counts = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+    if ($counts.maxCacheBytes -ne 100663296) {
+        throw "The $pass pass used a $($counts.maxCacheBytes)-byte render cap; expected 100663296."
+    }
+    if ($counts.peakCacheBytes -gt 100663296) {
+        throw "The $pass pass cached $($counts.peakCacheBytes) bytes of page images, over the cap."
+    }
+    if ($counts.cachedPagesAtClose -ge 200) {
+        throw "The $pass pass still held $($counts.cachedPagesAtClose) page images at close."
+    }
+    if ($counts.staleResults -le 0 -and $counts.loads -ge $counts.requests) {
+        throw "The $pass pass dropped no superseded page: $($counts.loads) loads for $($counts.requests) requests."
+    }
+    if ($counts.peakTextPages -gt 8) {
+        throw "The $pass pass kept the text of $($counts.peakTextPages) pages; expected at most 8."
+    }
+    if (-not $counts.disposedCleanly) {
+        throw "The $pass pass did not close the long PDF guide cleanly."
+    }
+    return $counts
+}
+
+function Run-PdfReaderScenarios {
+    # TR10.2-TR10.3: tagged text in UI Automation, an image-only page, 200
+    # rapid page turns with a bounded cache, typed errors, and TXT still
+    # opening. Light then dark.
+    $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
+    if (-not (Test-Path -LiteralPath (Join-Path $fixtureRoot 'p0\generated\pdf-long.pdf'))) {
+        throw 'pdf-long.pdf is missing; run tools/p0/make_fixtures.py first.'
+    }
+    $ids = Invoke-ShellSeed @('seed-pdf-reader', $dataRoot, $fixtureRoot) | ConvertFrom-Json
+    $diagnostics = Join-Path (Get-HtmlCacheRoot) 'diagnostics'
+    $report.pdfReader = [ordered]@{ pdfLong = $ids.pdfLong }
+    $originalTheme = Get-AppThemePreference
+    try {
+        foreach ($pass in @(
+            @{ name = 'pdf-reader-light'; light = $true },
+            @{ name = 'pdf-reader-dark'; light = $false })) {
+            Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
+            Set-AppThemePreference $pass.light
+            Invoke-PdfReaderPass $pass.name
+            $report.pdfReader["$($pass.name)-diagnostics"] = Assert-PdfDiagnostics $pass.name $diagnostics $ids.pdfLong
+        }
+    }
+    finally {
         Restore-AppThemePreference $originalTheme
     }
 }
@@ -1720,6 +1790,9 @@ try {
 
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-HtmlReaderScenarios
+
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    Run-PdfReaderScenarios
 
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-ImportScenarios
