@@ -1151,7 +1151,8 @@ function Assert-PdfDiagnostics([string] $pass, [string] $diagnostics, [string] $
     Copy-Item -LiteralPath $path -Destination (Join-Path $ResultDirectory "$pass.pdf-long.json")
     $counts = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
     foreach ($f in @('requests', 'loads', 'staleResults', 'peakCacheBytes', 'maxCacheBytes',
-        'cachedPagesAtClose', 'peakTextPages', 'peakTextCharacters', 'disposedCleanly')) {
+        'cachedPagesAtClose', 'peakTextPages', 'peakTextCharacters', 'disposedCleanly',
+        'evictions')) {
         if ($counts.PSObject.Properties.Name -notcontains $f) {
             throw "The $pass pass diagnostics have no '$f'."
         }
@@ -1163,6 +1164,7 @@ function Assert-PdfDiagnostics([string] $pass, [string] $diagnostics, [string] $
     [long] $maxCacheBytes = $counts.maxCacheBytes
     [long] $cachedPagesAtClose = $counts.cachedPagesAtClose
     [long] $peakTextPages = $counts.peakTextPages
+    [long] $evictions = $counts.evictions
     if ($maxCacheBytes -ne 100663296) {
         throw "The $pass pass used a $maxCacheBytes-byte render cap; expected 100663296."
     }
@@ -1174,6 +1176,9 @@ function Assert-PdfDiagnostics([string] $pass, [string] $diagnostics, [string] $
     }
     if ($peakCacheBytes -gt 100663296) {
         throw "The $pass pass cached $peakCacheBytes bytes of page images, over the cap."
+    }
+    if ($evictions -le 0) {
+        throw "The $pass pass never evicted a page image; the cap was not exercised."
     }
     if ($cachedPagesAtClose -ge 200) {
         throw "The $pass pass still held $cachedPagesAtClose page images at close."

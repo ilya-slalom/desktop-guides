@@ -1735,7 +1735,8 @@ try {
             $report.phases += 'pdf-scan'
 
             # 199 rapid turns end on page 200 with its own preview and text,
-            # then Start and End, then two more full sweeps.
+            # then Start and End, then a second rapid sweep and a third sweep that
+            # waits on every page.
             Back-ToTextGame
             Open-TextGuide 'Long PDF Guide'
             [void](Wait-Status 'Guide ready.')
@@ -1746,11 +1747,17 @@ try {
             [void](Wait-PdfPage 1 200 'page 1 of 200')
             Invoke-ReaderCommand 'Go to end'
             [void](Wait-PdfPage 200 200 'page 200 of 200')
-            foreach ($sweep in 2..3) {
-                Invoke-ReaderCommand 'Go to start'
-                [void](Wait-PdfPage 1 200 'page 1 of 200')
-                Invoke-NextPages 199
-                [void](Wait-PdfPage 200 200 'page 200 of 200' 60)
+            Invoke-ReaderCommand 'Go to start'
+            [void](Wait-PdfPage 1 200 'page 1 of 200')
+            Invoke-NextPages 199
+            [void](Wait-PdfPage 200 200 'page 200 of 200' 60)
+            # Sweep 3 waits on every page, so all 200 previews load and the
+            # render cache must evict to stay under its cap.
+            Invoke-ReaderCommand 'Go to start'
+            [void](Wait-PdfPage 1 200 'page 1 of 200')
+            for ($p = 2; $p -le 200; $p++) {
+                Invoke-NextPages 1
+                [void](Wait-PdfPage $p 200 "page $p of 200")
             }
             $report.phases += 'pdf-long'
 

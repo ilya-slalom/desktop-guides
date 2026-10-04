@@ -14,7 +14,8 @@ public sealed record PdfSessionDiagnostics(
     int CachedPagesAtClose,
     int PeakTextPages,
     long PeakTextCharacters,
-    bool DisposedCleanly)
+    bool DisposedCleanly,
+    int Evictions)
 {
     public string ToJson() => JsonSerializer.Serialize(new
     {
@@ -26,6 +27,7 @@ public sealed record PdfSessionDiagnostics(
         cachedPagesAtClose = CachedPagesAtClose,
         peakTextPages = PeakTextPages,
         peakTextCharacters = PeakTextCharacters,
-        disposedCleanly = DisposedCleanly
+        disposedCleanly = DisposedCleanly,
+        evictions = Evictions
     });
 }

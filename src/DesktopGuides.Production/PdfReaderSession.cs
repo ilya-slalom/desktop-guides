@@ -317,7 +317,7 @@ internal sealed class PdfReaderSession : IReaderSession
         PdfSessionDiagnostics counts = new(
             scheduler.Requests, scheduler.Loads, scheduler.StaleResults,
             cache.PeakBytes, cache.MaxBytes, cache.Count,
-            text.PeakPages, text.PeakCharacters, clean);
+            text.PeakPages, text.PeakCharacters, clean, cache.Evictions);
         View.Clear();
         cache.Clear();
         text.Dispose();

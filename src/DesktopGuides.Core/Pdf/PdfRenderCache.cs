@@ -22,6 +22,8 @@ public sealed class PdfRenderCache<TImage> where TImage : class
     // The highest total after eviction, so never above MaxBytes.
     public long PeakBytes { get; private set; }
     public int Count => entries.Count;
+    // Entries Add removed to stay under the cap; Clear doesn't count.
+    public int Evictions { get; private set; }
 
     public static long MeasureBytes(int pixelWidth, int pixelHeight) => (long)pixelWidth * pixelHeight * 4;
 
@@ -58,6 +60,7 @@ public sealed class PdfRenderCache<TImage> where TImage : class
             order.RemoveLast();
             entries.Remove(oldest.Value.Key);
             CachedBytes -= oldest.Value.Bytes;
+            Evictions++;
         }
         PeakBytes = Math.Max(PeakBytes, CachedBytes);
     }
