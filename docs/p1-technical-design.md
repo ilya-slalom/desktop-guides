@@ -722,6 +722,9 @@ project uses a provisional package identity until T17.1 sets the public one.
   changed bytes. Restore page exactly and vertical fraction within 0.1
   page after resize/zoom on `pdf-long`; confirm the text view refers to the
   same selected page. OCR for `pdf-scan` remains out of scope.
+  See the [T10.3 design](p1/t10-3-pdf-locator-design.md). The session
+  captures and restores in memory. T12.2 persists the envelope and restores
+  it on reopen, and T10.2 keeps the point across zoom.
 
 ### S11 — Provide a consistent reading shell
 

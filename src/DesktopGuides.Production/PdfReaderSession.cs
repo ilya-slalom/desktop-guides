@@ -39,7 +39,7 @@ internal sealed class PdfReaderSession : IReaderSession
     private int pageCount;
     private CancellationTokenSource? resizeDelay;
     private int target;
-    private int displayed;
+    private readonly PdfPagePosition position = new();
     private int appliedWidth;
     private double appliedAspect = double.NaN;
     private int failedPages;
@@ -60,6 +60,8 @@ internal sealed class PdfReaderSession : IReaderSession
             LoadPageAsync, Apply, (index, _) => Apply(index, BothFailed));
         View = new PdfReaderView();
         View.PreviewSizeChanged += OnPreviewSizeChanged;
+        View.PreviewLayoutChanged += OnPreviewLayoutChanged;
+        View.PreviewScrolled += OnPreviewScrolled;
     }
 
     public PdfReaderView View { get; }
@@ -122,7 +124,8 @@ internal sealed class PdfReaderSession : IReaderSession
     {
         token.ThrowIfCancellationRequested();
         if (document is null) throw new InvalidOperationException("The guide isn't open.");
-        return Task.FromResult(PdfLocationRules.Capture(guide.ContentSha256, displayed, pageCount));
+        return Task.FromResult(
+            PdfLocationRules.Capture(guide.ContentSha256, position.Page, position.Fraction, pageCount));
     }
 
     public Task<RestoreOutcome> RestoreLocationAsync(ReaderLocation location, CancellationToken token)
@@ -133,7 +136,7 @@ internal sealed class PdfReaderSession : IReaderSession
         PdfRestore restore = PdfLocationRules.Restore(location, guide.ContentSha256, pageCount);
         if (!disposed && restore.Outcome.Kind != RestoreKind.Unavailable)
         {
-            GoTo(restore.PageIndex);
+            GoTo(restore.PageIndex, restore.PageFraction);
         }
         return Task.FromResult(restore.Outcome);
     }
@@ -150,12 +153,13 @@ internal sealed class PdfReaderSession : IReaderSession
         switch (action)
         {
             // Turns build on the wanted page, not the shown one, so ten fast
-            // Next clicks move ten pages.
+            // Next clicks move ten pages. A turn past either end does nothing.
             case PageTurnAction turn:
-                GoTo((long)target + turn.Delta);
+                long next = Math.Clamp((long)target + turn.Delta, 0, pageCount - 1);
+                if (next != target) GoTo(next, 0);
                 break;
             case PageEdgeAction edge:
-                GoTo(edge.Edge == ReaderEdge.Start ? 0 : pageCount - 1);
+                GoTo(edge.Edge == ReaderEdge.Start ? 0 : pageCount - 1, 0);
                 break;
             default:
                 throw new NotSupportedException($"PDF guides don't support {action.Command}.");
@@ -163,12 +167,23 @@ internal sealed class PdfReaderSession : IReaderSession
         return Task.CompletedTask;
     }
 
-    private void GoTo(long index)
+    // A new page applies the point when its load is shown. The page already
+    // shown has no load coming, so it applies the point now.
+    private void GoTo(long index, double fraction)
     {
-        int clamped = (int)Math.Clamp(index, 0, pageCount - 1);
-        if (clamped == target) return;
-        target = clamped;
-        scheduler.Request(clamped);
+        int page = (int)Math.Clamp(index, 0, pageCount - 1);
+        position.Target(page, fraction);
+        if (page != target)
+        {
+            target = page;
+            scheduler.Request(page);
+        }
+        else if (page == position.Page)
+        {
+            position.Shown(page);
+            ScrollToPoint();
+            RaiseLocationChanged();
+        }
     }
 
     // Text extraction runs on a worker while the raster renders on the UI
@@ -237,13 +252,16 @@ internal sealed class PdfReaderSession : IReaderSession
     private void Apply(int index, PageResult result)
     {
         if (disposed || failed) return;
-        displayed = index;
+        position.Shown(index);
         appliedWidth = result.RasterWidth;
         appliedAspect = result.Aspect;
         bool shown = true;
         try
         {
             View.ShowPage(index, pageCount, result.Image, result.Text);
+            // A same-height image raises no SizeChanged, so apply the point
+            // here; a new height re-applies it from OnPreviewLayoutChanged.
+            ScrollToPoint();
         }
         catch (Exception)
         {
@@ -252,14 +270,7 @@ internal sealed class PdfReaderSession : IReaderSession
             shown = false;
         }
         failedPages = !shown || (result.Image is null && result.Text is null) ? failedPages + 1 : 0;
-        try
-        {
-            LocationChanged?.Invoke(this, new LocationChangedEventArgs());
-        }
-        catch (Exception)
-        {
-            // A throwing handler must not escape into the scheduler.
-        }
+        RaiseLocationChanged();
         if (failedPages < FailuresBeforeStop) return;
         failed = true;
         // Queued, so the shell disposes the session after this load returns.
@@ -267,6 +278,43 @@ internal sealed class PdfReaderSession : IReaderSession
         {
             if (!disposed) Failed?.Invoke(this, PdfGuideLoadError.Failed);
         });
+    }
+
+    // The image or the viewport changed height: put the point back.
+    private void OnPreviewLayoutChanged(object? sender, EventArgs args)
+    {
+        if (!disposed) ScrollToPoint();
+    }
+
+    // Only a user's scroll moves the point; PdfPagePosition ignores the
+    // app's own scrolls and the scroller's clamps.
+    private void OnPreviewScrolled(object? sender, EventArgs args)
+    {
+        if (disposed) return;
+        PdfPreviewLayout layout = View.PreviewLayout;
+        if (position.Scrolled(layout.Offset, layout.ImageHeight, layout.ViewportHeight))
+        {
+            RaiseLocationChanged();
+        }
+    }
+
+    private void ScrollToPoint()
+    {
+        PdfPreviewLayout layout = View.PreviewLayout;
+        View.ScrollTo(position.OffsetFor(layout.ImageHeight, layout.ViewportHeight));
+    }
+
+    private void RaiseLocationChanged()
+    {
+        try
+        {
+            LocationChanged?.Invoke(this, new LocationChangedEventArgs());
+        }
+        catch (Exception)
+        {
+            // A throwing handler must not escape into the scheduler or a
+            // XAML event.
+        }
     }
 
     // Re-renders the current page only when the raster width changes.
@@ -301,6 +349,8 @@ internal sealed class PdfReaderSession : IReaderSession
         LocationChanged = null;
         Failed = null;
         View.PreviewSizeChanged -= OnPreviewSizeChanged;
+        View.PreviewLayoutChanged -= OnPreviewLayoutChanged;
+        View.PreviewScrolled -= OnPreviewScrolled;
         resizeDelay?.Cancel();
         resizeDelay?.Dispose();
         resizeDelay = null;

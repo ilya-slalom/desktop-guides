@@ -32,6 +32,7 @@
                        Foreground="{ThemeResource DesktopGuidesSecondaryTextBrush}" />
             <ScrollViewer x:Name="PreviewScroller"
                           Grid.Row="1"
+                          AutomationProperties.AutomationId="PdfPreviewScroller"
                           HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
                 <Image x:Name="Preview"
