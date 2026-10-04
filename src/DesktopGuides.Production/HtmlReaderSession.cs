@@ -4,6 +4,7 @@ using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Reading;
 using DesktopGuides.Infrastructure.Reading;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
 
@@ -42,6 +43,13 @@ internal sealed class HtmlReaderSession : IReaderSession
     private HtmlCapture? current;
     private HtmlScroll? lastScroll;
     private bool ticking;
+    private static readonly TimeSpan ResizeSettle = TimeSpan.FromMilliseconds(300);
+    private CancellationTokenSource? resizeDelay;
+    private bool opened;
+    private bool resizing;
+    // Bumped by every size change: a capture or baseline taken across one
+    // is from a page mid-reflow and is dropped.
+    private int generation;
 
     public HtmlReaderSession(HtmlGuideLoaded loaded, string cacheRoot, HtmlSessionDiagnostics? diagnostics)
     {
@@ -58,6 +66,7 @@ internal sealed class HtmlReaderSession : IReaderSession
         tracker.Interval = TimeSpan.FromMilliseconds(500);
         tracker.IsRepeating = true;
         tracker.Tick += OnTrackerTick;
+        View.SizeChanged += OnViewSizeChanged;
     }
 
     public WebView2 View { get; }
@@ -175,6 +184,7 @@ internal sealed class HtmlReaderSession : IReaderSession
             // reaches the completion source.
             throw new HtmlGuideLoadException(failed ? HtmlGuideLoadError.Crashed : HtmlGuideLoadError.Changed);
         }
+        opened = true;
         tracker.Start();
     }
 
@@ -182,7 +192,8 @@ internal sealed class HtmlReaderSession : IReaderSession
     public async Task<ReaderLocation> GetLocationAsync(CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        if (await CaptureAsync() is HtmlCapture capture) current = capture;
+        // Mid-reflow, the page's top isn't the reader's point.
+        if (!resizing && await CaptureAsync() is HtmlCapture capture) current = capture;
         token.ThrowIfCancellationRequested();
         return HtmlLocationRules.Capture(contentSha256 ?? string.Empty, policy.Entry.RequestPath, current ?? Start);
     }
@@ -255,10 +266,15 @@ internal sealed class HtmlReaderSession : IReaderSession
         ticking = true;
         try
         {
+            int started = generation;
             HtmlScroll? scroll = HtmlLocationRules.ParseScroll(await RunScriptAsync(HtmlPositionScripts.ReadScroll));
-            if (scroll is null || disposed || !HtmlLocationRules.Moved(lastScroll, scroll)) return;
+            if (scroll is null || disposed || started != generation ||
+                !HtmlLocationRules.Moved(lastScroll, scroll))
+            {
+                return;
+            }
             HtmlCapture? capture = await CaptureAsync();
-            if (capture is null || disposed) return;
+            if (capture is null || disposed || started != generation) return;
             lastScroll = scroll;
             if (capture == current) return;
             current = capture;
@@ -273,6 +289,77 @@ internal sealed class HtmlReaderSession : IReaderSession
         {
             ticking = false;
         }
+    }
+
+    // Tracking pauses while the size changes; 300 ms after the last change
+    // the current point goes back to the top and the scroll it leaves is the
+    // new baseline. Chromium's own scroll change during the reflow is never
+    // taken as the reader's move.
+    private async void OnViewSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        if (!opened || disposed) return;
+        generation++;
+        resizing = true;
+        tracker.Stop();
+        resizeDelay?.Cancel();
+        resizeDelay?.Dispose();
+        CancellationTokenSource delay = new();
+        resizeDelay = delay;
+        try
+        {
+            await Task.Delay(ResizeSettle, delay.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        try
+        {
+            await ReapplyAsync();
+        }
+        catch (Exception)
+        {
+            // A failed re-apply leaves the page where the reflow put it.
+        }
+        finally
+        {
+            if (resizeDelay == delay && !disposed)
+            {
+                resizeDelay = null;
+                delay.Dispose();
+                resizing = false;
+                tracker.Start();
+            }
+        }
+    }
+
+    private async Task ReapplyAsync()
+    {
+        int started = generation;
+        if (current is HtmlCapture point)
+        {
+            // A page with no text has only its fraction.
+            HtmlRestoreStep step = point.Quote is null ? HtmlRestoreStep.Fraction : HtmlRestoreStep.Exact;
+            await ScrollToTargetAsync(new HtmlRestoreTarget(step, point.Offset, point.Fraction));
+        }
+        HtmlScroll? scroll = HtmlLocationRules.ParseScroll(await RunScriptAsync(HtmlPositionScripts.ReadScroll));
+        if (scroll is not null && started == generation && !disposed) lastScroll = scroll;
+    }
+
+    // Puts the target character's box at the viewport top. An offset whose
+    // text has no box (hidden since capture) falls back to the fraction, and
+    // the returned target says so. Null when no script replied.
+    private async Task<(HtmlRestoreTarget Target, int Pending)?> ScrollToTargetAsync(HtmlRestoreTarget target)
+    {
+        if (target.Step != HtmlRestoreStep.Fraction &&
+            HtmlLocationRules.ParsePending(await RunScriptAsync(HtmlPositionScripts.ScrollToOffset(target.Offset))) is int pending)
+        {
+            return (target, pending);
+        }
+        HtmlRestoreTarget fraction = target with { Step = HtmlRestoreStep.Fraction };
+        return HtmlLocationRules.ParsePending(await RunScriptAsync(HtmlPositionScripts.ScrollToFraction(fraction.Fraction))) is int left
+            ? (fraction, left)
+            : null;
     }
 
     private void RaiseLocationChanged()
@@ -412,6 +499,10 @@ internal sealed class HtmlReaderSession : IReaderSession
         tracker.Stop();
         tracker.Tick -= OnTrackerTick;
         LocationChanged = null;
+        View.SizeChanged -= OnViewSizeChanged;
+        resizeDelay?.Cancel();
+        resizeDelay?.Dispose();
+        resizeDelay = null;
         ExternalLinkRequested = null;
         Failed = null;
         WriteDiagnostics();
