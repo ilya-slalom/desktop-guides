@@ -251,7 +251,7 @@ public sealed class GuideImportValidator : IGuideImportValidator
         }
     }
 
-    private static bool StartsLikePdf(Stream stream)
+    internal static bool StartsLikePdf(Stream stream)
     {
         byte[] head = new byte[1024];
         int read = stream.ReadAtLeast(head, head.Length, throwOnEndOfStream: false);
