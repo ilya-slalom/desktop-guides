@@ -151,8 +151,12 @@ internal static class HtmlPositionScripts
     // browser to the scroll range.
     public static string ScrollToOffset(int offset) =>
         "(() => {" + Prelude + "const offset = " + JsonSerializer.Serialize(offset) + ";" + """
-        const box = boxAt(walk(), offset);
-        return box === null ? null : scrollToBox(box);
+        const w = walk(), box = boxAt(w, offset);
+        if (box === null) return null;
+        // The page's first text is its start: the margin above it stays.
+        const first = boxAt(w, 0);
+        if (first !== null && box.offset <= first.offset) { scrollTo(0, 0); return pending(); }
+        return scrollToBox(box);
         })()
         """;
 
