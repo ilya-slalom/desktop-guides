@@ -122,7 +122,7 @@ internal sealed class PdfReaderSession : IReaderSession
     {
         token.ThrowIfCancellationRequested();
         if (document is null) throw new InvalidOperationException("The guide isn't open.");
-        return Task.FromResult(PdfLocationRules.Capture(guide.ContentSha256, displayed, pageCount));
+        return Task.FromResult(PdfLocationRules.Capture(guide.ContentSha256, displayed, 0, pageCount));
     }
 
     public Task<RestoreOutcome> RestoreLocationAsync(ReaderLocation location, CancellationToken token)
