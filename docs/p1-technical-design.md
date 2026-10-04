@@ -691,6 +691,10 @@ project uses a provisional package identity until T17.1 sets the public one.
   reflow, delayed image layout, fragment navigation, and an unimported HTML
   link. P1 supports only the imported entry document and its fragments;
   S21 owns multi-document HTML.
+  See the [T09.3 design](p1/t09-3-html-locator-design.md). The session
+  captures and restores in memory; T12.2 persists the envelope and restores
+  it on reopen. Restore picks the step in Core: the host scripts only
+  measure and scroll.
 
 ### S10 — Read PDF manuals
 

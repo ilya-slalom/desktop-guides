@@ -1,6 +1,7 @@
 # T09.3 HTML locator and restore design
 
-Status: designed; not yet implemented.
+Status: implemented; CI run 37203750673 passed the installed `html-position`
+mode in light and dark.
 Prerequisites: T09.1 is merged (PR #35, merge commit `9f2ad26`); T12.1's
 locator codec is merged (PR #3); T07.3's WebView2 policy is merged (PR #34).
 
@@ -287,11 +288,7 @@ no gesture keeps page-initiated navigations page-initiated. It works with
 
 ## Docs
 
-On implementation: this status line and implementation notes;
-[implementation-plan.md](implementation-plan.md) (T10.3 merged through
-PR #37, merge commit `541c245`; T09.3 in review);
-[work-breakdown.md](../work-breakdown.md) T09.3;
-[p1-technical-design.md](../p1-technical-design.md) S09 T09.3.
+Done in the implementing branch; see the status lines in each.
 
 ## Out of scope
 
@@ -301,3 +298,104 @@ PR #37, merge commit `541c245`; T09.3 in review);
   reuse the resize re-apply).
 - Estimated progress labels (T12.3).
 - HTML guides with more than one document (S21).
+
+## Implementation notes
+
+Planning refinements, from the
+[implementation plan](t09-3-html-locator-plan.md):
+
+- **P1. The restore choice is in Core.** The `Restore(plan)` script became
+  `Find`, which only measures (is the quote at the saved offset, and where
+  else does it occur, inside the `ElementId` element and in the whole walk),
+  and `ScrollToOffset` and `ScrollToFraction`, which only scroll.
+  `HtmlLocationRules.Resolve` picks the step and the offset, so the tie rule
+  is a unit test. `Outcome` maps Core's own step; there is no restore reply
+  to parse.
+- **P2. Capture measures text boxes.** The capture script binary-searches
+  the walk for the first character whose box bottom is below the viewport
+  top, instead of `caretRangeFromPoint` and an 8 px step-down. Images, gaps,
+  padding and body margins don't affect it, and restore scrolls that
+  character's box top to the viewport top, so a capture after a restore
+  returns the same offset.
+- **P3. Exact needs a quote.** A page without text captures offset 0 and no
+  quote; its restore uses the fraction.
+- **P4.** A fraction restore of unchanged bytes is `Approximate` without a
+  reason, because "The guide changed" would be false.
+- **P5.** `RestoreLocationAsync` takes a `ReaderLocation`, as
+  `IReaderSession` defines it. `HtmlLocationRules.Decode` sends it through
+  the codec's `Serialize` and `Deserialize`, so it gets the checks a stored
+  locator gets.
+- **P6.** An unimported link is recorded as a denied navigation:
+  `HtmlDenyReason.UnimportedPage` with context `Navigation`.
+- **P7.** The smoke reads the page's top line independently of the app's
+  capture: it walks the page's UI Automation tree for the `MARK-` line
+  elements and takes the one whose bounding box starts within 30 px of the
+  page's top. `TextPattern` returned nothing for the WebView2 page, and
+  `ElementFromPoint` returns the WinUI hosting bridge, not page content.
+  The 30 px rule keeps "the top is not a MARK line" true for a page at its
+  start whose MARK lines are visible lower down.
+- **P8.** `html-position` is its own seed (`seed-html-position`, game "Web
+  Position Game") and smoke mode, so the canary passes' counts are
+  unchanged. The page-tree helpers moved to the shared reader scope.
+- **P9.** `HtmlNavigationPolicy.IsEntryDocument` is the one entry
+  comparison, used for a capture's `href` and the session's origin check.
+- **Script transport.** With scripts off (T07.3), `ExecuteScriptAsync`
+  doesn't run, so the session evaluates its measuring and scrolling scripts
+  through DevTools `Runtime.evaluate` with `userGesture` false. T07.3's
+  settings and the CSP are unchanged; the guide's own scripts still don't
+  run.
+- **Fixture lines.** `html-long` wraps each MARK line in its own `<span>`,
+  so the smoke can find lines in the page tree. Its `<pre>` sets
+  `overflow-anchor: none`: otherwise the spans give Chromium a scroll
+  anchor that keeps the point across a resize by itself, and the re-apply
+  would go untested against a guide that is one long text node.
+- **Page start.** A position at the walk's first text scrolls to 0, not to
+  that text's box top, so a re-apply at a page's start doesn't nudge the
+  page by its top margin.
+- **Fixture image.** The lazy image above the target is its own file,
+  `images/route.png`. A second `<img>` with `map.png`'s URL is answered
+  from Chromium's memory cache.
+- **No image wait.** With scripts off, Chromium ignores `loading="lazy"`
+  and loads every image eagerly, and the entry's load (`NavigationCompleted`)
+  waits for all of them, including those the test gate delays by 1 s. No
+  image is still loading when a restore runs (run 37200461420: `route.png`
+  complete and 462 px tall at the restore's first scroll), so the planned
+  image wait was dropped. `position-restore-late-images` stays as the check
+  that a restore after late images is `Exact` with the line on top. The
+  scroll scripts' pending count remains only as their reply.
+- **Diagnostics.** The installer saves each `html-position` pass's
+  diagnostics in a `finally`, so a failing pass still leaves them.
+
+## Verification
+
+- `HtmlLocationRulesTests` cover reply parsing (every type, cap and origin
+  row, and a titled entry's literal sub-delimiters), capture through the
+  T12.1 codec, a plan per decode status, `Resolve` including the tie, and
+  every outcome row. `HtmlNavigationPolicyTests` and
+  `HtmlSessionDiagnosticsTests` cover the `Unavailable` kind and the new
+  counts.
+- CI run 37203750673, `html-position` on `html-long`, light [dark]:
+
+  | Phase | Result |
+  | --- | --- |
+  | `position-fragment` | MARK-0420 on top, offset 29056 [29056] |
+  | `position-resize` | 600, 1100, 1500 px: same offset, MARK-0420 on top |
+  | `position-restore-exact` | `Exact` at 1100 px |
+  | `position-restore-late-images` | `Exact`, MARK-0420 on top; the open waited for the late images |
+  | `position-restore-changed` | `Approximate` through the text context |
+  | `position-restore-invalid` | `Unavailable`, page at its start |
+  | `position-unimported-link` | bar shown twice, offset unchanged, 2 [2] denied navigations |
+
+  The values are from
+  [light](evidence/t09-3-html-locator/html-position-light.json) and
+  [dark](evidence/t09-3-html-locator/html-position-dark.json).
+  Screenshots: restored page
+  [light](evidence/t09-3-html-locator/html-restore-light.png),
+  [dark](evidence/t09-3-html-locator/html-restore-dark.png); unavailable
+  link [light](evidence/t09-3-html-locator/html-unavailable-link-light.png),
+  [dark](evidence/t09-3-html-locator/html-unavailable-link-dark.png).
+- Not covered: saving and restoring on reopen, and showing restore reasons
+  (T12.2); the point across theme and font changes (T09.2, T14.3); a
+  `target="_blank"` link to an unimported page, which takes the same
+  `RaiseUnavailableLink` path as a plain link and is classified by the
+  `HtmlNavigationPolicyTests` rows only.

@@ -297,6 +297,8 @@ with a visible approximate fallback if the document changed.
 - **T09.2** Apply host-owned theme/font styling without requiring page scripts.
 - **T09.3** Capture and restore document-relative path, visible text/element
   context, and scroll-ratio fallback.
+  Implemented (in-session capture and restore; saving is T12.2); see
+  [p1/t09-3-html-locator-design.md](p1/t09-3-html-locator-design.md).
 - **TR09.1** DOM location results are treated as untrusted input and validated
   before persistence or navigation.
 - **TR09.2** A guide cannot navigate into another guide's managed directory.
