@@ -1,5 +1,6 @@
 using System.Text.Json;
 using DesktopGuides.Core.Html;
+using DesktopGuides.Core.Reading;
 using Xunit;
 
 namespace DesktopGuides.Core.Tests;
@@ -31,5 +32,36 @@ public sealed class HtmlSessionDiagnosticsTests
         Assert.Equal(("External", "Image", 2),
             (denied[1].GetProperty("reason").GetString(), denied[1].GetProperty("context").GetString(),
              denied[1].GetProperty("count").GetInt32()));
+    }
+
+    [Fact]
+    public void CountsRejectedCapturesAndRestoresByKind()
+    {
+        HtmlSessionDiagnostics diagnostics = new();
+        diagnostics.RecordRejectedCapture();
+        diagnostics.RecordRejectedCapture();
+        diagnostics.RecordRestore(RestoreKind.Exact);
+        diagnostics.RecordRestore(RestoreKind.Exact);
+        diagnostics.RecordRestore(RestoreKind.Approximate);
+        diagnostics.RecordDenied(HtmlDenyReason.UnimportedPage, "Navigation");
+
+        using JsonDocument json = JsonDocument.Parse(diagnostics.ToJson(Guid.NewGuid()));
+
+        Assert.Equal(2, json.RootElement.GetProperty("rejectedCaptures").GetInt32());
+        JsonElement restores = json.RootElement.GetProperty("restores");
+        Assert.Equal(["Approximate", "Exact"], restores.EnumerateObject().Select(p => p.Name));
+        Assert.Equal(2, restores.GetProperty("Exact").GetInt32());
+        Assert.Equal(1, restores.GetProperty("Approximate").GetInt32());
+        JsonElement denied = json.RootElement.GetProperty("denied")[0];
+        Assert.Equal("UnimportedPage", denied.GetProperty("reason").GetString());
+        Assert.Equal("Navigation", denied.GetProperty("context").GetString());
+    }
+
+    [Fact]
+    public void ANewSessionHasNoPositionCounts()
+    {
+        using JsonDocument json = JsonDocument.Parse(new HtmlSessionDiagnostics().ToJson(Guid.NewGuid()));
+        Assert.Equal(0, json.RootElement.GetProperty("rejectedCaptures").GetInt32());
+        Assert.Empty(json.RootElement.GetProperty("restores").EnumerateObject());
     }
 }

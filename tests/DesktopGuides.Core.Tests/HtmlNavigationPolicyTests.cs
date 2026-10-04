@@ -90,10 +90,34 @@ public sealed class HtmlNavigationPolicyTests
         Assert.Equal(HtmlNavigationKind.Deny, Kind(uri, user: false));
 
     [Theory]
-    [InlineData("https://example.com@evil.example/")]
-    [InlineData("https://g00000000000000000000000000000001.guide.invalid/guide.html")]
+    [InlineData("https://g3f2a9c0e4b7d1a65f08c2e9d3b4a7c10.guide.invalid/other.html")]
+    [InlineData("https://G3F2A9C0E4B7D1A65F08C2E9D3B4A7C10.guide.invalid/part2.html#top")]
+    [InlineData("https://g3f2a9c0e4b7d1a65f08c2e9d3b4a7c10.guide.invalid/guide.html?page=2")]
+    [InlineData("https://g3f2a9c0e4b7d1a65f08c2e9d3b4a7c10.guide.invalid/sub/guide.html")]
+    [InlineData("http://g3f2a9c0e4b7d1a65f08c2e9d3b4a7c10.guide.invalid/other.html")]
+    public void AClickToAnotherPageOfThisGuideIsUnavailable(string uri) =>
+        Assert.Equal(HtmlNavigationKind.Unavailable, Kind(uri));
+
+    [Theory]
     [InlineData("https://g3f2a9c0e4b7d1a65f08c2e9d3b4a7c10.guide.invalid/other.html")]
     [InlineData("https://g3f2a9c0e4b7d1a65f08c2e9d3b4a7c10.guide.invalid/guide.html?page=2")]
+    public void ANonUserNavigationToAnotherPageIsDenied(string uri) =>
+        Assert.Equal(HtmlNavigationKind.Deny, Kind(uri, user: false));
+
+    [Theory]
+    [InlineData("https://g00000000000000000000000000000001.guide.invalid/other.html")]
+    [InlineData("https://user@g3f2a9c0e4b7d1a65f08c2e9d3b4a7c10.guide.invalid/other.html")]
+    [InlineData("ftp://g3f2a9c0e4b7d1a65f08c2e9d3b4a7c10.guide.invalid/other.html")]
+    public void AnotherGuideUserInfoOrSchemeIsStillDenied(string uri) =>
+        Assert.Equal(HtmlNavigationKind.Deny, Kind(uri));
+
+    [Fact]
+    public void AClickToTheEntryItselfIsNotUnavailable() =>
+        Assert.Equal(HtmlNavigationKind.Deny, Kind(Entry.AbsoluteUri));
+
+    [Theory]
+    [InlineData("https://example.com@evil.example/")]
+    [InlineData("https://g00000000000000000000000000000001.guide.invalid/guide.html")]
     [InlineData("https://guide.invalid/guide.html")]
     [InlineData("javascript:alert(1)")]
     [InlineData("JAVASCRIPT:alert(1)")]
