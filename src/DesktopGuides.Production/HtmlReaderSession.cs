@@ -50,10 +50,22 @@ internal sealed class HtmlReaderSession : IReaderSession
     // Bumped by every size change: a capture or baseline taken across one
     // is from a page mid-reflow and is dropped.
     private int generation;
+    private static readonly TimeSpan ImageWait = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan ImagePoll = TimeSpan.FromMilliseconds(100);
+    private readonly TaskCompletionSource<bool> entryLoad = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly SemaphoreSlim restoreTurn = new(1, 1);
+    private readonly string? restoreFileForTest;
+    private readonly bool delayImagesForTest;
+    private bool restoring;
+    private RestoreOutcome? lastOutcome;
+    private HtmlRestoreStep? lastStep;
+    private int? lastPending;
 
-    public HtmlReaderSession(HtmlGuideLoaded loaded, string cacheRoot, HtmlSessionDiagnostics? diagnostics)
+    public HtmlReaderSession(
+        HtmlGuideLoaded loaded, string dataRoot, string cacheRoot, HtmlSessionDiagnostics? diagnostics)
     {
         ArgumentNullException.ThrowIfNull(loaded);
+        ArgumentException.ThrowIfNullOrEmpty(dataRoot);
         ArgumentException.ThrowIfNullOrEmpty(cacheRoot);
         policy = loaded.Policy;
         reader = loaded.Reader;
@@ -62,6 +74,8 @@ internal sealed class HtmlReaderSession : IReaderSession
         profile = Path.Combine(cacheRoot, "WebView2", Guid.NewGuid().ToString("N"));
         View = new WebView2();
         positionForTest = TestGate.IsOpen($@"Local\DesktopGuides.Preview.HtmlPosition.{Environment.ProcessId}");
+        restoreFileForTest = positionForTest ? Path.Combine(dataRoot, "test", "html-restore.json") : null;
+        delayImagesForTest = TestGate.IsOpen($@"Local\DesktopGuides.Preview.HtmlAssetDelay.{Environment.ProcessId}");
         tracker = View.DispatcherQueue.CreateTimer();
         tracker.Interval = TimeSpan.FromMilliseconds(500);
         tracker.IsRepeating = true;
@@ -93,7 +107,28 @@ internal sealed class HtmlReaderSession : IReaderSession
             ? Path.Combine(cacheRoot, "missing-runtime-test")
             : null;
 
+    // A saved point can be restored only once the entry has loaded;
+    // RestoreLocationAsync waits on entryLoad.
     public async Task OpenAsync(ManagedGuideSource source, CancellationToken token)
+    {
+        bool entryLoaded = false;
+        try
+        {
+            await OpenEntryAsync(source, token);
+            entryLoaded = true;
+        }
+        finally
+        {
+            entryLoad.TrySetResult(entryLoaded);
+        }
+        if (RestoreRequestForTest() is LocationDecodeResult request) await RestoreAsync(request);
+        token.ThrowIfCancellationRequested();
+        if (disposed) return;
+        opened = true;
+        tracker.Start();
+    }
+
+    private async Task OpenEntryAsync(ManagedGuideSource source, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(source);
         if (source.Guide.Id != policy.GuideId)
@@ -184,26 +219,27 @@ internal sealed class HtmlReaderSession : IReaderSession
             // reaches the completion source.
             throw new HtmlGuideLoadException(failed ? HtmlGuideLoadError.Crashed : HtmlGuideLoadError.Changed);
         }
-        opened = true;
-        tracker.Start();
     }
 
     // A capture that fails or is rejected keeps the last good point.
     public async Task<ReaderLocation> GetLocationAsync(CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        // Mid-reflow, the page's top isn't the reader's point.
-        if (!resizing && await CaptureAsync() is HtmlCapture capture) current = capture;
+        // Mid-reflow or mid-restore, the page's top isn't the reader's point.
+        if (!resizing && !restoring && await CaptureAsync() is HtmlCapture capture) current = capture;
         token.ThrowIfCancellationRequested();
         return HtmlLocationRules.Capture(contentSha256 ?? string.Empty, policy.Entry.RequestPath, current ?? Start);
     }
 
-    public Task<RestoreOutcome> RestoreLocationAsync(ReaderLocation location, CancellationToken token)
+    public async Task<RestoreOutcome> RestoreLocationAsync(ReaderLocation location, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(location);
         token.ThrowIfCancellationRequested();
-        return Task.FromResult(new RestoreOutcome(
-            RestoreKind.Unavailable, "HTML positions are restored in a later preview."));
+        if (!await entryLoad.Task.WaitAsync(token) || disposed || contentSha256 is null)
+        {
+            return new RestoreOutcome(RestoreKind.Unavailable, HtmlLocationRules.UnavailableReason);
+        }
+        return await RestoreAsync(HtmlLocationRules.Decode(location, contentSha256, policy.Entry.RequestPath));
     }
 
     public Task ApplyAppearanceAsync(ReaderAppearance appearance, CancellationToken token) => Task.CompletedTask;
@@ -262,7 +298,7 @@ internal sealed class HtmlReaderSession : IReaderSession
     // A cheap scroll read every tick; a capture only after a move.
     private async void OnTrackerTick(DispatcherQueueTimer sender, object args)
     {
-        if (ticking || disposed) return;
+        if (ticking || disposed || restoring) return;
         ticking = true;
         try
         {
@@ -335,6 +371,8 @@ internal sealed class HtmlReaderSession : IReaderSession
 
     private async Task ReapplyAsync()
     {
+        // A restore in progress scrolls to its own target again.
+        if (restoring) return;
         int started = generation;
         if (current is HtmlCapture point)
         {
@@ -362,6 +400,98 @@ internal sealed class HtmlReaderSession : IReaderSession
             : null;
     }
 
+    // Core plans the steps and picks the target; the scripts only measure
+    // and scroll. An image above the target that is still loading would push
+    // it down, so once images load (or after 2 s) the target goes to the top
+    // again, and again after any resize during the restore.
+    private async Task<RestoreOutcome> RestoreAsync(LocationDecodeResult decoded)
+    {
+        await restoreTurn.WaitAsync();
+        restoring = true;
+        try
+        {
+            HtmlRestorePlan plan = HtmlLocationRules.PlanRestore(decoded);
+            HtmlFindResult? find = null;
+            if (plan.NeedsFind && plan.Position is HtmlPosition position)
+            {
+                find = HtmlLocationRules.ParseFind(
+                    await RunScriptAsync(HtmlPositionScripts.Find(HtmlLocationRules.FindArgs(position))));
+            }
+            HtmlRestoreTarget? target = HtmlLocationRules.Resolve(plan, find);
+            int? pending = null;
+            if (target is not null)
+            {
+                int started = generation;
+                (HtmlRestoreTarget Target, int Pending)? first = await ScrollToTargetAsync(target);
+                target = first?.Target;
+                pending = first?.Pending;
+                if (first is { Pending: > 0 }) await WaitForImagesAsync();
+                while (target is not null && !disposed)
+                {
+                    target = (await ScrollToTargetAsync(target))?.Target ?? target;
+                    if (started == generation) break;
+                    // The window was resized during the restore.
+                    started = generation;
+                    await Task.Delay(ResizeSettle);
+                }
+            }
+            RestoreOutcome outcome = HtmlLocationRules.Outcome(plan, target);
+            if (disposed) return outcome;
+            HtmlScroll? scroll = HtmlLocationRules.ParseScroll(await RunScriptAsync(HtmlPositionScripts.ReadScroll));
+            if (scroll is not null) lastScroll = scroll;
+            HtmlCapture? capture = await CaptureAsync();
+            if (disposed) return outcome;
+            diagnostics?.RecordRestore(outcome.Kind);
+            lastOutcome = outcome;
+            lastStep = outcome.Kind == RestoreKind.Unavailable ? null : target?.Step;
+            lastPending = pending;
+            bool moved = capture is not null && capture != current;
+            if (capture is not null) current = capture;
+            WritePositionForTest();
+            if (moved) RaiseLocationChanged();
+            return outcome;
+        }
+        finally
+        {
+            restoring = false;
+            restoreTurn.Release();
+        }
+    }
+
+    // Polls until no image above the viewport's bottom is loading, or 2 s.
+    private async Task WaitForImagesAsync()
+    {
+        DateTime deadline = DateTime.UtcNow + ImageWait;
+        while (DateTime.UtcNow < deadline && !disposed)
+        {
+            await Task.Delay(ImagePoll);
+            if (HtmlLocationRules.ParsePending(await RunScriptAsync(HtmlPositionScripts.PendingImages)) is not > 0)
+            {
+                return;
+            }
+        }
+    }
+
+    // Test gate only: stands in for T12.2's reopen. The file is untrusted
+    // and goes through the codec like a stored locator.
+    private LocationDecodeResult? RestoreRequestForTest()
+    {
+        if (restoreFileForTest is null || contentSha256 is null) return null;
+        try
+        {
+            FileInfo file = new(restoreFileForTest);
+            if (!file.Exists) return null;
+            if (file.Length > ReaderLocationCodec.MaxBytes) return new(LocationDecodeStatus.Invalid, null);
+            return ReaderLocationCodec.Deserialize(
+                File.ReadAllText(restoreFileForTest), GuideFormat.Html,
+                contentSha256.ToLowerInvariant(), policy.Entry.RequestPath);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
     private void RaiseLocationChanged()
     {
         try
@@ -384,6 +514,11 @@ internal sealed class HtmlReaderSession : IReaderSession
             HtmlRequestDecision decision = policy.Decide(args.Request.Method, args.Request.Uri);
             if (decision is HtmlServe serve)
             {
+                // Test gate only: images answer late, as from a slow disk.
+                if (delayImagesForTest && serve.Asset.Kind == GuideAssetKind.Image)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+                }
                 HtmlAssetRead read = await Task.Run(() => reader.Read(serve.Asset));
                 if (read.Status == HtmlAssetReadStatus.Served && !disposed && environment is not null)
                 {
@@ -503,6 +638,7 @@ internal sealed class HtmlReaderSession : IReaderSession
         resizeDelay?.Cancel();
         resizeDelay?.Dispose();
         resizeDelay = null;
+        entryLoad.TrySetResult(false);
         ExternalLinkRequested = null;
         Failed = null;
         WriteDiagnostics();
@@ -578,9 +714,10 @@ internal sealed class HtmlReaderSession : IReaderSession
             string json = JsonSerializer.Serialize(new
             {
                 locator,
-                kind = (string?)null,
-                step = (string?)null,
-                reason = (string?)null
+                kind = lastOutcome?.Kind.ToString(),
+                step = lastStep?.ToString(),
+                reason = lastOutcome?.Reason,
+                pending = lastPending
             });
             string folder = Path.Combine(cacheRoot, "diagnostics");
             Directory.CreateDirectory(folder);

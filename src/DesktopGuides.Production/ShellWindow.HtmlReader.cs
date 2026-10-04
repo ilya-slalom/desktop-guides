@@ -37,7 +37,7 @@ public sealed partial class ShellWindow
             return true;
         }
         HtmlGuideLoaded loaded = (HtmlGuideLoaded)load;
-        HtmlReaderSession session = new(loaded, cacheRoot!, HtmlReaderSession.DiagnosticsForTest());
+        HtmlReaderSession session = new(loaded, dataRoot!, cacheRoot!, HtmlReaderSession.DiagnosticsForTest());
         // The next render disposes it if this one is cancelled.
         readerSession = session;
         session.ExternalLinkRequested += OnExternalLinkRequested;
