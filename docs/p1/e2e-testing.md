@@ -227,9 +227,20 @@ It uploads the JSON results and screenshots, and PRs link to that artifact.
 Provider live scenarios skip on CI, because the runner has no credential files.
 Run them on the Windows host with `-ProviderOnly`, using the user's keys and
 normal provider requests. Use the host for other scenarios only to debug a CI
-failure; `-CatalogOnly`, `-ImportOnly` and `-DesignOnly` run one scenario group
-against a fresh install. A portable CI job, a fake-provider CI lane and a CI
-scheduled-task entry point are T17.2 work.
+failure. One `*Only` switch runs a single scenario group against a fresh
+install: `-CoreOnly`, `-DesignOnly`, `-CatalogOnly`, `-TxtOnly`, `-HtmlOnly`,
+`-PdfOnly`, `-ImportOnly`, `-GameActionsOnly` or `-ProviderOnly`. With none,
+all groups run in that order. A portable CI job, a fake-provider CI lane and a
+CI scheduled-task entry point are T17.2 work.
+
+For faster CI iteration, dispatch the workflow manually.
+`shell-scope` picks one group, for example
+`gh workflow run windows-ci.yml --ref <branch> -f shell-scope=html -f dev-fast=true`.
+`dev-fast` runs only the x64 production build and shell smoke, next to
+`core-tests` instead of after it, and skips the app-package, toolbar and
+ARM64 jobs. It is ignored when `verify-test-gate` is set. A dev-fast run is not
+PR evidence: push and pull_request runs always use the full job graph and all
+scenario groups.
 
 When a host run installs a CI-built MSIX, stage the source with Windows line
 endings before building `DesktopGuides.ShellSeed`. The schema SQL is a raw
