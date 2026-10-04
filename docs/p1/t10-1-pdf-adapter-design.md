@@ -1,6 +1,6 @@
 # T10.1 PDF reader adapter design
 
-Status: implemented in PR #PRNUM; CI run 37169058467 passed the installed
+Status: implemented in PR #36; CI run 37169058467 passed the installed
 `pdf-reader` scenario in light and dark.
 Prerequisites: T06.3 is merged (PR #19, merge commit `494cb02`); T10.0's
 [decision](pdf-decision.md) selected the native hybrid; T11.2's reader

@@ -3401,11 +3401,11 @@ show the Damaged message with no action button.
 Replace the status line in `docs/p1/t10-1-pdf-adapter-design.md`:
 
 ```markdown
-Status: implemented in PR #PRNUM; CI run <RUN> passed the installed
+Status: implemented in PR #36; CI run <RUN> passed the installed
 `pdf-reader` scenario in light and dark.
 ```
 
-`#PRNUM` is filled in once the PR exists, as for T09.1.
+`#36` is filled in once the PR exists, as for T09.1.
 
 Append the following, replacing each `<...>` with the value from
 `<RUN>`'s light-pass JSON:
@@ -3464,7 +3464,7 @@ Screenshots:
 In `docs/p1/implementation-plan.md`, add after the T09.1 paragraph:
 
 ```markdown
-T10.1 is in review in PR #PRNUM (CI run <RUN>); see the
+T10.1 is in review in PR #36 (CI run <RUN>); see the
 [design and implementation notes](t10-1-pdf-adapter-design.md). PDF guides
 open in the Reader as a `Windows.Data.Pdf` preview beside the same page's
 PdfPig text in a read-only text box with a UI Automation `TextPattern`.
@@ -3477,7 +3477,7 @@ In `docs/work-breakdown.md`, change the T10.1 bullet to:
 
 ```markdown
 - **T10.1** Render and recycle pages with bounded cache/memory use.
-  Implemented in PR #PRNUM; see
+  Implemented in PR #36; see
   [p1/t10-1-pdf-adapter-design.md](p1/t10-1-pdf-adapter-design.md).
 ```
 
@@ -3509,5 +3509,5 @@ git add docs/p1/t10-1-pdf-adapter-design.md docs/p1/implementation-plan.md \
 git commit -m "docs(p1): T10.1 implementation notes and evidence"
 ```
 
-Once the PR exists, replace `#PRNUM` with its number in a follow-up commit,
+Once the PR exists, replace `#36` with its number in a follow-up commit,
 `docs(p1): T10.1 PR and CI run references`.

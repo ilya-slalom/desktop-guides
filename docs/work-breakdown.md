@@ -318,7 +318,7 @@ selection and a screen reader; a scanned PDF is labeled image-only.
   [M0 prototype decision](p1/pdf-decision.md): native preview plus PdfPig text;
   production acceptance remains under T10.1–T10.3 and T16.3.
 - **T10.1** Render and recycle pages with bounded cache/memory use.
-  Implemented in PR #PRNUM; see
+  Implemented in PR #36; see
   [p1/t10-1-pdf-adapter-design.md](p1/t10-1-pdf-adapter-design.md).
 - **T10.2** Add page count, page jump, fit-to-width, zoom, and keyboard commands.
 - **T10.3** Persist zero-based page index and within-page fraction.
