@@ -30,6 +30,7 @@ public sealed class PdfRenderCacheTests
         Assert.True(cache.TryGet(Key(2), out _));
         Assert.Equal(800, cache.CachedBytes);
         Assert.Equal(2, cache.Count);
+        Assert.Equal(1, cache.Evictions);
     }
 
     [Fact]
@@ -122,6 +123,7 @@ public sealed class PdfRenderCacheTests
         Assert.Equal(0, cache.CachedBytes);
         Assert.Equal(0, cache.Count);
         Assert.False(cache.TryGet(Key(0), out _));
+        Assert.Equal(0, cache.Evictions);
     }
 
     [Fact]
@@ -144,6 +146,7 @@ public sealed class PdfRenderCacheTests
 
         Assert.True(cache.PeakBytes <= 100_663_296);
         Assert.True(maxCount < 200);
+        Assert.True(cache.Evictions > 0);
     }
 
     [Theory]
