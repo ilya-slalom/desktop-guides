@@ -1815,11 +1815,12 @@ try {
     Run-StableNavigationScenarios
     Run-TxtReaderScenarios
 
-    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
-    Run-HtmlReaderScenarios
-
+    # TEMP T10.3 debug: PDF before HTML.
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-PdfReaderScenarios
+
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    Run-HtmlReaderScenarios
 
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Run-ImportScenarios
