@@ -106,11 +106,11 @@ public sealed class SqliteLibraryRepositoryTests
         foreach ((Guid guideId, StoreSession session) in new[] { (first, firstSession), (second, secondSession) })
         {
             ReadingState? state = await reopened.GetReadingStateAsync(guideId);
-            Assert.Null(state?.EstimatedFraction);
+            Assert.Equal(0.4, state?.EstimatedFraction);
             LocationDecodeResult decoded = ReaderLocationCodec.Deserialize(
                 state?.LocatorJson, GuideFormat.Txt, StoreSession.Hash);
             Assert.Equal(LocationDecodeStatus.Valid, decoded.Status);
-            Assert.Equal(session.Current with { EstimatedFraction = null }, decoded.Location);
+            Assert.Equal(session.Current, decoded.Location);
         }
     }
 

@@ -272,21 +272,61 @@ public sealed class ProgressCoordinatorTests
     }
 
     [Fact]
-    public void WrittenEstimateIsAlwaysNull()
+    public void SaveWritesTheEstimateInTheLocatorAndTheColumn()
     {
         ProgressCoordinator coordinator = new(store, clock);
-        FakeSession session = new() { Estimate = 0.5 };
+        FakeSession session = new() { Estimate = 0.25 };
         Track(coordinator, GuideA, session, null);
 
         session.Move();
         clock.Advance(TimeSpan.FromSeconds(1));
 
         (_, string json, double? estimate) = Assert.Single(store.Writes);
-        Assert.Null(estimate);
+        Assert.Equal(0.25, estimate);
         LocationDecodeResult decoded = ReaderLocationCodec.Deserialize(
             json, GuideFormat.Txt, FakeSession.Hash);
         Assert.Equal(LocationDecodeStatus.Valid, decoded.Status);
-        Assert.Null(decoded.Location!.EstimatedFraction);
+        Assert.Equal(0.25, decoded.Location!.EstimatedFraction);
+    }
+
+    [Theory]
+    [InlineData(-0.5, 0.0)]
+    [InlineData(1.5, 1.0)]
+    [InlineData(double.NaN, null)]
+    [InlineData(double.PositiveInfinity, null)]
+    [InlineData(double.NegativeInfinity, null)]
+    public void OutOfRangeEstimateIsBoundedBeforeItIsWritten(double estimate, double? expected)
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        FakeSession session = new() { Estimate = estimate };
+        Track(coordinator, GuideA, session, null);
+
+        session.Move();
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        (_, string json, double? written) = Assert.Single(store.Writes);
+        Assert.Equal(expected, written);
+        LocationDecodeResult decoded = ReaderLocationCodec.Deserialize(
+            json, GuideFormat.Txt, FakeSession.Hash);
+        Assert.Equal(LocationDecodeStatus.Valid, decoded.Status);
+        Assert.Equal(expected, decoded.Location!.EstimatedFraction);
+        Assert.Equal(0, coordinator.Counts.Failures);
+    }
+
+    // A row saved by a T12.2 build has the same position and no estimate.
+    [Fact]
+    public void NullEstimateBaselineIsRewrittenWithTheEstimate()
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        FakeSession session = new();
+        string t122Json = session.CurrentJson;
+        session.Estimate = 0.4;
+        Track(coordinator, GuideA, session, t122Json);
+
+        session.Touch();
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Equal([(GuideA, session.CurrentJson, (double?)0.4)], store.Writes);
     }
 
     [Fact]
@@ -389,7 +429,7 @@ public sealed class ProgressCoordinatorTests
         private EventHandler<LocationChangedEventArgs>? locationChanged;
 
         public int Offset { get; set; }
-        public double? Estimate { get; init; }
+        public double? Estimate { get; set; }
         public TaskCompletionSource? Hold { get; set; }
         public bool NeverCompletes { get; init; }
         public int Captures { get; private set; }
@@ -409,7 +449,7 @@ public sealed class ProgressCoordinatorTests
             new TextPosition(Offset, $"line {Offset}"), Estimate);
 
         public string CurrentJson =>
-            ReaderLocationCodec.Serialize(Current with { EstimatedFraction = null });
+            ReaderLocationCodec.Serialize(Current with { EstimatedFraction = ProgressEstimate.Bound(Estimate) });
 
         public void Move()
         {
