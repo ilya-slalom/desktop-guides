@@ -115,8 +115,8 @@ public sealed class SqliteLibraryRepositoryTests
             Assert.Equal(Now.AddHours(2), state?.LastOpenedUtc);
             Assert.Null(state?.CompletedUtc);
         }
-        Game game = Assert.Single(await reopened.ListGamesAsync());
-        IReadOnlyList<GuideSummary> summaries = await reopened.ListGuideSummariesAsync(game.Id);
+        Game listed = Assert.Single(await reopened.ListGamesAsync());
+        IReadOnlyList<GuideSummary> summaries = await reopened.ListGuideSummariesAsync(listed.Id);
         Assert.Equal(2, summaries.Count);
         Assert.All(summaries, summary => Assert.Equal(0.4, summary.State?.EstimatedFraction));
         Assert.All(summaries, summary => Assert.Equal(Now.AddHours(2), summary.State?.LastOpenedUtc));
