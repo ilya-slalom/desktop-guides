@@ -284,7 +284,7 @@ public sealed class TextLocatorTests
         });
 
         LocationDecodeResult decoded = ReaderLocationCodec.Deserialize(
-            json, GuideFormat.Txt, edited.ContentSha256);
+            json, GuideFormat.Txt, edited.ContentSha256.ToLowerInvariant());
         Assert.Equal(LocationDecodeStatus.ContentChanged, decoded.Status);
         TextRestore restore = TextLocator.Restore(edited, decoded.Location!);
 
