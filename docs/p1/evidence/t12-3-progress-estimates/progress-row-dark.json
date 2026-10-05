@@ -1,0 +1,32 @@
+﻿{
+    "mode":  "progress-row",
+    "invocationId":  "05d56c8eb29c41ba8f38de8d4f67caad",
+    "observedAt":  "2026-10-05T06:10:12.2995798Z",
+    "processId":  1652,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "progress-row"
+               ],
+    "progressRows":  [
+                         {
+                             "Name":  "Numbered Lines Guide",
+                             "HelpText":  "Text (TXT), about 37 percent, opened today at 6:09 AM"
+                         },
+                         {
+                             "Name":  "Long Web Guide",
+                             "HelpText":  "Web page (HTML), about 16 percent, opened today at 6:09 AM"
+                         },
+                         {
+                             "Name":  "Long PDF Guide",
+                             "HelpText":  "PDF, about 60 percent, opened today at 6:09 AM"
+                         },
+                         {
+                             "Name":  "Unopened Guide",
+                             "HelpText":  "Text (TXT), Not started"
+                         }
+                     ],
+    "progressRowScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\progress-row-dark.progress-row.png"
+}
