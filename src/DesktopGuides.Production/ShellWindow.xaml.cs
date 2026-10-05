@@ -1727,7 +1727,12 @@ public sealed partial class ShellWindow : Window
                     readerSession = session;
                     ShowReaderSurface(placeholder: false, view: session.View);
                     ReaderActions.SetSession(session);
-                    ShowTransientStatus("Guide ready.");
+                    if (!await OpenAtSavedPlaceAsync(
+                        guide, session, generation, document.ContentSha256.ToLowerInvariant(),
+                        null, readerToken))
+                    {
+                        return false;
+                    }
                     break;
 
                 case SettingsRoute:

@@ -52,17 +52,15 @@ internal sealed class HtmlReaderSession : IReaderSession
     private int generation;
     private readonly TaskCompletionSource<bool> entryLoad = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly SemaphoreSlim restoreTurn = new(1, 1);
-    private readonly string? restoreFileForTest;
     private readonly bool delayImagesForTest;
     private bool restoring;
     private RestoreOutcome? lastOutcome;
     private HtmlRestoreStep? lastStep;
 
     public HtmlReaderSession(
-        HtmlGuideLoaded loaded, string dataRoot, string cacheRoot, HtmlSessionDiagnostics? diagnostics)
+        HtmlGuideLoaded loaded, string cacheRoot, HtmlSessionDiagnostics? diagnostics)
     {
         ArgumentNullException.ThrowIfNull(loaded);
-        ArgumentException.ThrowIfNullOrEmpty(dataRoot);
         ArgumentException.ThrowIfNullOrEmpty(cacheRoot);
         policy = loaded.Policy;
         reader = loaded.Reader;
@@ -71,7 +69,6 @@ internal sealed class HtmlReaderSession : IReaderSession
         profile = Path.Combine(cacheRoot, "WebView2", Guid.NewGuid().ToString("N"));
         View = new WebView2();
         positionForTest = TestGate.IsOpen($@"Local\DesktopGuides.Preview.HtmlPosition.{Environment.ProcessId}");
-        restoreFileForTest = positionForTest ? Path.Combine(dataRoot, "test", "html-restore.json") : null;
         delayImagesForTest = TestGate.IsOpen($@"Local\DesktopGuides.Preview.HtmlAssetDelay.{Environment.ProcessId}");
         tracker = View.DispatcherQueue.CreateTimer();
         tracker.Interval = TimeSpan.FromMilliseconds(500);
@@ -121,7 +118,6 @@ internal sealed class HtmlReaderSession : IReaderSession
         {
             entryLoad.TrySetResult(entryLoaded);
         }
-        if (RestoreRequestForTest() is LocationDecodeResult request) await RestoreAsync(request);
         token.ThrowIfCancellationRequested();
         if (disposed) return;
         opened = true;
@@ -449,26 +445,6 @@ internal sealed class HtmlReaderSession : IReaderSession
         {
             restoring = false;
             restoreTurn.Release();
-        }
-    }
-
-    // Test gate only: stands in for T12.2's reopen. The file is untrusted
-    // and goes through the codec like a stored locator.
-    private LocationDecodeResult? RestoreRequestForTest()
-    {
-        if (restoreFileForTest is null || contentSha256 is null) return null;
-        try
-        {
-            FileInfo file = new(restoreFileForTest);
-            if (!file.Exists) return null;
-            if (file.Length > ReaderLocationCodec.MaxBytes) return new(LocationDecodeStatus.Invalid, null);
-            return ReaderLocationCodec.Deserialize(
-                File.ReadAllText(restoreFileForTest), GuideFormat.Html,
-                contentSha256.ToLowerInvariant(), policy.Entry.RequestPath);
-        }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-        {
-            return null;
         }
     }
 
