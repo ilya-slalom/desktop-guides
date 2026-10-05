@@ -2459,6 +2459,23 @@ try {
                 [void](Wait-Status "$numbered marked in progress.")
                 Wait-CompletionShown $false 'Left'
                 Wait-FocusedId 'CompletionInProgress'
+                # The CI launch size: the header actions stay whole and the
+                # guide list keeps GamePageLayout.MinGuideListHeight (96).
+                Resize-ShellWindow 768 519
+                $scale = [DesktopGuidesForegroundProbe]::Dpi($process.MainWindowHandle) / 96.0
+                $deadline = (Get-Date).AddSeconds(5)
+                do {
+                    $import = (Wait-VisibleById 'ImportGuideButton').Current.BoundingRectangle
+                    $list = (Wait-VisibleById 'GuideList').Current.BoundingRectangle
+                    $fits = $import.Right -le $list.Right + 1 -and $list.Height -ge 96 * $scale - 1
+                    if ($fits) { break }
+                    Start-Sleep -Milliseconds 200
+                } while ((Get-Date) -lt $deadline)
+                if (-not $fits) {
+                    throw "At 768x519 Import guide is $import and the guide list is $list."
+                }
+                $report.completionNarrow = [ordered]@{ import = $import.ToString(); list = $list.ToString() }
+                Resize-ShellWindow 1500 720
                 $report.phases += 'completion-segmented'
             }
             elseif ($Mode -eq 'completion-last-page') {
