@@ -1,5 +1,6 @@
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Reading;
+using Xunit;
 
 namespace DesktopGuides.Core.Tests;
 
