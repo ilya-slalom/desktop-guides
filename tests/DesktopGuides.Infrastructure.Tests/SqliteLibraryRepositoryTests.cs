@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Reading;
@@ -88,7 +89,7 @@ public sealed class SqliteLibraryRepositoryTests
             Game game = await repository.AddGameAsync("Progress", null, null);
             InsertGuide(directory.Paths.DatabasePath, first, game.Id);
             InsertGuide(directory.Paths.DatabasePath, second, game.Id);
-            ProgressCoordinator coordinator = new(repository, TimeProvider.System);
+            ProgressCoordinator coordinator = new(repository, new FixedTimeProvider(Now.AddHours(2)));
 
             await using (IProgressTracking tracking = coordinator.Track(first, firstSession, null))
             {
@@ -98,7 +99,7 @@ public sealed class SqliteLibraryRepositoryTests
             {
                 secondSession.Move();
             }
-            Assert.Equal(new ProgressCounts(2, 0, 0), coordinator.Counts);
+            Assert.Equal(new ProgressCounts(2, 0, 0, 2), coordinator.Counts);
         }
 
         await using SqliteLibraryRepository reopened = new(directory.Paths);
@@ -111,7 +112,57 @@ public sealed class SqliteLibraryRepositoryTests
                 state?.LocatorJson, GuideFormat.Txt, StoreSession.Hash);
             Assert.Equal(LocationDecodeStatus.Valid, decoded.Status);
             Assert.Equal(session.Current, decoded.Location);
+            Assert.Equal(Now.AddHours(2), state?.LastOpenedUtc);
+            Assert.Null(state?.CompletedUtc);
         }
+        Game game = Assert.Single(await reopened.ListGamesAsync());
+        IReadOnlyList<GuideSummary> summaries = await reopened.ListGuideSummariesAsync(game.Id);
+        Assert.Equal(2, summaries.Count);
+        Assert.All(summaries, summary => Assert.Equal(0.4, summary.State?.EstimatedFraction));
+        Assert.All(summaries, summary => Assert.Equal(Now.AddHours(2), summary.State?.LastOpenedUtc));
+    }
+
+    [Fact]
+    public async Task SaveAndOpenKeepACompletedGuideCompleted()
+    {
+        using TestLibrary directory = new();
+        Guid guide = Guid.NewGuid();
+        StoreSession session = new(120);
+        await using SqliteLibraryRepository repository =
+            new(directory.Paths, new FixedTimeProvider(Now));
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Progress", null, null);
+        InsertGuide(directory.Paths.DatabasePath, guide, game.Id);
+        SetCompleted(directory.Paths.DatabasePath, guide);
+        ProgressCoordinator coordinator = new(repository, new FixedTimeProvider(Now.AddHours(2)));
+
+        await using (IProgressTracking tracking = coordinator.Track(guide, session, null))
+        {
+            session.Move();
+        }
+
+        GuideSummary summary = Assert.Single(await repository.ListGuideSummariesAsync(game.Id));
+        Assert.Equal(Now, summary.State?.CompletedUtc);
+        Assert.Equal(0.4, summary.State?.EstimatedFraction);
+        Assert.Equal(Now.AddHours(2), summary.State?.LastOpenedUtc);
+        IReadOnlyList<CatalogFact> facts = CatalogPresentation.GuideFacts(
+            summary, new FixedTimeProvider(Now.AddHours(3)), CultureInfo.InvariantCulture);
+        Assert.Equal("Completed", facts[1].Label);
+    }
+
+    [Fact]
+    public async Task RecordGuideOpenedRejectsAMissingRowAndANegativeTime()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Guid unknown = Guid.NewGuid();
+
+        ReadingStateMissingException missing = await Assert.ThrowsAsync<ReadingStateMissingException>(() =>
+            repository.RecordGuideOpenedAsync(unknown, Now));
+        Assert.Equal(unknown, missing.GuideId);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            repository.RecordGuideOpenedAsync(unknown, DateTimeOffset.UnixEpoch.AddMilliseconds(-1)));
     }
 
     [Fact]
