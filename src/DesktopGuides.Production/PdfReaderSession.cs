@@ -29,6 +29,7 @@ internal sealed class PdfReaderSession : IReaderSession
     private readonly Guide guide;
     private readonly string filePath;
     private readonly PdfPageTextSource text;
+    private readonly string contentSha256;
     private readonly string cacheRoot;
     private readonly bool writeDiagnostics;
     private readonly PdfRenderCache<BitmapImage> cache = new(PdfRasterBudget.MaxBytes);
@@ -54,6 +55,7 @@ internal sealed class PdfReaderSession : IReaderSession
         this.guide = guide;
         filePath = loaded.FilePath;
         text = loaded.Text;
+        contentSha256 = loaded.ContentSha256;
         this.cacheRoot = cacheRoot;
         this.writeDiagnostics = writeDiagnostics;
         scheduler = new LatestWinsScheduler<PageResult>(
@@ -125,7 +127,7 @@ internal sealed class PdfReaderSession : IReaderSession
         token.ThrowIfCancellationRequested();
         if (document is null) throw new InvalidOperationException("The guide isn't open.");
         return Task.FromResult(
-            PdfLocationRules.Capture(guide.ContentSha256, position.Page, position.Fraction, pageCount));
+            PdfLocationRules.Capture(contentSha256, position.Page, position.Fraction, pageCount));
     }
 
     public Task<RestoreOutcome> RestoreLocationAsync(ReaderLocation location, CancellationToken token)
@@ -133,7 +135,7 @@ internal sealed class PdfReaderSession : IReaderSession
         ArgumentNullException.ThrowIfNull(location);
         token.ThrowIfCancellationRequested();
         if (document is null) throw new InvalidOperationException("The guide isn't open.");
-        PdfRestore restore = PdfLocationRules.Restore(location, guide.ContentSha256, pageCount);
+        PdfRestore restore = PdfLocationRules.Restore(location, contentSha256, pageCount);
         if (!disposed && restore.Outcome.Kind != RestoreKind.Unavailable)
         {
             GoTo(restore.PageIndex, restore.PageFraction);
@@ -221,7 +223,7 @@ internal sealed class PdfReaderSession : IReaderSession
             PdfRasterWidth raster = WidthFor(page.Size.Width, aspect);
             if (raster.IsTooLarge) return new Raster(null, 0, aspect);
             width = raster.Width;
-            PdfRenderKey key = new(guide.ContentSha256, index, width);
+            PdfRenderKey key = new(contentSha256, index, width);
             if (cache.TryGet(key, out BitmapImage? hit)) return new Raster(hit, width, aspect);
             using InMemoryRandomAccessStream png = new();
             await page.RenderToStreamAsync(

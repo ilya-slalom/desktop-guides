@@ -1711,7 +1711,7 @@ public sealed partial class ShellWindow : Window
                         ShowWarningStatus(message);
                         break;
                     }
-                    // ContentChanged is T12.3's; T08.2 shows the file as it is.
+                    // The restore compares the decoded document's hash; a changed file shows as it is.
                     TextGuideDocument document = ((TextGuideLoaded)textLoad).Document;
                     int maxColumns;
                     try
