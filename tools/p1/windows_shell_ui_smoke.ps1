@@ -2447,9 +2447,10 @@ try {
                     }
                 }
                 Wait-CompletionShown $false 'A guide never completed'
-                (Wait-VisibleById 'OpenSelectedGuide').SetFocus()
-                Wait-FocusedId 'OpenSelectedGuide'
-                Send-Keys '+{TAB}'
+                # The choice's row follows the header actions in tab order.
+                (Wait-VisibleById 'ImportGuideButton').SetFocus()
+                Wait-FocusedId 'ImportGuideButton'
+                Send-Keys '{TAB}'
                 Wait-FocusedId 'CompletionInProgress'
                 Send-Keys '{RIGHT}'
                 [void](Wait-Status "$numbered marked complete.")
