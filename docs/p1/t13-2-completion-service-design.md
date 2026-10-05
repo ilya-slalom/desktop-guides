@@ -1,6 +1,6 @@
 # T13.2 completion service design
 
-Status: designed; not yet implemented.
+Status: implemented; CI run 37286204673 passed `core-tests`.
 Prerequisites: T03.2 (the `ReadingStates` schema and repository) and T12.2
 (the progress coordinator, PR #40) are merged. T12.3 (PR #41, merge commit
 `a36b058`) stores estimates and open times, so the tests can show that a
@@ -180,3 +180,29 @@ installed scenario.
   display (T13.1).
 - Installed or UI Automation evidence (T13.1).
 - Any change to row ordering or presentation.
+
+## Implementation notes
+
+None beyond the design. The code follows the design as written.
+
+## Verification
+
+- `GuideCompletionServiceTests` (Core) check that:
+  - marking complete passes the clock's time, and marking in progress
+    passes null;
+  - each action returns the store's committed value;
+  - store errors reach the caller unchanged;
+  - a null store or clock is rejected.
+- `SqliteLibraryRepositoryTests` (Infrastructure) cover:
+  - toggling twice with the locator, estimate, and open time intact;
+  - a repeated action keeping the committed state;
+  - completion and its clearing surviving a reopen (`Completed`, then
+    `~40%`);
+  - a 1.0 estimate with an open time staying `~100%` and not complete;
+  - a missing row and a pre-epoch time being rejected;
+  - concurrent save, open, and completion writes keeping every column;
+  - a +09:00, sub-millisecond time committed as the same instant in UTC
+    milliseconds;
+  - a canceled write leaving nothing behind.
+- CI run 37286204673 (`dev-fast`, x64): Core.Tests 728, Infrastructure.Tests
+  528.
