@@ -1,0 +1,15 @@
+{
+    "mode":  "progress-two-guides",
+    "invocationId":  "7423a6a258c745f2864f6a01bded21a8",
+    "observedAt":  "2026-10-05T02:23:47.4422009Z",
+    "processId":  5520,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "progress-two-guides",
+                   "progress-unavailable"
+               ],
+    "progressUnavailableTxtScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\progress-two-guides.progress-unavailable-txt.png"
+}

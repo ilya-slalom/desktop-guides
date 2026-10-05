@@ -1,0 +1,38 @@
+{
+    "mode":  "html-position",
+    "invocationId":  "78cb683e098d4fbebf7cde9d6a2e401a",
+    "observedAt":  "2026-10-05T02:20:27.3674691Z",
+    "processId":  3688,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "position-fragment",
+                   "position-resize",
+                   "position-restore-exact",
+                   "position-restore-late-images",
+                   "position-restore-changed",
+                   "position-restore-invalid",
+                   "position-unimported-link"
+               ],
+    "sessionsOpened":  7,
+    "unimportedClicks":  2,
+    "restoreKinds":  [
+                         "Exact",
+                         "Exact",
+                         "Approximate",
+                         "Exact",
+                         "Exact"
+                     ],
+    "htmlPositionOffset":  29056,
+    "htmlResizeMarks":  [
+                            420,
+                            420,
+                            420
+                        ],
+    "htmlRestoreScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\html-position-light.html-restore.png",
+    "progressApproximateScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\html-position-light.progress-approximate.png",
+    "progressUnavailableHtmlScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\html-position-light.progress-unavailable-html.png",
+    "htmlUnavailableLinkScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\html-position-light.html-unavailable-link.png"
+}

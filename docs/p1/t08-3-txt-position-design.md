@@ -34,7 +34,9 @@ locator contract in `src/DesktopGuides.Core/Reading/ReaderLocation.cs`.
 Decisions made during brainstorming:
 
 - **Restore is exercised by layout changes, not persistence.** Saving and
-  resuming across a reopen is T12.2's `ProgressCoordinator`; adapters never
+  resuming across a reopen is T12.2's `ProgressCoordinator` (implemented; see
+  [t12-2-progress-coordinator-design.md](t12-2-progress-coordinator-design.md));
+  adapters never
   write SQLite. T08.3 provides the capture/restore API, Core tests for it,
   and the in-view restore after a resize or text-size change.
 - **Commands get toolbar buttons; keys wait for T16.1.** No keyboard

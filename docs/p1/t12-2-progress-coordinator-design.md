@@ -1,6 +1,7 @@
 # T12.2 progress coordinator design
 
-Status: design approved; not yet implemented.
+Status: implemented; CI run 37253787166 passed the installed `progress` group and
+the `html-position` restore phases in light and dark.
 Prerequisites: T03.2 (repository), T11.1 (route coordinator), T08.3 (TXT
 locator, PR #31), T09.3 (HTML locator, PR #39, merge commit `dee44e4`) and
 T10.3 (PDF locator, PR #37) are merged.
@@ -226,12 +227,7 @@ workflow's `shell-scope` input like the other groups):
 
 ## Docs
 
-Update this file's status and implementation notes,
-[implementation-plan.md](implementation-plan.md) (T09.3 merged note, T12.2
-status), [work-breakdown.md](../work-breakdown.md) T12.2,
-[e2e-testing.md](e2e-testing.md) for the `progress` group, and remove the
-"reopens at its start until T12.2" lines in the T08.3, T09.3 and T10.3
-designs' notes where they describe current behavior.
+Done in the implementing branch.
 
 ## Out of scope
 
@@ -241,3 +237,93 @@ designs' notes where they describe current behavior.
 - Restoring across text-size and theme changes (T14.3).
 - Reopening the last active guide at launch (unchanged: it isn't forced
   open).
+
+## Implementation notes
+
+Refinements made while planning:
+
+- **Threading.** `Track` captures `SynchronizationContext.Current`; timer
+  callbacks `Post` the save to it (inline when it is null) instead of the thread
+  pool, so every `GetLocationAsync` starts on the thread that opened the session.
+  The turn wait keeps the context; the capture and write awaits use
+  `ConfigureAwait(false)` and `WaitAsync(token)`, so a stuck capture can't outlive
+  its timeout.
+- **Baseline.** After an `Exact` restore the baseline is the stored JSON (as the
+  spec says). After any other outcome, or with no locator, the shell captures the
+  post-restore position and passes its serialized JSON as `restoredJson`, so an
+  adapter that raises `LocationChanged` while settling (HTML after a resize, PDF
+  after its first page) doesn't rewrite an unmoved guide. An `Unavailable` or
+  `Approximate` restore still keeps the stored locator until the reader moves.
+- **`IProgressTracking.Abandon()`** ends a tracking without flushing; the shell
+  calls it when a session fails (`html-crash`, PDF failure), where a capture
+  can't succeed.
+- **`ReadingStateMissingException`** (Core/Library, derives from
+  `InvalidOperationException`) replaces `RequireUpdated`'s generic exception for a
+  missing `ReadingStates` row, so the coordinator recognises a removed guide
+  without matching message text.
+- **`CountsChanged` and `Counts`** on the coordinator feed the diagnostics file.
+- **Restore-phase smoke.** The `html-position` restore phases use
+  `test\restore-locator.json` through the shell's override; `restore-invalid` is
+  decoded `Invalid` by the shell, so the session never restores and the phase no
+  longer adds to `restoreKinds`. Phases that reopen a guide in the same pass now
+  restore its saved place, so `unimported-link` and the final open expect
+  `Exact`, and `txt-switch` expects the saved anchor line.
+- **`progress-messages`** is folded in: the `Approximate` and HTML `Unavailable`
+  screenshots come from the `html-position` phases (light and dark), and the TXT
+  `Unavailable` screenshot from `progress-two-guides`.
+- **Installed test layout.** Three smoke modes over three launches of one data
+  root: `progress-timer` (then kill), `progress-restored` (covers `progress-flush`
+  and `progress-burst`, then a normal close), `progress-two-guides`.
+- **Burst bound.** 20 Next page and 10 Previous page presses 100 ms apart; the
+  allowed saves are `floor(elapsed / 4 s) + 1` (one per deadline that can fall
+  inside the burst, plus the final quiet save). The phase fails a burst of 8 s or
+  more, so the allowance never exceeds the spec's 2; UI Automation makes the
+  presses take longer than the spec's 3 s, which is why the bound uses the
+  measured time.
+- **Failure retry.** A failed save re-arms only the 4 s deadline (not during
+  dispose), so a broken store is retried every 4 s, not on every movement.
+- **Restore-read failure.** If `GetReadingStateAsync` throws (other than
+  cancellation), the restore counts as `Unavailable`.
+- **TXT with a changed file and no estimate.** T12.2 writes a null estimate, so a
+  TXT guide whose content changed and whose context isn't found restores
+  `Unavailable` (the codec offers `Approximate` only with an estimate) until
+  T12.3 writes estimates.
+- **Deactivation flush** uses a real 2 s `CancellationTokenSource`; timer and
+  dispose saves are bounded through the coordinator's `TimeProvider`.
+- **Clearing between passes.** A ShellSeed verb `clear-reading-locations`
+  nulls every saved locator; the runner calls it between passes that share a
+  data folder, so each pass starts every guide at its start as before.
+
+Rulings made during execution:
+
+- The coordinator tests' fake session awaits its hold with
+  `ConfigureAwait(false)`, so a held capture finishes before the test's next
+  clock step rather than on xUnit's synchronization context.
+- `StartProgress` subscribes through a local coordinator instead of the
+  nullable field; the behavior is the same.
+- `HtmlReaderSession.GetLocationAsync` writes the gated `html-position` file
+  when it moves the current point, without raising `LocationChanged`. The
+  shell's baseline capture (refinement 2) otherwise left the session's point
+  equal to the tracker's first capture, so the file was never written.
+- [e2e-testing.md](e2e-testing.md) has no gate list, so a sentence after the
+  `-*Only` switch list describes the two progress gates.
+
+## Verification
+
+- `ProgressCoordinatorTests` (16 tests, fake clock) cover the quiet and
+  deadline saves, the burst count, unchanged and baseline skips, flush and
+  dispose, the late capture, failure retry and reporting, the missing row,
+  the stuck capture, the null estimate, the tracking context and `Abandon`.
+- `SqliteLibraryRepositoryTests` save two guides' locators through the
+  coordinator and read them back after reopening the repository.
+- CI run 37253787166 (reports and screenshots in
+  [evidence/t12-2-progress-coordinator/](evidence/t12-2-progress-coordinator/)):
+
+  | Phase | Result |
+  | --- | --- |
+  | `progress-timer` | 3 saves within 5 s; the killed app reopened at line 70 |
+  | `progress-flush` | Back saved page 121 at fraction 0.3 |
+  | `progress-burst` | 1 save in 3.6 s (allowed 1) |
+  | `progress-two-guides` | TXT line 147 and MARK-0420 after a normal close |
+  | `progress-unavailable` | status shown, line 1, stored place kept |
+  | `html-position` | restoreKinds `Exact, Exact, Approximate, Exact, Exact` |

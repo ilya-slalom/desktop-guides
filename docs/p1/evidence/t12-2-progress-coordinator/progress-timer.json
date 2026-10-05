@@ -1,0 +1,19 @@
+{
+    "mode":  "progress-timer",
+    "invocationId":  "7581ec3ea10f43429412ca257e6a5c53",
+    "observedAt":  "2026-10-05T02:22:57.6737159Z",
+    "processId":  68,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "progress-timer"
+               ],
+    "progressTopLine":  70,
+    "progressTimerCounts":  {
+                                "saves":  3,
+                                "skippedUnchanged":  0,
+                                "failures":  0
+                            }
+}
