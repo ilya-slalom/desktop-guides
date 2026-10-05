@@ -389,8 +389,8 @@ public sealed class ProgressCoordinatorTests
         {
             Captures++;
             ReaderLocation snapshot = Current;
-            if (NeverCompletes) await new TaskCompletionSource().Task;
-            if (Hold is TaskCompletionSource hold) await hold.Task;
+            if (NeverCompletes) await new TaskCompletionSource().Task.ConfigureAwait(false);
+            if (Hold is TaskCompletionSource hold) await hold.Task.ConfigureAwait(false);
             return snapshot;
         }
 
