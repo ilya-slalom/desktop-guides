@@ -1,0 +1,15 @@
+<UserControl
+    x:Class="DesktopGuides.Production.GuideCompletionChoice"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:toolkit="using:CommunityToolkit.WinUI.Controls"
+    Visibility="Collapsed">
+    <toolkit:Segmented x:Name="Choice"
+                       VerticalAlignment="Top"
+                       AutomationProperties.AutomationId="CompletionChoice">
+        <toolkit:SegmentedItem x:Name="InProgressItem"
+                               AutomationProperties.AutomationId="CompletionInProgress" />
+        <toolkit:SegmentedItem x:Name="CompleteItem"
+                               AutomationProperties.AutomationId="CompletionComplete" />
+    </toolkit:Segmented>
+</UserControl>
