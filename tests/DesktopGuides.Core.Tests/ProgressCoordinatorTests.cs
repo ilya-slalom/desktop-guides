@@ -164,7 +164,7 @@ public sealed class ProgressCoordinatorTests
 
         FakeSession second = new() { Offset = 500 };
         Track(coordinator, GuideB, second, null);
-        first.Hold!.SetResult();
+        ReleaseInline(first.Hold!);
         second.Move();
         clock.Advance(TimeSpan.FromSeconds(1));
 
@@ -185,7 +185,7 @@ public sealed class ProgressCoordinatorTests
         session.Move();
         TaskCompletionSource hold = session.Hold!;
         session.Hold = null;
-        hold.SetResult();
+        ReleaseInline(hold);
         clock.Advance(TimeSpan.FromSeconds(1));
 
         Assert.Equal([captured, session.CurrentJson], store.Writes.Select(w => w.Json));
@@ -313,6 +313,22 @@ public sealed class ProgressCoordinatorTests
         try
         {
             return coordinator.Track(guideId, session, restoredJson);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+    }
+
+    // xUnit's sync context stops awaits from resuming inline, so release a
+    // held capture without one to finish it before the next clock advance.
+    private static void ReleaseInline(TaskCompletionSource hold)
+    {
+        SynchronizationContext? previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(null);
+        try
+        {
+            hold.SetResult();
         }
         finally
         {
