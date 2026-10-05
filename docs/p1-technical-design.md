@@ -792,6 +792,9 @@ project uses a provisional package identity until T17.1 sets the public one.
   Store the content fingerprint with the locator. On changed bytes, ask
   the adapter for context restoration, then label a percentage-only result
   `Approximate`. `LastOpenedUtcMs` updates only on a successful open.
+  See the [T12.3 design](p1/t12-3-progress-estimates-design.md). As shipped,
+  a PDF compares the hash of the copy it opened, and a changed HTML entry
+  file is denied, so it never reaches a restore.
 
 ### S13 — Track completion explicitly
 

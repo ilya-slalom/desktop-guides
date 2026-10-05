@@ -854,8 +854,17 @@ movement, and continuous movement saves at most once every 4 s. Leaving the
 Reader, the window losing focus and the window closing save an unsaved
 position at once. A restore that isn't exact says so in the status bar,
 and a lost place opens at the start and keeps the stored place until the
-reader moves. T12.2 writes only the locator: estimates and the open time
-remain T12.3.
+reader moves. T12.2 wrote only the locator; T12.3 adds estimates and the
+open time.
+
+T12.3 is implemented; see the
+[design and implementation notes](t12-3-progress-estimates-design.md).
+Library rows show the saved estimate (`~N%`) and when a guide was last
+opened; a guide never opened stays `Not started`. Estimates are clamped to
+`[0,1]` and non-finite values are dropped before they are stored. A TXT or
+PDF guide whose managed copy changed reopens near its place by context,
+else by percentage with the `Approximate` message. Completion is never
+inferred from the estimate.
 
 ## M4 — progress, completion, and appearance
 

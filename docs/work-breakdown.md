@@ -399,6 +399,8 @@ location approximate.
   [p1/t12-2-progress-coordinator-design.md](p1/t12-2-progress-coordinator-design.md).
 - **T12.3** Compute an estimated percentage per format and detect content
   fingerprint changes.
+  Implemented; see
+  [p1/t12-3-progress-estimates-design.md](p1/t12-3-progress-estimates-design.md).
 - **TR12.1** `ReadingState` is keyed by guide ID, never only by game or filename.
 - **TR12.2** A normally running app persists a changed location within five
   seconds of the last movement; continuous scrolling does not trigger one

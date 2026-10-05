@@ -1,6 +1,7 @@
 # T12.3 progress estimates design
 
-Status: approved design; not implemented.
+Status: implemented; CI run 37270721376 passed the installed `progress` group,
+including the `progress-row` phases in light and dark and `progress-changed`.
 Prerequisites: T12.2 (progress coordinator, PR #40, merge commit `17bdf48`)
 is merged. T05.1's row presentation and T12.1's codec are in place.
 
@@ -230,3 +231,53 @@ scenarios in [e2e-testing.md](e2e-testing.md).
 - Restoring across text-size and theme changes (T14.3).
 - Migrating rows saved by T12.2 builds.
 - End-of-view or scroll-range estimates.
+
+## Implementation notes
+
+- **The open runs from `Track`.** `Track` starts the open write at once on
+  the shell's UI thread, so it holds the tracking's first turn before any
+  timer save can post. It never marks the tracking dirty and never raises
+  `SaveFailed`.
+- **`change-progress-copies` rewrites every Numbered line.** Appending lines
+  can't remove the saved context, so the verb replaces `Numbered guide text.`
+  with `Edited guide text.` on every line. Each line keeps a uniform length,
+  so the stored estimate lands on the saved line exactly.
+- **Test corrections made while implementing:**
+  - The Infrastructure reopen test declared `game` twice; the reopened game
+    is now `listed`.
+  - The TXT characterization decodes against the lowercase document hash,
+    as the shell does (`ShellWindow.xaml.cs`). The codec decodes an
+    uppercase expected hash as `Invalid`.
+  - `HashReadFailureIsUnreadable` pads the managed copy 64 KiB past `%%EOF`
+    before it locks the last byte. In the 1 KiB fixture, the header check's
+    buffered first read reached the locked byte, so `Open`'s generic catch
+    returned `Damaged`. An I/O failure during the header check still maps to
+    `Damaged`, as before T12.3.
+
+## Verification
+
+- `ProgressEstimateTests` cover clamping, NaN and infinities.
+- `ProgressCoordinatorTests` cover:
+  - the estimate in both the JSON and the column;
+  - bounded out-of-range estimates;
+  - rewriting a baseline whose estimate is null;
+  - one open at the clock's time before the first save;
+  - an unmoved guide writing only its open;
+  - an open failure (counted, not raised) and a missing row (ignored);
+  - a held open never writing the next guide's ID;
+  - dispose waiting for a pending open.
+- `TextLocatorTests` restore a changed TXT guide without its context at the
+  stored estimate, `Approximate`.
+- `SqliteLibraryRepositoryTests` read back estimates and open times through
+  `ListGuideSummariesAsync` after reopening. They also check that a completed
+  guide stays completed after a save and an open, and that a missing row or a
+  negative time is rejected.
+- `ManagedPdfGuideLoaderTests` check the loaded hash, a changed hash after
+  bytes past `%%EOF`, and `Unreadable` when the hash's read fails.
+- CI run 37270721376 (reports and screenshots in
+  [evidence/t12-3-progress-estimates/](evidence/t12-3-progress-estimates/)):
+
+  | Phase | Result |
+  | --- | --- |
+  | `progress-row` (light, dark) | Numbered `~37%` (stored 0.365), Web `~16%` (0.165), PDF `~60%` (0.6015), each opened today; Unopened `Not started` with no estimate or open time; no row completed |
+  | `progress-changed` | TXT reopened at the saved line, PDF at page 121 fraction 0.300, both with the approximate message; fixture originals unchanged |
