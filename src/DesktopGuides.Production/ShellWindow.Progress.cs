@@ -48,6 +48,7 @@ public sealed partial class ShellWindow
                     saves = counts.Saves,
                     skippedUnchanged = counts.SkippedUnchanged,
                     failures = counts.Failures,
+                    opens = counts.Opens,
                 }));
                 File.Move(temp, path, true);
             }
@@ -100,7 +101,10 @@ public sealed partial class ShellWindow
         try
         {
             ReaderLocation location = await session.GetLocationAsync(token);
-            return ReaderLocationCodec.Serialize(location with { EstimatedFraction = null });
+            return ReaderLocationCodec.Serialize(location with
+            {
+                EstimatedFraction = ProgressEstimate.Bound(location.EstimatedFraction),
+            });
         }
         catch (Exception)
         {

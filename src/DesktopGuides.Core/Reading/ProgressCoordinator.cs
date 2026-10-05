@@ -2,7 +2,7 @@ using DesktopGuides.Core.Library;
 
 namespace DesktopGuides.Core.Reading;
 
-public sealed record ProgressCounts(int Saves, int SkippedUnchanged, int Failures);
+public sealed record ProgressCounts(int Saves, int SkippedUnchanged, int Failures, int Opens);
 
 public sealed class ProgressSaveFailedEventArgs(Guid guideId, Exception error) : EventArgs
 {
@@ -21,6 +21,7 @@ public interface IProgressTracking : IAsyncDisposable
 
 // Saves the open guide's position 1 s after movement stops, or 4 s after the
 // first unsaved movement during continuous movement, and on flush or dispose.
+// Each tracking first records the open time.
 // One guide is tracked at a time; a tracking that has ended never writes.
 public sealed class ProgressCoordinator
 {
@@ -35,6 +36,7 @@ public sealed class ProgressCoordinator
     private int saves;
     private int skippedUnchanged;
     private int failures;
+    private int opens;
 
     public ProgressCoordinator(IReadingLocationStore store, TimeProvider clock)
     {
@@ -51,7 +53,7 @@ public sealed class ProgressCoordinator
     {
         get
         {
-            lock (countsGate) return new(saves, skippedUnchanged, failures);
+            lock (countsGate) return new(saves, skippedUnchanged, failures, opens);
         }
     }
 
@@ -62,16 +64,19 @@ public sealed class ProgressCoordinator
         ArgumentNullException.ThrowIfNull(session);
         Tracking tracking = new(this, guideId, session, restoredJson, SynchronizationContext.Current);
         Interlocked.Exchange(ref current, tracking)?.End();
+        // The open is the tracking's first turn, so a save waits for it.
+        _ = tracking.RecordOpenAsync(clock.GetUtcNow());
         return tracking;
     }
 
-    private void Record(int saved, int skipped, int failed)
+    private void Record(int saved, int skipped, int failed, int opened = 0)
     {
         lock (countsGate)
         {
             saves += saved;
             skippedUnchanged += skipped;
             failures += failed;
+            opens += opened;
         }
         CountsChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -166,6 +171,43 @@ public sealed class ProgressCoordinator
             else context.Post(_ => _ = SaveFromTimerAsync(), null);
         }
 
+        // Never throws. A failure is counted but not reported: the guide did open,
+        // and the next open records it again.
+        internal async Task RecordOpenAsync(DateTimeOffset openedUtc)
+        {
+            using CancellationTokenSource timeout = new(FlushTimeout, owner.clock);
+            try
+            {
+                await turn.WaitAsync(timeout.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            try
+            {
+                lock (gate)
+                {
+                    if (ended) return;
+                }
+                await owner.store.RecordGuideOpenedAsync(guideId, openedUtc, timeout.Token)
+                    .WaitAsync(timeout.Token).ConfigureAwait(false);
+                owner.Record(0, 0, 0, 1);
+            }
+            catch (ReadingStateMissingException)
+            {
+                // The guide was removed.
+            }
+            catch (Exception)
+            {
+                owner.Record(0, 0, 1);
+            }
+            finally
+            {
+                turn.Release();
+            }
+        }
+
         private async Task SaveFromTimerAsync()
         {
             using CancellationTokenSource timeout = new(FlushTimeout, owner.clock);
@@ -199,7 +241,8 @@ public sealed class ProgressCoordinator
                 }
                 ReaderLocation location = await session.GetLocationAsync(token)
                     .WaitAsync(token).ConfigureAwait(false);
-                string json = ReaderLocationCodec.Serialize(location with { EstimatedFraction = null });
+                double? estimate = ProgressEstimate.Bound(location.EstimatedFraction);
+                string json = ReaderLocationCodec.Serialize(location with { EstimatedFraction = estimate });
                 lock (gate)
                 {
                     if (ended) return;
@@ -209,7 +252,7 @@ public sealed class ProgressCoordinator
                     owner.Record(0, 1, 0);
                     return;
                 }
-                await owner.store.SaveReadingLocationAsync(guideId, json, null, token)
+                await owner.store.SaveReadingLocationAsync(guideId, json, estimate, token)
                     .WaitAsync(token).ConfigureAwait(false);
                 lastJson = json;
                 owner.Record(1, 0, 0);

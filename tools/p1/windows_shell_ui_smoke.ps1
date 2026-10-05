@@ -14,7 +14,7 @@ param(
         'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted', 'txt-reader',
         'txt-load-paused', 'txt-back-during-load', 'txt-load-released', 'html-reader',
         'html-runtime-missing', 'pdf-reader', 'html-position',
-        'progress-timer', 'progress-restored', 'progress-two-guides')]
+        'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -1197,7 +1197,7 @@ try {
     }
     elseif ($Mode -in @('txt-reader', 'txt-load-paused', 'txt-back-during-load',
         'txt-load-released', 'html-reader', 'html-runtime-missing', 'pdf-reader', 'html-position',
-        'progress-timer', 'progress-restored', 'progress-two-guides')) {
+        'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
             elseif ($Mode -eq 'pdf-reader') { 'PDF Reader Game' }
@@ -2296,6 +2296,37 @@ try {
                 [void](Wait-TopMark 420 'the fragment link')
                 $report.phases += 'progress-restored'
             }
+            elseif ($Mode -eq 'progress-row') {
+                # progress-row: after a normal close and relaunch, moved guides
+                # show their estimate and open time; an unopened guide does not.
+                $report.progressRows = Assert-RowFacts 'GuideList' @(
+                    @('Numbered Lines Guide', 'Text (TXT), about * percent, opened today at *'),
+                    @('Long Web Guide', 'Web page (HTML), about * percent, opened today at *'),
+                    @('Long PDF Guide', 'PDF, about * percent, opened today at *'),
+                    @('Unopened Guide', 'Text (TXT), Not started'))
+                Wait-HiddenById 'ShellStatus'
+                $report.progressRowScreenshot = Save-WindowScreenshot 'progress-row'
+                $report.phases += 'progress-row'
+            }
+            elseif ($Mode -eq 'progress-changed') {
+                # progress-changed: changed managed copies restore near the
+                # saved place by its estimate, and say so.
+                $approximate = 'Opened near your last place. The guide changed since you were here.'
+                Open-TextGuide 'Numbered Lines Guide'
+                [void](Wait-Status $approximate)
+                Wait-FirstTextRow
+                Wait-TopLine $ExpectedTopLine 'Reopening a changed TXT guide'
+                $report.progressChangedTxtScreenshot = Save-WindowScreenshot 'progress-changed-txt'
+                Back-ToTextGame
+                Open-TextGuide 'Long PDF Guide'
+                [void](Wait-Status $approximate)
+                [void](Wait-PdfPage 121 200 'page 121 of 200')
+                $report.progressPdfFraction = Wait-PdfFraction 0.3 'Reopening a changed PDF guide'
+                $report.progressChangedPdfScreenshot = Save-WindowScreenshot 'progress-changed-pdf'
+                Back-ToTextGame
+                Assert-NoSaveFailure 'progress-changed'
+                $report.phases += 'progress-changed'
+            }
             else {
                 # progress-two-guides: after a normal close both guides
                 # reopen at their own places.
@@ -3126,26 +3157,27 @@ try {
         [void](Wait-SelectedGuide 'Atlas Second Guide')
         $report.phases += 'other-game-back-keeps-guide'
 
-        # Removal selects the next row, then the previous one at the end.
+        # Opening Second recorded an open, so the rows are Second, Third,
+        # First. Removing the top row selects the row after it, twice.
         Invoke-Element (Wait-Name 'RemoveSelectedGuide' 'Remove Atlas Second Guide')
         [void](Wait-VisibleById 'RemoveGuideDialog')
         Invoke-Element (Wait-EnabledById 'PrimaryButton')
         [void](Wait-HiddenById 'RemoveGuideDialog')
         [void](Wait-Status 'Removed Atlas Second Guide.')
         [void](Wait-GuideRowCount 2)
-        [void](Wait-SelectedGuide 'Atlas First Guide')
-        [void](Wait-FocusedGuide 'Atlas First Guide')
+        [void](Wait-SelectedGuide 'Atlas Third Guide')
+        [void](Wait-FocusedGuide 'Atlas Third Guide')
         $report.phases += 'remove-selects-next-guide'
 
-        Invoke-Element (Wait-Name 'RemoveSelectedGuide' 'Remove Atlas First Guide')
+        Invoke-Element (Wait-Name 'RemoveSelectedGuide' 'Remove Atlas Third Guide')
         [void](Wait-VisibleById 'RemoveGuideDialog')
         Invoke-Element (Wait-EnabledById 'PrimaryButton')
         [void](Wait-HiddenById 'RemoveGuideDialog')
-        [void](Wait-Status 'Removed Atlas First Guide.')
+        [void](Wait-Status 'Removed Atlas Third Guide.')
         [void](Wait-GuideRowCount 1)
-        [void](Wait-SelectedGuide 'Atlas Third Guide')
-        [void](Wait-FocusedGuide 'Atlas Third Guide')
-        $report.phases += 'remove-last-selects-previous-guide'
+        [void](Wait-SelectedGuide 'Atlas First Guide')
+        [void](Wait-FocusedGuide 'Atlas First Guide')
+        $report.phases += 'remove-again-selects-next-guide'
 
         # This Library entry is the one Atlas was opened from.
         Back-ToLibrary 'Back after guide removal'
@@ -3907,11 +3939,16 @@ try {
         [void](Wait-SelectedGuide $target)
         Wait-FocusedGuide $target
         [void](Wait-Name 'OpenSelectedGuide' "Open $target")
-        $report.phases += 'virtualized-guide-back-focus'
+        # The open moved the tail guide to the top of the list.
+        $firstRow = @(Get-ListRows 'GuideList')[0].Current.Name
+        if ($firstRow -ne $target) {
+            throw "The first guide row after Back was '$firstRow', not the opened guide."
+        }
+        $report.phases += 'opened-guide-back-focus-first-row'
         [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
         [void](Wait-Name 'ReaderHeading' $target)
         [void](Wait-Status 'Guide ready.')
-        $report.phases += 'virtualized-guide-enter-reopen'
+        $report.phases += 'opened-guide-enter-reopen'
     }
     elseif ($Mode -eq 'switch-game-prepare') {
         $target = 'ZZZ Focus Target Guide'

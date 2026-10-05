@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Pdf;
 using DesktopGuides.Infrastructure.Import;
@@ -7,7 +8,7 @@ using UglyToad.PdfPig.Exceptions;
 namespace DesktopGuides.Infrastructure.Reading;
 
 public abstract record PdfGuideLoad;
-public sealed record PdfGuideLoaded(string FilePath, PdfPageTextSource Text) : PdfGuideLoad;
+public sealed record PdfGuideLoaded(string FilePath, PdfPageTextSource Text, string ContentSha256) : PdfGuideLoad;
 public sealed record PdfGuideLoadFailed(PdfGuideLoadError Error) : PdfGuideLoad;
 
 /// <summary>
@@ -75,6 +76,15 @@ public sealed class ManagedPdfGuideLoader(ManagedPathResolver paths)
                 file.Dispose();
                 return Failed(PdfGuideLoadError.Damaged);
             }
+            // The managed copy can change after import, so restores compare against
+            // the bytes actually opened.
+            file.Position = 0;
+            string? contentSha256 = HashOrNull(file, token);
+            if (contentSha256 is null)
+            {
+                file.Dispose();
+                return Failed(PdfGuideLoadError.Unreadable);
+            }
             file.Position = 0;
             PdfPageTextSource text = PdfPageTextSource.Open(file, token);
             if (text.PageCount == 0)
@@ -82,7 +92,7 @@ public sealed class ManagedPdfGuideLoader(ManagedPathResolver paths)
                 text.Dispose();
                 return Failed(PdfGuideLoadError.Damaged);
             }
-            return new PdfGuideLoaded(path, text);
+            return new PdfGuideLoaded(path, text, contentSha256);
         }
         catch (PdfDocumentEncryptedException)
         {
@@ -101,6 +111,26 @@ public sealed class ManagedPdfGuideLoader(ManagedPathResolver paths)
             file.Dispose();
             return Failed(PdfGuideLoadError.Damaged);
         }
+    }
+
+    private static string? HashOrNull(FileStream file, CancellationToken token)
+    {
+        using IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        byte[] buffer = new byte[1024 * 1024];
+        try
+        {
+            int read;
+            while ((read = file.Read(buffer)) > 0)
+            {
+                token.ThrowIfCancellationRequested();
+                hash.AppendData(buffer, 0, read);
+            }
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+        return Convert.ToHexStringLower(hash.GetHashAndReset());
     }
 
     private static PdfGuideLoadFailed Failed(PdfGuideLoadError error) => new(error);

@@ -1361,7 +1361,7 @@ function Run-PdfReaderScenarios {
     }
 }
 
-function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $Kill) {
+function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $Kill, [string] $resultName = $mode) {
     Start-InstalledShell
     $processId = $report.launchedProcessId
     $gates = @(
@@ -1371,7 +1371,7 @@ function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $K
                 "Local\DesktopGuides.Preview.$name.$processId")
         })
     try {
-        $result = Run-ShellSmoke $mode -ExpectedTopLine $expectedTopLine `
+        $result = Run-ShellSmoke $mode -ResultName $resultName -ExpectedTopLine $expectedTopLine `
             -AppDataRoot $dataRoot -AppCacheRoot (Get-HtmlCacheRoot)
         if ($Kill) {
             # No flush: only a save the timer already made survives.
@@ -1388,10 +1388,34 @@ function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $K
     }
 }
 
+function Assert-ProgressRows($rows, $stored) {
+    # Each row's percentage is the stored estimate's; no estimate, no percentage.
+    foreach ($row in $rows) {
+        $state = @($stored | Where-Object { $_.title -eq $row.Name })
+        if ($state.Count -ne 1) { throw "No stored state for row '$($row.Name)'." }
+        if ($null -ne $state[0].completedUtcMs) { throw "Row '$($row.Name)' is completed." }
+        if ($row.HelpText -match 'about (\d+) percent') {
+            if ($null -eq $state[0].estimate) {
+                throw "Row '$($row.Name)' shows $($Matches[1]) percent with no stored estimate."
+            }
+            $expected = [Math]::Round([double]$state[0].estimate * 100, [MidpointRounding]::AwayFromZero)
+            if ([Math]::Abs([int]$Matches[1] - $expected) -gt 1) {
+                throw "Row '$($row.Name)' shows $($Matches[1]) percent; the stored estimate is $($state[0].estimate)."
+            }
+        }
+        elseif ($null -ne $state[0].estimate) {
+            throw "Row '$($row.Name)' shows no percentage; the stored estimate is $($state[0].estimate)."
+        }
+    }
+}
+
 function Run-ProgressScenarios {
     # TR12.1-TR12.2: the quiet and deadline saves survive a killed process,
     # Back and closing save at once, a burst writes a bounded number of times,
     # and two guides keep their own places across restarts.
+    # TR12.3 and TR05.2: rows show the stored estimate and open time, an
+    # unopened guide stays Not started, and changed TXT and PDF copies restore
+    # approximately.
     $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
     if (-not (Test-Path -LiteralPath (Join-Path $fixtureRoot 'p0\generated\pdf-long.pdf'))) {
         throw 'pdf-long.pdf is missing; run tools/p0/make_fixtures.py first.'
@@ -1408,6 +1432,31 @@ function Run-ProgressScenarios {
         $restored = Invoke-ProgressPass 'progress-restored' $timer.progressTopLine
         $report.progress.restored = $restored
         $report.progress.twoGuides = Invoke-ProgressPass 'progress-two-guides' $restored.progressTopLine
+
+        $stored = Invoke-ShellSeed @('describe-progress', $dataRoot) | ConvertFrom-Json
+        $report.progress.stored = $stored
+        $originalTheme = Get-AppThemePreference
+        try {
+            Set-AppThemePreference $true
+            $light = Invoke-ProgressPass 'progress-row' 0 -resultName 'progress-row-light'
+            Assert-ProgressRows $light.progressRows $stored
+            Set-AppThemePreference $false
+            $dark = Invoke-ProgressPass 'progress-row' 0 -resultName 'progress-row-dark'
+            Assert-ProgressRows $dark.progressRows $stored
+            $report.progress.rows = [ordered]@{ light = $light; dark = $dark }
+        }
+        finally {
+            Restore-AppThemePreference $originalTheme
+        }
+
+        # The changed copies are managed; the fixtures they came from stay untouched.
+        $originals = @('p1\txt-numbered.txt', 'p0\generated\pdf-long.pdf') | ForEach-Object {
+            Join-Path $fixtureRoot $_ }
+        $before = @($originals | ForEach-Object { (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash })
+        Invoke-ShellSeed @('change-progress-copies', $dataRoot) | Out-Null
+        $report.progress.changed = Invoke-ProgressPass 'progress-changed' $restored.progressTopLine
+        $after = @($originals | ForEach-Object { (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash })
+        if (($before -join ',') -ne ($after -join ',')) { throw 'A progress fixture original changed.' }
     }
     finally {
         Remove-Item -LiteralPath (Join-Path $dataRoot 'test') -Recurse -Force -ErrorAction SilentlyContinue

@@ -65,7 +65,7 @@ public sealed partial class ShellWindow
         }
         ReaderActions.SetSession(session);
         return await OpenAtSavedPlaceAsync(
-            guide, session, generation, guide.ContentSha256.ToLowerInvariant(), null, token);
+            guide, session, generation, loaded.ContentSha256, null, token);
     }
 
     private void ShowPdfLoadError(PdfGuideLoadError error)

@@ -25,7 +25,7 @@ public sealed class ProgressCoordinatorTests
 
         clock.Advance(TimeSpan.FromMilliseconds(1));
         Assert.Equal([(GuideA, session.CurrentJson, (double?)null)], store.Writes);
-        Assert.Equal(new ProgressCounts(1, 0, 0), coordinator.Counts);
+        Assert.Equal(new ProgressCounts(1, 0, 0, 1), coordinator.Counts);
         GC.KeepAlive(tracking);
     }
 
@@ -65,7 +65,7 @@ public sealed class ProgressCoordinatorTests
         clock.Advance(TimeSpan.FromSeconds(1));
 
         Assert.Single(store.Writes);
-        Assert.Equal(new ProgressCounts(1, 1, 0), coordinator.Counts);
+        Assert.Equal(new ProgressCounts(1, 1, 0, 1), coordinator.Counts);
         Assert.Equal(2, changes);
     }
 
@@ -80,11 +80,28 @@ public sealed class ProgressCoordinatorTests
         await tracking.DisposeAsync();
 
         Assert.Empty(store.Writes);
-        Assert.Equal(new ProgressCounts(0, 1, 0), coordinator.Counts);
+        Assert.Equal(new ProgressCounts(0, 1, 0, 1), coordinator.Counts);
     }
 
     [Fact]
-    public async Task NoMovementWritesNothing()
+    public void TrackRecordsOneOpenAtTheClocksTimeBeforeTheFirstSave()
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        FakeSession session = new();
+        DateTimeOffset opened = clock.GetUtcNow();
+        Track(coordinator, GuideA, session, null);
+
+        clock.Advance(TimeSpan.FromSeconds(3));
+        session.Move();
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Equal([(GuideA, opened)], store.Opens);
+        Assert.Equal(["open", "save"], store.Events);
+        Assert.Equal(new ProgressCounts(1, 0, 0, 1), coordinator.Counts);
+    }
+
+    [Fact]
+    public async Task UnmovedGuideWritesOnlyItsOpen()
     {
         ProgressCoordinator coordinator = new(store, clock);
         FakeSession session = new();
@@ -94,8 +111,82 @@ public sealed class ProgressCoordinatorTests
         await tracking.FlushAsync(CancellationToken.None);
         await tracking.DisposeAsync();
 
+        Assert.Single(store.Opens);
         Assert.Equal(0, store.Attempts);
         Assert.Equal(0, session.Captures);
+    }
+
+    [Fact]
+    public async Task FailedOpenCountsAFailureAndRaisesNothing()
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        int failed = 0;
+        coordinator.SaveFailed += (_, _) => failed++;
+        store.OpenFailures.Enqueue(new IOException("disk"));
+        FakeSession session = new();
+        IProgressTracking tracking = Track(coordinator, GuideA, session, null);
+
+        Assert.Equal(0, store.Attempts);
+        session.Move();
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await tracking.DisposeAsync();
+
+        Assert.Empty(store.Opens);
+        Assert.Single(store.Writes);
+        Assert.Equal(0, failed);
+        Assert.Equal(new ProgressCounts(1, 0, 1, 0), coordinator.Counts);
+    }
+
+    [Fact]
+    public async Task MissingRowOnOpenRaisesNothing()
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        int failed = 0;
+        coordinator.SaveFailed += (_, _) => failed++;
+        store.OpenFailures.Enqueue(new ReadingStateMissingException(GuideA));
+        IProgressTracking tracking = Track(coordinator, GuideA, new FakeSession(), null);
+
+        await tracking.DisposeAsync();
+
+        Assert.Equal(0, failed);
+        Assert.Equal(new ProgressCounts(0, 0, 0, 0), coordinator.Counts);
+    }
+
+    [Fact]
+    public void HeldOpenThenNextTrackNeverWritesTheNextGuidesId()
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        TaskCompletionSource hold = new();
+        store.OpenHold = hold;
+        FakeSession first = new();
+        Track(coordinator, GuideA, first, null);
+        store.OpenHold = null;
+
+        Track(coordinator, GuideB, new FakeSession { Offset = 500 }, null);
+        ReleaseInline(hold);
+        first.Move();
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Equal([GuideB, GuideA], store.Opens.Select(open => open.Guide));
+        Assert.Empty(store.Writes);
+    }
+
+    [Fact]
+    public async Task DisposeDuringAPendingOpenWaitsForIt()
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        TaskCompletionSource hold = new();
+        store.OpenHold = hold;
+        IProgressTracking tracking = Track(coordinator, GuideA, new FakeSession(), null);
+
+        Task disposing = tracking.DisposeAsync().AsTask();
+        Assert.False(disposing.IsCompleted);
+        ReleaseInline(hold);
+        await disposing;
+
+        Assert.Equal([(GuideA, clock.GetUtcNow())], store.Opens);
+        Assert.Equal(1, coordinator.Counts.Opens);
+        Assert.Equal(0, coordinator.Counts.Failures);
     }
 
     [Fact]
@@ -229,7 +320,7 @@ public sealed class ProgressCoordinatorTests
         Assert.Single(store.Writes);
         Assert.Equal(3, store.Attempts);
         Assert.Equal(GuideA, Assert.Single(failed).GuideId);
-        Assert.Equal(new ProgressCounts(1, 0, 2), coordinator.Counts);
+        Assert.Equal(new ProgressCounts(1, 0, 2, 1), coordinator.Counts);
     }
 
     [Fact]
@@ -272,21 +363,61 @@ public sealed class ProgressCoordinatorTests
     }
 
     [Fact]
-    public void WrittenEstimateIsAlwaysNull()
+    public void SaveWritesTheEstimateInTheLocatorAndTheColumn()
     {
         ProgressCoordinator coordinator = new(store, clock);
-        FakeSession session = new() { Estimate = 0.5 };
+        FakeSession session = new() { Estimate = 0.25 };
         Track(coordinator, GuideA, session, null);
 
         session.Move();
         clock.Advance(TimeSpan.FromSeconds(1));
 
         (_, string json, double? estimate) = Assert.Single(store.Writes);
-        Assert.Null(estimate);
+        Assert.Equal(0.25, estimate);
         LocationDecodeResult decoded = ReaderLocationCodec.Deserialize(
             json, GuideFormat.Txt, FakeSession.Hash);
         Assert.Equal(LocationDecodeStatus.Valid, decoded.Status);
-        Assert.Null(decoded.Location!.EstimatedFraction);
+        Assert.Equal(0.25, decoded.Location!.EstimatedFraction);
+    }
+
+    [Theory]
+    [InlineData(-0.5, 0.0)]
+    [InlineData(1.5, 1.0)]
+    [InlineData(double.NaN, null)]
+    [InlineData(double.PositiveInfinity, null)]
+    [InlineData(double.NegativeInfinity, null)]
+    public void OutOfRangeEstimateIsBoundedBeforeItIsWritten(double estimate, double? expected)
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        FakeSession session = new() { Estimate = estimate };
+        Track(coordinator, GuideA, session, null);
+
+        session.Move();
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        (_, string json, double? written) = Assert.Single(store.Writes);
+        Assert.Equal(expected, written);
+        LocationDecodeResult decoded = ReaderLocationCodec.Deserialize(
+            json, GuideFormat.Txt, FakeSession.Hash);
+        Assert.Equal(LocationDecodeStatus.Valid, decoded.Status);
+        Assert.Equal(expected, decoded.Location!.EstimatedFraction);
+        Assert.Equal(0, coordinator.Counts.Failures);
+    }
+
+    // A row saved by a T12.2 build has the same position and no estimate.
+    [Fact]
+    public void NullEstimateBaselineIsRewrittenWithTheEstimate()
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        FakeSession session = new();
+        string t122Json = session.CurrentJson;
+        session.Estimate = 0.4;
+        Track(coordinator, GuideA, session, t122Json);
+
+        session.Touch();
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Equal([(GuideA, session.CurrentJson, (double?)0.4)], store.Writes);
     }
 
     [Fact]
@@ -371,6 +502,10 @@ public sealed class ProgressCoordinatorTests
         public List<(Guid Guide, string Json, double? Estimate)> Writes { get; } = [];
         public Queue<Exception> Failures { get; } = new();
         public int Attempts { get; private set; }
+        public List<(Guid Guide, DateTimeOffset At)> Opens { get; } = [];
+        public Queue<Exception> OpenFailures { get; } = new();
+        public TaskCompletionSource? OpenHold { get; set; }
+        public List<string> Events { get; } = [];
 
         public Task SaveReadingLocationAsync(
             Guid guideId, string locatorJson, double? estimatedFraction,
@@ -379,7 +514,17 @@ public sealed class ProgressCoordinatorTests
             Attempts++;
             if (Failures.TryDequeue(out Exception? error)) return Task.FromException(error);
             Writes.Add((guideId, locatorJson, estimatedFraction));
+            Events.Add("save");
             return Task.CompletedTask;
+        }
+
+        public async Task RecordGuideOpenedAsync(
+            Guid guideId, DateTimeOffset openedUtc, CancellationToken token = default)
+        {
+            if (OpenHold is TaskCompletionSource hold) await hold.Task.ConfigureAwait(false);
+            if (OpenFailures.TryDequeue(out Exception? error)) throw error;
+            Opens.Add((guideId, openedUtc));
+            Events.Add("open");
         }
     }
 
@@ -389,7 +534,7 @@ public sealed class ProgressCoordinatorTests
         private EventHandler<LocationChangedEventArgs>? locationChanged;
 
         public int Offset { get; set; }
-        public double? Estimate { get; init; }
+        public double? Estimate { get; set; }
         public TaskCompletionSource? Hold { get; set; }
         public bool NeverCompletes { get; init; }
         public int Captures { get; private set; }
@@ -409,7 +554,7 @@ public sealed class ProgressCoordinatorTests
             new TextPosition(Offset, $"line {Offset}"), Estimate);
 
         public string CurrentJson =>
-            ReaderLocationCodec.Serialize(Current with { EstimatedFraction = null });
+            ReaderLocationCodec.Serialize(Current with { EstimatedFraction = ProgressEstimate.Bound(Estimate) });
 
         public void Move()
         {

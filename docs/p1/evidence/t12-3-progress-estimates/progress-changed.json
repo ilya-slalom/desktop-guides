@@ -1,0 +1,16 @@
+﻿{
+    "mode":  "progress-changed",
+    "invocationId":  "8e2a2aa206364254aa60c8c7312440a4",
+    "observedAt":  "2026-10-05T06:10:20.7926280Z",
+    "processId":  6736,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "progress-changed"
+               ],
+    "progressChangedTxtScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\progress-changed.progress-changed-txt.png",
+    "progressPdfFraction":  0.30000000662225923,
+    "progressChangedPdfScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\progress-changed.progress-changed-pdf.png"
+}
