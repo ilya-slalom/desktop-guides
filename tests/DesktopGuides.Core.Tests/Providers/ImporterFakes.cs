@@ -60,6 +60,7 @@ internal sealed class FakeRepository : ILibraryRepository
     public Task<ReadingState?> GetReadingStateAsync(Guid guideId, CancellationToken token = default) => throw new NotSupportedException();
     public Task SaveReadingLocationAsync(Guid guideId, string locatorJson, double? estimatedFraction, CancellationToken token = default) => throw new NotSupportedException();
     public Task RecordGuideOpenedAsync(Guid guideId, DateTimeOffset openedUtc, CancellationToken token = default) => throw new NotSupportedException();
+    public Task<DateTimeOffset?> SetGuideCompletionAsync(Guid guideId, DateTimeOffset? completedUtc, CancellationToken token = default) => throw new NotSupportedException();
     public Task<ReaderPreferences?> GetReaderPreferencesAsync(Guid guideId, CancellationToken token = default) => throw new NotSupportedException();
     public Task SaveReaderPreferencesAsync(Guid guideId, double? textScale, CancellationToken token = default) => throw new NotSupportedException();
     public Task<AppSettings> GetSettingsAsync(CancellationToken token = default) => throw new NotSupportedException();
