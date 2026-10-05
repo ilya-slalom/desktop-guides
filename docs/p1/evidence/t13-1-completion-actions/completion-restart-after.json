@@ -1,8 +1,8 @@
 ﻿{
     "mode":  "completion-restart-after",
-    "invocationId":  "487dd17828284aec936e77c281ecaaad",
-    "observedAt":  "2026-10-05T11:32:42.2929751Z",
-    "processId":  5300,
+    "invocationId":  "f4f0f31ed7564a8f87139aa2ca1297de",
+    "observedAt":  "2026-10-05T13:20:39.9959329Z",
+    "processId":  1800,
     "sessionId":  2,
     "exitDelayMilliseconds":  0,
     "expectedScalePercent":  0,
@@ -10,5 +10,5 @@
     "phases":  [
                    "completion-restart-after"
                ],
-    "completionRestartRow":  "Web page (HTML), In progress, opened today at 11:32 AM"
+    "completionRestartRow":  "Web page (HTML), In progress, opened today at 1:20 PM"
 }

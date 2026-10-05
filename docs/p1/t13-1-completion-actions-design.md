@@ -1,7 +1,8 @@
 # T13.1 completion actions design
 
 Status: implemented with the native `RadioButtons` fallback; CI run
-37302867776 passed `shell-scope=completion` and the full matrix.
+37315084947 passed `shell-scope=completion` and the full matrix, and PR
+#44's run 37311359432 passed `shell-scope=all`.
 Prerequisites: T05.1 (Library and Game rows, PR #23), T11.3 (the Reader
 shell, PR #7), and T13.2 (the completion service, PR #42, merge commit
 `0807d5a`) are merged.
@@ -110,8 +111,10 @@ the version of the other Toolkit pins. It goes in
 
 ### Placement
 
-- **Game page.** The choice goes in a new `Auto` column of
-  `GameGuidesHeader`, before *Open selected guide*. It shows when a guide
+- **Game page.** The choice goes on its own row of `GameGuidesHeader`,
+  under "Guides" and the header actions, and follows them in tab order.
+  (An `Auto` column before *Open selected guide* was the first placement;
+  see the implementation notes.) It shows when a guide
   of this game is selected, under the rule `UpdateOpenSelectedGuideAction`
   uses, and is hidden otherwise. It shows the selected guide's committed
   state. `GuideRowItem` keeps the summary's `CompletedUtc` for this. No row
@@ -254,6 +257,15 @@ In the implementing branch:
   The likely cause, not verified, is that `SegmentedItem`s declared in XAML
   are their own containers and get no data-item peer. An `ItemsSource`-bound
   `Segmented` wasn't tried; T14.2 can test it before choosing its control.
+- **The Game choice moved to its own row.** The first placement, an `Auto`
+  column before *Open selected guide*, passed the `completion` group in a
+  1024 px window but failed PR #44's `shell-scope=all` run, which uses the
+  768x519 launch size: "Guides", the choice and the three actions
+  overflowed one row, *Import guide* was clipped, and the taller header
+  left the guide list one row, so `queue-later-guide` couldn't select its
+  second guide. `GameGuidesHeader` is now a `StackPanel` holding the
+  actions row and then the choice, and `completion-segmented` checks the
+  header at 768x519.
 - The plan's rulings against this design:
   1. Focus is restored after the Game render. `RenderCurrentAsync`
      collapses the Game panel, which drops focus, so after a Game-page
@@ -281,12 +293,13 @@ In the implementing branch:
 - `GuideCompletionPresentationTests` (Core, 9 tests): the labels, both
   states from a null or stored time, the choice name, both announcements,
   the save-failure and removed text, and a long Unicode title kept verbatim.
-- Installed `completion` group, CI run 37302205371 (`dev-fast`) and run
-  37302867776 (full):
+- Installed `completion` group, CI run 37311355614 (`dev-fast`) and run
+  37315084947 (full), after the Game choice moved to its own row:
   - `completion-segmented`: the choice is named `Completion for Numbered
-    Lines Guide`; two `RadioButton`s with their names; Shift+Tab from *Open
-    selected guide* focuses `In progress`; Right selects and announces
-    `Complete`, Left returns to `In progress`.
+    Lines Guide`; two `RadioButton`s with their names; Tab from *Import
+    guide* focuses `In progress`; Right selects and announces `Complete`,
+    Left returns to `In progress`. At 768x519, *Import guide* keeps its
+    wide-window width and the guide list keeps its 96 px minimum.
   - `completion-last-page`: after Go to end in Numbered Lines Guide and on
     page 200 of the PDF, the rows show estimates (the PDF `~100%`), not
     `Completed`; `completedUtcMs` stays null and the choice shows
@@ -308,8 +321,13 @@ In the implementing branch:
     retry succeeds.
 - Screenshots and results are in
   [evidence/t13-1-completion-actions](evidence/t13-1-completion-actions/).
-- CI run 37302867776 (`shell-scope=completion`, the full matrix) passed
+- The narrow-window check failed before the move, in CI run 37310722161:
+  *Import guide* was 43 px wide at 768x519 against 115 px in a wide window.
+  After the move, run 37311355614 measured 115 px and a 193 px guide list.
+- CI run 37315084947 (`shell-scope=completion`, the full matrix) passed
   every job, including ARM64, packages, `production-shell-ui` and
-  `reader-toolbar-ui`: Core.Tests 737, Infrastructure.Tests 528. CI run
-  37302882954 (`shell-scope=progress`, the full matrix) passed, covering the
-  shared `Wait-Status` and lock-helper changes.
+  `reader-toolbar-ui`: Core.Tests 737, Infrastructure.Tests 528. PR #44's
+  run 37311359432 (`shell-scope=all`) passed every job, including
+  `queue-later-guide`. CI run 37302882954 (`shell-scope=progress`, the full
+  matrix, before the move) passed, covering the shared `Wait-Status` and
+  lock-helper changes.
