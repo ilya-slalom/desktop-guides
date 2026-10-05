@@ -111,8 +111,9 @@ public sealed class ProgressCoordinator
         {
             lock (gate)
             {
-                if (ended || !dirty) return;
+                if (ended) return;
             }
+            // Not dirty may mean a save is mid-capture: SaveAsync waits for it.
             await SaveAsync(token);
         }
 
@@ -180,6 +181,11 @@ public sealed class ProgressCoordinator
             }
             catch (OperationCanceledException error)
             {
+                // A flush with nothing to save that timed out behind a stuck save isn't a failure.
+                lock (gate)
+                {
+                    if (!dirty) return;
+                }
                 Failed(error);
                 return;
             }
