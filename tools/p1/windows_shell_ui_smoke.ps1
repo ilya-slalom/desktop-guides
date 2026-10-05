@@ -13,7 +13,8 @@ param(
         'remove-guide-cancel', 'remove-guide',
         'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted', 'txt-reader',
         'txt-load-paused', 'txt-back-during-load', 'txt-load-released', 'html-reader',
-        'html-runtime-missing', 'pdf-reader', 'html-position')]
+        'html-runtime-missing', 'pdf-reader', 'html-position',
+        'progress-timer', 'progress-restored', 'progress-two-guides')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -40,6 +41,8 @@ param(
 
     [ValidateRange(0, 400)]
     [int] $ExpectedScalePercent = 0,
+
+    [int] $ExpectedTopLine = 0,
 
     [ValidateSet('Mica', 'Acrylic', 'Solid')]
     [string] $ExpectedMaterial = 'Mica',
@@ -1193,10 +1196,12 @@ try {
         # These modes continue a shell left on Reader, Game, or Library.
     }
     elseif ($Mode -in @('txt-reader', 'txt-load-paused', 'txt-back-during-load',
-        'txt-load-released', 'html-reader', 'html-runtime-missing', 'pdf-reader', 'html-position')) {
+        'txt-load-released', 'html-reader', 'html-runtime-missing', 'pdf-reader', 'html-position',
+        'progress-timer', 'progress-restored', 'progress-two-guides')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
             elseif ($Mode -eq 'pdf-reader') { 'PDF Reader Game' }
+            elseif ($Mode -like 'progress-*') { 'Progress Game' }
             else { 'Text Reader Game' }
         $missingMessage = "This guide's file is missing from the library."
         $listItem = New-Object System.Windows.Automation.PropertyCondition(
@@ -1455,6 +1460,94 @@ try {
             } while ((Get-Date) -lt $deadline)
             [void](Save-WindowScreenshot "html-top-$step")
             throw "After $step the page's top line was $seen; expected MARK-$('{0:D4}' -f $mark) within one line ($script:topLineNote)."
+        }
+
+        # The page text through TextPattern, as a screen reader reads it;
+        # null while the text box is not shown.
+        function Get-PdfText {
+            $box = Find-ById 'PdfDocumentText'
+            if (-not $box -or $box.Current.IsOffscreen) { return $null }
+            return $box.GetCurrentPattern(
+                [System.Windows.Automation.TextPattern]::Pattern).DocumentRange.GetText(-1)
+        }
+
+        # An empty status line is collapsed.
+        function Get-PdfStatus([string] $id) {
+            $status = Find-ById $id
+            if (-not $status -or $status.Current.IsOffscreen) { return '' }
+            return $status.Current.Name
+        }
+
+        # Waits until the page status, the preview's name and the text all
+        # show one page.
+        function Wait-PdfPage([int] $page, [int] $count, [string] $text, [int] $seconds = 15) {
+            $label = "Page $page of $count"
+            $deadline = (Get-Date).AddSeconds($seconds)
+            do {
+                try {
+                    $status = Find-ById 'PdfPageStatus'
+                    $preview = Find-ById 'PdfPreviewImage'
+                    if ($status -and $preview -and $status.Current.Name -eq $label -and
+                        $preview.Current.Name -eq "$label preview") {
+                        $read = Get-PdfText
+                        if ($read -and $read.Contains($text)) { return $preview }
+                    }
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                    # The view replaced the element mid-read.
+                }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            throw "Expected $label with its preview, and text containing '$text'."
+        }
+
+        function Invoke-NextPages([int] $count) {
+            $next = Find-ByName 'Next page'
+            if (-not $next -or $next.Current.IsOffscreen) {
+                throw "The PDF reader has no visible 'Next page' command."
+            }
+            # No waiting between turns: superseded pages must be dropped.
+            for ($i = 0; $i -lt $count; $i++) { Invoke-Element $next }
+        }
+
+        function Get-PdfScroll {
+            $scroller = Find-ById 'PdfPreviewScroller'
+            if (-not $scroller) { throw 'The PDF preview has no scroller.' }
+            return $scroller.GetCurrentPattern(
+                [System.Windows.Automation.ScrollPattern]::Pattern)
+        }
+
+        # The share of the page above the top of the viewport. The
+        # scroller holds only the page image, so its extent is the page.
+        # A page that can't scroll reads -1 percent at a 100% view: 0.
+        function Get-PdfFraction {
+            $scroll = Get-PdfScroll
+            return $scroll.Current.VerticalScrollPercent / 100 *
+                (1 - $scroll.Current.VerticalViewSize / 100)
+        }
+
+        # Waits for the point to sit within 0.1 of $wanted, or of the
+        # lowest point this window can scroll to if that is higher up,
+        # and to stay there through the debounced re-render.
+        function Wait-PdfFraction([double] $wanted, [string] $context) {
+            $deadline = (Get-Date).AddSeconds(5)
+            $held = $false
+            do {
+                $scroll = Get-PdfScroll
+                $expected = [Math]::Min($wanted, 1 - $scroll.Current.VerticalViewSize / 100)
+                $fraction = Get-PdfFraction
+                if ([Math]::Abs($fraction - $expected) -le 0.1) {
+                    if ($held) { return $fraction }
+                    $held = $true
+                    Start-Sleep -Milliseconds 1000
+                    continue
+                }
+                $held = $false
+                Start-Sleep -Milliseconds 100
+                # A hold always gets its re-read, even past the deadline.
+            } while ($held -or (Get-Date) -lt $deadline)
+            throw ("$context left the page at fraction $([Math]::Round($fraction, 3)); " +
+                "expected $([Math]::Round($expected, 3)) +/- 0.1.")
         }
 
         # The shell's progress override replaces the guide's stored locator.
@@ -1956,94 +2049,6 @@ try {
             [void](Wait-Name 'GameHeading' $textGame)
             [void](Wait-Status 'Game ready.')
 
-            # The page text through TextPattern, as a screen reader reads it;
-            # null while the text box is not shown.
-            function Get-PdfText {
-                $box = Find-ById 'PdfDocumentText'
-                if (-not $box -or $box.Current.IsOffscreen) { return $null }
-                return $box.GetCurrentPattern(
-                    [System.Windows.Automation.TextPattern]::Pattern).DocumentRange.GetText(-1)
-            }
-
-            # An empty status line is collapsed.
-            function Get-PdfStatus([string] $id) {
-                $status = Find-ById $id
-                if (-not $status -or $status.Current.IsOffscreen) { return '' }
-                return $status.Current.Name
-            }
-
-            # Waits until the page status, the preview's name and the text all
-            # show one page.
-            function Wait-PdfPage([int] $page, [int] $count, [string] $text, [int] $seconds = 15) {
-                $label = "Page $page of $count"
-                $deadline = (Get-Date).AddSeconds($seconds)
-                do {
-                    try {
-                        $status = Find-ById 'PdfPageStatus'
-                        $preview = Find-ById 'PdfPreviewImage'
-                        if ($status -and $preview -and $status.Current.Name -eq $label -and
-                            $preview.Current.Name -eq "$label preview") {
-                            $read = Get-PdfText
-                            if ($read -and $read.Contains($text)) { return $preview }
-                        }
-                    }
-                    catch [System.Windows.Automation.ElementNotAvailableException] {
-                        # The view replaced the element mid-read.
-                    }
-                    Start-Sleep -Milliseconds 100
-                } while ((Get-Date) -lt $deadline)
-                throw "Expected $label with its preview, and text containing '$text'."
-            }
-
-            function Invoke-NextPages([int] $count) {
-                $next = Find-ByName 'Next page'
-                if (-not $next -or $next.Current.IsOffscreen) {
-                    throw "The PDF reader has no visible 'Next page' command."
-                }
-                # No waiting between turns: superseded pages must be dropped.
-                for ($i = 0; $i -lt $count; $i++) { Invoke-Element $next }
-            }
-
-            function Get-PdfScroll {
-                $scroller = Find-ById 'PdfPreviewScroller'
-                if (-not $scroller) { throw 'The PDF preview has no scroller.' }
-                return $scroller.GetCurrentPattern(
-                    [System.Windows.Automation.ScrollPattern]::Pattern)
-            }
-
-            # The share of the page above the top of the viewport. The
-            # scroller holds only the page image, so its extent is the page.
-            # A page that can't scroll reads -1 percent at a 100% view: 0.
-            function Get-PdfFraction {
-                $scroll = Get-PdfScroll
-                return $scroll.Current.VerticalScrollPercent / 100 *
-                    (1 - $scroll.Current.VerticalViewSize / 100)
-            }
-
-            # Waits for the point to sit within 0.1 of $wanted, or of the
-            # lowest point this window can scroll to if that is higher up,
-            # and to stay there through the debounced re-render.
-            function Wait-PdfFraction([double] $wanted, [string] $context) {
-                $deadline = (Get-Date).AddSeconds(5)
-                $held = $false
-                do {
-                    $scroll = Get-PdfScroll
-                    $expected = [Math]::Min($wanted, 1 - $scroll.Current.VerticalViewSize / 100)
-                    $fraction = Get-PdfFraction
-                    if ([Math]::Abs($fraction - $expected) -le 0.1) {
-                        if ($held) { return $fraction }
-                        $held = $true
-                        Start-Sleep -Milliseconds 1000
-                        continue
-                    }
-                    $held = $false
-                    Start-Sleep -Milliseconds 100
-                    # A hold always gets its re-read, even past the deadline.
-                } while ($held -or (Get-Date) -lt $deadline)
-                throw ("$context left the page at fraction $([Math]::Round($fraction, 3)); " +
-                    "expected $([Math]::Round($expected, 3)) +/- 0.1.")
-            }
-
             # Tagged text is readable through UI Automation beside its preview.
             Open-TextGuide 'Tagged PDF Guide'
             [void](Wait-Status 'Guide ready.')
@@ -2169,6 +2174,159 @@ try {
             Assert-Absent 'ReaderLoadError'
             $report.phases += 'pdf-txt'
             Back-ToTextGame
+        }
+        elseif ($Mode -like 'progress-*') {
+            $saveFailed = "Couldn't save your place in this guide."
+
+            function Read-ProgressCounts {
+                $path = Join-Path $AppCacheRoot "diagnostics\progress-$ProcessId.json"
+                $deadline = (Get-Date).AddSeconds(2)
+                do {
+                    try {
+                        if (Test-Path -LiteralPath $path) {
+                            return Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+                        }
+                    }
+                    catch {
+                        # Read during the atomic replace; try again.
+                    }
+                    Start-Sleep -Milliseconds 100
+                } while ((Get-Date) -lt $deadline)
+                return [pscustomobject] @{ saves = 0; skippedUnchanged = 0; failures = 0 }
+            }
+
+            function Assert-NoSaveFailure([string] $step) {
+                $counts = Read-ProgressCounts
+                if ($counts.failures -ne 0) { throw "$step had $($counts.failures) failed saves." }
+                # The status probe holds the latest message as 'sequence|message'.
+                $probe = Find-RawById 'ShellContent'
+                if ($probe -and $probe.Current.ItemStatus -like "*|$saveFailed") {
+                    throw "$step showed '$saveFailed'."
+                }
+            }
+
+            function Open-NumberedAt([int] $line, [string] $step) {
+                Open-TextGuide 'Numbered Lines Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Wait-FirstTextRow
+                Wait-TopLine $line $step
+            }
+
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            Resize-ShellWindow 1500 720
+            Select-Element $textGame
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+
+            if ($Mode -eq 'progress-timer') {
+                # progress-timer: the quiet timer saves within 5 s with no
+                # flush; the runner then kills the process.
+                Open-NumberedAt 1 'A first open'
+                $top = 1
+                for ($i = 0; $i -lt 3; $i++) {
+                    Invoke-ReaderCommand 'Next page'
+                    $top = Wait-TopLineChange $top 'Next page'
+                }
+                $report.progressTopLine = $top
+                Start-Sleep -Seconds 5
+                $counts = Read-ProgressCounts
+                if ($counts.saves -lt 1) { throw "No save within 5 s of the last movement." }
+                Assert-NoSaveFailure 'progress-timer'
+                $report.progressTimerCounts = $counts
+                $report.phases += 'progress-timer'
+            }
+            elseif ($Mode -eq 'progress-restored') {
+                Open-NumberedAt $ExpectedTopLine 'Reopening after the process was killed'
+                Back-ToTextGame
+
+                # progress-flush: Back saves a PDF place at once.
+                Open-TextGuide 'Long PDF Guide'
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-PdfPage 1 200 'page 1 of 200')
+                Invoke-NextPages 120
+                [void](Wait-PdfPage 121 200 'page 121 of 200' 60)
+                $scroll = Get-PdfScroll
+                $room = 1 - $scroll.Current.VerticalViewSize / 100
+                if (-not $scroll.Current.VerticallyScrollable -or $room -lt 0.3) {
+                    throw "Page 121 scrolls only $([Math]::Round($room, 3)) of its height; progress-flush needs 0.3."
+                }
+                $scroll.SetScrollPercent(
+                    [System.Windows.Automation.ScrollPattern]::NoScroll, 0.3 / $room * 100)
+                Back-ToTextGame
+                Open-TextGuide 'Long PDF Guide'
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-PdfPage 121 200 'page 121 of 200')
+                $report.progressPdfFraction = Wait-PdfFraction 0.3 'Reopening after Back'
+                Back-ToTextGame
+                $report.phases += 'progress-flush'
+
+                # progress-burst: 30 page turns write at most once per 4 s
+                # deadline plus the final quiet save.
+                Open-NumberedAt $ExpectedTopLine 'Reopening for the burst'
+                Start-Sleep -Seconds 2
+                $before = Read-ProgressCounts
+                $watch = [System.Diagnostics.Stopwatch]::StartNew()
+                foreach ($command in @(@('Next page') * 20 + @('Previous page') * 10)) {
+                    Invoke-ReaderCommand $command
+                    Start-Sleep -Milliseconds 100
+                }
+                $elapsed = $watch.Elapsed.TotalSeconds
+                Start-Sleep -Seconds 6
+                if ($elapsed -ge 8) {
+                    throw "The burst took $([Math]::Round($elapsed, 1)) s; the bound assumes under 8 s."
+                }
+                $after = Read-ProgressCounts
+                $saves = $after.saves - $before.saves
+                $allowed = [Math]::Floor($elapsed / 4) + 1
+                if ($saves -lt 1 -or $saves -gt $allowed) {
+                    throw "The burst made $saves saves in $([Math]::Round($elapsed, 1)) s; expected 1 to $allowed."
+                }
+                Assert-NoSaveFailure 'progress-burst'
+                $report.progressBurst = [ordered]@{ seconds = $elapsed; saves = $saves; allowed = $allowed }
+                $report.progressTopLine = Get-TopLine
+                Back-ToTextGame
+                $report.phases += 'progress-burst'
+
+                # The HTML guide moves last and stays open: closing the window saves it.
+                Open-TextGuide 'Long Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-PageName 'Long Web Guide')
+                Click-Element (Wait-PageVisible 'Jump to MARK-0420')
+                [void](Wait-TopMark 420 'the fragment link')
+                $report.phases += 'progress-restored'
+            }
+            else {
+                # progress-two-guides: after a normal close both guides
+                # reopen at their own places.
+                Open-NumberedAt $ExpectedTopLine 'Reopening the TXT guide after a restart'
+                Back-ToTextGame
+                Open-TextGuide 'Long Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-PageName 'Long Web Guide')
+                [void](Wait-TopMark 420 'Reopening the HTML guide after a restart')
+                Back-ToTextGame
+                $report.phases += 'progress-two-guides'
+
+                # progress-unavailable: a lost place opens at the start, says
+                # so, and leaves the stored place for the next open.
+                Set-RestoreLocator '{'
+                try {
+                    Open-TextGuide 'Numbered Lines Guide'
+                    [void](Wait-Status "Couldn't return to your last place, so the guide opened at the start.")
+                    Wait-FirstTextRow
+                    Wait-TopLine 1 'An unreadable saved place'
+                    $report.progressUnavailableTxtScreenshot = Save-WindowScreenshot 'progress-unavailable-txt'
+                }
+                finally {
+                    Clear-RestoreLocator
+                }
+                Back-ToTextGame
+                Open-NumberedAt $ExpectedTopLine 'Reopening after an unreadable place'
+                Back-ToTextGame
+                Assert-NoSaveFailure 'progress-two-guides'
+                $report.phases += 'progress-unavailable'
+            }
         }
         else {
             # The view re-measures at a larger test font size on this signal.

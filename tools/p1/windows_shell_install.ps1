@@ -16,6 +16,7 @@ param(
     [switch] $TxtOnly,
     [switch] $HtmlOnly,
     [switch] $PdfOnly,
+    [switch] $ProgressOnly,
     [switch] $ImportOnly,
     [switch] $GameActionsOnly,
     [switch] $ProviderOnly,
@@ -40,6 +41,7 @@ $scenarioGroups = [ordered]@{
     'txt' = $TxtOnly.IsPresent
     'html' = $HtmlOnly.IsPresent
     'pdf' = $PdfOnly.IsPresent
+    'progress' = $ProgressOnly.IsPresent
     'import' = $ImportOnly.IsPresent
     'game-actions' = $GameActionsOnly.IsPresent
     'provider' = $ProviderOnly.IsPresent
@@ -690,6 +692,7 @@ function Run-ShellSmoke(
     [string] $SteamGridDbCredentialFile = '',
     [string] $ExpectedProviderFailure = '',
     [string] $ExpectedGuideTitle = '',
+    [int] $ExpectedTopLine = 0,
     [string] $AppDataRoot = '',
     [string] $AppCacheRoot = '') {
     $resultPath = Join-Path $ResultDirectory "$ResultName.json"
@@ -705,7 +708,8 @@ function Run-ShellSmoke(
         ' -ExecutablePath "' + $expectedExecutablePath + '"' +
         ' -ExpectedResumeGuide "' + $expectedResumeGuide + '"' +
         ' -ExitDelayMilliseconds ' + $ExitDelayMilliseconds +
-        ' -ExpectedScalePercent ' + $ExpectedScalePercent
+        ' -ExpectedScalePercent ' + $ExpectedScalePercent +
+        ' -ExpectedTopLine ' + $ExpectedTopLine
     if ($ExpectedMaterial) {
         $arguments += ' -ExpectedMaterial ' + $ExpectedMaterial
     }
@@ -735,7 +739,7 @@ function Run-ShellSmoke(
     Register-ScheduledTask -TaskName $smokeTask -Action $action `
         -Principal $principal -Force | Out-Null
     Start-ScheduledTask -TaskName $smokeTask
-    $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*') { 240 }
+    $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*') { 240 }
         elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*') { 120 }
         else { 60 }
     $deadline = (Get-Date).AddSeconds($timeoutSeconds)
@@ -1357,6 +1361,60 @@ function Run-PdfReaderScenarios {
     }
 }
 
+function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $Kill) {
+    Start-InstalledShell
+    $processId = $report.launchedProcessId
+    $gates = @(
+        foreach ($name in @('ProgressDiagnostics', 'ProgressOverride')) {
+            [System.Threading.EventWaitHandle]::new(
+                $false, [System.Threading.EventResetMode]::ManualReset,
+                "Local\DesktopGuides.Preview.$name.$processId")
+        })
+    try {
+        $result = Run-ShellSmoke $mode -ExpectedTopLine $expectedTopLine `
+            -AppDataRoot $dataRoot -AppCacheRoot (Get-HtmlCacheRoot)
+        if ($Kill) {
+            # No flush: only a save the timer already made survives.
+            Stop-Process -Id $processId -Force
+            Wait-InstalledShellExit $processId
+        }
+        else {
+            Close-InstalledShell
+        }
+        return $result
+    }
+    finally {
+        foreach ($gate in $gates) { $gate.Dispose() }
+    }
+}
+
+function Run-ProgressScenarios {
+    # TR12.1-TR12.2: the quiet and deadline saves survive a killed process,
+    # Back and closing save at once, a burst writes a bounded number of times,
+    # and two guides keep their own places across restarts.
+    $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
+    if (-not (Test-Path -LiteralPath (Join-Path $fixtureRoot 'p0\generated\pdf-long.pdf'))) {
+        throw 'pdf-long.pdf is missing; run tools/p0/make_fixtures.py first.'
+    }
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    $ids = Invoke-ShellSeed @('seed-progress', $dataRoot, $fixtureRoot) | ConvertFrom-Json
+    $diagnostics = Join-Path (Get-HtmlCacheRoot) 'diagnostics'
+    Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Join-Path $dataRoot 'test') -Recurse -Force -ErrorAction SilentlyContinue
+    $report.progress = [ordered]@{ ids = $ids }
+    try {
+        $timer = Invoke-ProgressPass 'progress-timer' 0 -Kill
+        $report.progress.timer = $timer
+        $restored = Invoke-ProgressPass 'progress-restored' $timer.progressTopLine
+        $report.progress.restored = $restored
+        $report.progress.twoGuides = Invoke-ProgressPass 'progress-two-guides' $restored.progressTopLine
+    }
+    finally {
+        Remove-Item -LiteralPath (Join-Path $dataRoot 'test') -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Run-ImportScenarios {
     Invoke-ShellSeed @('seed-import', $dataRoot) | Out-Null
     $originalTheme = Get-AppThemePreference
@@ -1927,6 +1985,8 @@ try {
     }
 
     if (Enter-ScenarioGroup 'pdf') { Run-PdfReaderScenarios }
+
+    if (Enter-ScenarioGroup 'progress') { Run-ProgressScenarios }
 
     if (Enter-ScenarioGroup 'import') {
         Run-ImportScenarios
