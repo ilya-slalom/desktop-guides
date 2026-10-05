@@ -1,38 +1,71 @@
 # P1 implementation results
 
-Status: M0 merged into `main` through
-[PR #3](https://github.com/ilya-slalom/desktop-guides/pull/3) on
-26 September 2026, including the SQLite initialization review fix.
-The P1 first usable release remains in progress. The
-[dependency plan](implementation-plan.md) defines all 53 task exit gates;
-this file records checks actually run.
+Status: P1 work is merged into `main` through
+[PR #42](https://github.com/ilya-slalom/desktop-guides/pull/42) (T13.2, merge
+commit `0807d5a`) on 5 October 2026. The [merged PR summary](#merged-pr-summary)
+lists every PR since M0 with its CI run and test counts. The P1 first usable
+release remains in progress: the [dependency plan](implementation-plan.md)
+defines all task exit gates, and this file records only checks actually run.
 
-The M2 T07.1 scanner verification is recorded in the
-[static-asset result](t07-static-assets-results.md).
-T07.1 was merged into `main` through PR #9 on 27 September 2026 at
-`7039aef8127f4fcf45f1547344b4e88dad849b59`. Its last Windows 11 x64
-run passed 74/74 Infrastructure tests and an unsigned Release x64 MSIX
-build; all 18 CI checks passed.
-The T07.2 Windows implementation check is recorded in the
-[static-boundary result](t07-static-boundary-results.md).
-T07.2 was merged into `main` through PR #10 on 27 September 2026 at
-`72f43785fad2b01b3f79b739017f0623d46b6665`. Its final Windows 11 x64
-run passed 89/89 Infrastructure tests and an unsigned Release x64 MSIX build;
-all 18 CI checks passed. T04.1's Windows x64 checks passed and PR #11 merged
-on 28 September 2026 at
-`e18964f1d253746a3e6cdc0d51c659a71a531bc3`.
+M0 merged through [PR #3](https://github.com/ilya-slalom/desktop-guides/pull/3)
+on 26 September 2026, including the SQLite initialization review fix.
+T07.1 merged through PR #9 on 27 September 2026 at
+`7039aef8127f4fcf45f1547344b4e88dad849b59`; see the
+[static-asset result](t07-static-assets-results.md). T07.2 merged through
+PR #10 the same day at `72f43785fad2b01b3f79b739017f0623d46b6665`; see the
+[static-boundary result](t07-static-boundary-results.md). T04.1 merged through
+PR #11 on 28 September 2026 at `e18964f1d253746a3e6cdc0d51c659a71a531bc3`.
 
-On 28 September 2026, requirements review added T04.4 for provider-backed,
-search-first game addition with a cached offline metadata/artwork snapshot and
-T04.1 as the manual fallback. T11.4 now precedes T04.4; T04.4 precedes T05.4,
-which supplies shared catalog/workflow components to T04.2, T05.1, and T06.1.
-No provider has been selected and no T04.4 implementation result is claimed.
+On 28 September 2026, requirements review added T04.4 (provider-backed,
+search-first game addition with a cached offline snapshot, and T04.1 as the
+manual fallback) and UI planning added T11.4, T05.4, and T14.4. T11.4 merged
+in PR #13 and T04.4, using IGDB and SteamGridDB, in PR #14; T05.4 merged in
+PR #16. T14.4 isn't implemented yet.
 
-On 28 September 2026, UI planning added T11.4, T05.4, and T14.4. T11.4
-establishes the shared design language before T04.4. Gallery-informed
-components are then adopted with provider addition, catalog/import, and
-Reader/Settings work instead of being deferred to a final visual pass. No
-implementation result is claimed for these tasks.
+## Merged PR summary
+
+One row per PR merged into `main` after M0, through PR #42. The *Record* column
+links the task's own verification section, which has the full evidence.
+
+- *Final CI run* is the run the PR cites as decisive. Where no CI run is
+  cited, it says *Host only* or *—*. Every cited run passed every job it ran
+  unless the caveat says otherwise.
+- *Core* and *Infra* are the Core.Tests and Infrastructure.Tests pass counts.
+  *(host)* marks counts from a unit-test run on `pcsx2-win`, not CI. *—* means
+  the PR states no count.
+- PRs record `shell-scope` only from #38 onward, when the input was added.
+- Tasks for #33 (a T08.3 harness follow-up) and #37 are inferred from the PR
+  titles. #15, #21 and #38 aren't task PRs.
+
+| PR | Merged | Commit | Task | Final CI run | Core | Infra | Record | Caveats |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [#13](https://github.com/ilya-slalom/desktop-guides/pull/13) | 2026-09-29 | `23e0694` | T11.4 | Host only | 73 | 98 | [t11-design-language-plan](t11-design-language-plan.md#verification-record) | Signed interactive install on `pcsx2-win`, no CI run cited. High contrast and 200% scaling deferred to T16.2. |
+| [#14](https://github.com/ilya-slalom/desktop-guides/pull/14) | 2026-09-29 | `3e490de` | T04.4 | Host only | 150 | 221 | [below](#m2-t044-provider-search--implementation-check-29-september-2026) | Installed provider pass and blocked-network run on `pcsx2-win`. The offline run used a package from before the thumbnail fix. |
+| [#15](https://github.com/ilya-slalom/desktop-guides/pull/15) | 2026-09-29 | `a4bb44c` | Portable build | Host only | 150 | 233 | — | Portable scenario suite on `pcsx2-win`. The signed-MSIX harness path wasn't run end to end. |
+| [#16](https://github.com/ilya-slalom/desktop-guides/pull/16) | 2026-09-29 | `515440a` | T05.4 | [36577997048](https://github.com/ilya-slalom/desktop-guides/actions/runs/36577997048) | 165 | 233 | [t05-4-catalog-components-design](t05-4-catalog-components-design.md#t054-verification-record) | Counts come from the earlier run [36572000282](https://github.com/ilya-slalom/desktop-guides/actions/runs/36572000282); the later commit was docs-only. |
+| [#17](https://github.com/ilya-slalom/desktop-guides/pull/17) | 2026-09-30 | `f359ca7` | T06.1, T06.2 | [36658419215](https://github.com/ilya-slalom/desktop-guides/actions/runs/36658419215) | 198 | 294 | [t06-1-import-preview-design](t06-1-import-preview-design.md#t061--t062-verification-record) | Every job passed, including x64 and ARM64 packages. |
+| [#19](https://github.com/ilya-slalom/desktop-guides/pull/19) | 2026-09-30 | `494cb02` | T06.3 | [36669062806](https://github.com/ilya-slalom/desktop-guides/actions/runs/36669062806) | 198 | 333 | [t06-3-import-publication-design](t06-3-import-publication-design.md#t063-verification-record) | Push run. The pull-request run [36669095974](https://github.com/ilya-slalom/desktop-guides/actions/runs/36669095974) failed `native-arm64-ui` on the known P0 `pdf-short` probe. |
+| [#20](https://github.com/ilya-slalom/desktop-guides/pull/20) | 2026-09-30 | `81e9eb7` | T06.4 | [36675695341](https://github.com/ilya-slalom/desktop-guides/actions/runs/36675695341) | 198 | 349 | [t06-4-duplicate-import-design](t06-4-duplicate-import-design.md#t064-verification-record) | — |
+| [#21](https://github.com/ilya-slalom/desktop-guides/pull/21) | 2026-09-30 | `b54d28d` | CI | — | — | — | — | CI-only change. Checked only by the absence of a push run for the branch. |
+| [#22](https://github.com/ilya-slalom/desktop-guides/pull/22) | 2026-09-30 | `1d36a26` | T15.3 | [36689994514](https://github.com/ilya-slalom/desktop-guides/actions/runs/36689994514) | 210 (host) | 383 (host) | [t15-3-guide-deletion-design](t15-3-guide-deletion-design.md#t153-verification-record) | Earlier run [36688055406](https://github.com/ilya-slalom/desktop-guides/actions/runs/36688055406) failed `native-arm64-ui` on the known P0 flake. |
+| [#23](https://github.com/ilya-slalom/desktop-guides/pull/23) | 2026-09-30 | `d94df92` | T05.1 | [36705946660](https://github.com/ilya-slalom/desktop-guides/actions/runs/36705946660) | 235 (host) | 395 (host) | [t05-1-guide-rows-design](t05-1-guide-rows-design.md#t051-verification-record) | — |
+| [#24](https://github.com/ilya-slalom/desktop-guides/pull/24) | 2026-09-30 | `b774fd4` | T05.2 | [36726600007](https://github.com/ilya-slalom/desktop-guides/actions/runs/36726600007) | — | — | [t05-2-library-search-design](t05-2-library-search-design.md#t052-verification-record) | All nine jobs passed. The later [36730472882](https://github.com/ilya-slalom/desktop-guides/actions/runs/36730472882) passed `production-shell-ui` but failed `native-arm64-ui` on P0 `pdf-short`. |
+| [#25](https://github.com/ilya-slalom/desktop-guides/pull/25) | 2026-10-01 | `739212e` | T04.2 | [36827722176](https://github.com/ilya-slalom/desktop-guides/actions/runs/36827722176) | 276 (host) | 407 (host) | [t04-2-game-actions-design](t04-2-game-actions-design.md#t042-verification-record) | Live IGDB and SteamGridDB checks aren't run in CI. |
+| [#26](https://github.com/ilya-slalom/desktop-guides/pull/26) | 2026-10-01 | `d7a4e77` | T04.3 | [36841135926](https://github.com/ilya-slalom/desktop-guides/actions/runs/36841135926) | 280 (host) | 429 (host) | [t04-3-game-removal-design](t04-3-game-removal-design.md#t043-verification-record) | The re-prompt, failed restore, and pending cleanup aren't in the installed smoke. |
+| [#27](https://github.com/ilya-slalom/desktop-guides/pull/27) | 2026-10-01 | `8dd9cd5` | T05.3 | [36857845252](https://github.com/ilya-slalom/desktop-guides/actions/runs/36857845252) | 301 (host) | 429 (host) | [t05-3-stable-navigation-design](t05-3-stable-navigation-design.md#t053-verification-record) | No smoke phase covers a stale metadata refresh. |
+| [#28](https://github.com/ilya-slalom/desktop-guides/pull/28) | 2026-10-01 | `da1e975` | T08.1 | — | 323 (host) | 438 (host) | [t08-1-txt-decoding-design](t08-1-txt-decoding-design.md#t081-verification-record) | No CI run cited at merge, and no installed smoke. |
+| [#30](https://github.com/ilya-slalom/desktop-guides/pull/30) | 2026-10-02 | `1294e4b` | T08.2 | [36946245355](https://github.com/ilya-slalom/desktop-guides/actions/runs/36946245355) | 371 | 438 | [t08-2-txt-view-design](t08-2-txt-view-design.md#t082-verification-record) | Earlier run [36885091223](https://github.com/ilya-slalom/desktop-guides/actions/runs/36885091223) failed: the smoke window showed too few guides. |
+| [#31](https://github.com/ilya-slalom/desktop-guides/pull/31) | 2026-10-02 | `3157a19` | T08.3 | [36967638178](https://github.com/ilya-slalom/desktop-guides/actions/runs/36967638178) | 397 | — | [t08-3-txt-position-design](t08-3-txt-position-design.md#t083-verification-record) | `native-arm64-ui` passed on a re-run after a transient P0 PDF probe failure. |
+| [#33](https://github.com/ilya-slalom/desktop-guides/pull/33) | 2026-10-02 | `e447597` | T08.3 follow-up | [36978593823](https://github.com/ilya-slalom/desktop-guides/actions/runs/36978593823) | — | — | [t08-3-txt-position-design](t08-3-txt-position-design.md#t083-verification-record) | Test harness only. The `txt-resize` flake fix held across 4 of 4 re-runs. |
+| [#34](https://github.com/ilya-slalom/desktop-guides/pull/34) | 2026-10-03 | `3339fc7` | T07.3 | [37084631667](https://github.com/ilya-slalom/desktop-guides/actions/runs/37084631667) | 488 | 469 | [t07-3-webview2-policy-design](t07-3-webview2-policy-design.md#verification) | Counts come from [37081967040](https://github.com/ilya-slalom/desktop-guides/actions/runs/37081967040). Run [37083514707](https://github.com/ilya-slalom/desktop-guides/actions/runs/37083514707) failed on a harness race. |
+| [#35](https://github.com/ilya-slalom/desktop-guides/pull/35) | 2026-10-03 | `9f2ad26` | T09.1 | [37125967628](https://github.com/ilya-slalom/desktop-guides/actions/runs/37125967628) | — | — | [t09-1-html-adapter-design](t09-1-html-adapter-design.md#verification) | Earlier run [37123660786](https://github.com/ilya-slalom/desktop-guides/actions/runs/37123660786) timed out; the cause is unknown. |
+| [#36](https://github.com/ilya-slalom/desktop-guides/pull/36) | 2026-10-04 | `e2b9b8c` | T10.1 | [37169058467](https://github.com/ilya-slalom/desktop-guides/actions/runs/37169058467) | — | — | [t10-1-pdf-adapter-design](t10-1-pdf-adapter-design.md#verification) | PDF smoke runs on x64 only; ARM64 PDF is untested. |
+| [#37](https://github.com/ilya-slalom/desktop-guides/pull/37) | 2026-10-04 | `541c245` | T10.3 | [37179558877](https://github.com/ilya-slalom/desktop-guides/actions/runs/37179558877) | 611 | 514 | [t10-3-pdf-locator-design](t10-3-pdf-locator-design.md#verification) | Counts come from the earlier run [37178208319](https://github.com/ilya-slalom/desktop-guides/actions/runs/37178208319). |
+| [#38](https://github.com/ilya-slalom/desktop-guides/pull/38) | 2026-10-04 | `b4e31ae` | CI | [37202551075](https://github.com/ilya-slalom/desktop-guides/actions/runs/37202551075) | — | — | — | Adds the `shell-scope` and `dev-fast` dispatch inputs. [37202214399](https://github.com/ilya-slalom/desktop-guides/actions/runs/37202214399) checked `shell-scope=html` with `dev-fast`. |
+| [#39](https://github.com/ilya-slalom/desktop-guides/pull/39) | 2026-10-04 | `dee44e4` | T09.3 | [37209771443](https://github.com/ilya-slalom/desktop-guides/actions/runs/37209771443) | — | — | [t09-3-html-locator-design](t09-3-html-locator-design.md#verification) | `shell-scope=all` on the merge with `main`. [37206866197](https://github.com/ilya-slalom/desktop-guides/actions/runs/37206866197) passed before that merge. |
+| [#40](https://github.com/ilya-slalom/desktop-guides/pull/40) | 2026-10-05 | `17bdf48` | T12.2 | [37256476218](https://github.com/ilya-slalom/desktop-guides/actions/runs/37256476218) | 702 | 515 | [t12-2-progress-coordinator-design](t12-2-progress-coordinator-design.md#verification) | The installed shell job passed on its second attempt after an `html-position-dark` miss. |
+| [#41](https://github.com/ilya-slalom/desktop-guides/pull/41) | 2026-10-05 | `a36b058` | T12.3 | [37274977026](https://github.com/ilya-slalom/desktop-guides/actions/runs/37274977026) | 723 | 520 | [t12-3-progress-estimates-design](t12-3-progress-estimates-design.md#verification) | `shell-scope=all`. `native-arm64-ui` passed on its second attempt after a P0 `pdf-short` timeout. |
+| [#42](https://github.com/ilya-slalom/desktop-guides/pull/42) | 2026-10-05 | `0807d5a` | T13.2 | [37286991639](https://github.com/ilya-slalom/desktop-guides/actions/runs/37286991639) | 728 | 528 | [t13-2-completion-service-design](t13-2-completion-service-design.md#verification) | `shell-scope=core`, full matrix. |
 
 ## M2 T04.1 game editor — implementation check, 27 September 2026
 
