@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Pdf;
 using DesktopGuides.Infrastructure.Reading;
@@ -203,5 +204,49 @@ public sealed class ManagedPdfGuideLoaderTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             new ManagedPdfGuideLoader(harness.Paths).LoadAsync(guide, new CancellationToken(canceled: true)));
+    }
+
+    [Fact]
+    public async Task LoadedHashIsTheManagedCopysSha256()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        (Guide guide, _) = await PublishAsync(harness);
+
+        PdfGuideLoaded loaded = Assert.IsType<PdfGuideLoaded>(await LoadAsync(harness, guide));
+        using PdfPageTextSource text = loaded.Text;
+
+        string expected = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(ManagedFile(harness, guide))));
+        Assert.Equal(expected, loaded.ContentSha256);
+        Assert.Equal(guide.ContentSha256, loaded.ContentSha256, ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task BytesAppendedPastEofChangeTheHashButStillLoad()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        (Guide guide, _) = await PublishAsync(harness);
+        string managed = ManagedFile(harness, guide);
+        File.SetAttributes(managed, FileAttributes.Normal);
+        File.AppendAllText(managed, "\n% changed\n");
+
+        PdfGuideLoaded loaded = Assert.IsType<PdfGuideLoaded>(await LoadAsync(harness, guide));
+        using PdfPageTextSource text = loaded.Text;
+
+        Assert.NotEqual(guide.ContentSha256, loaded.ContentSha256, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(1, text.PageCount);
+    }
+
+    [Fact]
+    public async Task HashReadFailureIsUnreadable()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        (Guide guide, _) = await PublishAsync(harness);
+        string managed = ManagedFile(harness, guide);
+        using FileStream locker = new(managed, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        // A byte-range lock past the header makes the hash's read fail with an
+        // IOException after the header check has passed.
+        locker.Lock(locker.Length - 1, 1);
+
+        Assert.Equal(PdfGuideLoadError.Unreadable, await FailedAsync(harness, guide));
     }
 }

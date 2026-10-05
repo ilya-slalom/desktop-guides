@@ -269,4 +269,26 @@ public sealed class TextLocatorTests
         Assert.Equal(new TextRestore(10, new RestoreOutcome(RestoreKind.Context)), restore);
         Assert.True(clock.ElapsedMilliseconds < 50, $"Restore took {clock.ElapsedMilliseconds} ms.");
     }
+
+    [Fact]
+    public void ChangedGuideWithoutItsContextRestoresNearTheStoredEstimate()
+    {
+        static string Lines(string word) => string.Concat(
+            Enumerable.Range(1, 400).Select(i => $"Line {i:0000} | {word} guide text.\n"));
+        TextGuideDocument numbered = Doc(Lines("Numbered"));
+        TextGuideDocument edited = Doc(Lines("Edited"));
+        ReaderLocation captured = TextLocator.Capture(numbered, 150);
+        string json = ReaderLocationCodec.Serialize(captured with
+        {
+            EstimatedFraction = ProgressEstimate.Bound(captured.EstimatedFraction),
+        });
+
+        LocationDecodeResult decoded = ReaderLocationCodec.Deserialize(
+            json, GuideFormat.Txt, edited.ContentSha256);
+        Assert.Equal(LocationDecodeStatus.ContentChanged, decoded.Status);
+        TextRestore restore = TextLocator.Restore(edited, decoded.Location!);
+
+        Assert.Equal(new TextRestore(150,
+            new RestoreOutcome(RestoreKind.Approximate, TextLocator.ApproximateReason)), restore);
+    }
 }
