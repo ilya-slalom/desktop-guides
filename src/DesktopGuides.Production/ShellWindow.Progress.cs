@@ -48,6 +48,7 @@ public sealed partial class ShellWindow
                     saves = counts.Saves,
                     skippedUnchanged = counts.SkippedUnchanged,
                     failures = counts.Failures,
+                    opens = counts.Opens,
                 }));
                 File.Move(temp, path, true);
             }

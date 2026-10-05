@@ -462,6 +462,24 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         }, token);
     }
 
+    public Task RecordGuideOpenedAsync(
+        Guid guideId, DateTimeOffset openedUtc, CancellationToken token = default)
+    {
+        long openedMs = openedUtc.ToUnixTimeMilliseconds();
+        if (openedMs < 0) throw new ArgumentOutOfRangeException(nameof(openedUtc));
+        return WriteAsync(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                UPDATE ReadingStates SET LastOpenedUtcMs = $opened WHERE GuideId = $id
+                """;
+            command.Parameters.AddWithValue("$id", guideId.ToString("N"));
+            command.Parameters.AddWithValue("$opened", openedMs);
+            if (command.ExecuteNonQuery() != 1) throw new ReadingStateMissingException(guideId);
+        }, token);
+    }
+
     public Task<ReaderPreferences?> GetReaderPreferencesAsync(
         Guid guideId, CancellationToken token = default) =>
         ReadAsync<ReaderPreferences?>(() =>
