@@ -1905,13 +1905,15 @@ try {
             # position-unimported-link: a link to a page that wasn't imported
             # shows the unavailable bar, and the point stays where it was.
             $unavailable = "This link goes to a page that isn't part of the imported guide."
+            Clear-HtmlPosition
             Open-TextGuide 'Long Web Guide'
             $report.sessionsOpened++
             [void](Wait-Status 'Guide ready.')
+            [void](Wait-HtmlPosition { param($p) $p.kind -eq 'Exact' } 'the saved place')
+            $report.restoreKinds += 'Exact'
             [void](Wait-PageName 'Long Web Guide')
-            Click-Element (Wait-PageVisible 'Jump to MARK-0420')
             $here = Wait-HtmlPosition { param($p) $p.quote -like 'MARK-0420 *' } 'the MARK-0420 line'
-            [void](Wait-TopMark 420 'the fragment link')
+            [void](Wait-TopMark 420 'the saved place')
             Click-Element (Wait-PageVisible 'Part 2 of this guide')
             $report.unimportedClicks++
             [void](Wait-VisibleById 'ReaderUnavailableLinkBar')
@@ -1940,6 +1942,8 @@ try {
             Open-TextGuide 'Long Web Guide'
             $report.sessionsOpened++
             [void](Wait-Status 'Guide ready.')
+            [void](Wait-HtmlPosition { param($p) $p.kind -eq 'Exact' } 'the saved place')
+            $report.restoreKinds += 'Exact'
             [void](Wait-PageName 'Long Web Guide')
             Wait-HiddenById 'ReaderUnavailableLinkBar'
             Back-ToTextGame
@@ -2384,19 +2388,19 @@ try {
             $report.txtPosition.widthRatio = $widthRatio
             $report.phases += 'txt-remeasure'
 
-            # txt-switch: a new guide starts at its first line with normal rows.
+            # txt-switch: a reopened guide returns to its saved line with normal rows.
             Back-ToTextGame
             Open-TextGuide 'Numbered Lines Guide'
             [void](Wait-Status 'Guide ready.')
             Wait-StatusClosed
             Wait-FirstTextRow
-            Wait-TopLine 1 'Reopening the Numbered guide'
+            Wait-TopLine $anchor 'Reopening the Numbered guide'
             $switchRatio = (Get-TopRowHeight) / $heightBefore
             if ([Math]::Abs($switchRatio - 1) -gt 0.1) {
                 throw "A new TXT session kept the test text size (rows $([Math]::Round($switchRatio, 2))x)."
             }
             Invoke-ReaderCommand 'Next page'
-            Wait-TopLine (1 + $pageStep) 'Next page after switching guides'
+            Wait-TopLine ($anchor + $pageStep) 'Next page after switching guides'
             $report.phases += 'txt-switch'
 
             # txt-horizontal: paging, Go to start and resizing keep the sideways scroll.
