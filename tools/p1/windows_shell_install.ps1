@@ -1502,7 +1502,7 @@ function Run-CompletionScenarios {
     $report.completion = [ordered]@{ ids = $ids }
     $lockDir = Join-Path $env:TEMP "dg-completion-lock-$PID"
     try {
-        # The Segmented gate runs first: a failure here means the RadioButtons fallback.
+        # The UIA gate runs first: names, RadioButton items and their selected state.
         $report.completion.segmented = Invoke-ProgressPass 'completion-segmented' 0
 
         $report.completion.lastPage = Invoke-ProgressPass 'completion-last-page' 0

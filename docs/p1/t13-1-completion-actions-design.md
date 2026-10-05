@@ -292,9 +292,10 @@ In the implementing branch:
     `Completed`; `completedUtcMs` stays null and the choice shows
     `In progress`.
   - `completion-game` (light, dark): from the keyboard the row reads
-    `Completed`, the announcement shows and `completedUtcMs` is set, with
-    the locator, estimate and open time unchanged; Left restores the
-    captured row text and clears `completedUtcMs`.
+    `Completed` and the announcement shows; Left restores the exact row
+    text captured before (its estimate and open time), and after both
+    themes `completedUtcMs` is null. The locator isn't compared here;
+    T13.2's repository tests cover it.
   - `completion-reader` (light, dark): Long Web Guide is marked complete in
     the Reader header, and Back shows `Completed` on its row.
   - `completion-restart`, `completion-restart-after`: after a relaunch the
