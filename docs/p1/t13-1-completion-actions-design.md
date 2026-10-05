@@ -83,7 +83,7 @@ UserControl around Toolkit `Segmented`. It has two `SegmentedItem`s with
 AutomationIds `CompletionInProgress` and `CompletionComplete`.
 
 ```csharp
-internal sealed partial class GuideCompletionChoice : UserControl
+public sealed partial class GuideCompletionChoice : UserControl
 {
     // Shows the committed state without raising CompletionRequested.
     public void Show(Guid guideId, string title, bool complete);
@@ -92,7 +92,8 @@ internal sealed partial class GuideCompletionChoice : UserControl
     public event EventHandler<GuideCompletionRequest>? CompletionRequested;
 }
 
-internal sealed record GuideCompletionRequest(Guid GuideId, bool Complete);
+// The title travels with the request for the announcement and error text.
+public sealed record GuideCompletionRequest(Guid GuideId, string Title, bool Complete);
 ```
 
 - Tab moves focus into the choice, and the arrow keys move between items.
@@ -132,16 +133,20 @@ For a `CompletionRequested(guideId, complete)` from either surface:
 1. If a close has begun or a completion write is already running, show the
    last committed state again and stop.
 2. Set `completionRequested` and call `SetBusy(true)` on both choices.
-   `Segmented` has already moved its selection, but it stays disabled until
-   the write commits.
+   `Segmented` has already moved its selection. Until the write commits it
+   ignores pointer input, and a keyboard change snaps back to the pending
+   choice. It isn't disabled, because disabling the focused item would
+   move focus away.
 3. Inside `RunNavigationAsync`, so the write is serialized with route
    changes as T15.3 and T04.2 are, call `MarkCompleteAsync` or
    `MarkInProgressAsync`.
 4. On success:
    - **Game page, same game still shown:** `RenderCurrentAsync()`. The
      anchor keeps the guide selected, and its row fact becomes `Completed`
-     or goes back to `~N%` or `In progress`. Then `Show(committed)`. Focus
-     stays on the choice: the header isn't rebuilt, and
+     or goes back to `~N%` or `In progress`, and
+     `UpdateOpenSelectedGuideAction` shows the selected row's stored state
+     in the choice. The render collapses the Game panel, which drops focus,
+     so the shell then focuses the choice's selected item.
      `pendingGuideFocus` isn't set.
    - **Reader, same guide still shown:** `Show(committed)`. Library and
      Game rows show the change on their next render; Back always renders.
@@ -189,9 +194,12 @@ repository tests already cover the transaction, repeats, and restart.
 
 `windows_shell_install.ps1` gains `-CompletionOnly` and a `completion`
 scenario group. The CI `shell-scope` input gains `completion`. The pass
-uses `seed-progress` (Numbered TXT at about 37%, Web, PDF, and Unopened)
-and checks stored state through `describe-progress` (`completedUtcMs`,
-locator, estimate, and open time) as well as the UI.
+uses `seed-progress` (Numbered TXT, Web, PDF, and Unopened, with no stored
+estimates) and checks stored state through `describe-progress`
+(`completedUtcMs` and the estimate) as well as the UI. Because no estimate
+is seeded, the table's `~37%` and `~16%` stand for "the row's text before
+the toggle": the harness captures it and requires the same text after
+returning to in progress.
 
 | Mode | Checks |
 | --- | --- |
