@@ -1,6 +1,6 @@
 # T13.2 completion service design
 
-Status: implemented; CI run 37286204673 passed `core-tests`.
+Status: implemented; CI run 37286991639 passed `core-tests` and the full matrix.
 Prerequisites: T03.2 (the `ReadingStates` schema and repository) and T12.2
 (the progress coordinator, PR #40) are merged. T12.3 (PR #41, merge commit
 `a36b058`) stores estimates and open times, so the tests can show that a
@@ -206,3 +206,6 @@ None beyond the design. The code follows the design as written.
   - a canceled write leaving nothing behind.
 - CI run 37286204673 (`dev-fast`, x64): Core.Tests 728, Infrastructure.Tests
   528.
+- CI run 37286991639 (`shell-scope=core`, the full matrix) passed every job,
+  including ARM64, packages, `production-shell-ui` and `reader-toolbar-ui`:
+  Core.Tests 728, Infrastructure.Tests 528.
