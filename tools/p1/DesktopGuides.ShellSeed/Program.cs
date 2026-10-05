@@ -602,11 +602,16 @@ if (args.Length == 3 && args[0] == "seed-progress")
         File.ReadAllBytes(Path.Combine(fixtures, "p1", "txt-numbered.txt")));
     Guid web = await PublishAsync(Path.Combine("p1", "html-long", "guide.html"), "Long Web Guide");
     Guid pdf = await PublishAsync(Path.Combine("p0", "generated", "pdf-long.pdf"), "Long PDF Guide");
+    Guid unopened = Guid.NewGuid();
+    await InsertTextGuideAsync(progressPaths, progressGame.Id, unopened, "Unopened Guide",
+        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+        File.ReadAllBytes(Path.Combine(fixtures, "p1", "txt-numbered.txt")));
     Console.WriteLine(JsonSerializer.Serialize(new
     {
         numbered = numbered.ToString("N"),
         web = web.ToString("N"),
-        pdf = pdf.ToString("N")
+        pdf = pdf.ToString("N"),
+        unopened = unopened.ToString("N")
     }));
     return 0;
 }
@@ -620,6 +625,57 @@ if (args.Length == 2 && args[0] == "clear-reading-locations")
     return 0;
 }
 
+if (args.Length == 2 && args[0] == "describe-progress")
+{
+    // The stored reading state behind each Progress Game row, newest first.
+    ManagedPathResolver describePaths = new(args[1]);
+    await using SqliteLibraryRepository describeRepository = new(describePaths);
+    await describeRepository.InitializeAsync();
+    Game describeGame = (await describeRepository.ListGamesAsync())
+        .Single(game => game.Title == "Progress Game");
+    var describeRows = (await describeRepository.ListGuideSummariesAsync(describeGame.Id))
+        .Select(summary => new
+        {
+            title = summary.Guide.Title,
+            estimate = summary.State?.EstimatedFraction,
+            openedUtcMs = summary.State?.LastOpenedUtc?.ToUnixTimeMilliseconds(),
+            completedUtcMs = summary.State?.CompletedUtc?.ToUnixTimeMilliseconds(),
+        });
+    Console.WriteLine(JsonSerializer.Serialize(describeRows));
+    return 0;
+}
+
+if (args.Length == 2 && args[0] == "change-progress-copies")
+{
+    // Edits the managed copies, never the fixtures: every TXT line loses its
+    // saved context, and the PDF gains bytes past %%EOF.
+    ManagedPathResolver changePaths = new(args[1]);
+    await using SqliteLibraryRepository changeRepository = new(changePaths);
+    await changeRepository.InitializeAsync();
+    Game changeGame = (await changeRepository.ListGamesAsync())
+        .Single(game => game.Title == "Progress Game");
+    IReadOnlyList<GuideSummary> changeGuides =
+        await changeRepository.ListGuideSummariesAsync(changeGame.Id);
+    string ManagedCopy(string title)
+    {
+        Guide guide = changeGuides.Single(summary => summary.Guide.Title == title).Guide;
+        string copy = changePaths.ResolveExistingGuideFile(guide.Id, guide.PrimaryRelativePath);
+        File.SetAttributes(copy, FileAttributes.Normal);
+        return copy;
+    }
+    string numberedCopy = ManagedCopy("Numbered Lines Guide");
+    string numberedText = File.ReadAllText(numberedCopy);
+    if (!numberedText.Contains("Numbered guide text.", StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException("The Numbered guide copy has no line to edit.");
+    }
+    File.WriteAllText(numberedCopy,
+        numberedText.Replace("Numbered guide text.", "Edited guide text.", StringComparison.Ordinal),
+        new UTF8Encoding(false));
+    File.AppendAllText(ManagedCopy("Long PDF Guide"), "\n% changed\n");
+    return 0;
+}
+
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second" or
         "seed-design" or "seed-catalog" or "seed-facts" or "seed-search" or "seed-import" or
@@ -628,11 +684,12 @@ if (args.Length != 2 ||
     Console.Error.WriteLine(
         "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-search|seed-import|seed-actions|seed-navigation " +
         "<app-data-root> " +
-        "or seed-linked-game|describe-providers|describe-import|describe-actions <app-data-root> " +
+        "or seed-linked-game|describe-providers|describe-import|describe-actions|describe-progress <app-data-root> " +
         "or seed-txt-reader|seed-html-reader|seed-html-position|seed-pdf-reader|seed-progress <app-data-root> <fixtures-root> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
         "or invalidate-blocked-guide <app-data-root> " +
         "or clear-reading-locations <app-data-root> " +
+        "or change-progress-copies <app-data-root> " +
         "or corrupt-reader-guide|restore-reader-guide <app-data-root> " +
         "or hold-write-lock|hold-read-lock <app-data-root> <ready-path> <release-path>");
     return 2;
