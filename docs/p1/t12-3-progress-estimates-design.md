@@ -2,6 +2,7 @@
 
 Status: implemented; CI run 37270721376 passed the installed `progress` group,
 including the `progress-row` phases in light and dark and `progress-changed`.
+CI run 37273004373 passed every installed group (`shell-scope=all`).
 Prerequisites: T12.2 (progress coordinator, PR #40, merge commit `17bdf48`)
 is merged. T05.1's row presentation and T12.1's codec are in place.
 
@@ -295,3 +296,7 @@ scenarios in [e2e-testing.md](e2e-testing.md).
   | --- | --- |
   | `progress-row` (light, dark) | Numbered `~37%` (stored 0.365), Web `~16%` (0.165), PDF `~60%` (0.6015), each opened today; Unopened `Not started` with no estimate or open time; no row completed |
   | `progress-changed` | TXT reopened at the saved line, PDF at page 121 fraction 0.300, both with the approximate message; fixture originals unchanged |
+- CI run 37273004373 (`shell-scope=all`, x64) passed every installed group,
+  including `stable-navigation` (light, dark) and `long-list` with the
+  phases described under Implementation notes; Core.Tests 723,
+  Infrastructure.Tests 520.
