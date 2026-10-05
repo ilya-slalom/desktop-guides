@@ -91,7 +91,7 @@ public sealed partial class GuideCompletionChoice : UserControl
         bool restore = busy ? pendingComplete : shownComplete;
         if (Choice.SelectedIndex < 0)
         {
-            // Ctrl+Space can clear a ListView selection; a choice always has one.
+            // A choice always has one selected item.
             DispatcherQueue.TryEnqueue(() => Select(restore));
             return;
         }

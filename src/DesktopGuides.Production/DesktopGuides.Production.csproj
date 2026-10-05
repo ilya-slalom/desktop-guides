@@ -24,7 +24,6 @@
     <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" />
     <PackageReference Include="CommunityToolkit.WinUI.Controls.MetadataControl" />
     <PackageReference Include="CommunityToolkit.WinUI.Controls.HeaderedControls" />
-    <PackageReference Include="CommunityToolkit.WinUI.Controls.Segmented" />
     <PackageReference Include="Microsoft.WindowsAppSDK" />
     <ProjectReference Include="../DesktopGuides.Core/DesktopGuides.Core.csproj" />
     <ProjectReference Include="../DesktopGuides.Infrastructure/DesktopGuides.Infrastructure.csproj" />
