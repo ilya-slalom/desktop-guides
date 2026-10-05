@@ -242,6 +242,10 @@ public sealed class ManagedPdfGuideLoaderTests
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         (Guide guide, _) = await PublishAsync(harness);
         string managed = ManagedFile(harness, guide);
+        // Padding past %%EOF keeps the locked byte beyond the header check's
+        // buffered first read.
+        File.SetAttributes(managed, FileAttributes.Normal);
+        File.AppendAllText(managed, "\n%" + new string(' ', 64 * 1024) + "\n");
         using FileStream locker = new(managed, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         // A byte-range lock past the header makes the hash's read fail with an
         // IOException after the header check has passed.
