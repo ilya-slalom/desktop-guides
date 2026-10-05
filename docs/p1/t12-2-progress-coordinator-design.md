@@ -305,15 +305,21 @@ Rulings made during execution:
   when it moves the current point, without raising `LocationChanged`. The
   shell's baseline capture (refinement 2) otherwise left the session's point
   equal to the tracker's first capture, so the file was never written.
+- From the final review: `FlushAsync` always takes the save turn, even when
+  the tracking isn't dirty, so Back or close during a timer save waits for
+  that save's write instead of ending the tracking under it. A flush with
+  nothing to save that times out behind a stuck save isn't counted as a
+  failure (`DisposeDuringTimerCaptureWaitsAndWritesIt`).
 - [e2e-testing.md](e2e-testing.md) has no gate list, so a sentence after the
   `-*Only` switch list describes the two progress gates.
 
 ## Verification
 
-- `ProgressCoordinatorTests` (16 tests, fake clock) cover the quiet and
+- `ProgressCoordinatorTests` (17 tests, fake clock) cover the quiet and
   deadline saves, the burst count, unchanged and baseline skips, flush and
-  dispose, the late capture, failure retry and reporting, the missing row,
-  the stuck capture, the null estimate, the tracking context and `Abandon`.
+  dispose (also during a running save), the late capture, failure retry
+  and reporting, the missing row, the stuck capture, the null estimate,
+  the tracking context and `Abandon`.
 - `SqliteLibraryRepositoryTests` save two guides' locators through the
   coordinator and read them back after reopening the repository.
 - CI run 37253787166 (reports and screenshots in
