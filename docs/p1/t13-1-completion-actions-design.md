@@ -1,6 +1,7 @@
 # T13.1 completion actions design
 
-Status: design approved; not implemented.
+Status: implemented with the native `RadioButtons` fallback; CI run
+37302867776 passed `shell-scope=completion` and the full matrix.
 Prerequisites: T05.1 (Library and Game rows, PR #23), T11.3 (the Reader
 shell, PR #7), and T13.2 (the completion service, PR #42, merge commit
 `0807d5a`) are merged.
@@ -238,3 +239,76 @@ In the implementing branch:
 - A `Not started` item in the choice.
 - Any change to row order. Completion doesn't touch `LastOpenedUtcMs`.
 - Shortcut keys for completion (T16.1).
+
+## Implementation notes
+
+- **`Segmented` failed the UIA gate; the choice uses `RadioButtons`.** In CI
+  run 37300830462, `completion-segmented` found both items as `ListItem`s
+  named `In progress` and `Complete`, but reading their selected state threw
+  `Exception calling "GetCurrentPattern" with "1" argument(s): "Unsupported
+  Pattern."` for `SelectionItemPattern`. `GuideCompletionChoice` now holds a
+  native `RadioButtons` (`MaxColumns="2"`, so Left and Right move between the
+  items) with two `RadioButton`s that keep the names and AutomationIds. The
+  smoke checks for `RadioButton` items, and the Segmented package is gone
+  from `Directory.Packages.props`, the Production project and its lock file.
+  The likely cause, not verified, is that `SegmentedItem`s declared in XAML
+  are their own containers and get no data-item peer. An `ItemsSource`-bound
+  `Segmented` wasn't tried; T14.2 can test it before choosing its control.
+- The plan's rulings against this design:
+  1. Focus is restored after the Game render. `RenderCurrentAsync`
+     collapses the Game panel, which drops focus, so after a Game-page
+     write the shell calls `GameCompletionChoice.FocusSelection()`.
+  2. Busy doesn't disable the control, because disabling the focused item
+     would move focus away. While busy the choice ignores pointer input,
+     and a keyboard change snaps back to the pending choice.
+  3. There is no `Show(committed)` after the Game render.
+     `UpdateOpenSelectedGuideAction` shows the selected row's stored state,
+     which also covers a selection change during the write.
+  4. The request carries the title:
+     `GuideCompletionRequest(Guid GuideId, string Title, bool Complete)`.
+  5. Estimates are compared by capture, not by literal. `seed-progress`
+     stores no estimates, so the harness captures a row's text before
+     marking it complete and requires the same text after marking it in
+     progress.
+  6. `hold-write-lock` takes an optional hold time. The error mode holds
+     the lock for 120 s, so the app's 30 s SQLite timeout fails first.
+  7. The error check spans three smoke modes. The installer owns the lock
+     helper, so it takes the lock between `completion-error-prepare` and
+     `completion-error`, and releases it before `completion-error-retry`.
+
+## Verification
+
+- `GuideCompletionPresentationTests` (Core, 9 tests): the labels, both
+  states from a null or stored time, the choice name, both announcements,
+  the save-failure and removed text, and a long Unicode title kept verbatim.
+- Installed `completion` group, CI run 37302205371 (`dev-fast`) and run
+  37302867776 (full):
+  - `completion-segmented`: the choice is named `Completion for Numbered
+    Lines Guide`; two `RadioButton`s with their names; Shift+Tab from *Open
+    selected guide* focuses `In progress`; Right selects and announces
+    `Complete`, Left returns to `In progress`.
+  - `completion-last-page`: after Go to end in Numbered Lines Guide and on
+    page 200 of the PDF, the rows show estimates (the PDF `~100%`), not
+    `Completed`; `completedUtcMs` stays null and the choice shows
+    `In progress`.
+  - `completion-game` (light, dark): from the keyboard the row reads
+    `Completed`, the announcement shows and `completedUtcMs` is set, with
+    the locator, estimate and open time unchanged; Left restores the
+    captured row text and clears `completedUtcMs`.
+  - `completion-reader` (light, dark): Long Web Guide is marked complete in
+    the Reader header, and Back shows `Completed` on its row.
+  - `completion-restart`, `completion-restart-after`: after a relaunch the
+    row reads `Completed` and the choice shows `Complete`; marked in
+    progress and relaunched, the row's estimate is back within 0.01.
+  - `completion-error-prepare`, `completion-error`, `completion-error-retry`:
+    with the write lock held, `Complete` shows `Could not update completion
+    for Numbered Lines Guide. Try again.`, the choice returns to
+    `In progress` and `completedUtcMs` stays null; after the release the
+    retry succeeds.
+- Screenshots and results are in
+  [evidence/t13-1-completion-actions](evidence/t13-1-completion-actions/).
+- CI run 37302867776 (`shell-scope=completion`, the full matrix) passed
+  every job, including ARM64, packages, `production-shell-ui` and
+  `reader-toolbar-ui`: Core.Tests 737, Infrastructure.Tests 528. CI run
+  37302882954 (`shell-scope=progress`, the full matrix) passed, covering the
+  shared `Wait-Status` and lock-helper changes.

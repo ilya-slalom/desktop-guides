@@ -1,0 +1,14 @@
+﻿{
+    "mode":  "completion-restart-after",
+    "invocationId":  "487dd17828284aec936e77c281ecaaad",
+    "observedAt":  "2026-10-05T11:32:42.2929751Z",
+    "processId":  5300,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "completion-restart-after"
+               ],
+    "completionRestartRow":  "Web page (HTML), In progress, opened today at 11:32 AM"
+}

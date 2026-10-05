@@ -1,0 +1,13 @@
+﻿{
+    "mode":  "completion-restart",
+    "invocationId":  "bf2fa8b6a0ad4841bfab817c589f65d9",
+    "observedAt":  "2026-10-05T11:32:34.0153327Z",
+    "processId":  9972,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "completion-restart"
+               ]
+}

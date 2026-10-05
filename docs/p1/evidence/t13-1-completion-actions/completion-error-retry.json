@@ -1,0 +1,13 @@
+﻿{
+    "mode":  "completion-error-retry",
+    "invocationId":  "1a832980817e404e8b99d55161da5b2a",
+    "observedAt":  "2026-10-05T11:33:30.4578375Z",
+    "processId":  6656,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "completion-error-retry"
+               ]
+}

@@ -1,0 +1,19 @@
+﻿{
+    "mode":  "completion-game",
+    "invocationId":  "cae51b352c8f4612b23b197439ad5828",
+    "observedAt":  "2026-10-05T11:32:14.9040771Z",
+    "processId":  7128,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "completion-game"
+               ],
+    "completionGameScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\completion-game-dark.completion-game.png",
+    "completionGameRows":  {
+                               "before":  "Text (TXT), about 95 percent, opened today at 11:32 AM",
+                               "completed":  "Text (TXT), Completed, opened today at 11:32 AM",
+                               "after":  "Text (TXT), about 95 percent, opened today at 11:32 AM"
+                           }
+}

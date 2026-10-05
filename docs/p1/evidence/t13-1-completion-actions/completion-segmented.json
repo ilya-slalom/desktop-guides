@@ -1,0 +1,13 @@
+﻿{
+    "mode":  "completion-segmented",
+    "invocationId":  "c50135fef33944a09c0244253cefab81",
+    "observedAt":  "2026-10-05T11:31:36.2725544Z",
+    "processId":  8496,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "completion-segmented"
+               ]
+}
