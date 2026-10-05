@@ -1457,14 +1457,15 @@ try {
             throw "After $step the page's top line was $seen; expected MARK-$('{0:D4}' -f $mark) within one line ($script:topLineNote)."
         }
 
-        function Set-HtmlRestore([string] $json) {
+        # The shell's progress override replaces the guide's stored locator.
+        function Set-RestoreLocator([string] $json) {
             $folder = Join-Path $AppDataRoot 'test'
             [void](New-Item -ItemType Directory -Force -Path $folder)
-            [System.IO.File]::WriteAllText((Join-Path $folder 'html-restore.json'), $json)
+            [System.IO.File]::WriteAllText((Join-Path $folder 'restore-locator.json'), $json)
         }
 
-        function Clear-HtmlRestore {
-            Remove-Item -LiteralPath (Join-Path $AppDataRoot 'test\html-restore.json') -Force -ErrorAction SilentlyContinue
+        function Clear-RestoreLocator {
+            Remove-Item -LiteralPath (Join-Path $AppDataRoot 'test\restore-locator.json') -Force -ErrorAction SilentlyContinue
         }
 
         function Clear-HtmlPosition {
@@ -1472,17 +1473,17 @@ try {
                 -Force -ErrorAction SilentlyContinue
         }
 
-        function Open-RestoredGuide([string] $guide, [string] $restore) {
+        function Open-RestoredGuide([string] $guide, [string] $restore, [string] $status = 'Guide ready.') {
             Clear-HtmlPosition
-            Set-HtmlRestore $restore
+            Set-RestoreLocator $restore
             try {
                 Open-TextGuide $guide
                 $report.sessionsOpened++
-                [void](Wait-Status 'Guide ready.')
+                [void](Wait-Status $status)
                 return Wait-HtmlPosition { param($p) $p.kind } 'a restore outcome'
             }
             finally {
-                Clear-HtmlRestore
+                Clear-RestoreLocator
             }
         }
 
@@ -1864,21 +1865,32 @@ try {
 
             # position-restore-changed: in changed bytes the quote is found
             # by context; the text inserted above moved every offset.
-            $changed = Open-RestoredGuide 'Changed Long Web Guide' $saved
+            $changed = Open-RestoredGuide 'Changed Long Web Guide' $saved `
+                'Opened near your last place. The guide changed since you were here.'
             Assert-Restore $changed 'Approximate' 'Context' `
                 'The guide changed, so this is an approximate position.' 'a restore in changed bytes'
             if ($changed.offset -le $target.offset) {
                 throw "A restore in changed bytes captured offset $($changed.offset); expected more than $($target.offset)."
             }
             [void](Wait-TopMark 420 'a restore in changed bytes')
+            $report.progressApproximateScreenshot = Save-WindowScreenshot 'progress-approximate'
             Back-ToTextGame
             $report.phases += 'position-restore-changed'
 
-            # position-restore-invalid: a malformed locator is Unavailable
-            # and the page stays at its start.
-            $invalid = Open-RestoredGuide 'Long Web Guide' '{"format":"Html","schemaVersion":1,"payload":'
-            Assert-Restore $invalid 'Unavailable' '' `
-                "This reading position can't be used with this guide." 'a malformed locator'
+            # position-restore-invalid: the shell can't decode a malformed
+            # locator, so it says so and the page stays at its start. The
+            # session never restores, so no restore kind is counted.
+            Clear-HtmlPosition
+            Set-RestoreLocator '{"format":"Html","schemaVersion":1,"payload":'
+            try {
+                Open-TextGuide 'Long Web Guide'
+                $report.sessionsOpened++
+                [void](Wait-Status "Couldn't return to your last place, so the guide opened at the start.")
+                $invalid = Wait-HtmlPosition { param($p) $p.locator } 'a position after a malformed locator'
+            }
+            finally {
+                Clear-RestoreLocator
+            }
             if ([string] $invalid.quote -notlike 'Long Web Guide*') {
                 throw "After a malformed locator the position was not the page's start."
             }
@@ -1886,6 +1898,7 @@ try {
             if ($top -match '^MARK-') {
                 throw "After a malformed locator the page's top line was $top."
             }
+            $report.progressUnavailableHtmlScreenshot = Save-WindowScreenshot 'progress-unavailable-html'
             Back-ToTextGame
             $report.phases += 'position-restore-invalid'
 

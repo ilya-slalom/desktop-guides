@@ -1163,7 +1163,7 @@ function Invoke-HtmlPositionPass([string] $resultName) {
     Start-InstalledShell
     $processId = $report.launchedProcessId
     $gates = @(
-        foreach ($name in @('HtmlDiagnostics', 'HtmlPosition')) {
+        foreach ($name in @('HtmlDiagnostics', 'HtmlPosition', 'ProgressOverride')) {
             [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::ManualReset,
                 "Local\DesktopGuides.Preview.$name.$processId")
