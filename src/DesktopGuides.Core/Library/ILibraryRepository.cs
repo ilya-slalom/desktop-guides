@@ -1,8 +1,9 @@
 using DesktopGuides.Core.Providers;
+using DesktopGuides.Core.Reading;
 
 namespace DesktopGuides.Core.Library;
 
-public interface ILibraryRepository : IAsyncDisposable
+public interface ILibraryRepository : IReadingLocationStore, IAsyncDisposable
 {
     StartupReconciliationReport? LastStartupReconciliation { get; }
     Task InitializeAsync(CancellationToken token = default);
@@ -23,9 +24,6 @@ public interface ILibraryRepository : IAsyncDisposable
     Task<Guide?> GetGuideAsync(Guid guideId, CancellationToken token = default);
     Task<ReadingState?> GetReadingStateAsync(
         Guid guideId, CancellationToken token = default);
-    Task SaveReadingLocationAsync(
-        Guid guideId, string locatorJson, double? estimatedFraction,
-        CancellationToken token = default);
     Task<ReaderPreferences?> GetReaderPreferencesAsync(
         Guid guideId, CancellationToken token = default);
     Task SaveReaderPreferencesAsync(
