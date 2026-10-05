@@ -1,0 +1,18 @@
+﻿{
+    "mode":  "completion-segmented",
+    "invocationId":  "34560e20c8ee4305859a8979801037f7",
+    "observedAt":  "2026-10-05T13:19:28.1584822Z",
+    "processId":  6640,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "completion-segmented"
+               ],
+    "completionNarrow":  {
+                             "wideImport":  "869,197,115,33",
+                             "import":  "741,297,115,33",
+                             "list":  "217,394,639,193"
+                         }
+}

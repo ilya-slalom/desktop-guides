@@ -1,0 +1,17 @@
+﻿{
+    "mode":  "completion-last-page",
+    "invocationId":  "20461fcf3f4c4a4393cda8d369eccdd1",
+    "observedAt":  "2026-10-05T13:19:40.5376580Z",
+    "processId":  8480,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "completion-last-page"
+               ],
+    "completionLastPageRows":  [
+                                   "Text (TXT), about 95 percent, opened today at 1:19 PM",
+                                   "PDF, about 100 percent, opened today at 1:19 PM"
+                               ]
+}

@@ -1,0 +1,13 @@
+﻿{
+    "mode":  "completion-error-prepare",
+    "invocationId":  "3ec67e33cad943568ec83212195eefa4",
+    "observedAt":  "2026-10-05T13:20:50.3249269Z",
+    "processId":  6408,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "completion-error-prepare"
+               ]
+}

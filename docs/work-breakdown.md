@@ -421,6 +421,9 @@ the final page does not silently mark the guide complete.
   Toolkit `Segmented` control for the bounded `In progress` / `Complete`
   choice when UI Automation exposes the selected state correctly; otherwise
   retain equivalent native radio buttons.
+  Implemented with native radio buttons (`Segmented` failed the UIA gate);
+  see
+  [p1/t13-1-completion-actions-design.md](p1/t13-1-completion-actions-design.md).
 - **T13.2** Store completion time separately from reading location and
   percentage.
   Implemented; see

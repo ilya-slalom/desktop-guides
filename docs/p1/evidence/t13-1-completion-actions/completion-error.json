@@ -1,0 +1,14 @@
+﻿{
+    "mode":  "completion-error",
+    "invocationId":  "ca45a0ad0f464fbfa755a6b300668e30",
+    "observedAt":  "2026-10-05T13:20:54.0240163Z",
+    "processId":  6408,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "completion-error"
+               ],
+    "completionErrorScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\completion-error.completion-error.png"
+}

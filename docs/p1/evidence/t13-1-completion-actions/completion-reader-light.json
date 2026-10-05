@@ -1,0 +1,16 @@
+﻿{
+    "mode":  "completion-reader",
+    "invocationId":  "55aea0bfb5ec43bda1261e02f8817c79",
+    "observedAt":  "2026-10-05T13:20:01.3940697Z",
+    "processId":  8492,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "completion-reader"
+               ],
+    "completionReaderStartedComplete":  false,
+    "completionReaderScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\completion-reader-light.completion-reader.png",
+    "completionReaderRow":  "Web page (HTML), Completed, opened today at 1:20 PM"
+}

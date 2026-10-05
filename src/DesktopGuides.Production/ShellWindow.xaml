@@ -338,40 +338,46 @@
                     </ScrollViewer>
                 </Border>
 
-                <Grid x:Name="GameGuidesHeader"
-                      Grid.Row="2"
-                      ColumnSpacing="{StaticResource DesktopGuidesSpacing16}"
-                      SizeChanged="GamePageSizeChanged">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="Guides"
-                               Style="{StaticResource DesktopGuidesSectionTitleStyle}" />
-                    <Button x:Name="OpenSelectedGuideButton"
-                            Grid.Column="1"
-                            Content="Open selected guide"
-                            Visibility="Collapsed"
-                            Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
-                            Click="OpenSelectedGuideClicked"
-                            AutomationProperties.AutomationId="OpenSelectedGuide" />
-                    <Button x:Name="RemoveSelectedGuideButton"
-                            Grid.Column="2"
-                            Content="Remove guide"
-                            Visibility="Collapsed"
-                            Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
-                            Click="RemoveSelectedGuideClicked"
-                            AutomationProperties.AutomationId="RemoveSelectedGuide" />
-                    <Button x:Name="ImportGuideButton"
-                            Grid.Column="3"
-                            Content="Import guide"
-                            IsEnabled="False"
-                            Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
-                            Click="ImportGuideClicked"
-                            AutomationProperties.AutomationId="ImportGuideButton" />
-                </Grid>
+                <!-- The completion choice has its own row, so the actions still
+                     fit one row in a narrow window. -->
+                <StackPanel x:Name="GameGuidesHeader"
+                            Grid.Row="2"
+                            Spacing="{StaticResource DesktopGuidesSpacing8}"
+                            SizeChanged="GamePageSizeChanged">
+                    <Grid ColumnSpacing="{StaticResource DesktopGuidesSpacing16}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Guides"
+                                   Style="{StaticResource DesktopGuidesSectionTitleStyle}" />
+                        <Button x:Name="OpenSelectedGuideButton"
+                                Grid.Column="1"
+                                Content="Open selected guide"
+                                Visibility="Collapsed"
+                                Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                                Click="OpenSelectedGuideClicked"
+                                AutomationProperties.AutomationId="OpenSelectedGuide" />
+                        <Button x:Name="RemoveSelectedGuideButton"
+                                Grid.Column="2"
+                                Content="Remove guide"
+                                Visibility="Collapsed"
+                                Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                                Click="RemoveSelectedGuideClicked"
+                                AutomationProperties.AutomationId="RemoveSelectedGuide" />
+                        <Button x:Name="ImportGuideButton"
+                                Grid.Column="3"
+                                Content="Import guide"
+                                IsEnabled="False"
+                                Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                                Click="ImportGuideClicked"
+                                AutomationProperties.AutomationId="ImportGuideButton" />
+                    </Grid>
+                    <local:GuideCompletionChoice x:Name="GameCompletionChoice"
+                                                 HorizontalAlignment="Left" />
+                </StackPanel>
 
                 <Grid Grid.Row="3">
                     <Border x:Name="GameEmptyState"
@@ -428,17 +434,22 @@
                                    Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
                                    AutomationProperties.AutomationId="ReaderGameName" />
                     </StackPanel>
-                    <Border Grid.Column="1"
-                            Padding="10,4"
-                            VerticalAlignment="Top"
-                            Background="{ThemeResource DesktopGuidesSurfaceBrush}"
-                            BorderBrush="{ThemeResource DesktopGuidesBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="{StaticResource DesktopGuidesControlCornerRadius}">
-                        <TextBlock x:Name="ReaderFormat"
-                                   Style="{StaticResource DesktopGuidesMetadataStyle}"
-                                   AutomationProperties.AutomationId="ReaderFormat" />
-                    </Border>
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Top"
+                                Spacing="{StaticResource DesktopGuidesSpacing16}">
+                        <local:GuideCompletionChoice x:Name="ReaderCompletionChoice" />
+                        <Border Padding="10,4"
+                                VerticalAlignment="Top"
+                                Background="{ThemeResource DesktopGuidesSurfaceBrush}"
+                                BorderBrush="{ThemeResource DesktopGuidesBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="{StaticResource DesktopGuidesControlCornerRadius}">
+                            <TextBlock x:Name="ReaderFormat"
+                                       Style="{StaticResource DesktopGuidesMetadataStyle}"
+                                       AutomationProperties.AutomationId="ReaderFormat" />
+                        </Border>
+                    </StackPanel>
                 </Grid>
 
                 <StackPanel Grid.Row="2">

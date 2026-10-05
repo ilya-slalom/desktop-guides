@@ -888,7 +888,16 @@ T13.2 is implemented; see the
 in progress, and returns the committed state. The write changes only
 `CompletedUtcMs`, in one SQLite transaction. A repeated completion keeps the
 first time, and the locator, estimate, and open time are untouched. A 100%
-estimate never creates a completion time. T13.1 adds the actions.
+estimate never creates a completion time.
+
+T13.1 is implemented; see the
+[design and implementation notes](t13-1-completion-actions-design.md).
+The Game page and the Reader header show an `In progress` / `Complete`
+choice that calls `GuideCompletionService`, shows the committed state, and
+announces it. Toolkit `Segmented` failed the selected-state UIA gate, so the
+choice uses native `RadioButtons`. Reaching the last line or page leaves a
+guide not complete, and a failed write reverts the choice and explains the
+error.
 
 ## M5 — errors, accessibility, and portable backup
 
