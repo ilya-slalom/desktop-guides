@@ -395,6 +395,8 @@ location approximate.
   restoration order: exact/context anchor, then approximate percentage.
 - **T12.2** Save after meaningful movement with throttling; flush on
   navigation away and app deactivation.
+  Implemented; see
+  [p1/t12-2-progress-coordinator-design.md](p1/t12-2-progress-coordinator-design.md).
 - **T12.3** Compute an estimated percentage per format and detect content
   fingerprint changes.
 - **TR12.1** `ReadingState` is keyed by guide ID, never only by game or filename.

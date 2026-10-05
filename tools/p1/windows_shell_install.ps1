@@ -16,6 +16,7 @@ param(
     [switch] $TxtOnly,
     [switch] $HtmlOnly,
     [switch] $PdfOnly,
+    [switch] $ProgressOnly,
     [switch] $ImportOnly,
     [switch] $GameActionsOnly,
     [switch] $ProviderOnly,
@@ -40,6 +41,7 @@ $scenarioGroups = [ordered]@{
     'txt' = $TxtOnly.IsPresent
     'html' = $HtmlOnly.IsPresent
     'pdf' = $PdfOnly.IsPresent
+    'progress' = $ProgressOnly.IsPresent
     'import' = $ImportOnly.IsPresent
     'game-actions' = $GameActionsOnly.IsPresent
     'provider' = $ProviderOnly.IsPresent
@@ -690,6 +692,7 @@ function Run-ShellSmoke(
     [string] $SteamGridDbCredentialFile = '',
     [string] $ExpectedProviderFailure = '',
     [string] $ExpectedGuideTitle = '',
+    [int] $ExpectedTopLine = 0,
     [string] $AppDataRoot = '',
     [string] $AppCacheRoot = '') {
     $resultPath = Join-Path $ResultDirectory "$ResultName.json"
@@ -705,7 +708,8 @@ function Run-ShellSmoke(
         ' -ExecutablePath "' + $expectedExecutablePath + '"' +
         ' -ExpectedResumeGuide "' + $expectedResumeGuide + '"' +
         ' -ExitDelayMilliseconds ' + $ExitDelayMilliseconds +
-        ' -ExpectedScalePercent ' + $ExpectedScalePercent
+        ' -ExpectedScalePercent ' + $ExpectedScalePercent +
+        ' -ExpectedTopLine ' + $ExpectedTopLine
     if ($ExpectedMaterial) {
         $arguments += ' -ExpectedMaterial ' + $ExpectedMaterial
     }
@@ -735,7 +739,7 @@ function Run-ShellSmoke(
     Register-ScheduledTask -TaskName $smokeTask -Action $action `
         -Principal $principal -Force | Out-Null
     Start-ScheduledTask -TaskName $smokeTask
-    $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*') { 240 }
+    $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*') { 240 }
         elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*') { 120 }
         else { 60 }
     $deadline = (Get-Date).AddSeconds($timeoutSeconds)
@@ -903,6 +907,7 @@ function Run-TxtReaderScenarios {
         $report.txtReaderLight = Run-ShellSmoke 'txt-reader' -ResultName 'txt-reader-light'
         Close-InstalledShell
 
+        Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
         Set-AppThemePreference $false
         Start-InstalledShell
         $report.txtReaderDark = Run-ShellSmoke 'txt-reader' -ResultName 'txt-reader-dark'
@@ -1116,6 +1121,7 @@ function Run-HtmlReaderScenarios {
         $canary = Start-HtmlCanary $logPath
         $baseline = @(Get-HtmlCanaryLines $logPath).Count
         Set-AppThemePreference $true
+        Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
         Invoke-HtmlReaderPass 'html-reader-online'
         Save-HtmlDiagnostics 'html-reader-online' $cacheRoot
         if (Test-Path -LiteralPath $leftover) {
@@ -1135,6 +1141,7 @@ function Run-HtmlReaderScenarios {
         Remove-Item -LiteralPath $diagnostics -Recurse -Force
         $baseline = @(Get-HtmlCanaryLines $logPath).Count
         Set-AppThemePreference $false
+        Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
         Invoke-HtmlReaderPass 'html-reader-offline'
         Save-HtmlDiagnostics 'html-reader-offline' $cacheRoot
         $report.htmlReader.offline = Assert-HtmlReaderPass 'offline' $cacheRoot $readerSessions $readerLaunches $logPath $baseline
@@ -1145,6 +1152,7 @@ function Run-HtmlReaderScenarios {
         Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
         $canary = Start-HtmlCanary $logPath
         $baseline = @(Get-HtmlCanaryLines $logPath).Count
+        Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
         Invoke-HtmlReaderPass 'html-runtime-missing' 'html-runtime-missing' -NoRuntime
         Save-HtmlDiagnostics 'html-runtime-missing' $cacheRoot
         $report.htmlReader.runtimeMissing = Assert-HtmlReaderPass 'runtime-missing' $cacheRoot `
@@ -1163,7 +1171,7 @@ function Invoke-HtmlPositionPass([string] $resultName) {
     Start-InstalledShell
     $processId = $report.launchedProcessId
     $gates = @(
-        foreach ($name in @('HtmlDiagnostics', 'HtmlPosition')) {
+        foreach ($name in @('HtmlDiagnostics', 'HtmlPosition', 'ProgressOverride')) {
             [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::ManualReset,
                 "Local\DesktopGuides.Preview.$name.$processId")
@@ -1239,6 +1247,7 @@ function Run-HtmlPositionScenarios {
             @{ name = 'html-position-dark'; light = $false })) {
             Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
             Remove-Item -LiteralPath (Join-Path $dataRoot 'test') -Recurse -Force -ErrorAction SilentlyContinue
+            Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
             Set-AppThemePreference $pass.light
             try {
                 $result = Invoke-HtmlPositionPass $pass.name
@@ -1342,12 +1351,67 @@ function Run-PdfReaderScenarios {
             @{ name = 'pdf-reader-dark'; light = $false })) {
             Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
             Set-AppThemePreference $pass.light
+            Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
             Invoke-PdfReaderPass $pass.name
             $report.pdfReader["$($pass.name)-diagnostics"] = Assert-PdfDiagnostics $pass.name $diagnostics $ids.pdfLong
         }
     }
     finally {
         Restore-AppThemePreference $originalTheme
+    }
+}
+
+function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $Kill) {
+    Start-InstalledShell
+    $processId = $report.launchedProcessId
+    $gates = @(
+        foreach ($name in @('ProgressDiagnostics', 'ProgressOverride')) {
+            [System.Threading.EventWaitHandle]::new(
+                $false, [System.Threading.EventResetMode]::ManualReset,
+                "Local\DesktopGuides.Preview.$name.$processId")
+        })
+    try {
+        $result = Run-ShellSmoke $mode -ExpectedTopLine $expectedTopLine `
+            -AppDataRoot $dataRoot -AppCacheRoot (Get-HtmlCacheRoot)
+        if ($Kill) {
+            # No flush: only a save the timer already made survives.
+            Stop-Process -Id $processId -Force
+            Wait-InstalledShellExit $processId
+        }
+        else {
+            Close-InstalledShell
+        }
+        return $result
+    }
+    finally {
+        foreach ($gate in $gates) { $gate.Dispose() }
+    }
+}
+
+function Run-ProgressScenarios {
+    # TR12.1-TR12.2: the quiet and deadline saves survive a killed process,
+    # Back and closing save at once, a burst writes a bounded number of times,
+    # and two guides keep their own places across restarts.
+    $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
+    if (-not (Test-Path -LiteralPath (Join-Path $fixtureRoot 'p0\generated\pdf-long.pdf'))) {
+        throw 'pdf-long.pdf is missing; run tools/p0/make_fixtures.py first.'
+    }
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    $ids = Invoke-ShellSeed @('seed-progress', $dataRoot, $fixtureRoot) | ConvertFrom-Json
+    $diagnostics = Join-Path (Get-HtmlCacheRoot) 'diagnostics'
+    Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Join-Path $dataRoot 'test') -Recurse -Force -ErrorAction SilentlyContinue
+    $report.progress = [ordered]@{ ids = $ids }
+    try {
+        $timer = Invoke-ProgressPass 'progress-timer' 0 -Kill
+        $report.progress.timer = $timer
+        $restored = Invoke-ProgressPass 'progress-restored' $timer.progressTopLine
+        $report.progress.restored = $restored
+        $report.progress.twoGuides = Invoke-ProgressPass 'progress-two-guides' $restored.progressTopLine
+    }
+    finally {
+        Remove-Item -LiteralPath (Join-Path $dataRoot 'test') -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -1921,6 +1985,8 @@ try {
     }
 
     if (Enter-ScenarioGroup 'pdf') { Run-PdfReaderScenarios }
+
+    if (Enter-ScenarioGroup 'progress') { Run-ProgressScenarios }
 
     if (Enter-ScenarioGroup 'import') {
         Run-ImportScenarios

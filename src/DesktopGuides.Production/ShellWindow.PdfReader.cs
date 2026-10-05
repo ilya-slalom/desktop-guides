@@ -64,8 +64,8 @@ public sealed partial class ShellWindow
             return false;
         }
         ReaderActions.SetSession(session);
-        ShowTransientStatus("Guide ready.");
-        return true;
+        return await OpenAtSavedPlaceAsync(
+            guide, session, generation, guide.ContentSha256.ToLowerInvariant(), null, token);
     }
 
     private void ShowPdfLoadError(PdfGuideLoadError error)
@@ -84,6 +84,9 @@ public sealed partial class ShellWindow
             {
                 return;
             }
+            // A failed renderer can't report a place; leave the stored one.
+            progressTracking?.Abandon();
+            progressTracking = null;
             IReaderSession failed = readerSession!;
             readerSession = null;
             ReaderActions.SetSession(null);

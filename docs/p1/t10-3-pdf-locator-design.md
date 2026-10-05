@@ -37,7 +37,8 @@ Decisions made during brainstorming:
 - **In-session only.** As in T08.3 for TXT, T10.3 captures and restores
   within an open guide. Saving the locator to `ReadingStates` and restoring
   it when a guide reopens is T12.2's `ProgressCoordinator`, for all three
-  formats at once. A PDF still reopens at page 1 until T12.2.
+  formats at once (implemented; see
+  [t12-2-progress-coordinator-design.md](t12-2-progress-coordinator-design.md)).
 - **A Core position tracker.** The within-page rules (which fraction a newly
   shown page gets, what a resize re-applies, which scroll events move the
   saved point) live in a pure Core class with unit tests. Holding the anchor

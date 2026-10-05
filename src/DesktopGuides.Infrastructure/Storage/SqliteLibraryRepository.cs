@@ -458,7 +458,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             command.Parameters.AddWithValue("$locator", locatorJson);
             command.Parameters.AddWithValue("$estimate",
                 (object?)estimatedFraction ?? DBNull.Value);
-            RequireUpdated(command.ExecuteNonQuery(), "reading state");
+            if (command.ExecuteNonQuery() != 1) throw new ReadingStateMissingException(guideId);
         }, token);
     }
 

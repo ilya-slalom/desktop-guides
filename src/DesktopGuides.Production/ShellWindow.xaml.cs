@@ -128,6 +128,7 @@ public sealed partial class ShellWindow : Window
         UpdatePaneStatus();
         ReaderActions.CommandFailed += ShowErrorStatus;
         AppWindow.Closing += WindowClosing;
+        Activated += WindowActivated;
     }
 
     private void UpdatePaneStatus() =>
@@ -271,6 +272,7 @@ public sealed partial class ShellWindow : Window
             repository = new SqliteLibraryRepository(paths);
             artwork = new ManagedArtworkStore(paths);
             await repository.InitializeAsync();
+            StartProgress(repository);
             guidePublisher = new GuideImportPublisher(repository, paths);
             guideRemover = new GuideRemover(repository, paths);
             gameRemover = new GameRemover(repository, paths, artwork);
@@ -361,6 +363,7 @@ public sealed partial class ShellWindow : Window
             {
                 try
                 {
+                    await DisposeProgressTrackingAsync();
                     if (repository is not null)
                     {
                         await repository.DisposeAsync();
@@ -1282,6 +1285,7 @@ public sealed partial class ShellWindow : Window
     // toolbar and surface drop the old session before it is disposed.
     private async Task CloseReaderSessionAsync()
     {
+        await DisposeProgressTrackingAsync();
         HideExternalLinkBar();
         HideUnavailableLinkBar();
         readerLoad?.Cancel();
@@ -1727,7 +1731,12 @@ public sealed partial class ShellWindow : Window
                     readerSession = session;
                     ShowReaderSurface(placeholder: false, view: session.View);
                     ReaderActions.SetSession(session);
-                    ShowTransientStatus("Guide ready.");
+                    if (!await OpenAtSavedPlaceAsync(
+                        guide, session, generation, document.ContentSha256.ToLowerInvariant(),
+                        null, readerToken))
+                    {
+                        return false;
+                    }
                     break;
 
                 case SettingsRoute:

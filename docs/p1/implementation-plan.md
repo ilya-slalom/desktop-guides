@@ -831,9 +831,10 @@ survives narrow, medium and wide windows on `pdf-long` and resets to the
 top on a page turn. A restore clamps a missing page to the nearest page's
 top, keeps the point as `Approximate` when the bytes changed, and opens at
 the first page for a malformed, wrong-format or future-version locator.
-Saving it and restoring on reopen remain T12.2.
+T12.2 saves it and restores it on reopen.
 
-T09.3 is in review in PR #39 (CI run 37206866197); see the
+T09.3 was merged through PR #39 on 5 October 2026 (merge commit `dee44e4`;
+final-HEAD CI run 37209771443); see the
 [design and implementation notes](t09-3-html-locator-design.md). An HTML
 position is now a character offset in the entry document with a text
 quote, the nearest element id and the scroll fraction. It survives narrow,
@@ -841,8 +842,20 @@ medium and wide windows on `html-long`. A restore is `Exact` in the same
 bytes, also when images above the point answer late; `Approximate` through
 the text context in changed bytes; and `Unavailable`, at the page's start,
 for a malformed locator. A link to a page that wasn't imported shows an
-informational bar and leaves the point where it was. Saving it and
-restoring on reopen remain T12.2.
+informational bar and leaves the point where it was. T12.2 saves it and
+restores it on reopen.
+
+T12.2 is implemented on `feat/p1-t12-2-progress-coordinator` (CI run
+37253787166); see the
+[design and implementation notes](t12-2-progress-coordinator-design.md). A
+guide now reopens where it was left, after leaving the Reader or
+restarting the app. A changed position is saved 1 s after the last
+movement, and continuous movement saves at most once every 4 s. Leaving the
+Reader, the window losing focus and the window closing save an unsaved
+position at once. A restore that isn't exact says so in the status bar,
+and a lost place opens at the start and keeps the stored place until the
+reader moves. T12.2 writes only the locator: estimates and the open time
+remain T12.3.
 
 ## M4 — progress, completion, and appearance
 

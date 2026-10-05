@@ -1,0 +1,22 @@
+{
+    "mode":  "progress-restored",
+    "invocationId":  "31bb87a9b1744199bf2a23bff75360b4",
+    "observedAt":  "2026-10-05T02:23:14.2224810Z",
+    "processId":  5704,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "progress-flush",
+                   "progress-burst",
+                   "progress-restored"
+               ],
+    "progressPdfFraction":  0.30000000662225923,
+    "progressBurst":  {
+                          "seconds":  3.600689,
+                          "saves":  1,
+                          "allowed":  1
+                      },
+    "progressTopLine":  147
+}

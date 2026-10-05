@@ -44,8 +44,8 @@ Decisions made during brainstorming:
 
 - **In-session only.** As in T08.3 and T10.3, T09.3 captures and restores
   within an open guide. Saving the locator and restoring it on reopen is
-  T12.2's `ProgressCoordinator`. An HTML guide still reopens at its start
-  until T12.2.
+  T12.2's `ProgressCoordinator`. T12.2 does this through
+  `RestoreLocationAsync`.
 - **Unimported links are reported** in an informational Reader bar, the
   design's "reported as unavailable"; they stay denied.
 - **Approach A:** fixed host scripts run through the DevTools protocol's
@@ -250,9 +250,8 @@ Named-event gates in the existing `TestGate` pattern:
 - `HtmlPosition`: writes `html-position-<pid>.json` to the cache's
   diagnostics folder whenever the current point or a restore outcome
   changes (the encoded locator, the outcome kind, the step and the
-  reason). While it is open, the session also restores the locator in
-  `LocalState\test\html-restore.json` after open, if that file exists.
-  This stands in for T12.2's reopen in the smoke only.
+  reason). The restore file moved to the shell's `ProgressOverride` gate
+  in T12.2.
 - `HtmlAssetDelay`: image responses are delayed by 1 s.
 
 ### Installed smoke: `html-position` (light and dark)

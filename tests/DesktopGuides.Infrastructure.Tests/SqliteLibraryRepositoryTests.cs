@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Reading;
 using DesktopGuides.Core.Providers;
 using DesktopGuides.Infrastructure.Artwork;
 using DesktopGuides.Infrastructure.Storage;
@@ -73,6 +74,47 @@ public sealed class SqliteLibraryRepositoryTests
     }
 
     [Fact]
+    public async Task ProgressCoordinatorSavesEachGuidesLocatorAcrossReopen()
+    {
+        using TestLibrary directory = new();
+        Guid first = Guid.NewGuid();
+        Guid second = Guid.NewGuid();
+        StoreSession firstSession = new(120);
+        StoreSession secondSession = new(9000);
+        await using (SqliteLibraryRepository repository =
+            new(directory.Paths, new FixedTimeProvider(Now)))
+        {
+            await repository.InitializeAsync();
+            Game game = await repository.AddGameAsync("Progress", null, null);
+            InsertGuide(directory.Paths.DatabasePath, first, game.Id);
+            InsertGuide(directory.Paths.DatabasePath, second, game.Id);
+            ProgressCoordinator coordinator = new(repository, TimeProvider.System);
+
+            await using (IProgressTracking tracking = coordinator.Track(first, firstSession, null))
+            {
+                firstSession.Move();
+            }
+            await using (IProgressTracking tracking = coordinator.Track(second, secondSession, null))
+            {
+                secondSession.Move();
+            }
+            Assert.Equal(new ProgressCounts(2, 0, 0), coordinator.Counts);
+        }
+
+        await using SqliteLibraryRepository reopened = new(directory.Paths);
+        await reopened.InitializeAsync();
+        foreach ((Guid guideId, StoreSession session) in new[] { (first, firstSession), (second, secondSession) })
+        {
+            ReadingState? state = await reopened.GetReadingStateAsync(guideId);
+            Assert.Null(state?.EstimatedFraction);
+            LocationDecodeResult decoded = ReaderLocationCodec.Deserialize(
+                state?.LocatorJson, GuideFormat.Txt, StoreSession.Hash);
+            Assert.Equal(LocationDecodeStatus.Valid, decoded.Status);
+            Assert.Equal(session.Current with { EstimatedFraction = null }, decoded.Location);
+        }
+    }
+
+    [Fact]
     public async Task RejectsInvalidMetadataAndUnknownGuidePosition()
     {
         using TestLibrary directory = new();
@@ -83,8 +125,9 @@ public sealed class SqliteLibraryRepositoryTests
             repository.AddGameAsync("  ", null, null));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             repository.SaveReadingLocationAsync(Guid.NewGuid(), "{}", 1.1));
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        ReadingStateMissingException missing = await Assert.ThrowsAsync<ReadingStateMissingException>(() =>
             repository.SaveReadingLocationAsync(Guid.NewGuid(), "{}", 0.5));
+        Assert.NotEqual(Guid.Empty, missing.GuideId);
     }
 
     [Fact]
@@ -1209,6 +1252,38 @@ public sealed class SqliteLibraryRepositoryTests
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    private sealed class StoreSession(int offset) : IReaderSession
+    {
+        public static readonly string Hash = new('a', 64);
+        private int offset = offset;
+
+        public GuideFormat Format => GuideFormat.Txt;
+        public ReaderCapabilities Capabilities => ReaderCapabilities.Scroll;
+        public event EventHandler? CapabilitiesChanged { add { } remove { } }
+        public event EventHandler<LocationChangedEventArgs>? LocationChanged;
+
+        public ReaderLocation Current => new(
+            GuideFormat.Txt, ReaderLocationCodec.CurrentVersion, Hash,
+            new TextPosition(offset, $"line {offset}"), 0.4);
+
+        public void Move()
+        {
+            offset++;
+            LocationChanged?.Invoke(this, new LocationChangedEventArgs());
+        }
+
+        public Task<ReaderLocation> GetLocationAsync(CancellationToken token) => Task.FromResult(Current);
+        public Task OpenAsync(ManagedGuideSource source, CancellationToken token) =>
+            throw new NotSupportedException();
+        public Task<RestoreOutcome> RestoreLocationAsync(ReaderLocation location, CancellationToken token) =>
+            throw new NotSupportedException();
+        public Task ApplyAppearanceAsync(ReaderAppearance appearance, CancellationToken token) =>
+            throw new NotSupportedException();
+        public Task ExecuteAsync(ReaderAction action, CancellationToken token) =>
+            throw new NotSupportedException();
+        public ValueTask DisposeAsync() => default;
     }
 
     private sealed class AdjustableTimeProvider(DateTimeOffset now) : TimeProvider

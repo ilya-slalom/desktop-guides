@@ -572,6 +572,54 @@ if (args.Length == 3 && args[0] == "seed-pdf-reader")
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "seed-progress")
+{
+    ManagedPathResolver progressPaths = new(args[1]);
+    await using SqliteLibraryRepository progressRepository = new(progressPaths);
+    await progressRepository.InitializeAsync();
+    if ((await progressRepository.ListGamesAsync()).Count != 0)
+    {
+        throw new InvalidOperationException("The progress seed needs an empty library.");
+    }
+    string fixtures = Path.GetFullPath(args[2]);
+    Game progressGame = await progressRepository.AddGameAsync("Progress Game", null, null);
+    GuideImportValidator progressValidator = new();
+    GuideImportPublisher progressPublisher = new(progressRepository, progressPaths);
+    async Task<Guid> PublishAsync(string relative, string title)
+    {
+        ImportInspection inspection = await progressValidator.InspectAsync(
+            Path.Combine(fixtures, relative), CancellationToken.None);
+        if (inspection is not ImportReady ready)
+        {
+            throw new InvalidOperationException($"The {relative} fixture failed the import preview: {inspection}.");
+        }
+        return await progressPublisher.PublishAsync(
+            ready.Manifest, progressGame.Id, title, false, null, CancellationToken.None);
+    }
+    Guid numbered = Guid.NewGuid();
+    await InsertTextGuideAsync(progressPaths, progressGame.Id, numbered, "Numbered Lines Guide",
+        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+        File.ReadAllBytes(Path.Combine(fixtures, "p1", "txt-numbered.txt")));
+    Guid web = await PublishAsync(Path.Combine("p1", "html-long", "guide.html"), "Long Web Guide");
+    Guid pdf = await PublishAsync(Path.Combine("p0", "generated", "pdf-long.pdf"), "Long PDF Guide");
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        numbered = numbered.ToString("N"),
+        web = web.ToString("N"),
+        pdf = pdf.ToString("N")
+    }));
+    return 0;
+}
+
+if (args.Length == 2 && args[0] == "clear-reading-locations")
+{
+    // Puts every guide back at its start between passes that share a data folder.
+    ExecuteSql(
+        new ManagedPathResolver(args[1]),
+        "UPDATE ReadingStates SET LocatorJson = NULL, EstimatedFraction = NULL");
+    return 0;
+}
+
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second" or
         "seed-design" or "seed-catalog" or "seed-facts" or "seed-search" or "seed-import" or
@@ -581,9 +629,10 @@ if (args.Length != 2 ||
         "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-search|seed-import|seed-actions|seed-navigation " +
         "<app-data-root> " +
         "or seed-linked-game|describe-providers|describe-import|describe-actions <app-data-root> " +
-        "or seed-txt-reader|seed-html-reader|seed-html-position|seed-pdf-reader <app-data-root> <fixtures-root> " +
+        "or seed-txt-reader|seed-html-reader|seed-html-position|seed-pdf-reader|seed-progress <app-data-root> <fixtures-root> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
         "or invalidate-blocked-guide <app-data-root> " +
+        "or clear-reading-locations <app-data-root> " +
         "or corrupt-reader-guide|restore-reader-guide <app-data-root> " +
         "or hold-write-lock|hold-read-lock <app-data-root> <ready-path> <release-path>");
     return 2;
