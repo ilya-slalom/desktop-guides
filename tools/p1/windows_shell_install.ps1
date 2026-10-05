@@ -17,6 +17,7 @@ param(
     [switch] $HtmlOnly,
     [switch] $PdfOnly,
     [switch] $ProgressOnly,
+    [switch] $CompletionOnly,
     [switch] $ImportOnly,
     [switch] $GameActionsOnly,
     [switch] $ProviderOnly,
@@ -42,6 +43,7 @@ $scenarioGroups = [ordered]@{
     'html' = $HtmlOnly.IsPresent
     'pdf' = $PdfOnly.IsPresent
     'progress' = $ProgressOnly.IsPresent
+    'completion' = $CompletionOnly.IsPresent
     'import' = $ImportOnly.IsPresent
     'game-actions' = $GameActionsOnly.IsPresent
     'provider' = $ProviderOnly.IsPresent
@@ -358,7 +360,8 @@ function Close-InstalledShell {
 function Start-ShellDatabaseLock(
     [string] $Mode,
     [string] $ReadyPath,
-    [string] $ReleasePath) {
+    [string] $ReleasePath,
+    [int] $HoldSeconds = 0) {
     if ($Mode -notin @('hold-write-lock', 'hold-read-lock')) {
         throw "Unsupported shell database lock mode $Mode."
     }
@@ -371,6 +374,7 @@ function Start-ShellDatabaseLock(
         ('"{0}"' -f $seedDll), $Mode, ('"{0}"' -f $dataRoot),
         ('"{0}"' -f $ReadyPath), ('"{0}"' -f $ReleasePath)
     )
+    if ($HoldSeconds -gt 0) { $lockArguments += [string]$HoldSeconds }
     $lockProcess = Start-Process -FilePath 'dotnet.exe' `
         -ArgumentList $lockArguments -PassThru -WindowStyle Hidden
     try {
@@ -739,7 +743,7 @@ function Run-ShellSmoke(
     Register-ScheduledTask -TaskName $smokeTask -Action $action `
         -Principal $principal -Force | Out-Null
     Start-ScheduledTask -TaskName $smokeTask
-    $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*') { 240 }
+    $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*' -or $mode -like 'completion-*') { 240 }
         elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*') { 120 }
         else { 60 }
     $deadline = (Get-Date).AddSeconds($timeoutSeconds)
@@ -1464,6 +1468,100 @@ function Run-ProgressScenarios {
     }
 }
 
+function Get-StoredCompletion([string] $title) {
+    $stored = Invoke-ShellSeed @('describe-progress', $dataRoot) | ConvertFrom-Json
+    $state = @($stored | Where-Object { $_.title -eq $title })
+    if ($state.Count -ne 1) { throw "No stored state for '$title'." }
+    return $state[0]
+}
+
+function Assert-NotCompleted([string] $title, [string] $step) {
+    $state = Get-StoredCompletion $title
+    if ($null -ne $state.completedUtcMs) { throw "$step left '$title' completed." }
+    return $state
+}
+
+function Assert-Completed([string] $title, [string] $step) {
+    $state = Get-StoredCompletion $title
+    if ($null -eq $state.completedUtcMs) { throw "$step did not complete '$title'." }
+    return $state
+}
+
+function Run-CompletionScenarios {
+    # TR13.1-TR13.2: completion is an explicit choice on the Game page and in
+    # the Reader, it survives a relaunch, the last line or page never sets it,
+    # and a failed write is shown and put back.
+    $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
+    if (-not (Test-Path -LiteralPath (Join-Path $fixtureRoot 'p0\generated\pdf-long.pdf'))) {
+        throw 'pdf-long.pdf is missing; run tools/p0/make_fixtures.py first.'
+    }
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    $ids = Invoke-ShellSeed @('seed-progress', $dataRoot, $fixtureRoot) | ConvertFrom-Json
+    $diagnostics = Join-Path (Get-HtmlCacheRoot) 'diagnostics'
+    Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
+    $report.completion = [ordered]@{ ids = $ids }
+    $lockDir = Join-Path $env:TEMP "dg-completion-lock-$PID"
+    try {
+        # The Segmented gate runs first: a failure here means the RadioButtons fallback.
+        $report.completion.segmented = Invoke-ProgressPass 'completion-segmented' 0
+
+        $report.completion.lastPage = Invoke-ProgressPass 'completion-last-page' 0
+        foreach ($title in 'Numbered Lines Guide', 'Long PDF Guide') {
+            $state = Assert-NotCompleted $title 'Reading to the end'
+            if ($null -eq $state.estimate -or [double]$state.estimate -lt 0.9) {
+                throw "'$title' estimate after the end is $($state.estimate)."
+            }
+        }
+
+        $originalTheme = Get-AppThemePreference
+        try {
+            Set-AppThemePreference $true
+            $report.completion.gameLight = Invoke-ProgressPass 'completion-game' 0 -resultName 'completion-game-light'
+            $report.completion.readerLight = Invoke-ProgressPass 'completion-reader' 0 -resultName 'completion-reader-light'
+            Set-AppThemePreference $false
+            $report.completion.gameDark = Invoke-ProgressPass 'completion-game' 0 -resultName 'completion-game-dark'
+            $report.completion.readerDark = Invoke-ProgressPass 'completion-reader' 0 -resultName 'completion-reader-dark'
+        }
+        finally {
+            Restore-AppThemePreference $originalTheme
+        }
+        [void](Assert-NotCompleted 'Numbered Lines Guide' 'completion-game')
+        $webBefore = Assert-Completed 'Long Web Guide' 'completion-reader'
+
+        $report.completion.restart = Invoke-ProgressPass 'completion-restart' 0
+        $report.completion.restartAfter = Invoke-ProgressPass 'completion-restart-after' 0
+        $webAfter = Assert-NotCompleted 'Long Web Guide' 'completion-restart'
+        if ([Math]::Abs([double]$webAfter.estimate - [double]$webBefore.estimate) -gt 0.01) {
+            throw "Long Web Guide estimate moved from $($webBefore.estimate) to $($webAfter.estimate)."
+        }
+
+        # A held write lock makes the app's write time out after 30 s.
+        New-Item -ItemType Directory -Force $lockDir | Out-Null
+        $ready = Join-Path $lockDir 'ready'
+        $release = Join-Path $lockDir 'release'
+        Start-InstalledShell
+        $report.completion.errorPrepare = Run-ShellSmoke 'completion-error-prepare' `
+            -AppDataRoot $dataRoot -AppCacheRoot (Get-HtmlCacheRoot)
+        $lock = Start-ShellDatabaseLock 'hold-write-lock' $ready $release -HoldSeconds 120
+        try {
+            $report.completion.error = Run-ShellSmoke 'completion-error' `
+                -AppDataRoot $dataRoot -AppCacheRoot (Get-HtmlCacheRoot)
+        }
+        finally {
+            Release-ShellDatabaseLock $lock $release
+        }
+        [void](Assert-NotCompleted 'Numbered Lines Guide' 'completion-error')
+        $report.completion.errorRetry = Run-ShellSmoke 'completion-error-retry' `
+            -AppDataRoot $dataRoot -AppCacheRoot (Get-HtmlCacheRoot)
+        Close-InstalledShell
+        [void](Assert-Completed 'Numbered Lines Guide' 'completion-error-retry')
+    }
+    finally {
+        Remove-Item -LiteralPath $lockDir -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Run-ImportScenarios {
     Invoke-ShellSeed @('seed-import', $dataRoot) | Out-Null
     $originalTheme = Get-AppThemePreference
@@ -2036,6 +2134,7 @@ try {
     if (Enter-ScenarioGroup 'pdf') { Run-PdfReaderScenarios }
 
     if (Enter-ScenarioGroup 'progress') { Run-ProgressScenarios }
+    if (Enter-ScenarioGroup 'completion') { Run-CompletionScenarios }
 
     if (Enter-ScenarioGroup 'import') {
         Run-ImportScenarios

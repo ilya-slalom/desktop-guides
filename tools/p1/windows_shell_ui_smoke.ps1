@@ -14,7 +14,8 @@ param(
         'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted', 'txt-reader',
         'txt-load-paused', 'txt-back-during-load', 'txt-load-released', 'html-reader',
         'html-runtime-missing', 'pdf-reader', 'html-position',
-        'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed')]
+        'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed',
+        'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -214,14 +215,15 @@ try {
 
     function Wait-Status(
         [string[]] $expected,
-        [switch] $AllowHidden) {
+        [switch] $AllowHidden,
+        [int] $Seconds = 15) {
         $transient = @($expected | Where-Object { $_ -in @(
             'Library ready.',
             'Game ready.',
             'Guide ready.',
             'Settings ready.') }).Count -gt 0
         $lastObserved = 'status probe was not found'
-        $deadline = (Get-Date).AddSeconds(15)
+        $deadline = (Get-Date).AddSeconds($Seconds)
         do {
             $probe = Find-RawById 'ShellContent'
             $status = if ($probe) { $probe.Current.ItemStatus } else { '' }
@@ -1197,11 +1199,12 @@ try {
     }
     elseif ($Mode -in @('txt-reader', 'txt-load-paused', 'txt-back-during-load',
         'txt-load-released', 'html-reader', 'html-runtime-missing', 'pdf-reader', 'html-position',
-        'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed')) {
+        'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed',
+        'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
             elseif ($Mode -eq 'pdf-reader') { 'PDF Reader Game' }
-            elseif ($Mode -like 'progress-*') { 'Progress Game' }
+            elseif ($Mode -like 'progress-*' -or $Mode -like 'completion-*') { 'Progress Game' }
             else { 'Text Reader Game' }
         $missingMessage = "This guide's file is missing from the library."
         $listItem = New-Object System.Windows.Automation.PropertyCondition(
@@ -2357,6 +2360,219 @@ try {
                 Back-ToTextGame
                 Assert-NoSaveFailure 'progress-two-guides'
                 $report.phases += 'progress-unavailable'
+            }
+        }
+        elseif ($Mode -like 'completion-*') {
+            $numbered = 'Numbered Lines Guide'
+            $web = 'Long Web Guide'
+            $pdf = 'Long PDF Guide'
+
+            function Test-ItemSelected([string] $id) {
+                $item = Find-ById $id
+                if (-not $item -or $item.Current.IsOffscreen) { return $false }
+                return $item.GetCurrentPattern(
+                    [System.Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected
+            }
+
+            # The committed state is the only selected item.
+            function Wait-CompletionShown([bool] $complete, [string] $step) {
+                $on = if ($complete) { 'CompletionComplete' } else { 'CompletionInProgress' }
+                $off = if ($complete) { 'CompletionInProgress' } else { 'CompletionComplete' }
+                $deadline = (Get-Date).AddSeconds(10)
+                do {
+                    if ((Test-ItemSelected $on) -and -not (Test-ItemSelected $off)) { return }
+                    Start-Sleep -Milliseconds 100
+                } while ((Get-Date) -lt $deadline)
+                throw "$step expected '$on' as the only selected completion item."
+            }
+
+            function Focus-Completion {
+                $id = if (Test-ItemSelected 'CompletionComplete') { 'CompletionComplete' }
+                      else { 'CompletionInProgress' }
+                (Wait-VisibleById $id).SetFocus()
+                Wait-FocusedId $id
+            }
+
+            function Send-Keys([string] $keys) {
+                [System.Windows.Forms.SendKeys]::SendWait($keys)
+            }
+
+            function Get-RowHelp([string] $name) {
+                $row = @(Get-ListRows 'GuideList' | Where-Object { $_.Current.Name -eq $name })
+                if ($row.Count -ne 1) { return $null }
+                return $row[0].Current.HelpText
+            }
+
+            # -Exact compares the whole text; otherwise $pattern is a -like pattern.
+            function Wait-RowHelp([string] $name, [string] $pattern, [switch] $Exact, [switch] $NotCompleted) {
+                $deadline = (Get-Date).AddSeconds(10)
+                do {
+                    $help = Get-RowHelp $name
+                    $matched = $help -and $(if ($Exact) { $help -ceq $pattern } else { $help -like $pattern })
+                    if ($matched -and $NotCompleted) { $matched = $help -notlike '*Completed*' }
+                    if ($matched) { return $help }
+                    Start-Sleep -Milliseconds 200
+                } while ((Get-Date) -lt $deadline)
+                throw "Row '$name' help text was '$help'; expected '$pattern'."
+            }
+
+            function Anchor-Guide([string] $guide) {
+                Open-TextGuide $guide
+                [void](Wait-Status 'Guide ready.' -Seconds 60)
+                Back-ToTextGame
+                [void](Wait-VisibleById 'CompletionInProgress')
+            }
+
+            if ($Mode -notin @('completion-error', 'completion-error-retry')) {
+                [void](Wait-Name 'LibraryHeading' 'Library')
+                Resize-ShellWindow 1500 720
+                Select-Element $textGame
+                [void](Wait-Name 'GameHeading' $textGame)
+                [void](Wait-Status 'Game ready.')
+            }
+
+            if ($Mode -eq 'completion-segmented') {
+                # The UIA gate: two list items with their names, the selected
+                # state matching storage and following the arrow keys.
+                Anchor-Guide $numbered
+                $choice = Wait-VisibleById 'CompletionChoice'
+                if ($choice.Current.Name -ne "Completion for $numbered") {
+                    throw "The choice is named '$($choice.Current.Name)'."
+                }
+                foreach ($pair in @(@('CompletionInProgress', 'In progress'), @('CompletionComplete', 'Complete'))) {
+                    $item = Wait-VisibleById $pair[0]
+                    if ($item.Current.ControlType -ne [System.Windows.Automation.ControlType]::ListItem -or
+                        $item.Current.Name -ne $pair[1]) {
+                        throw "$($pair[0]) is a $($item.Current.ControlType.ProgrammaticName) named '$($item.Current.Name)'."
+                    }
+                }
+                Wait-CompletionShown $false 'A guide never completed'
+                (Wait-VisibleById 'OpenSelectedGuide').SetFocus()
+                Wait-FocusedId 'OpenSelectedGuide'
+                Send-Keys '+{TAB}'
+                Wait-FocusedId 'CompletionInProgress'
+                Send-Keys '{RIGHT}'
+                [void](Wait-Status "$numbered marked complete.")
+                Wait-CompletionShown $true 'Right'
+                Wait-FocusedId 'CompletionComplete'
+                Send-Keys '{LEFT}'
+                [void](Wait-Status "$numbered marked in progress.")
+                Wait-CompletionShown $false 'Left'
+                Wait-FocusedId 'CompletionInProgress'
+                $report.phases += 'completion-segmented'
+            }
+            elseif ($Mode -eq 'completion-last-page') {
+                # TR13.1: reaching the last line or page doesn't complete a guide.
+                Open-TextGuide $numbered
+                [void](Wait-Status 'Guide ready.')
+                Invoke-ReaderCommand 'Go to end'
+                Start-Sleep -Seconds 1
+                Back-ToTextGame
+                Open-TextGuide $pdf
+                [void](Wait-Status 'Guide ready.' -Seconds 60)
+                Invoke-ReaderCommand 'Go to end'
+                [void](Wait-PdfPage 200 200 'page 200 of 200' 60)
+                Back-ToTextGame
+                $report.completionLastPageRows = @(
+                    (Wait-RowHelp $numbered 'Text (TXT), about * percent, opened today at *'),
+                    (Wait-RowHelp $pdf 'PDF, about * percent, opened today at *'))
+                Wait-CompletionShown $false 'The last PDF page'
+                $report.phases += 'completion-last-page'
+            }
+            elseif ($Mode -eq 'completion-game') {
+                # The Game page: complete, then back to in progress with the
+                # row's estimate and open time shown exactly as before.
+                Anchor-Guide $numbered
+                $before = Wait-RowHelp $numbered 'Text (TXT), *' -NotCompleted
+                Focus-Completion
+                Send-Keys '{RIGHT}'
+                [void](Wait-Status "$numbered marked complete.")
+                $completed = Wait-RowHelp $numbered 'Text (TXT), Completed, opened today at *'
+                Wait-CompletionShown $true 'Marking complete on the Game page'
+                Wait-FocusedId 'CompletionComplete'
+                $report.completionGameScreenshot = Save-WindowScreenshot 'completion-game'
+                Send-Keys '{LEFT}'
+                [void](Wait-Status "$numbered marked in progress.")
+                $after = Wait-RowHelp $numbered $before -Exact
+                Wait-CompletionShown $false 'Marking in progress on the Game page'
+                Wait-FocusedId 'CompletionInProgress'
+                $report.completionGameRows = [ordered]@{ before = $before; completed = $completed; after = $after }
+                $report.phases += 'completion-game'
+            }
+            elseif ($Mode -eq 'completion-reader') {
+                # The light pass finds Web in progress and completes it. The
+                # dark pass finds it complete, toggles twice, and ends complete.
+                Open-TextGuide $web
+                [void](Wait-Status 'Guide ready.' -Seconds 60)
+                [void](Wait-VisibleById 'CompletionChoice')
+                $startedComplete = Test-ItemSelected 'CompletionComplete'
+                Focus-Completion
+                if ($startedComplete) {
+                    Send-Keys '{LEFT}'
+                    [void](Wait-Status "$web marked in progress.")
+                    Wait-CompletionShown $false 'Marking in progress in the Reader'
+                    Wait-FocusedId 'CompletionInProgress'
+                }
+                Send-Keys '{RIGHT}'
+                [void](Wait-Status "$web marked complete.")
+                Wait-CompletionShown $true 'Marking complete in the Reader'
+                Wait-FocusedId 'CompletionComplete'
+                $report.completionReaderStartedComplete = $startedComplete
+                $report.completionReaderScreenshot = Save-WindowScreenshot 'completion-reader'
+                Back-ToTextGame
+                $report.completionReaderRow = Wait-RowHelp $web 'Web page (HTML), Completed, opened today at *'
+                $report.phases += 'completion-reader'
+            }
+            elseif ($Mode -eq 'completion-restart') {
+                # TR13.2: completion survives a relaunch, and so does clearing it.
+                [void](Wait-RowHelp $web 'Web page (HTML), Completed, opened today at *')
+                Open-TextGuide $web
+                [void](Wait-Status 'Guide ready.' -Seconds 60)
+                Wait-CompletionShown $true 'Reopening a completed guide'
+                Focus-Completion
+                Send-Keys '{LEFT}'
+                [void](Wait-Status "$web marked in progress.")
+                Wait-CompletionShown $false 'Marking in progress after a relaunch'
+                Back-ToTextGame
+                $report.phases += 'completion-restart'
+            }
+            elseif ($Mode -eq 'completion-restart-after') {
+                $report.completionRestartRow = Wait-RowHelp $web 'Web page (HTML), *opened today at *' -NotCompleted
+                Open-TextGuide $web
+                [void](Wait-Status 'Guide ready.' -Seconds 60)
+                Wait-CompletionShown $false 'Reopening after clearing completion'
+                Back-ToTextGame
+                $report.phases += 'completion-restart-after'
+            }
+            elseif ($Mode -eq 'completion-error-prepare') {
+                # The installer takes the write lock after this mode.
+                Anchor-Guide $numbered
+                Wait-CompletionShown $false 'Before the held lock'
+                $report.phases += 'completion-error-prepare'
+            }
+            elseif ($Mode -eq 'completion-error') {
+                # The write waits on the held lock. Left while it waits keeps
+                # the pending choice; the timeout shows the error and puts
+                # the choice back.
+                Focus-Completion
+                Send-Keys '{RIGHT}'
+                Wait-CompletionShown $true 'The pending write'
+                Send-Keys '{LEFT}'
+                Start-Sleep -Seconds 1
+                Wait-CompletionShown $true 'Left while the write is pending'
+                [void](Wait-Status "Could not update completion for $numbered. Try again." -Seconds 60)
+                Wait-CompletionShown $false 'After the failed write'
+                [void](Wait-RowHelp $numbered 'Text (TXT), *' -NotCompleted)
+                $report.completionErrorScreenshot = Save-WindowScreenshot 'completion-error'
+                $report.phases += 'completion-error'
+            }
+            else {
+                # completion-error-retry: the lock is gone and the retry commits.
+                Focus-Completion
+                Send-Keys '{RIGHT}'
+                [void](Wait-Status "$numbered marked complete.")
+                Wait-CompletionShown $true 'The retry'
+                $report.phases += 'completion-error-retry'
             }
         }
         else {

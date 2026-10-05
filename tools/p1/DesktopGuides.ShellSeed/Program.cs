@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO.Compression;
 using System.Net;
 using System.Security.Cryptography;
@@ -14,7 +15,7 @@ using DesktopGuides.Infrastructure.Providers;
 using DesktopGuides.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
 
-if (args.Length == 4 &&
+if (args.Length is 4 or 5 &&
     args[0] is "hold-write-lock" or "hold-read-lock")
 {
     ManagedPathResolver lockPaths = new(args[1]);
@@ -45,7 +46,9 @@ if (args.Length == 4 &&
     try
     {
         File.WriteAllText(args[2], "ready");
-        DateTime deadline = DateTime.UtcNow.AddSeconds(30);
+        // The holder outlasts a caller's 30 s SQLite timeout when asked to.
+        int holdSeconds = args.Length == 5 ? int.Parse(args[4], CultureInfo.InvariantCulture) : 30;
+        DateTime deadline = DateTime.UtcNow.AddSeconds(holdSeconds);
         while (!File.Exists(args[3]) && DateTime.UtcNow < deadline)
         {
             Thread.Sleep(50);
@@ -691,7 +694,7 @@ if (args.Length != 2 ||
         "or clear-reading-locations <app-data-root> " +
         "or change-progress-copies <app-data-root> " +
         "or corrupt-reader-guide|restore-reader-guide <app-data-root> " +
-        "or hold-write-lock|hold-read-lock <app-data-root> <ready-path> <release-path>");
+        "or hold-write-lock|hold-read-lock <app-data-root> <ready-path> <release-path> [hold-seconds]");
     return 2;
 }
 

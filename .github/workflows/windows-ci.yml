@@ -24,6 +24,7 @@ on:
           - html
           - pdf
           - progress
+          - completion
           - import
           - game-actions
           - provider
@@ -368,7 +369,7 @@ jobs:
           $groupSwitches = [ordered]@{
             'all' = $null; 'core' = 'CoreOnly'; 'design' = 'DesignOnly'
             'catalog' = 'CatalogOnly'; 'txt' = 'TxtOnly'; 'html' = 'HtmlOnly'
-            'pdf' = 'PdfOnly'; 'progress' = 'ProgressOnly'; 'import' = 'ImportOnly'
+            'pdf' = 'PdfOnly'; 'progress' = 'ProgressOnly'; 'completion' = 'CompletionOnly'; 'import' = 'ImportOnly'
             'game-actions' = 'GameActionsOnly'; 'provider' = 'ProviderOnly'
           }
           if (-not $groupSwitches.Contains($env:SHELL_SCOPE)) {
