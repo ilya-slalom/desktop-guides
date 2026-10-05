@@ -132,6 +132,24 @@ public sealed class ProgressCoordinatorTests
     }
 
     [Fact]
+    public async Task DisposeDuringTimerCaptureWaitsAndWritesIt()
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        FakeSession session = new() { Hold = new TaskCompletionSource() };
+        IProgressTracking tracking = Track(coordinator, GuideA, session, null);
+        session.Move();
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal(1, session.Captures);
+
+        Task disposing = tracking.DisposeAsync().AsTask();
+        ReleaseInline(session.Hold!);
+        await disposing;
+
+        Assert.Equal([(GuideA, session.CurrentJson, (double?)null)], store.Writes);
+        Assert.Equal(0, coordinator.Counts.Failures);
+    }
+
+    [Fact]
     public async Task FlushDuringBurstKeepsDeadlineAndWritesLatest()
     {
         ProgressCoordinator coordinator = new(store, clock);
