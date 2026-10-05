@@ -3157,26 +3157,27 @@ try {
         [void](Wait-SelectedGuide 'Atlas Second Guide')
         $report.phases += 'other-game-back-keeps-guide'
 
-        # Removal selects the next row, then the previous one at the end.
+        # Opening Second recorded an open, so the rows are Second, Third,
+        # First. Removing the top row selects the row after it, twice.
         Invoke-Element (Wait-Name 'RemoveSelectedGuide' 'Remove Atlas Second Guide')
         [void](Wait-VisibleById 'RemoveGuideDialog')
         Invoke-Element (Wait-EnabledById 'PrimaryButton')
         [void](Wait-HiddenById 'RemoveGuideDialog')
         [void](Wait-Status 'Removed Atlas Second Guide.')
         [void](Wait-GuideRowCount 2)
-        [void](Wait-SelectedGuide 'Atlas First Guide')
-        [void](Wait-FocusedGuide 'Atlas First Guide')
+        [void](Wait-SelectedGuide 'Atlas Third Guide')
+        [void](Wait-FocusedGuide 'Atlas Third Guide')
         $report.phases += 'remove-selects-next-guide'
 
-        Invoke-Element (Wait-Name 'RemoveSelectedGuide' 'Remove Atlas First Guide')
+        Invoke-Element (Wait-Name 'RemoveSelectedGuide' 'Remove Atlas Third Guide')
         [void](Wait-VisibleById 'RemoveGuideDialog')
         Invoke-Element (Wait-EnabledById 'PrimaryButton')
         [void](Wait-HiddenById 'RemoveGuideDialog')
-        [void](Wait-Status 'Removed Atlas First Guide.')
+        [void](Wait-Status 'Removed Atlas Third Guide.')
         [void](Wait-GuideRowCount 1)
-        [void](Wait-SelectedGuide 'Atlas Third Guide')
-        [void](Wait-FocusedGuide 'Atlas Third Guide')
-        $report.phases += 'remove-last-selects-previous-guide'
+        [void](Wait-SelectedGuide 'Atlas First Guide')
+        [void](Wait-FocusedGuide 'Atlas First Guide')
+        $report.phases += 'remove-again-selects-next-guide'
 
         # This Library entry is the one Atlas was opened from.
         Back-ToLibrary 'Back after guide removal'
@@ -3938,11 +3939,16 @@ try {
         [void](Wait-SelectedGuide $target)
         Wait-FocusedGuide $target
         [void](Wait-Name 'OpenSelectedGuide' "Open $target")
-        $report.phases += 'virtualized-guide-back-focus'
+        # The open moved the tail guide to the top of the list.
+        $firstRow = @(Get-ListRows 'GuideList')[0].Current.Name
+        if ($firstRow -ne $target) {
+            throw "The first guide row after Back was '$firstRow', not the opened guide."
+        }
+        $report.phases += 'opened-guide-back-focus-first-row'
         [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
         [void](Wait-Name 'ReaderHeading' $target)
         [void](Wait-Status 'Guide ready.')
-        $report.phases += 'virtualized-guide-enter-reopen'
+        $report.phases += 'opened-guide-enter-reopen'
     }
     elseif ($Mode -eq 'switch-game-prepare') {
         $target = 'ZZZ Focus Target Guide'

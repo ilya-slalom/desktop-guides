@@ -242,6 +242,20 @@ scenarios in [e2e-testing.md](e2e-testing.md).
   can't remove the saved context, so the verb replaces `Numbered guide text.`
   with `Edited guide text.` on every line. Each line keeps a uniform length,
   so the stored estimate lands on the saved line exactly.
+- **An open moves its guide to the top of the Game page.** Rows sort by
+  `MAX(ImportedUtcMs, LastOpenedUtcMs)` (T05.1), and T12.3 is the first
+  runtime write of `LastOpenedUtcMs`. Selecting a guide opens it, so the
+  selected guide is the top row after Back, and two older smoke
+  expectations changed:
+  - `stable-navigation` opens Atlas Second, so its rows become Second,
+    Third, First. Each removal now selects the row after the removed one
+    (`remove-selects-next-guide`, `remove-again-selects-next-guide`).
+    Removing the last row can't happen there any more, and
+    `ListAnchorTests` keep covering the previous-row fallback.
+  - `long-list` reopens the tail guide, which comes back as the first row.
+    `virtualized-guide-back-focus` became `opened-guide-back-focus-first-row`
+    and checks that order; returning focus to a still-virtualized row is
+    no longer reachable from the Reader.
 - **Test corrections made while implementing:**
   - The Infrastructure reopen test declared `game` twice; the reopened game
     is now `listed`.
