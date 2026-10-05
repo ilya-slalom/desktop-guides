@@ -199,7 +199,8 @@ public sealed class ProgressCoordinator
                 }
                 ReaderLocation location = await session.GetLocationAsync(token)
                     .WaitAsync(token).ConfigureAwait(false);
-                string json = ReaderLocationCodec.Serialize(location with { EstimatedFraction = null });
+                double? estimate = ProgressEstimate.Bound(location.EstimatedFraction);
+                string json = ReaderLocationCodec.Serialize(location with { EstimatedFraction = estimate });
                 lock (gate)
                 {
                     if (ended) return;
@@ -209,7 +210,7 @@ public sealed class ProgressCoordinator
                     owner.Record(0, 1, 0);
                     return;
                 }
-                await owner.store.SaveReadingLocationAsync(guideId, json, null, token)
+                await owner.store.SaveReadingLocationAsync(guideId, json, estimate, token)
                     .WaitAsync(token).ConfigureAwait(false);
                 lastJson = json;
                 owner.Record(1, 0, 0);

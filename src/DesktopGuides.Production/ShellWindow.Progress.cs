@@ -100,7 +100,10 @@ public sealed partial class ShellWindow
         try
         {
             ReaderLocation location = await session.GetLocationAsync(token);
-            return ReaderLocationCodec.Serialize(location with { EstimatedFraction = null });
+            return ReaderLocationCodec.Serialize(location with
+            {
+                EstimatedFraction = ProgressEstimate.Bound(location.EstimatedFraction),
+            });
         }
         catch (Exception)
         {
