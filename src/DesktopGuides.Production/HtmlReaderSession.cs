@@ -222,7 +222,12 @@ internal sealed class HtmlReaderSession : IReaderSession
     {
         token.ThrowIfCancellationRequested();
         // Mid-reflow or mid-restore, the page's top isn't the reader's point.
-        if (!resizing && !restoring && await CaptureAsync() is HtmlCapture capture) current = capture;
+        if (!resizing && !restoring && await CaptureAsync() is HtmlCapture capture && capture != current)
+        {
+            // The caller asked, so no LocationChanged; the test file still follows the point.
+            current = capture;
+            WritePositionForTest();
+        }
         token.ThrowIfCancellationRequested();
         return HtmlLocationRules.Capture(contentSha256 ?? string.Empty, policy.Entry.RequestPath, current ?? Start);
     }
