@@ -903,6 +903,7 @@ function Run-TxtReaderScenarios {
         $report.txtReaderLight = Run-ShellSmoke 'txt-reader' -ResultName 'txt-reader-light'
         Close-InstalledShell
 
+        Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
         Set-AppThemePreference $false
         Start-InstalledShell
         $report.txtReaderDark = Run-ShellSmoke 'txt-reader' -ResultName 'txt-reader-dark'
@@ -1116,6 +1117,7 @@ function Run-HtmlReaderScenarios {
         $canary = Start-HtmlCanary $logPath
         $baseline = @(Get-HtmlCanaryLines $logPath).Count
         Set-AppThemePreference $true
+        Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
         Invoke-HtmlReaderPass 'html-reader-online'
         Save-HtmlDiagnostics 'html-reader-online' $cacheRoot
         if (Test-Path -LiteralPath $leftover) {
@@ -1135,6 +1137,7 @@ function Run-HtmlReaderScenarios {
         Remove-Item -LiteralPath $diagnostics -Recurse -Force
         $baseline = @(Get-HtmlCanaryLines $logPath).Count
         Set-AppThemePreference $false
+        Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
         Invoke-HtmlReaderPass 'html-reader-offline'
         Save-HtmlDiagnostics 'html-reader-offline' $cacheRoot
         $report.htmlReader.offline = Assert-HtmlReaderPass 'offline' $cacheRoot $readerSessions $readerLaunches $logPath $baseline
@@ -1145,6 +1148,7 @@ function Run-HtmlReaderScenarios {
         Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
         $canary = Start-HtmlCanary $logPath
         $baseline = @(Get-HtmlCanaryLines $logPath).Count
+        Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
         Invoke-HtmlReaderPass 'html-runtime-missing' 'html-runtime-missing' -NoRuntime
         Save-HtmlDiagnostics 'html-runtime-missing' $cacheRoot
         $report.htmlReader.runtimeMissing = Assert-HtmlReaderPass 'runtime-missing' $cacheRoot `
@@ -1239,6 +1243,7 @@ function Run-HtmlPositionScenarios {
             @{ name = 'html-position-dark'; light = $false })) {
             Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
             Remove-Item -LiteralPath (Join-Path $dataRoot 'test') -Recurse -Force -ErrorAction SilentlyContinue
+            Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
             Set-AppThemePreference $pass.light
             try {
                 $result = Invoke-HtmlPositionPass $pass.name
@@ -1342,6 +1347,7 @@ function Run-PdfReaderScenarios {
             @{ name = 'pdf-reader-dark'; light = $false })) {
             Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
             Set-AppThemePreference $pass.light
+            Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
             Invoke-PdfReaderPass $pass.name
             $report.pdfReader["$($pass.name)-diagnostics"] = Assert-PdfDiagnostics $pass.name $diagnostics $ids.pdfLong
         }

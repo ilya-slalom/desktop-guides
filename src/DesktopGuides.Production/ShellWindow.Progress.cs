@@ -1,5 +1,7 @@
+using System.Text.Json;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Reading;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 namespace DesktopGuides.Production;
@@ -10,6 +12,101 @@ public sealed partial class ShellWindow
         "Opened near your last place. The guide changed since you were here.";
     private const string UnavailableRestoreMessage =
         "Couldn't return to your last place, so the guide opened at the start.";
+    private const string SaveFailedMessage = "Couldn't save your place in this guide.";
+
+    private ProgressCoordinator? progress;
+    private IProgressTracking? progressTracking;
+    private readonly object progressCountsFile = new();
+
+    private void StartProgress(IReadingLocationStore store)
+    {
+        ProgressCoordinator coordinator = new(store, TimeProvider.System);
+        coordinator.SaveFailed += (_, _) =>
+            DispatcherQueue.TryEnqueue(() => ShowWarningStatus(SaveFailedMessage));
+        coordinator.CountsChanged += (_, _) => WriteProgressCountsForTest(coordinator.Counts);
+        progress = coordinator;
+    }
+
+    // Test gate only: counts, never locator text.
+    private void WriteProgressCountsForTest(ProgressCounts counts)
+    {
+        if (cacheRoot is null ||
+            !TestGate.IsOpen($@"Local\DesktopGuides.Preview.ProgressDiagnostics.{Environment.ProcessId}"))
+        {
+            return;
+        }
+        string folder = Path.Combine(cacheRoot, "diagnostics");
+        string path = Path.Combine(folder, $"progress-{Environment.ProcessId}.json");
+        lock (progressCountsFile)
+        {
+            try
+            {
+                Directory.CreateDirectory(folder);
+                string temp = path + ".tmp";
+                File.WriteAllText(temp, JsonSerializer.Serialize(new
+                {
+                    saves = counts.Saves,
+                    skippedUnchanged = counts.SkippedUnchanged,
+                    failures = counts.Failures,
+                }));
+                File.Move(temp, path, true);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
+    }
+
+    // Saves an unsaved place while the session is still alive. Never throws.
+    private async Task DisposeProgressTrackingAsync()
+    {
+        IProgressTracking? tracking = progressTracking;
+        progressTracking = null;
+        if (tracking is not null)
+        {
+            await tracking.DisposeAsync();
+        }
+    }
+
+    private void WindowActivated(object sender, WindowActivatedEventArgs args)
+    {
+        if (args.WindowActivationState == WindowActivationState.Deactivated)
+        {
+            FlushProgressAsync();
+        }
+    }
+
+    private async void FlushProgressAsync()
+    {
+        if (progressTracking is not IProgressTracking tracking)
+        {
+            return;
+        }
+        using CancellationTokenSource timeout = new(ProgressCoordinator.FlushTimeout);
+        try
+        {
+            await tracking.FlushAsync(timeout.Token);
+        }
+        catch (Exception)
+        {
+            // The coordinator reports failures through SaveFailed.
+        }
+    }
+
+    // The unmoved place the coordinator compares captures against.
+    private static async Task<string?> CaptureBaselineAsync(
+        IReaderSession session, CancellationToken token)
+    {
+        try
+        {
+            ReaderLocation location = await session.GetLocationAsync(token);
+            return ReaderLocationCodec.Serialize(location with { EstimatedFraction = null });
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
 
     // Once a session is showing, returns it to the guide's saved place and
     // says so when that place is approximate or lost. Returns false when a
@@ -68,6 +165,17 @@ public sealed partial class ShellWindow
             }
         }
         ShowRestoreStatus(kind);
+        // An exact restore is already at the stored place; any other outcome
+        // compares against where the reader actually is, so an unmoved guide
+        // keeps its stored locator.
+        string? baseline = kind == RestoreKind.Exact
+            ? stored
+            : await CaptureBaselineAsync(session, token);
+        if (generation != renderGeneration)
+        {
+            return false;
+        }
+        progressTracking = progress!.Track(guide.Id, session, baseline);
         return true;
     }
 

@@ -572,6 +572,15 @@ if (args.Length == 3 && args[0] == "seed-pdf-reader")
     return 0;
 }
 
+if (args.Length == 2 && args[0] == "clear-reading-locations")
+{
+    // Puts every guide back at its start between passes that share a data folder.
+    ExecuteSql(
+        new ManagedPathResolver(args[1]),
+        "UPDATE ReadingStates SET LocatorJson = NULL, EstimatedFraction = NULL");
+    return 0;
+}
+
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second" or
         "seed-design" or "seed-catalog" or "seed-facts" or "seed-search" or "seed-import" or
@@ -584,6 +593,7 @@ if (args.Length != 2 ||
         "or seed-txt-reader|seed-html-reader|seed-html-position|seed-pdf-reader <app-data-root> <fixtures-root> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
         "or invalidate-blocked-guide <app-data-root> " +
+        "or clear-reading-locations <app-data-root> " +
         "or corrupt-reader-guide|restore-reader-guide <app-data-root> " +
         "or hold-write-lock|hold-read-lock <app-data-root> <ready-path> <release-path>");
     return 2;
