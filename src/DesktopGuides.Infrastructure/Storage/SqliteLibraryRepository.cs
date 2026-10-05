@@ -480,6 +480,37 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         }, token);
     }
 
+    // Changes only CompletedUtcMs. A repeated completion keeps the first time.
+    public Task<DateTimeOffset?> SetGuideCompletionAsync(
+        Guid guideId, DateTimeOffset? completedUtc, CancellationToken token = default)
+    {
+        long? completedMs = completedUtc?.ToUnixTimeMilliseconds();
+        if (completedMs < 0) throw new ArgumentOutOfRangeException(nameof(completedUtc));
+        return WriteAsync<DateTimeOffset?>(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            using SqliteCommand update = connection.CreateCommand();
+            update.Transaction = transaction;
+            update.CommandText = """
+                UPDATE ReadingStates
+                SET CompletedUtcMs = CASE WHEN $completed IS NULL THEN NULL
+                                          ELSE COALESCE(CompletedUtcMs, $completed) END
+                WHERE GuideId = $id
+                """;
+            update.Parameters.AddWithValue("$id", guideId.ToString("N"));
+            update.Parameters.AddWithValue("$completed", (object?)completedMs ?? DBNull.Value);
+            if (update.ExecuteNonQuery() != 1) throw new ReadingStateMissingException(guideId);
+            using SqliteCommand read = connection.CreateCommand();
+            read.Transaction = transaction;
+            read.CommandText = "SELECT CompletedUtcMs FROM ReadingStates WHERE GuideId = $id";
+            read.Parameters.AddWithValue("$id", guideId.ToString("N"));
+            object? stored = read.ExecuteScalar();
+            transaction.Commit();
+            return stored is long ms ? FromUnixMilliseconds(ms) : null;
+        }, token);
+    }
+
     public Task<ReaderPreferences?> GetReaderPreferencesAsync(
         Guid guideId, CancellationToken token = default) =>
         ReadAsync<ReaderPreferences?>(() =>

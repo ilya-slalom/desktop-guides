@@ -809,6 +809,7 @@ project uses a provisional package identity until T17.1 sets the public one.
   clears the completion timestamp; repeating the same action is idempotent.
   Tests toggle twice, restart, and verify that 100% estimated progress does
   not create a completion timestamp.
+  See the [T13.2 design](p1/t13-2-completion-service-design.md).
 
 ### S14 — Remember reader appearance
 

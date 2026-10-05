@@ -882,6 +882,14 @@ restart. Theme/font changes preserve or visibly approximate the location.
 | T14.3 | T08.3, T09.3, T10.3, T14.1, T14.2 | Pre-change capture and post-layout restore across text/theme changes. TXT returns within one line, HTML to matching context where present, PDF to page/fraction; fallback is announced. | TR14.1, TR14.2 |
 | T14.4 | T05.4, T08.3, T09.2, T10.2, T11.3, T14.2 | Shared design language applied to production Reader and Settings commands, Toolkit `SettingsCard`/`SettingsExpander` groups, the T14.2 `Segmented` choice, and teaching/status surfaces. Installed TXT/HTML/PDF/Settings screenshots and keyboard, theme, high-contrast, text-scale, display-scale, and narrow-width checks pass; every Toolkit dependency is centrally locked. | TR11.3, TR14.3 |
 
+T13.2 is implemented; see the
+[design and implementation notes](t13-2-completion-service-design.md).
+`GuideCompletionService` marks a guide complete with the clock's time or back
+in progress, and returns the committed state. The write changes only
+`CompletedUtcMs`, in one SQLite transaction. A repeated completion keeps the
+first time, and the locator, estimate, and open time are untouched. A 100%
+estimate never creates a completion time. T13.1 adds the actions.
+
 ## M5 — errors, accessibility, and portable backup
 
 Exit: interrupted operations recover without damaging unrelated content;

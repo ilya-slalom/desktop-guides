@@ -423,6 +423,8 @@ the final page does not silently mark the guide complete.
   retain equivalent native radio buttons.
 - **T13.2** Store completion time separately from reading location and
   percentage.
+  Implemented; see
+  [p1/t13-2-completion-service-design.md](p1/t13-2-completion-service-design.md).
 - **TR13.1** Completion status is derived from an explicit user action, not
   from estimated percentage.
 - **TR13.2** State changes are persisted as one transaction and survive restart.

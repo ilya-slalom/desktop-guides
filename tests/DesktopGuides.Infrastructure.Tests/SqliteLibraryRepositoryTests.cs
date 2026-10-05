@@ -165,6 +165,203 @@ public sealed class SqliteLibraryRepositoryTests
             repository.RecordGuideOpenedAsync(unknown, DateTimeOffset.UnixEpoch.AddMilliseconds(-1)));
     }
 
+    private const string PlaceJson = """{"place":1}""";
+
+    [Fact]
+    public async Task CompletionTogglesTwiceAndKeepsTheReadingPlace()
+    {
+        using TestLibrary directory = new();
+        Guid guide = Guid.NewGuid();
+        await using SqliteLibraryRepository repository =
+            new(directory.Paths, new FixedTimeProvider(Now));
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Completion", null, null);
+        InsertGuide(directory.Paths.DatabasePath, guide, game.Id);
+        await repository.SaveReadingLocationAsync(guide, PlaceJson, 0.4);
+        await repository.RecordGuideOpenedAsync(guide, Now.AddHours(1));
+
+        async Task AssertState(DateTimeOffset? completed)
+        {
+            ReadingState? state = await repository.GetReadingStateAsync(guide);
+            Assert.Equal(PlaceJson, state?.LocatorJson);
+            Assert.Equal(0.4, state?.EstimatedFraction);
+            Assert.Equal(Now.AddHours(1), state?.LastOpenedUtc);
+            Assert.Equal(completed, state?.CompletedUtc);
+        }
+
+        Assert.Equal(Now.AddHours(2), await repository.SetGuideCompletionAsync(guide, Now.AddHours(2)));
+        await AssertState(Now.AddHours(2));
+        Assert.Null(await repository.SetGuideCompletionAsync(guide, null));
+        await AssertState(null);
+        Assert.Equal(Now.AddHours(3), await repository.SetGuideCompletionAsync(guide, Now.AddHours(3)));
+        await AssertState(Now.AddHours(3));
+        Assert.Null(await repository.SetGuideCompletionAsync(guide, null));
+        await AssertState(null);
+    }
+
+    [Fact]
+    public async Task RepeatingAnActionKeepsTheCommittedState()
+    {
+        using TestLibrary directory = new();
+        Guid guide = Guid.NewGuid();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Completion", null, null);
+        InsertGuide(directory.Paths.DatabasePath, guide, game.Id);
+
+        Assert.Null(await repository.SetGuideCompletionAsync(guide, null));
+        Assert.Equal(Now, await repository.SetGuideCompletionAsync(guide, Now));
+        Assert.Equal(Now, await repository.SetGuideCompletionAsync(guide, Now.AddHours(5)));
+        Assert.Equal(Now, (await repository.GetReadingStateAsync(guide))?.CompletedUtc);
+        Assert.Null(await repository.SetGuideCompletionAsync(guide, null));
+        Assert.Null(await repository.SetGuideCompletionAsync(guide, null));
+        Assert.Null((await repository.GetReadingStateAsync(guide))?.CompletedUtc);
+    }
+
+    [Fact]
+    public async Task CompletionSurvivesReopen()
+    {
+        using TestLibrary directory = new();
+        Guid guide = Guid.NewGuid();
+        Guid gameId;
+        FixedTimeProvider later = new(Now.AddHours(3));
+        await using (SqliteLibraryRepository repository =
+            new(directory.Paths, new FixedTimeProvider(Now)))
+        {
+            await repository.InitializeAsync();
+            Game game = await repository.AddGameAsync("Completion", null, null);
+            gameId = game.Id;
+            InsertGuide(directory.Paths.DatabasePath, guide, gameId);
+            await repository.SaveReadingLocationAsync(guide, PlaceJson, 0.4);
+            await repository.SetGuideCompletionAsync(guide, Now.AddHours(2));
+        }
+
+        await using (SqliteLibraryRepository reopened = new(directory.Paths))
+        {
+            await reopened.InitializeAsync();
+            GuideSummary summary = Assert.Single(await reopened.ListGuideSummariesAsync(gameId));
+            Assert.Equal(Now.AddHours(2), summary.State?.CompletedUtc);
+            Assert.Equal("Completed", CatalogPresentation.GuideFacts(
+                summary, later, CultureInfo.InvariantCulture)[1].Label);
+            Assert.Null(await reopened.SetGuideCompletionAsync(guide, null));
+        }
+
+        await using SqliteLibraryRepository again = new(directory.Paths);
+        await again.InitializeAsync();
+        GuideSummary returned = Assert.Single(await again.ListGuideSummariesAsync(gameId));
+        Assert.Null(returned.State?.CompletedUtc);
+        Assert.Equal(PlaceJson, returned.State?.LocatorJson);
+        Assert.Equal("~40%", CatalogPresentation.GuideFacts(
+            returned, later, CultureInfo.InvariantCulture)[1].Label);
+    }
+
+    [Fact]
+    public async Task AFullEstimateIsNotCompletion()
+    {
+        // TR13.1: reading to 100% never creates a completion time.
+        using TestLibrary directory = new();
+        Guid guide = Guid.NewGuid();
+        Guid gameId;
+        await using (SqliteLibraryRepository repository =
+            new(directory.Paths, new FixedTimeProvider(Now)))
+        {
+            await repository.InitializeAsync();
+            Game game = await repository.AddGameAsync("Completion", null, null);
+            gameId = game.Id;
+            InsertGuide(directory.Paths.DatabasePath, guide, gameId);
+            await repository.SaveReadingLocationAsync(guide, PlaceJson, 1.0);
+            await repository.RecordGuideOpenedAsync(guide, Now.AddHours(1));
+        }
+
+        await using SqliteLibraryRepository reopened = new(directory.Paths);
+        await reopened.InitializeAsync();
+        GuideSummary summary = Assert.Single(await reopened.ListGuideSummariesAsync(gameId));
+        Assert.Equal(1.0, summary.State?.EstimatedFraction);
+        Assert.Null(summary.State?.CompletedUtc);
+        Assert.Equal("~100%", CatalogPresentation.GuideFacts(
+            summary, new FixedTimeProvider(Now.AddHours(2)), CultureInfo.InvariantCulture)[1].Label);
+    }
+
+    [Fact]
+    public async Task SetGuideCompletionRejectsAMissingRowAndANegativeTime()
+    {
+        using TestLibrary directory = new();
+        Guid guide = Guid.NewGuid();
+        Guid unknown = Guid.NewGuid();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Completion", null, null);
+        InsertGuide(directory.Paths.DatabasePath, guide, game.Id);
+
+        ReadingStateMissingException missing = await Assert.ThrowsAsync<ReadingStateMissingException>(() =>
+            repository.SetGuideCompletionAsync(unknown, Now));
+        Assert.Equal(unknown, missing.GuideId);
+        missing = await Assert.ThrowsAsync<ReadingStateMissingException>(() =>
+            repository.SetGuideCompletionAsync(unknown, null));
+        Assert.Equal(unknown, missing.GuideId);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            repository.SetGuideCompletionAsync(guide, DateTimeOffset.UnixEpoch.AddMilliseconds(-1)));
+        Assert.Null((await repository.GetReadingStateAsync(guide))?.CompletedUtc);
+    }
+
+    [Fact]
+    public async Task ConcurrentWritesKeepEveryColumn()
+    {
+        using TestLibrary directory = new();
+        Guid guide = Guid.NewGuid();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Completion", null, null);
+        InsertGuide(directory.Paths.DatabasePath, guide, game.Id);
+
+        await Task.WhenAll(
+            repository.SaveReadingLocationAsync(guide, PlaceJson, 0.4),
+            repository.SetGuideCompletionAsync(guide, Now.AddHours(2)),
+            repository.RecordGuideOpenedAsync(guide, Now.AddHours(1)));
+
+        ReadingState? state = await repository.GetReadingStateAsync(guide);
+        Assert.Equal(PlaceJson, state?.LocatorJson);
+        Assert.Equal(0.4, state?.EstimatedFraction);
+        Assert.Equal(Now.AddHours(1), state?.LastOpenedUtc);
+        Assert.Equal(Now.AddHours(2), state?.CompletedUtc);
+    }
+
+    [Fact]
+    public async Task CompletionTimeIsCommittedInUtcMilliseconds()
+    {
+        using TestLibrary directory = new();
+        Guid guide = Guid.NewGuid();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Completion", null, null);
+        InsertGuide(directory.Paths.DatabasePath, guide, game.Id);
+        DateTimeOffset local = new(2026, 10, 5, 17, 0, 0, TimeSpan.FromHours(9));
+
+        DateTimeOffset? committed = await repository.SetGuideCompletionAsync(guide, local.AddTicks(5));
+
+        Assert.Equal(local, committed);
+        Assert.Equal(TimeSpan.Zero, committed?.Offset);
+        Assert.Equal(committed, (await repository.GetReadingStateAsync(guide))?.CompletedUtc);
+    }
+
+    [Fact]
+    public async Task CanceledCompletionWritesNothing()
+    {
+        using TestLibrary directory = new();
+        Guid guide = Guid.NewGuid();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Completion", null, null);
+        InsertGuide(directory.Paths.DatabasePath, guide, game.Id);
+        using CancellationTokenSource canceled = new();
+        canceled.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            repository.SetGuideCompletionAsync(guide, Now, canceled.Token));
+
+        Assert.Null((await repository.GetReadingStateAsync(guide))?.CompletedUtc);
+    }
+
     [Fact]
     public async Task RejectsInvalidMetadataAndUnknownGuidePosition()
     {
