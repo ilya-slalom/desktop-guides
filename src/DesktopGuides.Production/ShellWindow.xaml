@@ -347,25 +347,28 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="Guides"
                                Style="{StaticResource DesktopGuidesSectionTitleStyle}" />
+                    <local:GuideCompletionChoice x:Name="GameCompletionChoice"
+                                                 Grid.Column="1" />
                     <Button x:Name="OpenSelectedGuideButton"
-                            Grid.Column="1"
+                            Grid.Column="2"
                             Content="Open selected guide"
                             Visibility="Collapsed"
                             Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
                             Click="OpenSelectedGuideClicked"
                             AutomationProperties.AutomationId="OpenSelectedGuide" />
                     <Button x:Name="RemoveSelectedGuideButton"
-                            Grid.Column="2"
+                            Grid.Column="3"
                             Content="Remove guide"
                             Visibility="Collapsed"
                             Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
                             Click="RemoveSelectedGuideClicked"
                             AutomationProperties.AutomationId="RemoveSelectedGuide" />
                     <Button x:Name="ImportGuideButton"
-                            Grid.Column="3"
+                            Grid.Column="4"
                             Content="Import guide"
                             IsEnabled="False"
                             Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
@@ -428,17 +431,22 @@
                                    Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
                                    AutomationProperties.AutomationId="ReaderGameName" />
                     </StackPanel>
-                    <Border Grid.Column="1"
-                            Padding="10,4"
-                            VerticalAlignment="Top"
-                            Background="{ThemeResource DesktopGuidesSurfaceBrush}"
-                            BorderBrush="{ThemeResource DesktopGuidesBorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="{StaticResource DesktopGuidesControlCornerRadius}">
-                        <TextBlock x:Name="ReaderFormat"
-                                   Style="{StaticResource DesktopGuidesMetadataStyle}"
-                                   AutomationProperties.AutomationId="ReaderFormat" />
-                    </Border>
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Top"
+                                Spacing="{StaticResource DesktopGuidesSpacing16}">
+                        <local:GuideCompletionChoice x:Name="ReaderCompletionChoice" />
+                        <Border Padding="10,4"
+                                VerticalAlignment="Top"
+                                Background="{ThemeResource DesktopGuidesSurfaceBrush}"
+                                BorderBrush="{ThemeResource DesktopGuidesBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="{StaticResource DesktopGuidesControlCornerRadius}">
+                            <TextBlock x:Name="ReaderFormat"
+                                       Style="{StaticResource DesktopGuidesMetadataStyle}"
+                                       AutomationProperties.AutomationId="ReaderFormat" />
+                        </Border>
+                    </StackPanel>
                 </Grid>
 
                 <StackPanel Grid.Row="2">

@@ -14,9 +14,12 @@ public sealed class GuideRowItem : CatalogRowItem
             CatalogPresentation.GuideFacts(summary, clock, culture))
     {
         Guide = summary.Guide;
+        CompletedUtc = summary.State?.CompletedUtc;
     }
 
     internal Guide Guide { get; }
+
+    internal DateTimeOffset? CompletedUtc { get; }
 
     private static string FormatGlyph(GuideFormat format) => format switch
     {

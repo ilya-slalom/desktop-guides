@@ -127,6 +127,8 @@ public sealed partial class ShellWindow : Window
             NavigationView.IsPaneOpenProperty, (_, _) => UpdatePaneStatus());
         UpdatePaneStatus();
         ReaderActions.CommandFailed += ShowErrorStatus;
+        GameCompletionChoice.CompletionRequested += CompletionChoiceRequested;
+        ReaderCompletionChoice.CompletionRequested += CompletionChoiceRequested;
         AppWindow.Closing += WindowClosing;
         Activated += WindowActivated;
     }
@@ -275,6 +277,7 @@ public sealed partial class ShellWindow : Window
             StartProgress(repository);
             guidePublisher = new GuideImportPublisher(repository, paths);
             guideRemover = new GuideRemover(repository, paths);
+            completion = new GuideCompletionService(repository, TimeProvider.System);
             gameRemover = new GameRemover(repository, paths, artwork);
             textLoader = new ManagedTextGuideLoader(paths);
             htmlLoader = new ManagedHtmlGuideLoader(repository, paths);
@@ -574,11 +577,17 @@ public sealed partial class ShellWindow : Window
                 RemoveSelectedGuideButton, $"Remove {guide.Title}");
             OpenSelectedGuideButton.Visibility = Visibility.Visible;
             RemoveSelectedGuideButton.Visibility = Visibility.Visible;
+            if (GuideList.SelectedItem is GuideRowItem row)
+            {
+                GameCompletionChoice.Show(guide.Id, guide.Title,
+                    GuideCompletionPresentation.IsComplete(row.CompletedUtc));
+            }
         }
         else
         {
             OpenSelectedGuideButton.Visibility = Visibility.Collapsed;
             RemoveSelectedGuideButton.Visibility = Visibility.Collapsed;
+            GameCompletionChoice.Hide();
         }
     }
 
@@ -1462,6 +1471,8 @@ public sealed partial class ShellWindow : Window
         SettingsPanel.Visibility = Visibility.Collapsed;
         OpenSelectedGuideButton.Visibility = Visibility.Collapsed;
         RemoveSelectedGuideButton.Visibility = Visibility.Collapsed;
+        GameCompletionChoice.Hide();
+        ReaderCompletionChoice.Hide();
         loadedGameGuideCount = null;
         UpdateRemoveGameAction();
         AppTitleBar.IsBackButtonEnabled = navigator.CanGoBack;
@@ -1671,6 +1682,14 @@ public sealed partial class ShellWindow : Window
                     ReaderHeading.Text = guide.Title;
                     ReaderGameName.Text = readerGame.Title;
                     ReaderFormat.Text = guide.Format.ToString().ToUpperInvariant();
+                    // Shown before the content opens, so it stays usable when a load fails.
+                    ReadingState? readingState = await library.GetReadingStateAsync(guide.Id);
+                    if (generation != renderGeneration)
+                    {
+                        return false;
+                    }
+                    ReaderCompletionChoice.Show(guide.Id, guide.Title,
+                        GuideCompletionPresentation.IsComplete(readingState?.CompletedUtc));
                     if (guide.Format == GuideFormat.Html)
                     {
                         if (!await OpenHtmlGuideAsync(guide, generation))
