@@ -1,7 +1,8 @@
 # T10.2 PDF page controls, zoom and passwords design
 
-Status: implemented; CI run 37421797876 passed the full matrix, including
-the installed `pdf` and `import` groups.
+Status: implemented; final CI run 37432552738 (after the final-review fix
+wave) passed the full matrix, including the installed `pdf` and `import`
+groups. Earlier full run: 37421797876, on `48a17ff`.
 Prerequisites: T10.1 (the PDF adapter, PR #36, merge commit `e2b9b8c`) and
 T10.3 (the PDF locator, PR #37, merge commit `541c245`) are merged. T06.2's
 import validation is merged with T06.1 (PR #17).
@@ -507,11 +508,15 @@ Rulings made during execution, each with what it costs if wrong:
 
 ## Verification
 
-Core.Tests and Infrastructure.Tests ran in `core-tests` of CI run
-[37421797876](https://github.com/ilya-slalom/desktop-guides/actions/runs/37421797876)
+The final run is
+[37432552738](https://github.com/ilya-slalom/desktop-guides/actions/runs/37432552738)
 (`windows-ci.yml`, no `dev-fast`, no `shell-scope`, so every group ran, on
-`48a17ff`): Core.Tests 788 passed, Infrastructure.Tests 540 passed, none
-failed or skipped. The counts below are test methods in each class
+`52b0fca`, after the final-review fixes): every job passed, and `core-tests`
+reported Core.Tests 788 passed and Infrastructure.Tests 540 passed, none
+failed or skipped. The earlier full run,
+[37421797876](https://github.com/ilya-slalom/desktop-guides/actions/runs/37421797876)
+on `48a17ff`, had the same counts, and its `pdf-reader-dark` job needed a
+rerun (the intermittent below). The counts below are test methods in each class
 (theories count once):
 
 - Core: `PdfZoomTests` (11), `PageEntryTests` (4), `PdfLocationRulesTests`
@@ -585,8 +590,10 @@ RED and GREEN runs, by task:
 - Task 8 Step 2: RED 37419645116 (`import-light` at
   `Expected 'ImportFileName' named 'pdf-locked.pdf'.`); GREEN 37421019023.
 
-Runs other than 37421797876 used `dev-fast` or a `shell-scope`; 37421797876
-is the full matrix.
+Runs other than 37432552738 and 37421797876 used `dev-fast` or a
+`shell-scope`; those two are full matrices. A full run on `7667b79`
+(37430835784) failed in `production-shell-ui` on a smoke-helper scope error
+in the fix wave itself, corrected in `52b0fca`.
 
 An intermittent, not explained: `The PDF reader has no visible 'Next page'
 command.` failed twice, in `pdf-reader-light` at `9dedf06` (run 37413047727,
