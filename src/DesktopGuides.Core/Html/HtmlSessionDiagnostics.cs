@@ -14,6 +14,12 @@ public sealed class HtmlSessionDiagnostics
     private readonly Dictionary<(HtmlDenyReason Reason, string Context), int> denied = [];
     private readonly SortedDictionary<string, int> restores = new(StringComparer.Ordinal);
     private int rejectedCaptures;
+    private int entryNavigations;
+    private string? appearanceTheme;
+    private double? appearanceScale;
+    private int appearanceApplications;
+    private int appearanceFailures;
+    private HtmlAppliedStyle? appearanceComputed;
 
     public void RecordServed(string requestPath)
     {
@@ -35,6 +41,28 @@ public sealed class HtmlSessionDiagnostics
         lock (gate) restores[kind.ToString()] = restores.GetValueOrDefault(kind.ToString()) + 1;
     }
 
+    public void RecordEntryNavigation()
+    {
+        lock (gate) entryNavigations++;
+    }
+
+    // computed is null when the readback after the write failed.
+    public void RecordAppearance(string theme, double scale, HtmlAppliedStyle? computed)
+    {
+        lock (gate)
+        {
+            appearanceTheme = theme;
+            appearanceScale = scale;
+            appearanceApplications++;
+            appearanceComputed = computed;
+        }
+    }
+
+    public void RecordAppearanceFailed()
+    {
+        lock (gate) appearanceFailures++;
+    }
+
     public string ToJson(Guid guideId)
     {
         lock (gate)
@@ -49,7 +77,18 @@ public sealed class HtmlSessionDiagnostics
                     .Select(pair => new { reason = pair.Key.Reason.ToString(), context = pair.Key.Context, count = pair.Value })
                     .ToArray(),
                 rejectedCaptures,
-                restores = new Dictionary<string, int>(restores)
+                restores = new Dictionary<string, int>(restores),
+                entryNavigations,
+                appearance = new
+                {
+                    theme = appearanceTheme,
+                    scale = appearanceScale,
+                    applications = appearanceApplications,
+                    failures = appearanceFailures,
+                    bodyBackground = appearanceComputed?.BodyBackground,
+                    bodyColor = appearanceComputed?.BodyColor,
+                    rootZoom = appearanceComputed?.RootZoom
+                }
             });
         }
     }
