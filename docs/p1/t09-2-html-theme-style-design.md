@@ -122,8 +122,13 @@ formatted with the invariant culture. No page data enters it.
 and any authored rule wins:
 
 ```css
-:where(html) { color-scheme: light; background-color: #FFFFFF; color: #000000; }
+:where(html) { color-scheme: light; color: #000000; }
 ```
+
+It sets no background. A root background would stop a page's `body`
+background (`<body bgcolor>` or a `body` rule) from filling the window,
+because CSS only carries the body's background to the canvas when the
+root has none. An unstyled page shows the view's white page color.
 
 **Dark:**
 
@@ -425,6 +430,7 @@ unchecked.
   - Every pass serves only `guide.html`, `images/route.png` and
     `style.css`, and makes no non-loopback connection.
   - `html-reader` and `html-position` pass unchanged.
+- Full run 37484041874 at f3370f4 is green on every job.
 
 ## Risks
 

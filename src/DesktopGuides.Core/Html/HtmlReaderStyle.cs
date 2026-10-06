@@ -19,7 +19,7 @@ public static class HtmlReaderStyle
 
     // Zero specificity: any rule the page sets wins.
     private const string Light =
-        ":where(html) { color-scheme: light; background-color: #FFFFFF; color: #000000; }";
+        ":where(html) { color-scheme: light; color: #000000; }";
 
     // Background images, media, layout and fonts stay as authored.
     private const string Dark =

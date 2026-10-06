@@ -21,11 +21,14 @@ public sealed class HtmlReaderStyleTests
     public void ClampScaleBoundsTheStoredScale(double stored, double expected) =>
         Assert.Equal(expected, HtmlReaderStyle.ClampScale(stored));
 
+    // A root background would stop a page's body background from filling
+    // the window (CSS background propagation), so Light leaves the canvas
+    // to the page and to the view's white page color.
     [Fact]
     public void LightOnlySetsZeroSpecificityDefaults() =>
         Assert.Equal(
             "html { zoom: 1 !important; }\n" +
-            ":where(html) { color-scheme: light; background-color: #FFFFFF; color: #000000; }",
+            ":where(html) { color-scheme: light; color: #000000; }",
             HtmlReaderStyle.Css(ReaderTheme.Light, 1.0));
 
     [Fact]
