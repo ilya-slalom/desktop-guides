@@ -14,6 +14,10 @@ internal sealed class PdfGuideLoadException(PdfGuideLoadError error)
     public PdfGuideLoadError Error { get; } = error;
 }
 
+// What the toolbar shows for zoom: the status label and which directions
+// have a step left on the shown page.
+public readonly record struct PdfZoomState(string Label, bool CanZoomIn, bool CanZoomOut);
+
 // The Reader's session for one PDF guide: a Windows.Data.Pdf preview of the
 // current page beside PdfPig's text of the same page. Loads run one at a
 // time and the latest wins, so fast page turns never show one page's text
@@ -21,11 +25,11 @@ internal sealed class PdfGuideLoadException(PdfGuideLoadError error)
 internal sealed class PdfReaderSession : IReaderSession
 {
     private const int FailuresBeforeStop = 3;
-    // ERROR_WRONG_PASSWORD. Import rejects encrypted PDFs, so this is a
-    // managed copy replaced after import.
+    // ERROR_WRONG_PASSWORD after PdfPig accepted the password (P12): an
+    // engine split, reported as PasswordProtected.
     private const int WrongPassword = unchecked((int)0x8007052B);
     private static readonly TimeSpan ResizeDelay = TimeSpan.FromMilliseconds(150);
-    private static readonly PageResult BothFailed = new(null, null, 0, double.NaN);
+    private static readonly PageResult BothFailed = new(null, null, 0, double.NaN, double.NaN);
     private readonly Guide guide;
     private readonly string filePath;
     private readonly PdfPageTextSource text;
@@ -43,6 +47,13 @@ internal sealed class PdfReaderSession : IReaderSession
     private readonly PdfPagePosition position = new();
     private int appliedWidth;
     private double appliedAspect = double.NaN;
+    private static readonly TimeSpan CloseWait = TimeSpan.FromSeconds(2);
+    private PdfZoom zoom = PdfZoom.Fit;
+    // The shown page's natural width in DIPs (P1); NaN before the first page.
+    private double appliedNatural = double.NaN;
+    // The page a zoom or resize re-renders. Its Apply isn't reader movement,
+    // so it raises no LocationChanged and schedules no progress save.
+    private int relayoutOf = -1;
     private int failedPages;
     private bool failed;
     private bool disposed;
@@ -68,7 +79,27 @@ internal sealed class PdfReaderSession : IReaderSession
 
     public PdfReaderView View { get; }
     public GuideFormat Format => GuideFormat.Pdf;
-    public ReaderCapabilities Capabilities => ReaderCapabilities.PageNavigation;
+    public ReaderCapabilities Capabilities =>
+        ReaderCapabilities.PageNavigation | ReaderCapabilities.PageJump |
+        ReaderCapabilities.FitWidth | ReaderCapabilities.Zoom;
+    public int PageCount => pageCount;
+    public PdfZoomState ZoomState
+    {
+        get
+        {
+            double fit = FitPercent;
+            bool known = double.IsFinite(fit) && fit > 0;
+            return new(zoom.Label, known && zoom.CanZoomIn(fit), known && zoom.CanZoomOut(fit));
+        }
+    }
+    public event EventHandler? ZoomChanged;
+
+    // The shown page's fit width as a percent of its natural width; NaN
+    // before layout or before a page is shown.
+    private double FitPercent =>
+        View.PreviewWidth >= 1 && double.IsFinite(appliedNatural) && appliedNatural > 0
+            ? View.PreviewWidth / appliedNatural * 100
+            : double.NaN;
 
     // Capabilities don't change during a PDF session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
@@ -79,7 +110,12 @@ internal sealed class PdfReaderSession : IReaderSession
     public static bool DiagnosticsEnabledForTest() =>
         TestGate.IsOpen($@"Local\DesktopGuides.Preview.PdfDiagnostics.{Environment.ProcessId}");
 
-    public async Task OpenAsync(ManagedGuideSource source, CancellationToken token)
+    public Task OpenAsync(ManagedGuideSource source, CancellationToken token) =>
+        OpenAsync(source, null, token);
+
+    // The password is a parameter only: Windows.Data.Pdf uses it once, and
+    // the session never stores it. PdfPig already opened with it (P3).
+    public async Task OpenAsync(ManagedGuideSource source, string? password, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(source);
         if (source.Guide.Id != guide.Id || source.PrimaryFilePath != filePath)
@@ -97,7 +133,9 @@ internal sealed class PdfReaderSession : IReaderSession
         {
             file = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             stream = file.AsRandomAccessStream();
-            document = await WinPdf.PdfDocument.LoadFromStreamAsync(stream).AsTask(token);
+            document = await (password is null
+                ? WinPdf.PdfDocument.LoadFromStreamAsync(stream)
+                : WinPdf.PdfDocument.LoadFromStreamAsync(stream, password)).AsTask(token);
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
@@ -163,6 +201,25 @@ internal sealed class PdfReaderSession : IReaderSession
             case PageEdgeAction edge:
                 GoTo(edge.Edge == ReaderEdge.Start ? 0 : pageCount - 1, 0);
                 break;
+            // The count comes from the opened document, never the locator.
+            case PageJumpAction jump:
+                if (!PdfLocationRules.IsPageInRange(jump.PageNumber, pageCount))
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(action), jump.PageNumber, PageEntry.RangeMessage(pageCount));
+                }
+                GoTo(jump.PageNumber - 1, 0);
+                break;
+            case FitWidthAction:
+                SetZoom(PdfZoom.Fit);
+                break;
+            // Before the first page is laid out there's no fit percent, so a
+            // zoom does nothing rather than guess.
+            case ZoomAction step when double.IsFinite(FitPercent):
+                SetZoom(step.Factor > 1 ? zoom.In(FitPercent) : step.Factor < 1 ? zoom.Out(FitPercent) : zoom);
+                break;
+            case ZoomAction:
+                break;
             default:
                 throw new NotSupportedException($"PDF guides don't support {action.Command}.");
         }
@@ -178,6 +235,7 @@ internal sealed class PdfReaderSession : IReaderSession
         if (page != target)
         {
             target = page;
+            relayoutOf = -1;
             scheduler.Request(page);
         }
         else if (page == position.Page)
@@ -185,6 +243,41 @@ internal sealed class PdfReaderSession : IReaderSession
             position.Shown(page);
             ScrollToPoint();
             RaiseLocationChanged();
+        }
+    }
+
+    private void SetZoom(PdfZoom next)
+    {
+        if (next == zoom) return;
+        zoom = next;
+        Relayout();
+        RaiseZoomChanged();
+    }
+
+    // Sets the new width now, so the old bitmap stretches to it while the
+    // sharper one renders; the layout guard then puts the point back.
+    private void Relayout()
+    {
+        View.SetPageWidth(DisplayWidth(View.PreviewWidth, appliedNatural));
+        relayoutOf = target == position.Page ? target : -1;
+        scheduler.Request(target);
+    }
+
+    // NaN means fit: the view fills the viewport.
+    private double DisplayWidth(double viewport, double natural) =>
+        zoom.IsFit || !double.IsFinite(natural) || natural <= 0
+            ? double.NaN
+            : zoom.WidthFor(viewport >= 1 ? viewport : natural, natural);
+
+    private void RaiseZoomChanged()
+    {
+        try
+        {
+            ZoomChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception)
+        {
+            // Like LocationChanged: a handler must not escape into a XAML event.
         }
     }
 
@@ -197,7 +290,7 @@ internal sealed class PdfReaderSession : IReaderSession
         Task<Raster> rasterTask = RenderAsync(index, token);
         await Task.WhenAll(textTask, rasterTask);
         Raster raster = await rasterTask;
-        return new PageResult(await textTask, raster.Image, raster.Width, raster.Aspect);
+        return new PageResult(await textTask, raster.Image, raster.Width, raster.Aspect, raster.NaturalWidth);
     }
 
     private async Task<PdfPageText?> ReadTextAsync(int index, CancellationToken token)
@@ -216,15 +309,17 @@ internal sealed class PdfReaderSession : IReaderSession
     {
         int width = 0;
         double aspect = double.NaN;
+        double natural = double.NaN;
         try
         {
             using WinPdf.PdfPage page = document!.GetPage((uint)index);
             aspect = page.Size.Height / page.Size.Width;
+            natural = page.Size.Width;
             PdfRasterWidth raster = WidthFor(page.Size.Width, aspect);
-            if (raster.IsTooLarge) return new Raster(null, 0, aspect);
+            if (raster.IsTooLarge) return new Raster(null, 0, aspect, natural);
             width = raster.Width;
             PdfRenderKey key = new(contentSha256, index, width);
-            if (cache.TryGet(key, out BitmapImage? hit)) return new Raster(hit, width, aspect);
+            if (cache.TryGet(key, out BitmapImage? hit)) return new Raster(hit, width, aspect, natural);
             using InMemoryRandomAccessStream png = new();
             await page.RenderToStreamAsync(
                 png, new WinPdf.PdfPageRenderOptions { DestinationWidth = (uint)width }).AsTask(token);
@@ -233,19 +328,20 @@ internal sealed class PdfReaderSession : IReaderSession
             await image.SetSourceAsync(png).AsTask(token);
             // Measured from the decoded image, not from the requested width.
             cache.Add(key, image, image.PixelWidth, image.PixelHeight);
-            return new Raster(image, width, aspect);
+            return new Raster(image, width, aspect, natural);
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
             // A page the engine can't draw fails on its own; the next may work.
-            return new Raster(null, width, aspect);
+            return new Raster(null, width, aspect, natural);
         }
     }
 
     // Before layout the preview has no width, so the page's own width stands in.
     private PdfRasterWidth WidthFor(double pageWidth, double aspect)
     {
-        double display = View.PreviewWidth >= 1 ? View.PreviewWidth : pageWidth;
+        double viewport = View.PreviewWidth >= 1 ? View.PreviewWidth : pageWidth;
+        double display = zoom.IsFit ? viewport : zoom.WidthFor(viewport, pageWidth);
         double scale = View.XamlRoot?.RasterizationScale ?? 1;
         return PdfRasterBudget.WidthFor(display * scale, aspect, PdfRasterBudget.MaxBytes);
     }
@@ -257,10 +353,17 @@ internal sealed class PdfReaderSession : IReaderSession
         position.Shown(index);
         appliedWidth = result.RasterWidth;
         appliedAspect = result.Aspect;
+        // A failed page keeps the last known width, so a zoom still has a
+        // fit percent to step from.
+        if (double.IsFinite(result.NaturalWidth)) appliedNatural = result.NaturalWidth;
+        bool relayout = index == relayoutOf;
+        relayoutOf = -1;
         bool shown = true;
         try
         {
-            View.ShowPage(index, pageCount, result.Image, result.Text);
+            // Pages differ in size, so a percent gives each its own width.
+            View.SetPageWidth(DisplayWidth(View.PreviewWidth, appliedNatural));
+            View.ShowPage(index, pageCount, zoom.Label, result.Image, result.Text);
             // A same-height image raises no SizeChanged, so apply the point
             // here; a new height re-applies it from OnPreviewLayoutChanged.
             ScrollToPoint();
@@ -272,7 +375,9 @@ internal sealed class PdfReaderSession : IReaderSession
             shown = false;
         }
         failedPages = !shown || (result.Image is null && result.Text is null) ? failedPages + 1 : 0;
-        RaiseLocationChanged();
+        if (!relayout) RaiseLocationChanged();
+        // The new page may allow a different step, so the toolbar refreshes.
+        RaiseZoomChanged();
         if (failedPages < FailuresBeforeStop) return;
         failed = true;
         // Queued, so the shell disposes the session after this load returns.
@@ -334,14 +439,17 @@ internal sealed class PdfReaderSession : IReaderSession
         {
             return;
         }
-        if (disposed || document is null || View.PreviewWidth < 1 || !double.IsFinite(appliedAspect))
+        if (disposed || document is null || View.PreviewWidth < 1 || !double.IsFinite(appliedAspect)
+            || !double.IsFinite(appliedNatural))
         {
             return;
         }
-        if (WidthFor(View.PreviewWidth, appliedAspect).Width != appliedWidth)
+        if (WidthFor(appliedNatural, appliedAspect).Width != appliedWidth)
         {
-            scheduler.Request(target);
+            Relayout();
         }
+        // The fit percent follows the viewport, so a step may have opened or closed.
+        RaiseZoomChanged();
     }
 
     public async ValueTask DisposeAsync()
@@ -350,6 +458,7 @@ internal sealed class PdfReaderSession : IReaderSession
         disposed = true;
         LocationChanged = null;
         Failed = null;
+        ZoomChanged = null;
         View.PreviewSizeChanged -= OnPreviewSizeChanged;
         View.PreviewLayoutChanged -= OnPreviewLayoutChanged;
         View.PreviewScrolled -= OnPreviewScrolled;
@@ -357,24 +466,56 @@ internal sealed class PdfReaderSession : IReaderSession
         resizeDelay?.Dispose();
         resizeDelay = null;
         bool clean = true;
-        try
+        // A hung PdfPig page must not hold Back: wait at most CloseWait for
+        // the scheduler, then at most CloseWait for the text source.
+        Task cancelling = scheduler.CancelAsync();
+        bool settled = await Task.WhenAny(cancelling, Task.Delay(CloseWait)) == cancelling;
+        if (settled)
         {
-            await scheduler.CancelAsync();
+            try
+            {
+                await cancelling;
+            }
+            catch (Exception)
+            {
+                // Recorded for the test diagnostics; closing goes on regardless.
+                clean = false;
+            }
         }
-        catch (Exception)
+        else
         {
-            // Recorded for the test diagnostics; closing goes on regardless.
             clean = false;
         }
+        bool closed = await text.CloseAsync(settled ? CloseWait : TimeSpan.Zero);
         PdfSessionDiagnostics counts = new(
             scheduler.Requests, scheduler.Loads, scheduler.StaleResults,
             cache.PeakBytes, cache.MaxBytes, cache.Count,
-            text.PeakPages, text.PeakCharacters, clean, cache.Evictions, false);
+            text.PeakPages, text.PeakCharacters, clean, cache.Evictions,
+            AbandonedExtraction: !closed);
         View.Clear();
         cache.Clear();
-        text.Dispose();
-        stream?.Dispose();
-        file?.Dispose();
+        if (settled)
+        {
+            stream?.Dispose();
+            file?.Dispose();
+        }
+        else
+        {
+            // The render may still be reading the stream; close it when the
+            // load ends, and observe its fault so it isn't unobserved.
+            IRandomAccessStream? heldStream = stream;
+            FileStream? heldFile = file;
+            _ = cancelling.ContinueWith(
+                done =>
+                {
+                    _ = done.Exception;
+                    heldStream?.Dispose();
+                    heldFile?.Dispose();
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+        }
         WriteDiagnostics(counts);
     }
 
@@ -393,7 +534,8 @@ internal sealed class PdfReaderSession : IReaderSession
         }
     }
 
-    private sealed record Raster(BitmapImage? Image, int Width, double Aspect);
+    private sealed record Raster(BitmapImage? Image, int Width, double Aspect, double NaturalWidth);
 
-    private sealed record PageResult(PdfPageText? Text, BitmapImage? Image, int RasterWidth, double Aspect);
+    private sealed record PageResult(
+        PdfPageText? Text, BitmapImage? Image, int RasterWidth, double Aspect, double NaturalWidth);
 }

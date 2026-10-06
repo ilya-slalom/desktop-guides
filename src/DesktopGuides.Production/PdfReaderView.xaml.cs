@@ -1,6 +1,7 @@
 using DesktopGuides.Infrastructure.Reading;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 
@@ -51,10 +52,10 @@ public sealed partial class PdfReaderView : UserControl
     public void ScrollTo(double offset) =>
         PreviewScroller.ChangeView(null, offset, null, disableAnimation: true);
 
-    public void ShowPage(int index, int count, ImageSource? image, PdfPageText? text)
+    public void ShowPage(int index, int count, string zoomLabel, ImageSource? image, PdfPageText? text)
     {
         string page = $"Page {index + 1} of {count}";
-        PageStatus.Text = page;
+        ShowStatus($"{page} \u00B7 {zoomLabel}");
         Preview.Source = image;
         AutomationProperties.SetName(Preview, page + " preview");
         SetStatus(PreviewStatus, image is null ? "This page's preview couldn't be shown." : null);
@@ -69,10 +70,33 @@ public sealed partial class PdfReaderView : UserControl
         });
     }
 
+    // Fit (NaN) fills the viewport with no horizontal scroll; a percent sets
+    // the image's width and lets the page scroll sideways when it's wider.
+    public void SetPageWidth(double width)
+    {
+        Preview.Width = width;
+        PreviewScroller.HorizontalScrollBarVisibility =
+            double.IsNaN(width) ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto;
+    }
+
+    public bool FocusPreview() => PreviewScroller.Focus(FocusState.Programmatic);
+
     public void Clear()
     {
         Preview.Source = null;
         DocumentText.Text = string.Empty;
+        SetPageWidth(double.NaN);
+    }
+
+    // A polite live region announces page and zoom changes without moving
+    // focus. It's raised only when the text changes, so a re-render of the
+    // same page at the same zoom stays quiet.
+    private void ShowStatus(string status)
+    {
+        if (PageStatus.Text == status) return;
+        PageStatus.Text = status;
+        FrameworkElementAutomationPeer.FromElement(PageStatus)
+            ?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
     }
 
     private static void SetStatus(TextBlock status, string? message)
