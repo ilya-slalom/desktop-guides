@@ -486,7 +486,17 @@ internal sealed class PdfReaderSession : IReaderSession
         {
             clean = false;
         }
-        bool closed = await text.CloseAsync(settled ? CloseWait : TimeSpan.Zero);
+        bool closed;
+        try
+        {
+            closed = await text.CloseAsync(settled ? CloseWait : TimeSpan.Zero);
+        }
+        catch (Exception)
+        {
+            // A faulted text source counts as not closed; the rest still runs.
+            closed = false;
+            clean = false;
+        }
         PdfSessionDiagnostics counts = new(
             scheduler.Requests, scheduler.Loads, scheduler.StaleResults,
             cache.PeakBytes, cache.MaxBytes, cache.Count,
