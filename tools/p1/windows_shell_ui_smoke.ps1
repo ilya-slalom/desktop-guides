@@ -5039,9 +5039,8 @@ try {
         }
         Assert-Absent 'ReaderPlaceholder'
         foreach ($name in 'Go to start', 'Previous page', 'Next page', 'Go to end') {
-            $button = Wait-ReaderCommand $name
-            if (-not $button) {
-                Write-ReaderCommandDiagnostics $name 'txt-command-missing'
+            $button = Find-ByName $name
+            if (-not $button -or $button.Current.IsOffscreen) {
                 throw "The TXT reader has no visible '$name' command."
             }
         }
