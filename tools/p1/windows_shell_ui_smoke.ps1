@@ -1605,9 +1605,55 @@ try {
             [void](Wait-Status 'Game ready.')
         }
 
+        # The command bar can re-lay out after the commands are shown, so wait
+        # briefly for a command that is on screen and enabled. The caller's
+        # failure still stands when it never gets there.
+        function Wait-ReaderCommand([string] $name) {
+            $deadline = (Get-Date).AddSeconds(5)
+            do {
+                $command = Find-ByName $name
+                try {
+                    if ($command -and -not $command.Current.IsOffscreen -and
+                        $command.Current.IsEnabled) {
+                        return $command
+                    }
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                    # Replaced mid-check; look it up again.
+                }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            return $null
+        }
+
+        # Says why a command is missing. Never throws: the caller's message
+        # is the failure.
+        function Write-ReaderCommandDiagnostics([string] $name, [string] $view) {
+            try { [void](Save-WindowScreenshot $view) } catch { }
+            try {
+                $condition = [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::NameProperty, $name)
+                $found = @($root.FindAll($scope, $condition))
+                Write-Host "'$name' elements: $($found.Count)"
+                foreach ($element in $found) {
+                    Write-Host "  '$name' IsOffscreen=$($element.Current.IsOffscreen) IsEnabled=$($element.Current.IsEnabled)"
+                }
+            }
+            catch { Write-Host "Could not list '$name' elements." }
+            try {
+                $bar = Find-ById 'ReaderCommands'
+                if ($bar) {
+                    Write-Host "ReaderCommands bounds: $($bar.Current.BoundingRectangle)"
+                }
+                else { Write-Host 'ReaderCommands was not found.' }
+            }
+            catch { Write-Host 'Could not read the ReaderCommands bounds.' }
+        }
+
         function Invoke-NextPages([int] $count) {
-            $next = Find-ByName 'Next page'
-            if (-not $next -or $next.Current.IsOffscreen) {
+            $next = Wait-ReaderCommand 'Next page'
+            if (-not $next) {
+                Write-ReaderCommandDiagnostics 'Next page' 'pdf-next-page-missing'
                 throw "The PDF reader has no visible 'Next page' command."
             }
             # No waiting between turns: superseded pages must be dropped.
@@ -1779,8 +1825,9 @@ try {
         }
 
         function Invoke-ReaderCommand([string] $name) {
-            $button = Find-ByName $name
-            if (-not $button -or $button.Current.IsOffscreen) {
+            $button = Wait-ReaderCommand $name
+            if (-not $button) {
+                Write-ReaderCommandDiagnostics $name 'txt-command-missing'
                 throw "The TXT reader has no visible '$name' command."
             }
             Invoke-Element $button
@@ -4992,8 +5039,9 @@ try {
         }
         Assert-Absent 'ReaderPlaceholder'
         foreach ($name in 'Go to start', 'Previous page', 'Next page', 'Go to end') {
-            $button = Find-ByName $name
-            if (-not $button -or $button.Current.IsOffscreen) {
+            $button = Wait-ReaderCommand $name
+            if (-not $button) {
+                Write-ReaderCommandDiagnostics $name 'txt-command-missing'
                 throw "The TXT reader has no visible '$name' command."
             }
         }
