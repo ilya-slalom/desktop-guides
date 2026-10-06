@@ -1,6 +1,6 @@
 # T14.2 theme setting design
 
-Status: design approved; implementation pending.
+Status: implemented; CI run 37465745451.
 Prerequisites: T03.2 (versioned migrations, PR #4) and T11.1 (the
 production shell, PR #6) are merged. The `Theme` key and
 `ThemePreference` (`System`, `Light`, `Dark`, default `System`) have been
@@ -290,6 +290,38 @@ In the implementing branch:
   cleared selection.
 - The theme-change popup screenshot is the open Window background
   drop-down: the TXT design guide's Reader overflow menu is empty.
+
+## Verification
+
+- `ThemePresentationTests` (Core): the options, their labels and ids,
+  `Resolve` for every preference with and without high contrast and for an
+  undefined value, `IndexOf`, and the status and save-failure texts. Core
+  went from 788 to 807 tests; Infrastructure stays at 540.
+- Installed `theme` group, CI run 37465006657 (`dev-fast`) and full run
+  37465745451 (`pdf` shard). Reports and screenshots are in
+  [evidence/t14-2-theme-setting](evidence/t14-2-theme-setting/):
+  - `theme-segmented`: at 768x519, `AppThemeChoice` has three `ListItem`s,
+    `System`, `Light` and `Dark`, each with `SelectionItem`. System starts
+    selected; Right selects Light and keeps focus on it, Left returns to
+    System.
+  - `theme-change` with Windows light: System (Light) to Dark. With Windows
+    dark: Dark to Light, then Light to System (Dark). Each relaunches; the
+    status, the choice's `ItemStatus`, `AppTitleBar` and the Edit game
+    dialog report the same theme, and the stored value matches. Screenshots
+    per theme: Settings, Library, Edit game, Reader and the open Window
+    background drop-down.
+  - `theme-restored`: System follows Windows light after a relaunch.
+    `theme-change` and `theme-restored` make no non-loopback connection.
+  - `theme-error`, `theme-error-retry`: with the write lock held, Light shows
+    the save-failure text and the choice returns to System, with focus on
+    it; tabbing out and back in leaves it on System. After the release the
+    retry stores Light.
+- Installed `completion` group, full run 37465745451 (`html` shard), on
+  `BoundedChoice`: `completion-segmented` checks the two `ListItem`s and
+  their `SelectionItem` state and the 768x519 header; `completion-game`
+  keeps the choice compact (201 of 1024 px) in light and dark; the
+  restart, error and Reader checks pass as in T13.1.
+- The same full run is green on every job, including `native-arm64-ui`.
 
 ## Risks
 

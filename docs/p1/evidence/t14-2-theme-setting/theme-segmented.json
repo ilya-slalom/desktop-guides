@@ -1,0 +1,41 @@
+﻿{
+    "mode":  "theme-segmented",
+    "invocationId":  "c9796f80ad88469baf5bee7a3d8885e4",
+    "observedAt":  "2026-10-06T12:59:26.1373605Z",
+    "processId":  7200,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "theme-segmented"
+               ],
+    "themeItems":  {
+                       "System":  {
+                                      "name":  "System",
+                                      "controlType":  "ControlType.ListItem",
+                                      "patterns":  [
+                                                       "SelectionItemPatternIdentifiers.Pattern",
+                                                       "ScrollItemPatternIdentifiers.Pattern"
+                                                   ]
+                                  },
+                       "Light":  {
+                                     "name":  "Light",
+                                     "controlType":  "ControlType.ListItem",
+                                     "patterns":  [
+                                                      "SelectionItemPatternIdentifiers.Pattern",
+                                                      "ScrollItemPatternIdentifiers.Pattern"
+                                                  ]
+                                 },
+                       "Dark":  {
+                                    "name":  "Dark",
+                                    "controlType":  "ControlType.ListItem",
+                                    "patterns":  [
+                                                     "SelectionItemPatternIdentifiers.Pattern",
+                                                     "ScrollItemPatternIdentifiers.Pattern"
+                                                 ]
+                                }
+                   },
+    "themeNarrowScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\theme-segmented.theme-segmented-narrow.png"
+}

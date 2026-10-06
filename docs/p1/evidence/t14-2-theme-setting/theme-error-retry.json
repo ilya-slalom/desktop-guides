@@ -1,0 +1,13 @@
+﻿{
+    "mode":  "theme-error-retry",
+    "invocationId":  "eeac491318924474a0ac025e1b6fb248",
+    "observedAt":  "2026-10-06T13:00:53.8742901Z",
+    "processId":  8416,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "theme-error-retry"
+               ]
+}
