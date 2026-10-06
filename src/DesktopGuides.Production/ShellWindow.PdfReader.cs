@@ -111,16 +111,15 @@ public sealed partial class ShellWindow
         PdfReaderView view = session.View;
         if (view.IsLoaded)
         {
-            if (!view.FocusPreview()) ShowWarningStatus("DEBUG focus false while loaded");
+            view.FocusPreview();
             return;
         }
-        ShowWarningStatus("DEBUG view not loaded at unlock");
         void OnLoaded(object sender, RoutedEventArgs args)
         {
             view.Loaded -= OnLoaded;
             if (ReferenceEquals(readerSession, session))
             {
-                if (!view.FocusPreview()) ShowWarningStatus("DEBUG focus false after Loaded");
+                view.FocusPreview();
             }
         }
         view.Loaded += OnLoaded;

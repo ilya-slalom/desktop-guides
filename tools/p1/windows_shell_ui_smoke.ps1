@@ -535,9 +535,7 @@ try {
             if ($focused -and $focused.Current.AutomationId -eq $id) { return }
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
-        $f = [System.Windows.Automation.AutomationElement]::FocusedElement
-        [void](Save-WindowScreenshot "debug-focus-$id")
-        throw "Expected keyboard focus on '$id'. DEBUG focus=$($f.Current.Name)|$($f.Current.AutomationId)|$($f.Current.ClassName)|$($f.Current.ControlType.ProgrammaticName)"
+        throw "Expected keyboard focus on '$id'."
     }
 
     # Focus in an AutoSuggestBox lands on its inner edit box.
@@ -1610,14 +1608,7 @@ try {
         function Invoke-NextPages([int] $count) {
             $next = Find-ByName 'Next page'
             if (-not $next -or $next.Current.IsOffscreen) {
-                [void](Save-WindowScreenshot 'debug-next')
-                $all = $root.FindAll($scope, [System.Windows.Automation.PropertyCondition]::new(
-                    [System.Windows.Automation.AutomationElement]::NameProperty, 'Next page'))
-                $info = @($all | ForEach-Object { "$($_.Current.ControlType.ProgrammaticName)|off=$($_.Current.IsOffscreen)|$($_.Current.BoundingRectangle)|id=$($_.Current.AutomationId)|cls=$($_.Current.ClassName)" }) -join ' ;; '
-                $f = [System.Windows.Automation.AutomationElement]::FocusedElement
-                $cmds = Find-ById 'ReaderCommands'
-                $cinfo = if ($cmds) { "cmds off=$($cmds.Current.IsOffscreen) $($cmds.Current.BoundingRectangle)" } else { 'no cmds' }
-                throw "DEBUG next missing; found=[$info]; focus=$($f.Current.Name)|$($f.Current.AutomationId)|$($f.Current.ClassName); $cinfo"
+                throw "The PDF reader has no visible 'Next page' command."
             }
             # No waiting between turns: superseded pages must be dropped.
             for ($i = 0; $i -lt $count; $i++) { Invoke-Element $next }
