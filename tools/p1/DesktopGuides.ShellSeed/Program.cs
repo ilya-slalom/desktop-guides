@@ -534,6 +534,54 @@ if (args.Length == 3 && args[0] == "seed-html-position")
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "seed-html-theme")
+{
+    // One styled guide, imported as a user would. T09.2's passes set its
+    // stored theme and scale with set-html-appearance.
+    ManagedPathResolver themePaths = new(args[1]);
+    await using SqliteLibraryRepository themeLibrary = new(themePaths);
+    await themeLibrary.InitializeAsync();
+    if ((await themeLibrary.ListGamesAsync()).Count != 0)
+    {
+        throw new InvalidOperationException("The HTML theme seed needs an empty library.");
+    }
+    string themeEntry = Path.Combine(Path.GetFullPath(args[2]), "p1", "html-theme", "guide.html");
+    Game themeGame = await themeLibrary.AddGameAsync("Web Theme Game", null, null);
+    ImportInspection themeInspection = await new GuideImportValidator().InspectAsync(themeEntry, CancellationToken.None);
+    if (themeInspection is not ImportReady themeReady)
+    {
+        throw new InvalidOperationException($"The theme guide failed the import preview: {themeInspection}.");
+    }
+    Guid themeGuide = await new GuideImportPublisher(themeLibrary, themePaths).PublishAsync(
+        themeReady.Manifest, themeGame.Id, "Theme Web Guide", false, null, CancellationToken.None);
+    Console.WriteLine(JsonSerializer.Serialize(new { guide = themeGuide.ToString("N") }));
+    return 0;
+}
+
+if (args.Length == 5 && args[0] == "set-html-appearance")
+{
+    if (!Enum.TryParse(args[3], false, out ThemePreference storedTheme) ||
+        !Enum.IsDefined(storedTheme) || storedTheme.ToString() != args[3])
+    {
+        Console.Error.WriteLine("Theme must be System, Light, or Dark.");
+        return 2;
+    }
+    double? storedScale = args[4] == "default"
+        ? null
+        : double.Parse(args[4], System.Globalization.CultureInfo.InvariantCulture);
+    Guid appearanceGuide = Guid.ParseExact(args[2], "N");
+    await using SqliteLibraryRepository appearanceLibrary = new(new ManagedPathResolver(args[1]));
+    await appearanceLibrary.InitializeAsync();
+    await appearanceLibrary.UpdateSettingsAsync(settings => settings with { Theme = storedTheme });
+    await appearanceLibrary.SaveReaderPreferencesAsync(appearanceGuide, storedScale);
+    // The save is an UPDATE: a guide without a preferences row would keep no scale.
+    if ((await appearanceLibrary.GetReaderPreferencesAsync(appearanceGuide))?.TextScale != storedScale)
+    {
+        throw new InvalidOperationException("The guide's text scale did not save.");
+    }
+    return 0;
+}
+
 if (args.Length == 3 && args[0] == "seed-pdf-reader")
 {
     ManagedPathResolver pdfPaths = new(args[1]);
@@ -734,7 +782,8 @@ if (args.Length != 2 ||
         "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-search|seed-import|seed-actions|seed-navigation " +
         "<app-data-root> " +
         "or seed-linked-game|describe-providers|describe-import|describe-actions|describe-progress|describe-theme <app-data-root> " +
-        "or seed-txt-reader|seed-html-reader|seed-html-position|seed-pdf-reader|seed-progress <app-data-root> <fixtures-root> " +
+        "or seed-txt-reader|seed-html-reader|seed-html-position|seed-html-theme|seed-pdf-reader|seed-progress <app-data-root> <fixtures-root> " +
+        "or set-html-appearance <app-data-root> <guide-id> <System|Light|Dark> <scale|default> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
         "or invalidate-blocked-guide <app-data-root> " +
         "or clear-reading-locations <app-data-root> " +
