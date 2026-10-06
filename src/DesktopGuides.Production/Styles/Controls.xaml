@@ -43,14 +43,16 @@
 
     <!-- Segmented's panel finds its control by exact type, so a subclass
          needs the same panel naming BoundedChoice. Without it the panel
-         loses the control's alignment and stretches across the page. -->
+         loses the control's alignment and stretches across the page. The
+         spacing is the Toolkit's SegmentedItemSpacing, which app resources
+         can't reach. -->
     <Style TargetType="local:BoundedChoice">
         <Setter Property="ItemsPanel">
             <Setter.Value>
                 <ItemsPanelTemplate>
                     <tkcontrols:EqualPanel HorizontalAlignment="{Binding (tk:FrameworkElementExtensions.Ancestor).HorizontalAlignment, RelativeSource={RelativeSource Self}}"
                                            tk:FrameworkElementExtensions.AncestorType="local:BoundedChoice"
-                                           Spacing="{ThemeResource SegmentedItemSpacing}" />
+                                           Spacing="1" />
                 </ItemsPanelTemplate>
             </Setter.Value>
         </Setter>
