@@ -33,6 +33,7 @@ public sealed class PdfPageTextSource : IDisposable
     private readonly LinkedList<(int Page, PdfPageText Text)> recent = new();
     private long recentCharacters;
     private bool disposed;
+    private volatile bool closing;
 
     private PdfPageTextSource(Stream file, CancellableReadStream reader, PdfDocument document,
         int maxPageCharacters, int maxPages, long maxCharacters)
@@ -51,7 +52,8 @@ public sealed class PdfPageTextSource : IDisposable
     public long PeakCharacters { get; private set; }
 
     // On success the source owns file; on failure the caller still does.
-    internal static PdfPageTextSource Open(Stream file, CancellationToken token,
+    // PdfPig decrypts on open, so the password isn't needed or kept afterwards.
+    internal static PdfPageTextSource Open(Stream file, CancellationToken token, string? password = null,
         int maxPageCharacters = DefaultMaxPageCharacters, int maxPages = DefaultMaxPages,
         long maxCharacters = DefaultMaxCharacters)
     {
@@ -60,20 +62,20 @@ public sealed class PdfPageTextSource : IDisposable
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxPages);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxCharacters, maxPageCharacters);
         CancellableReadStream reader = new(file, token);
-        PdfDocument document = PdfDocument.Open(reader);
+        PdfDocument document = PdfDocument.Open(reader, new ParsingOptions { Password = password });
         reader.Token = CancellationToken.None;
         return new PdfPageTextSource(file, reader, document, maxPageCharacters, maxPages, maxCharacters);
     }
 
     public async Task<PdfPageText> GetPageTextAsync(int pageIndex, CancellationToken token)
     {
-        ObjectDisposedException.ThrowIf(disposed, this);
+        ObjectDisposedException.ThrowIf(disposed || closing, this);
         ArgumentOutOfRangeException.ThrowIfNegative(pageIndex);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(pageIndex, PageCount);
         await gate.WaitAsync(token).ConfigureAwait(false);
         try
         {
-            ObjectDisposedException.ThrowIf(disposed, this);
+            ObjectDisposedException.ThrowIf(disposed || closing, this);
             if (TakeRecent(pageIndex) is PdfPageText hit) return hit;
             PdfPageText text = await Task.Run(() => Extract(pageIndex, token), token).ConfigureAwait(false);
             Remember(pageIndex, text);
@@ -85,23 +87,63 @@ public sealed class PdfPageTextSource : IDisposable
         }
     }
 
-    // Waits for a running extraction, so the document is never closed under it.
-    public void Dispose()
+    // Waits at most `wait` for a running extraction. If it is still running,
+    // returns false and closes the document when the extraction ends.
+    public async Task<bool> CloseAsync(TimeSpan wait)
     {
-        gate.Wait();
+        closing = true;
+        if (await gate.WaitAsync(wait).ConfigureAwait(false))
+        {
+            try
+            {
+                CloseHeld();
+            }
+            finally
+            {
+                gate.Release();
+            }
+            return true;
+        }
+        _ = CloseWhenFreeAsync();
+        return false;
+    }
+
+    private async Task CloseWhenFreeAsync()
+    {
+        await gate.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (disposed) return;
-            disposed = true;
-            recent.Clear();
-            recentCharacters = 0;
-            document.Dispose();
-            file.Dispose();
+            CloseHeld();
         }
         finally
         {
             gate.Release();
         }
+    }
+
+    // Waits for a running extraction, so the document is never closed under it.
+    public void Dispose()
+    {
+        closing = true;
+        gate.Wait();
+        try
+        {
+            CloseHeld();
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private void CloseHeld()
+    {
+        if (disposed) return;
+        disposed = true;
+        recent.Clear();
+        recentCharacters = 0;
+        document.Dispose();
+        file.Dispose();
     }
 
     private PdfPageText Extract(int pageIndex, CancellationToken token)
