@@ -559,7 +559,8 @@ try {
             if ($focused -and $focused.Current.AutomationId -eq $id) { return }
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
-        throw "Expected keyboard focus on '$id'."
+        $found = if ($focused) { "'$($focused.Current.AutomationId)' ($($focused.Current.ControlType.ProgrammaticName))" } else { 'nothing' }
+        throw "Expected keyboard focus on '$id', found $found."
     }
 
     # Focus in an AutoSuggestBox lands on its inner edit box.
