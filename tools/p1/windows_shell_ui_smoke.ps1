@@ -2973,6 +2973,14 @@ try {
                 Wait-CompletionShown $true 'Marking complete on the Game page'
                 Wait-FocusedId 'CompletionComplete'
                 $report.completionGameScreenshot = Save-WindowScreenshot 'completion-game'
+                # The choice keeps its items' width; a lost panel alignment
+                # stretches it across the page.
+                $choiceWidth = (Wait-VisibleById 'CompletionChoice').Current.BoundingRectangle.Width
+                $windowWidth = $root.Current.BoundingRectangle.Width
+                $report.completionGameChoiceWidth = "$choiceWidth of $windowWidth"
+                if ($choiceWidth -ge $windowWidth / 2) {
+                    throw "The Game page's completion choice is $choiceWidth px wide in a $windowWidth px window."
+                }
                 Send-Keys '{LEFT}'
                 [void](Wait-Status "$numbered marked in progress.")
                 $after = Wait-RowHelp $numbered $before -Exact
