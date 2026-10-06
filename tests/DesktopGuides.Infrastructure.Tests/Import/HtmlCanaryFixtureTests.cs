@@ -15,6 +15,8 @@ public sealed class HtmlCanaryFixtureTests
     [Fact]
     public async Task CanaryGuidesPublishOnlyTheirOwnLocalFiles()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         Guid b = await harness.PublishAsync(
             harness.Publisher(), await harness.InspectAsync(CopyCanary(harness, "b", null)));

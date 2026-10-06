@@ -491,6 +491,8 @@ public sealed class GuideImportPublisherTests
     [Fact]
     public async Task PublishesStaticHtmlGuide()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         string entry = CopyHtmlStatic(harness, "guide.html");
         IReadOnlyList<FileFingerprint> original = FileFingerprint.Of(harness.Sources.Root);
@@ -515,6 +517,8 @@ public sealed class GuideImportPublisherTests
     [Fact]
     public async Task PercentNamedEntryPublishesAsGuideHtml()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         string entry = CopyHtmlStatic(harness, "100% Walkthrough.html");
 
@@ -530,6 +534,8 @@ public sealed class GuideImportPublisherTests
     [Fact]
     public async Task OnlyScannedFilesAreCopied()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         string entry = CopyHtmlStatic(harness, "guide.html");
         harness.Sources.Write("notes.txt", "not referenced");
@@ -542,6 +548,8 @@ public sealed class GuideImportPublisherTests
     [Fact]
     public async Task AssetEditedAfterPreviewIsChanged()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         string entry = CopyHtmlStatic(harness, "guide.html");
         ImportManifest manifest = await harness.InspectAsync(entry);
@@ -557,6 +565,8 @@ public sealed class GuideImportPublisherTests
     [Fact]
     public async Task AssetEditedDuringCopyIsChanged()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         string entry = CopyHtmlStatic(harness, "guide.html");
         ImportManifest manifest = await harness.InspectAsync(entry);
@@ -575,6 +585,8 @@ public sealed class GuideImportPublisherTests
     [Fact]
     public async Task PublishesTheHtmlManifestAsAssetRows()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         string entry = CopyHtmlStatic(harness, "guide.html");
 

@@ -33,6 +33,28 @@ dotnet build src\DesktopGuides.App\DesktopGuides.App.csproj `
 
 The unsigned packages appear under `src\DesktopGuides.App\AppPackages\DesktopGuides.App_0.1.0.0_<architecture>_Test\`. Those folders include architecture-specific `Dependencies` with the Windows App Runtime framework package. The local SDK reported a missing optional `mspdbcmf.exe` symbols tool; the packages built successfully. [Windows CI](../../.github/workflows/windows-ci.yml) repeats fixture verification, locked restore, 23 Core tests and both architecture builds. It also accepts a manually dispatched `verify-test-gate` input that inserts a failing Core test to verify packaging is skipped. The passing [x64](evidence/ci/x64-final-manifest.json) and [ARM64](evidence/ci/arm64-final-manifest.json) build manifests identify runner versions and package hashes.
 
+### Unit tests on macOS
+
+Core and Infrastructure tests target `net10.0` and run on the macOS checkout,
+which is faster than a CI round trip. Install SDK `10.0.401` (the
+`global.json` pin), then:
+
+```sh
+python3 tools/p0/make_fixtures.py && python3 tools/p0/verify_fixtures.py
+dotnet restore tests/DesktopGuides.Core.Tests/DesktopGuides.Core.Tests.csproj --locked-mode
+dotnet restore tests/DesktopGuides.Infrastructure.Tests/DesktopGuides.Infrastructure.Tests.csproj --locked-mode
+dotnet test tests/DesktopGuides.Core.Tests/DesktopGuides.Core.Tests.csproj --no-restore
+mkdir -p /private/tmp/dg
+TMPDIR=/private/tmp/dg/ dotnet test tests/DesktopGuides.Infrastructure.Tests/DesktopGuides.Infrastructure.Tests.csproj --no-restore
+```
+
+`TMPDIR` must not cross a symbolic link: the default `/var/folders/...` path
+goes through `/var -> /private/var`, which the managed-path checks reject. The
+short path also keeps local socket names under the macOS length limit. Tests
+that need Windows (the static HTML boundary, file locks, package identity)
+return early on other platforms, so a green macOS run doesn't replace the
+Windows `core-tests` job.
+
 For unpackaged UI iteration:
 
 ```powershell

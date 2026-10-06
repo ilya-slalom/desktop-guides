@@ -1452,6 +1452,8 @@ public sealed class SqliteLibraryRepositoryTests
     [Fact]
     public async Task StartupLeavesAnEmptyGameFolderItCannotDelete()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         using TestLibrary directory = new();
         directory.Paths.EnsureCreated();
         string folder = Path.Combine(directory.Paths.ArtworkRoot, Guid.NewGuid().ToString("N"));
