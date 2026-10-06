@@ -62,7 +62,9 @@ public sealed class PdfPageTextSource : IDisposable
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxPages);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxCharacters, maxPageCharacters);
         CancellableReadStream reader = new(file, token);
-        PdfDocument document = PdfDocument.Open(reader, new ParsingOptions { Password = password });
+        PdfDocument document = password is null
+            ? PdfDocument.Open(reader)
+            : PdfDocument.Open(reader, new ParsingOptions { Password = password });
         reader.Token = CancellationToken.None;
         return new PdfPageTextSource(file, reader, document, maxPageCharacters, maxPages, maxCharacters);
     }

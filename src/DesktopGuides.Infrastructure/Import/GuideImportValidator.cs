@@ -255,8 +255,10 @@ public sealed class GuideImportValidator : IGuideImportValidator
             }
             stream.Position = 0;
             // PdfPig ignores the token, so the stream checks it on each read.
-            using PdfDocument document = PdfDocument.Open(
-                new CancellableReadStream(stream, token), new ParsingOptions { Password = password });
+            CancellableReadStream reader = new(stream, token);
+            using PdfDocument document = password is null
+                ? PdfDocument.Open(reader)
+                : PdfDocument.Open(reader, new ParsingOptions { Password = password });
             int pages = document.NumberOfPages;
             if (pages == 0)
             {
