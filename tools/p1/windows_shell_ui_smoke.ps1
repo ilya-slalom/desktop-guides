@@ -4199,7 +4199,7 @@ try {
             if ((Wait-PresentById 'ImportPdfUnlock').Current.IsEnabled) {
                 throw 'The password box kept the wrong attempt: Unlock is still enabled.'
             }
-            [void](Wait-VisibleById 'ImportPreview')
+            [void](Wait-PresentById 'ImportPreview')
             if ((Find-ById 'ImportStatus')) { throw 'A wrong password replaced the preview with a status.' }
             $report.importPdfLockedScreenshot = Save-WindowScreenshot 'import-pdf-locked'
             $report.phases += 'import-pdf-locked'
