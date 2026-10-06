@@ -3,7 +3,11 @@ using DesktopGuides.Core.Reading;
 using DesktopGuides.Production.Materials;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Windows.System;
 
 namespace DesktopGuides.Production;
 
@@ -12,10 +16,51 @@ public sealed partial class ReaderToolbar : UserControl
     private IReaderSession? session;
     private CancellationTokenSource sessionActions = new();
 
+    // VK_OEM_PLUS and VK_OEM_MINUS: the = and - keys of the main keyboard.
+    private const VirtualKey EqualsKey = (VirtualKey)187;
+    private const VirtualKey MinusKey = (VirtualKey)189;
+    private const VirtualKeyModifiers Ctrl = VirtualKeyModifiers.Control;
+
+    private static readonly (VirtualKey Key, VirtualKeyModifiers Modifiers)[] KeyTable =
+    [
+        (VirtualKey.PageUp, VirtualKeyModifiers.None),
+        (VirtualKey.PageDown, VirtualKeyModifiers.None),
+        (VirtualKey.Home, Ctrl),
+        (VirtualKey.End, Ctrl),
+        (VirtualKey.G, Ctrl),
+        (VirtualKey.Add, Ctrl),
+        (EqualsKey, Ctrl),
+        (EqualsKey, Ctrl | VirtualKeyModifiers.Shift),
+        (VirtualKey.Subtract, Ctrl),
+        (MinusKey, Ctrl),
+        (VirtualKey.Number0, Ctrl),
+        (VirtualKey.NumberPad0, Ctrl)
+    ];
+
+    private bool promptOpen;
+
     public ReaderToolbar()
     {
         InitializeComponent();
+        // The tooltips name the keys, so WinUI's own key tips stay hidden.
+        KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
+        foreach ((VirtualKey key, VirtualKeyModifiers modifiers) in KeyTable)
+        {
+            KeyboardAccelerator accelerator = new() { Key = key, Modifiers = modifiers };
+            accelerator.Invoked += (sender, args) =>
+                args.Handled = TryRunKey(sender.Key, sender.Modifiers);
+            KeyboardAccelerators.Add(accelerator);
+        }
     }
+
+    // The open document's page count; 0 means the dialog has no range.
+    public int PageCount { get; set; }
+
+    // The shell turns keys on for PDF only; TXT and HTML get them in T16.1.
+    public bool KeysEnabled { get; set; }
+
+    // Raised after a dialog that a key opened closes, for the shell to focus content.
+    public event EventHandler? ContentFocusRequested;
 
     public event Action<string>? CommandFailed;
 
@@ -36,6 +81,10 @@ public sealed partial class ReaderToolbar : UserControl
         sessionActions.Dispose();
         sessionActions = new CancellationTokenSource();
         session = value;
+        PageCount = 0;
+        KeysEnabled = false;
+        ZoomIn.IsEnabled = true;
+        ZoomOut.IsEnabled = true;
         if (session is not null)
         {
             session.CapabilitiesChanged += CapabilitiesChanged;
@@ -95,6 +144,80 @@ public sealed partial class ReaderToolbar : UserControl
     private static Visibility Show(bool visible) =>
         visible ? Visibility.Visible : Visibility.Collapsed;
 
+    // P4 and P14: the accelerators and the PDF preview both come here.
+    public bool TryRunKey(
+        VirtualKey key, VirtualKeyModifiers modifiers, bool fromContent = false)
+    {
+        AppBarButton? command = CommandFor(key, modifiers);
+        if (command is null || !KeysEnabled || promptOpen || session is null ||
+            XamlRoot is null || Commands.Visibility != Visibility.Visible ||
+            command.Visibility != Visibility.Visible || !command.IsEnabled ||
+            DialogOpen())
+        {
+            return false;
+        }
+        // A text box or scroll viewer keeps its own page keys. The preview
+        // routes its keys here itself (fromContent), so they never run twice.
+        bool pageKey = command == PreviousPage || command == NextPage ||
+            command == PageStart || command == PageEnd;
+        if (pageKey && !fromContent &&
+            FocusManager.GetFocusedElement(XamlRoot) is TextBox or PasswordBox or ScrollViewer)
+        {
+            return false;
+        }
+        _ = RunAsync(command, fromKeyboard: true);
+        return true;
+    }
+
+    // Any ContentDialog, including the shell's, owns the keyboard while open.
+    private bool DialogOpen() =>
+        VisualTreeHelper.GetOpenPopupsForXamlRoot(XamlRoot)
+            .Any(popup => popup.Child is ContentDialog);
+
+    private AppBarButton? CommandFor(VirtualKey key, VirtualKeyModifiers modifiers) =>
+        (key, modifiers) switch
+        {
+            (VirtualKey.PageUp, VirtualKeyModifiers.None) => PreviousPage,
+            (VirtualKey.PageDown, VirtualKeyModifiers.None) => NextPage,
+            (VirtualKey.Home, Ctrl) => PageStart,
+            (VirtualKey.End, Ctrl) => PageEnd,
+            (VirtualKey.G, Ctrl) => GoToPage,
+            (VirtualKey.Add or EqualsKey, Ctrl) => ZoomIn,
+            (EqualsKey, Ctrl | VirtualKeyModifiers.Shift) => ZoomIn,
+            (VirtualKey.Subtract or MinusKey, Ctrl) => ZoomOut,
+            (VirtualKey.Number0 or VirtualKey.NumberPad0, Ctrl) => FitToWidth,
+            _ => null
+        };
+
+    // One place maps a keyed command to its action, for clicks and keys.
+    private Task RunAsync(AppBarButton command, bool fromKeyboard = false)
+    {
+        if (command == GoToPage) return GoToPageAsync(fromKeyboard);
+        if (command == PreviousPage) return ExecuteAsync(new PageTurnAction(-1), "turn to the previous page");
+        if (command == NextPage) return ExecuteAsync(new PageTurnAction(1), "turn to the next page");
+        if (command == PageStart) return ExecuteAsync(new PageEdgeAction(ReaderEdge.Start), "go to the start");
+        if (command == PageEnd) return ExecuteAsync(new PageEdgeAction(ReaderEdge.End), "go to the end");
+        if (command == ZoomOut) return ExecuteAsync(new ZoomAction(0.9), "zoom out");
+        if (command == ZoomIn) return ExecuteAsync(new ZoomAction(1.1), "zoom in");
+        if (command == FitToWidth) return ExecuteAsync(new FitWidthAction(), "fit to width");
+        throw new ArgumentException("This command has no key.", nameof(command));
+    }
+
+    // P5. Disabling the focused command would move focus, so it moves to the other one first.
+    public void SetZoomAvailability(bool canZoomIn, bool canZoomOut)
+    {
+        if (!canZoomIn && canZoomOut && ZoomIn.FocusState != FocusState.Unfocused)
+        {
+            ZoomOut.Focus(ZoomIn.FocusState);
+        }
+        else if (!canZoomOut && canZoomIn && ZoomOut.FocusState != FocusState.Unfocused)
+        {
+            ZoomIn.Focus(ZoomOut.FocusState);
+        }
+        ZoomIn.IsEnabled = canZoomIn;
+        ZoomOut.IsEnabled = canZoomOut;
+    }
+
     private async Task ExecuteAsync(ReaderAction action, string description)
     {
         IReaderSession? current = session;
@@ -122,17 +245,25 @@ public sealed partial class ReaderToolbar : UserControl
 
     private async Task<string?> PromptAsync(
         string title, string label, string primaryButtonText,
-        Control invokingControl, IReaderSession expectedSession)
+        Control invokingControl, IReaderSession expectedSession,
+        Func<string, string?>? validate = null, bool fromKeyboard = false)
     {
         TextBox input = new()
         {
             Header = label
         };
         AutomationProperties.SetAutomationId(input, "ReaderCommandInput");
+        TextBlock error = new()
+        {
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed
+        };
+        AutomationProperties.SetAutomationId(error, "ReaderCommandError");
+        AutomationProperties.SetLiveSetting(error, AutomationLiveSetting.Polite);
         ContentDialog dialog = new()
         {
             Title = title,
-            Content = input,
+            Content = new StackPanel { Spacing = 8, Children = { input, error } },
             PrimaryButtonText = primaryButtonText,
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
@@ -140,6 +271,26 @@ public sealed partial class ReaderToolbar : UserControl
         };
         DialogSurface.Apply(dialog, DialogMaterial);
         dialog.Opened += (_, _) => input.Focus(FocusState.Programmatic);
+        if (validate is not null)
+        {
+            // Go stays available, so a refusal explains itself (P2).
+            dialog.PrimaryButtonClick += (_, args) =>
+            {
+                string? refusal = validate(input.Text);
+                if (refusal is null)
+                {
+                    return;
+                }
+                args.Cancel = true;
+                error.Text = refusal;
+                error.Visibility = Visibility.Visible;
+                FrameworkElementAutomationPeer.CreatePeerForElement(error)
+                    ?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+                input.Focus(FocusState.Programmatic);
+                input.SelectAll();
+            };
+        }
+        promptOpen = true;
         try
         {
             return await dialog.ShowAsync() == ContentDialogResult.Primary
@@ -148,9 +299,27 @@ public sealed partial class ReaderToolbar : UserControl
         }
         finally
         {
-            RestorePromptFocus(invokingControl, expectedSession);
+            promptOpen = false;
+            if (fromKeyboard)
+            {
+                RequestContentFocus(expectedSession);
+            }
+            else
+            {
+                RestorePromptFocus(invokingControl, expectedSession);
+            }
         }
     }
+
+    // After Ctrl+G the reader content, not the overflow command, gets focus.
+    private void RequestContentFocus(IReaderSession expectedSession) =>
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (ReferenceEquals(session, expectedSession))
+            {
+                ContentFocusRequested?.Invoke(this, EventArgs.Empty);
+            }
+        });
 
     private void RestorePromptFocus(
         Control invokingControl, IReaderSession expectedSession)
@@ -190,16 +359,16 @@ public sealed partial class ReaderToolbar : UserControl
     }
 
     private async void PreviousPageClicked(object sender, RoutedEventArgs args) =>
-        await ExecuteAsync(new PageTurnAction(-1), "turn to the previous page");
+        await RunAsync(PreviousPage);
 
     private async void NextPageClicked(object sender, RoutedEventArgs args) =>
-        await ExecuteAsync(new PageTurnAction(1), "turn to the next page");
+        await RunAsync(NextPage);
 
     private async void PageStartClicked(object sender, RoutedEventArgs args) =>
-        await ExecuteAsync(new PageEdgeAction(ReaderEdge.Start), "go to the start");
+        await RunAsync(PageStart);
 
     private async void PageEndClicked(object sender, RoutedEventArgs args) =>
-        await ExecuteAsync(new PageEdgeAction(ReaderEdge.End), "go to the end");
+        await RunAsync(PageEnd);
 
     private async void SmallerTextClicked(object sender, RoutedEventArgs args) =>
         await ExecuteAsync(new TextSizeAction(0.9), "make the text smaller");
@@ -208,28 +377,39 @@ public sealed partial class ReaderToolbar : UserControl
         await ExecuteAsync(new TextSizeAction(1.1), "make the text larger");
 
     private async void ZoomOutClicked(object sender, RoutedEventArgs args) =>
-        await ExecuteAsync(new ZoomAction(0.9), "zoom out");
+        await RunAsync(ZoomOut);
 
     private async void ZoomInClicked(object sender, RoutedEventArgs args) =>
-        await ExecuteAsync(new ZoomAction(1.1), "zoom in");
+        await RunAsync(ZoomIn);
 
     private async void FitToWidthClicked(object sender, RoutedEventArgs args) =>
-        await ExecuteAsync(new FitWidthAction(), "fit to width");
+        await RunAsync(FitToWidth);
 
-    private async void GoToPageClicked(object sender, RoutedEventArgs args)
+    private async void GoToPageClicked(object sender, RoutedEventArgs args) =>
+        await RunAsync(GoToPage);
+
+    private async Task GoToPageAsync(bool fromKeyboard)
     {
         IReaderSession? current = session;
         if (current is null)
         {
             return;
         }
+        // P2: with a count the dialog refuses a bad entry itself.
+        int count = PageCount;
+        Func<string, string?>? validate = count > 0
+            ? text => PageEntry.TryParse(text, count, out _) ? null : PageEntry.RangeMessage(count)
+            : null;
         string? value = await PromptAsync(
-            "Go to page", "Page number", "Go", GoToPage, current);
+            "Go to page", "Page number", "Go", GoToPage, current, validate, fromKeyboard);
         if (value is null || !ReferenceEquals(current, session))
         {
             return;
         }
-        if (!int.TryParse(value, out int page) || page < 1)
+        bool valid = count > 0
+            ? PageEntry.TryParse(value, count, out int page)
+            : int.TryParse(value, out page) && page >= 1;
+        if (!valid)
         {
             CommandFailed?.Invoke("Enter a page number greater than zero.");
             return;
