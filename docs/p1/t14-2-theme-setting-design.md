@@ -66,7 +66,8 @@ Decisions made during brainstorming:
   applies the theme again when high contrast changes.
 - **HTML guide content is out of scope.** T09.2, which depends on this
   task, adds the fixed local HTML style for the effective theme. Until
-  then, HTML pages render as authored, in both themes.
+  then, HTML pages render as authored, in both themes. T09.2 adds it:
+  see [t09-2-html-theme-style-design.md](t09-2-html-theme-style-design.md).
 - **Tests assert the app's choices.** The installed checks read the theme
   the app reports applying to the root, the dialogs and the title bar.
   They don't measure rendered pixels or re-test WinUI theme resources.

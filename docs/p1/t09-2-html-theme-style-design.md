@@ -1,6 +1,6 @@
 # T09.2 HTML theme style design
 
-Status: design approved; not yet implemented.
+Status: implemented; see Verification.
 Prerequisites:
 - T09.1 (the managed-guide HTML adapter, PR #35) is merged.
 - T14.2 (the app theme setting, PR #48) is merged.
@@ -331,14 +331,109 @@ In the implementing branch:
 - the T14.2 design's "HTML guide content is out of scope" note, which
   gets a pointer to this design.
 
+## Implementation notes
+
+The plan ([t09-2-html-theme-style-plan.md](t09-2-html-theme-style-plan.md))
+made these calls against this design:
+
+1. **A live test file.** With the HtmlDiagnostics gate open, the session
+   writes `diagnostics\html-appearance-<pid>.json`
+   (`{ "opacity", "session" }`) after each application, atomically, so
+   the switch check can read it while the guide is open.
+2. **Entry navigations are counted.** `RecordEntryNavigation()` and
+   `entryNavigations` make "the page doesn't reload" a number (1).
+3. **An unchanged appearance isn't rewritten.** One Windows switch can
+   raise both `ActualThemeChanged` and `ThemeSettings.Changed`; the
+   switch check expects exactly 2 applications.
+4. **Writes are serialized by a loop, not a lock.** A call during a write,
+   or before the open's write, stores the appearance; the writer loops
+   until the page has the latest one.
+5. **A failed readback still counts the application.** Its computed
+   fields stay null. A failed write counts as a failure.
+6. **The offline check runs inside the theme modes.** Each mode asserts
+   no non-loopback connection, and the install side asserts the served
+   set is the fixture's three files with nothing denied. There's no
+   separate `html-theme-offline` mode.
+7. **Seed commands.** `seed-html-theme <dataRoot> <fixtures>` and
+   `set-html-appearance <dataRoot> <guideId> <System|Light|Dark> <scale|default>`.
+8. **The live Windows switch.** The smoke sets `AppsUseLightTheme` and
+   broadcasts `WM_SETTINGCHANGE` `ImmersiveColorSet`
+   (`DesktopGuidesForegroundProbe.BroadcastThemeChange()`); the install
+   side restores the user's value in its `finally`.
+9. **The id collision.** The fixture has
+   `<p id="desktop-guides-style">`; the Dark pass checks its text stays.
+10. **The open check doesn't assert the guide's start.** A new guide has
+    no saved place; the switch pass checks the place is unchanged.
+11. **The original page color is kept.** HighContrast puts back the
+    view's own `DefaultBackgroundColor`.
+
+Made during execution:
+
+- `OpenAsync(source, token)` is an `IReaderSession` member, so it stays
+  and opens in Light at 1.0; the shell calls the new
+  `OpenAsync(source, appearance, token)`.
+- Host syncs from macOS use `COPYFILE_DISABLE=1`, so `tar` adds no
+  AppleDouble `._*` files to the Windows build.
+- The theme passes allow one denied request: `NotInManifest` as `Other`,
+  which Chromium makes for its favicon on every page (the position
+  passes see it too). Any other denial fails, so a font or stylesheet
+  request still fails.
+- The first red run stopped earlier, in `html-position-dark`: a reopen
+  whose WebView2 never requested the entry. That path is unchanged here.
+  A rerun of that job at the same commit passed it and failed in
+  `html-theme-open` as expected.
+
+### Real-guide check: `!important` colors
+
+Fetched on 2026-10-06, one page each, with `curl`:
+
+| Site | Page | Result |
+| --- | --- | --- |
+| GameFAQs | `gamefaqs.gamespot.com/snes/563538-chrono-trigger/faqs/1934` | Blocked: Cloudflare challenge (403), also with browser headers. Not checked. |
+| Fandom | `finalfantasy.fandom.com/wiki/Final_Fantasy_VII_walkthrough` | Blocked (403). The article bodies of `chrono.fandom.com` *Millennial Fair (Chapter)* and `finalfantasy.fandom.com` *Chapter 8 (Crisis Core)*, through the MediaWiki parse API: 0 `!important` colors, 0 inline `!important` colors, 1 inline color without `!important`. The site CSS was blocked too. |
+| StrategyWiki | `strategywiki.org/wiki/Chrono_Trigger/Walkthrough` | Page: 0. Its two same-site stylesheets: 10 `!important` color or background rules, all in `@media print` (tables, links) or site chrome (sidebar, footer, search button). None reaches guide content on screen. |
+
+No guide content seen used an `!important` color, so the risk stays
+low priority and isn't fixed in P1. This is uncertain: it's three
+pages, one fetch each, and GameFAQs wasn't seen. GameFAQs FAQs are
+mostly plain text, which this risk doesn't touch, but its HTML FAQs are
+unchecked.
+
+## Verification
+
+- Core unit tests: `HtmlReaderStyleTests` (each theme's CSS, `ClampScale`
+  bounds, NaN and infinity, `de-DE` formatting, no `url(`, `@import`,
+  `@font-face` or `font-family`, `PageColor`, the write and readback
+  scripts and `ParseApplied`) and the new `HtmlSessionDiagnostics` fields.
+  Core went from 807 to 839 tests; Infrastructure stays at 540.
+- Red: CI run 37480289557 (`html`, `dev-fast`) at the harness commit.
+  After the rerun noted above, `html-theme-open` failed with
+  `The app applied no style for the open`.
+- Green: CI run 37482852132 (`html`, `dev-fast`). Run 37481608053 before
+  it failed only on the favicon denial noted above. Reports, the
+  `html-appearance` files and screenshots are in
+  [evidence/t09-2-html-theme-style](evidence/t09-2-html-theme-style/):
+  - `html-theme-open`: Dark at 1.5, one application, `rgb(30, 30, 30)` on
+    `rgb(230, 230, 230)`, `rootZoom` `1.5`, opacity 1; the page's
+    `#desktop-guides-style` paragraph keeps its text.
+  - `html-theme-light`: Light with Windows dark, the authored
+    `rgb(255, 255, 255)` and `rgb(34, 34, 34)`, `rootZoom` `1`.
+  - `html-theme-switch`: System with Windows light opens Light; the
+    Windows dark switch (`themeBroadcast` true) restyles it to Dark with 2
+    applications, one entry navigation, the same served and denied sets
+    and the same reading place. The user's Windows theme is restored.
+  - Every pass serves only `guide.html`, `images/route.png` and
+    `style.css`, and makes no non-loopback connection.
+  - `html-reader` and `html-position` pass unchanged.
+
 ## Risks
 
 - **Inline `!important` on the page wins in Dark.** A rule such as
   `style="color: #000 !important"` on a dark page leaves that element
   hard to read.
-  - Prevalence is uncertain: no real guides have been checked yet. The
-    plan checks a few representative saved guides from major sites, and
-    the verification records what it found.
+  - Prevalence looks low but is uncertain: the
+    [real-guide check](#real-guide-check-important-colors) found none in
+    guide content on three sites, with GameFAQs unchecked.
   - The impact is one unreadable element, not a broken guide.
   - Not fixed in P1.
 - **Text over a light `background-image`.** Dark keeps background

@@ -1,0 +1,16 @@
+﻿{
+    "mode":  "html-theme-open",
+    "invocationId":  "80b0d79f8bbd4541aef1d9e21b377c6d",
+    "observedAt":  "2026-10-06T14:59:27.3089954Z",
+    "processId":  6872,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "html-theme-open"
+               ],
+    "htmlAppearance":  "theme=Dark applications=1 failures=0 background=rgb(30, 30, 30) color=rgb(230, 230, 230) zoom=1.5 opacity=1",
+    "htmlThemeScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\html-theme-open.html-theme-dark-1.5.png",
+    "remoteConnections":  0
+}
