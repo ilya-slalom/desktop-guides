@@ -535,6 +535,20 @@ if (args.Length == 3 && args[0] == "seed-pdf-reader")
         throw new InvalidOperationException("The PDF reader seed needs an empty library.");
     }
     string pdfFixtures = Path.Combine(Path.GetFullPath(args[2]), "p0");
+    // P8: imports read a temp copy of the fixtures, so the installer can
+    // delete the originals before pdf-offline. The TXT guide is inserted
+    // directly and needs no original.
+    string originals = Path.Combine(
+        Path.GetTempPath(), $"desktop-guides-pdf-originals-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(Path.Combine(originals, "generated"));
+    foreach (string fixture in new[]
+    {
+        "pdf-access.pdf", "pdf-scan.pdf", "pdf-short.pdf", "pdf-locked.pdf",
+        Path.Combine("generated", "pdf-long.pdf"),
+    })
+    {
+        File.Copy(Path.Combine(pdfFixtures, fixture), Path.Combine(originals, fixture));
+    }
     Game pdfGame = await pdfRepository.AddGameAsync("PDF Reader Game", null, null);
     GuideImportValidator pdfValidator = new();
     GuideImportPublisher pdfPublisher = new(pdfRepository, pdfPaths);
@@ -543,7 +557,7 @@ if (args.Length == 3 && args[0] == "seed-pdf-reader")
     async Task<Guid> PublishPdfAsync(string fixture, string title, bool allowDuplicate)
     {
         ImportInspection inspection = await pdfValidator.InspectAsync(
-            Path.Combine(pdfFixtures, fixture), CancellationToken.None);
+            Path.Combine(originals, fixture), CancellationToken.None);
         if (inspection is not ImportReady ready)
         {
             throw new InvalidOperationException($"The {fixture} fixture failed the import preview: {inspection}.");
@@ -552,12 +566,30 @@ if (args.Length == 3 && args[0] == "seed-pdf-reader")
             ready.Manifest, pdfGame.Id, title, allowDuplicate, null, CancellationToken.None);
     }
 
+    // A locked fixture goes through the password step, as the dialog does.
+    // "guide" is the fixture's public test password.
+    async Task<Guid> PublishLockedPdfAsync(string fixture, string title, string password)
+    {
+        ImportInspection inspection = await pdfValidator.InspectAsync(
+            Path.Combine(originals, fixture), CancellationToken.None);
+        if (inspection is not ImportNeedsPdfPassword needs)
+        {
+            throw new InvalidOperationException(
+                $"The {fixture} fixture didn't ask for a password: {inspection.GetType().Name}.");
+        }
+        PdfImportManifest manifest = await pdfValidator.ResolvePdfPasswordAsync(
+            needs, password, CancellationToken.None);
+        return await pdfPublisher.PublishAsync(
+            manifest, pdfGame.Id, title, false, null, CancellationToken.None);
+    }
+
     async Task<string> ManagedCopyAsync(Guid id) =>
         pdfPaths.ResolveExistingGuideFile(id, (await pdfRepository.GetGuideAsync(id))!.PrimaryRelativePath);
 
     await PublishPdfAsync("pdf-access.pdf", "Tagged PDF Guide", false);
     await PublishPdfAsync("pdf-scan.pdf", "Scanned PDF Guide", false);
     Guid pdfLong = await PublishPdfAsync(Path.Combine("generated", "pdf-long.pdf"), "Long PDF Guide", false);
+    Guid pdfLocked = await PublishLockedPdfAsync("pdf-locked.pdf", "Locked PDF Guide", "guide");
     Guid damaged = await PublishPdfAsync("pdf-short.pdf", "Damaged PDF Guide", false);
     Guid missing = await PublishPdfAsync("pdf-short.pdf", "Missing PDF Guide", true);
     // Cuts the managed copy before its cross-reference table, as a failed
@@ -571,7 +603,12 @@ if (args.Length == 3 && args[0] == "seed-pdf-reader")
     await InsertTextGuideAsync(pdfPaths, pdfGame.Id, Guid.NewGuid(), "Plain Text Guide",
         DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
         File.ReadAllBytes(Path.Combine(pdfFixtures, "txt-ascii.txt")));
-    Console.WriteLine(JsonSerializer.Serialize(new { pdfLong = pdfLong.ToString("N") }));
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        pdfLong = pdfLong.ToString("N"),
+        pdfLocked = pdfLocked.ToString("N"),
+        originals,
+    }));
     return 0;
 }
 
