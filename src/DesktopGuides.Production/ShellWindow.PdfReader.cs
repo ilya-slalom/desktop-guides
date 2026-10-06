@@ -99,9 +99,31 @@ public sealed partial class ShellWindow
         // After an unlock the preview takes focus from the gone password box.
         if (opened && password is not null && ReferenceEquals(readerSession, session))
         {
-            session.View.FocusPreview();
+            FocusPdfPreviewWhenLoaded(session);
         }
         return opened;
+    }
+
+    // A small PDF can open before its view has had a layout pass, and an
+    // unloaded view can't take focus, so the focus waits for Loaded.
+    private void FocusPdfPreviewWhenLoaded(PdfReaderSession session)
+    {
+        PdfReaderView view = session.View;
+        if (view.IsLoaded)
+        {
+            if (!view.FocusPreview()) ShowWarningStatus("DEBUG focus false while loaded");
+            return;
+        }
+        ShowWarningStatus("DEBUG view not loaded at unlock");
+        void OnLoaded(object sender, RoutedEventArgs args)
+        {
+            view.Loaded -= OnLoaded;
+            if (ReferenceEquals(readerSession, session))
+            {
+                if (!view.FocusPreview()) ShowWarningStatus("DEBUG focus false after Loaded");
+            }
+        }
+        view.Loaded += OnLoaded;
     }
 
     private void ShowPdfLoadError(PdfGuideLoadError error)
