@@ -249,8 +249,9 @@ In the implementing branch:
   control is chosen without them.
 - **Popups that don't inherit the root theme.** Flyouts, tooltips and
   menus outside `ContentDialog` may keep the Windows theme. The theme-change
-  screenshots include the Reader overflow menu; any popup that needs it
-  gets the theme from the same applied value.
+  screenshots include the open Window background drop-down (the TXT
+  Reader's overflow menu is empty); any popup that needs it gets the theme
+  from the same applied value.
 - **Existing light and dark passes.** They change the Windows app theme
   and rely on the app following it. Each group starts from an empty data
   root, so the stored theme is System there and nothing changes for them.

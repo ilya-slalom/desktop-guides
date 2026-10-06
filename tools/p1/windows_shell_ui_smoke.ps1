@@ -3601,6 +3601,24 @@ try {
                 [void](Wait-HiddenById 'ShellStatus')
                 Assert-ShellForeground
                 $report.themeSettingsScreenshot = Save-WindowScreenshot "theme-$SwitchToTheme-settings"
+                # An open drop-down is a popup outside the shell root; the
+                # screenshot shows its theme. The TXT Reader has no overflow menu.
+                $selector = Wait-EnabledById 'WindowMaterialSelector'
+                $dropDown = $selector.GetCurrentPattern(
+                    [System.Windows.Automation.ExpandCollapsePattern]::Pattern)
+                $dropDown.Expand()
+                $deadline = (Get-Date).AddSeconds(5)
+                while (-not (Find-VisibleName 'Acrylic') -and (Get-Date) -lt $deadline) {
+                    Start-Sleep -Milliseconds 100
+                }
+                Start-Sleep -Milliseconds 400
+                if ($dropDown.Current.ExpandCollapseState -ne
+                    [System.Windows.Automation.ExpandCollapseState]::Expanded) {
+                    throw 'The Window background drop-down did not stay open.'
+                }
+                Assert-ShellForeground
+                $report.themePopupScreenshot = Save-WindowScreenshot "theme-$SwitchToTheme-drop-down"
+                $dropDown.Collapse()
 
                 $designGame = 'The Legend of Zelda: Tears of the Kingdom'
                 $designGuide = 'Complete Story Walkthrough'
@@ -3624,19 +3642,6 @@ try {
                 [void](Wait-HiddenById 'ShellStatus')
                 Assert-ShellForeground
                 $report.themeReaderScreenshot = Save-WindowScreenshot "theme-$SwitchToTheme-reader"
-                # The overflow menu is a popup; the screenshot shows its theme.
-                $more = $null
-                # The candidates match the pdf branch's Invoke-OverflowCommand.
-                foreach ($candidate in @('More', 'More options', 'More commands', 'Show more', 'See more')) {
-                    $more = Find-VisibleName $candidate
-                    if ($more) { break }
-                }
-                if (-not $more) { throw 'The Reader toolbar has no visible overflow button.' }
-                Invoke-Element $more
-                Start-Sleep -Milliseconds 400
-                Assert-ShellForeground
-                $report.themeMenuScreenshot = Save-WindowScreenshot "theme-$SwitchToTheme-reader-menu"
-                Send-ThemeKeys '{ESC}'
                 $report.themeAfter = $after
             }
             Assert-NoRemoteConnections "theme ($Mode)"
