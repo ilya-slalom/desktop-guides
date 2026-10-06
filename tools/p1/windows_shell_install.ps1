@@ -718,6 +718,10 @@ function Run-ShellSmoke(
     [int] $ExpectedScalePercent = 0,
     [string] $ExpectedMaterial = '',
     [string] $SwitchToMaterial = '',
+    [string] $ExpectedTheme = '',
+    [string] $ExpectedThemeStatus = '',
+    [string] $SwitchToTheme = '',
+    [string] $WindowsTheme = '',
     [string] $IgdbCredentialFile = '',
     [string] $SteamGridDbCredentialFile = '',
     [string] $ExpectedProviderFailure = '',
@@ -745,6 +749,18 @@ function Run-ShellSmoke(
     }
     if ($SwitchToMaterial) {
         $arguments += ' -SwitchToMaterial ' + $SwitchToMaterial
+    }
+    if ($ExpectedTheme) {
+        $arguments += ' -ExpectedTheme ' + $ExpectedTheme
+    }
+    if ($ExpectedThemeStatus) {
+        $arguments += ' -ExpectedThemeStatus "' + $ExpectedThemeStatus + '"'
+    }
+    if ($SwitchToTheme) {
+        $arguments += ' -SwitchToTheme ' + $SwitchToTheme
+    }
+    if ($WindowsTheme) {
+        $arguments += ' -WindowsTheme ' + $WindowsTheme
     }
     if ($IgdbCredentialFile) {
         $arguments += ' -IgdbCredentialFile "' + $IgdbCredentialFile + '"'
@@ -1677,17 +1693,72 @@ function Run-CompletionScenarios {
     }
 }
 
+function Assert-StoredTheme([string] $expected, [string] $step) {
+    $stored = (Invoke-ShellSeed @('describe-theme', $dataRoot)).Trim()
+    if ($stored -ne $expected) { throw "After $step the stored theme is '$stored', not '$expected'." }
+    return $stored
+}
+
 function Run-ThemeScenarios {
-    # TR14.2: the App theme choice. The UIA gate runs first.
+    # TR14.2: the App theme choice applies at once, survives a relaunch,
+    # makes no remote connection, and puts back a failed save. The UIA
+    # gate runs first. High contrast is deferred to T16.2.
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     [void](Invoke-ShellSeed @('seed-design', $dataRoot))
-    $report.theme = [ordered]@{}
+    $report.theme = [ordered]@{ highContrast = 'deferred-to-T16.2' }
     $originalTheme = Get-AppThemePreference
     try {
         Set-AppThemePreference $true
         Start-InstalledShell
         $report.theme.segmented = Run-ShellSmoke 'theme-segmented'
         Close-InstalledShell
+        [void](Assert-StoredTheme 'System' 'the gate')
+
+        # Windows light: System to Dark (two arrow presses, two saves).
+        Start-InstalledShell
+        $report.theme.lightToDark = Run-ShellSmoke 'theme-change' -ResultName 'theme-change-light' `
+            -ExpectedTheme System -ExpectedThemeStatus 'System (Light)' -SwitchToTheme Dark
+        Close-InstalledShell
+        [void](Assert-StoredTheme 'Dark' 'choosing Dark')
+
+        # Windows dark: Dark survives the relaunch; choose Light.
+        Set-AppThemePreference $false
+        Start-InstalledShell
+        $report.theme.darkToLight = Run-ShellSmoke 'theme-change' -ResultName 'theme-change-dark' `
+            -ExpectedTheme Dark -ExpectedThemeStatus 'Dark' -SwitchToTheme Light
+        Close-InstalledShell
+        [void](Assert-StoredTheme 'Light' 'choosing Light')
+
+        # Light survives; back to System, which follows Windows dark.
+        Start-InstalledShell
+        $report.theme.lightToSystem = Run-ShellSmoke 'theme-change' -ResultName 'theme-change-system' `
+            -ExpectedTheme Light -ExpectedThemeStatus 'Light' -SwitchToTheme System `
+            -WindowsTheme Dark
+        Close-InstalledShell
+        [void](Assert-StoredTheme 'System' 'choosing System')
+
+        # System follows Windows again after a relaunch.
+        Set-AppThemePreference $true
+        Start-InstalledShell
+        $report.theme.restored = Run-ShellSmoke 'theme-restored' `
+            -ExpectedTheme System -ExpectedThemeStatus 'System (Light)'
+
+        # A held write lock makes the app's save time out after 30 s.
+        $ready = Join-Path $ResultDirectory "theme-lock-ready-$runId"
+        $release = Join-Path $ResultDirectory "theme-lock-release-$runId"
+        $lock = Start-ShellDatabaseLock 'hold-write-lock' $ready $release -HoldSeconds 120
+        try {
+            $report.theme.error = Run-ShellSmoke 'theme-error' `
+                -ExpectedTheme System -ExpectedThemeStatus 'System (Light)' -SwitchToTheme Light
+        }
+        finally {
+            Release-ShellDatabaseLock $lock $release
+        }
+        [void](Assert-StoredTheme 'System' 'the failed save')
+        $report.theme.errorRetry = Run-ShellSmoke 'theme-error-retry' `
+            -ExpectedTheme System -SwitchToTheme Light
+        Close-InstalledShell
+        [void](Assert-StoredTheme 'Light' 'the retry')
     }
     finally {
         Restore-AppThemePreference $originalTheme

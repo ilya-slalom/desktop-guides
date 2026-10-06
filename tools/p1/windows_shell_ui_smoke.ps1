@@ -17,7 +17,7 @@ param(
         'html-position',
         'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed',
         'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry',
-        'theme-segmented')]
+        'theme-segmented', 'theme-change', 'theme-restored', 'theme-error', 'theme-error-retry')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -52,6 +52,19 @@ param(
 
     [ValidateSet('', 'Mica', 'Acrylic', 'Solid')]
     [string] $SwitchToMaterial = '',
+
+    [ValidateSet('System', 'Light', 'Dark')]
+    [string] $ExpectedTheme = 'System',
+
+    # The choice's ItemStatus at the start, for example 'System (Light)'.
+    [string] $ExpectedThemeStatus = '',
+
+    [ValidateSet('', 'System', 'Light', 'Dark')]
+    [string] $SwitchToTheme = '',
+
+    # The Windows app theme, needed when the start status doesn't name it.
+    [ValidateSet('', 'Light', 'Dark')]
+    [string] $WindowsTheme = '',
 
     [string] $IgdbCredentialFile = '',
 
@@ -218,6 +231,7 @@ try {
     function Wait-Status(
         [string[]] $expected,
         [switch] $AllowHidden,
+        [switch] $Prefix,
         [int] $Seconds = 15) {
         $transient = @($expected | Where-Object { $_ -in @(
             'Library ready.',
@@ -240,7 +254,10 @@ try {
                     $status.Substring(0, $separator), [ref] $sequence)) {
                 $message = $status.Substring($separator + 1)
             }
-            if ($message -in $expected -and
+            $matched = if ($Prefix) {
+                @($expected | Where-Object { $message.StartsWith($_) }).Count -gt 0
+            } else { $message -in $expected }
+            if ($matched -and
                 $sequence -gt $script:lastStatusSequence) {
                 if ($message -eq 'Library ready.') { Assert-Absent 'LibraryLoading' }
                 if ($transient -or $AllowHidden) {
@@ -273,6 +290,12 @@ try {
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
         throw "Expected visible '$id'."
+    }
+
+    function Find-VisibleName([string] $name) {
+        $element = Find-ByName $name
+        if ($element -and -not $element.Current.IsOffscreen) { return $element }
+        return $null
     }
 
     function Wait-HiddenById([string] $id) {
@@ -1533,12 +1556,6 @@ try {
                 Start-Sleep -Milliseconds 100
             } while ((Get-Date) -lt $deadline)
             throw "Expected the PDF zoom to match '$pattern'; the status read '$seen'."
-        }
-
-        function Find-VisibleName([string] $name) {
-            $element = Find-ByName $name
-            if ($element -and -not $element.Current.IsOffscreen) { return $element }
-            return $null
         }
 
         # Go to page and Fit to width sit in the CommandBar overflow.
@@ -3472,6 +3489,40 @@ try {
             [System.Windows.Forms.SendKeys]::SendWait($keys)
         }
 
+        function Wait-ItemStatus([string] $id, [string] $expected, [string] $step) {
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                $element = Find-ById $id
+                $status = if ($element) { $element.Current.ItemStatus } else { '' }
+                if ($status -ceq $expected) { return }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            throw "$step expected $id to report '$expected', found '$status'."
+        }
+
+        # The theme the window, title bar and choice report now.
+        function Assert-ThemeShown([string] $label, [string] $status, [string] $step) {
+            Wait-ThemeShown $label $step
+            Wait-ItemStatus 'AppThemeChoice' $status $step
+            $titleBar = if ($label -eq 'System') { 'UseDefaultAppMode' } else { $label }
+            Wait-ItemStatus 'AppTitleBar' $titleBar $step
+        }
+
+        # Keyboard only: focus the shown item, then arrow to the target.
+        function Select-ThemeByKeys([string] $from, [string] $to) {
+            $order = @('System', 'Light', 'Dark')
+            $steps = $order.IndexOf($to) - $order.IndexOf($from)
+            (Wait-VisibleById $themeIds[$from]).SetFocus()
+            Wait-FocusedId $themeIds[$from]
+            $key = if ($steps -gt 0) { '{RIGHT}' } else { '{LEFT}' }
+            for ($i = 0; $i -lt [Math]::Abs($steps); $i++) { Send-ThemeKeys $key }
+        }
+
+        $windowsTheme = if ($WindowsTheme) { $WindowsTheme }
+            elseif ($ExpectedThemeStatus -like 'System (*)') {
+                $ExpectedThemeStatus.Substring(8).TrimEnd(')') }
+            else { '' }
+
         function Open-ThemeSettings {
             Select-Element 'Settings'
             [void](Wait-Name 'AppThemeSettingsCard' 'App theme. Choose light or dark, or follow Windows.')
@@ -3525,6 +3576,80 @@ try {
             $report.themeNarrowScreenshot = Save-WindowScreenshot 'theme-segmented-narrow'
             Resize-ShellWindow 1500 720
             $report.phases += 'theme-segmented'
+        }
+        elseif ($Mode -in @('theme-change', 'theme-restored')) {
+            # TR14.2: the stored theme is applied at launch, and a keyboard
+            # change applies at once and is confirmed.
+            Assert-ThemeShown $ExpectedTheme $ExpectedThemeStatus 'Launch'
+            $report.themeAtLaunch = $ExpectedThemeStatus
+            if ($Mode -eq 'theme-change') {
+                Select-ThemeByKeys $ExpectedTheme $SwitchToTheme
+                [void](Wait-Status "App theme set to $SwitchToTheme.")
+                if ($SwitchToTheme -eq 'System' -and -not $windowsTheme) {
+                    throw 'Switching to System needs -WindowsTheme or a System start status.'
+                }
+                $after = if ($SwitchToTheme -eq 'System') { "System ($windowsTheme)" } else { $SwitchToTheme }
+                Assert-ThemeShown $SwitchToTheme $after 'Change'
+                $dialogTheme = if ($SwitchToTheme -eq 'System') { $windowsTheme } else { $SwitchToTheme }
+                [void](Wait-HiddenById 'ShellStatus')
+                Assert-ShellForeground
+                $report.themeSettingsScreenshot = Save-WindowScreenshot "theme-$SwitchToTheme-settings"
+
+                $designGame = 'The Legend of Zelda: Tears of the Kingdom'
+                $designGuide = 'Complete Story Walkthrough'
+                Select-Element 'Library'
+                [void](Wait-GameRow $designGame)
+                Start-Sleep -Milliseconds 400
+                Assert-ShellForeground
+                $report.themeLibraryScreenshot = Save-WindowScreenshot "theme-$SwitchToTheme-library"
+                Press-Enter (Wait-GameRow $designGame)
+                [void](Wait-Name 'GameHeading' $designGame)
+                Invoke-Element (Wait-EnabledById 'EditGameButton')
+                [void](Wait-VisibleById 'GameTitleInput')
+                Wait-ItemStatus 'GameEditorDialog' $dialogTheme 'Edit game'
+                Assert-ShellForeground
+                $report.themeDialogScreenshot = Save-WindowScreenshot "theme-$SwitchToTheme-edit-game"
+                Send-ThemeKeys '{ESC}'
+                Wait-EditorClosed
+                Press-Enter (Wait-GuideRow $designGuide)
+                [void](Wait-Name 'ReaderHeading' $designGuide)
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-HiddenById 'ShellStatus')
+                Assert-ShellForeground
+                $report.themeReaderScreenshot = Save-WindowScreenshot "theme-$SwitchToTheme-reader"
+                # The overflow menu is a popup; the screenshot shows its theme.
+                $more = $null
+                # The candidates match the pdf branch's Invoke-OverflowCommand.
+                foreach ($candidate in @('More', 'More options', 'More commands', 'Show more', 'See more')) {
+                    $more = Find-VisibleName $candidate
+                    if ($more) { break }
+                }
+                if (-not $more) { throw 'The Reader toolbar has no visible overflow button.' }
+                Invoke-Element $more
+                Start-Sleep -Milliseconds 400
+                Assert-ShellForeground
+                $report.themeMenuScreenshot = Save-WindowScreenshot "theme-$SwitchToTheme-reader-menu"
+                Send-ThemeKeys '{ESC}'
+                $report.themeAfter = $after
+            }
+            Assert-NoRemoteConnections "theme ($Mode)"
+            $report.phases += $Mode
+        }
+        elseif ($Mode -eq 'theme-error') {
+            # The installer holds the write lock, so the save times out.
+            Assert-ThemeShown $ExpectedTheme $ExpectedThemeStatus 'Before the failed save'
+            Select-ThemeByKeys $ExpectedTheme $SwitchToTheme
+            [void](Wait-Status 'Could not save the app theme: ' -Prefix -Seconds 60)
+            Assert-ThemeShown $ExpectedTheme $ExpectedThemeStatus 'After the failed save'
+            Assert-ShellForeground
+            $report.themeErrorScreenshot = Save-WindowScreenshot 'theme-error'
+            $report.phases += 'theme-error'
+        }
+        elseif ($Mode -eq 'theme-error-retry') {
+            Select-ThemeByKeys $ExpectedTheme $SwitchToTheme
+            [void](Wait-Status "App theme set to $SwitchToTheme.")
+            Assert-ThemeShown $SwitchToTheme $SwitchToTheme 'Retry'
+            $report.phases += 'theme-error-retry'
         }
     }
     elseif ($Mode -eq 'material') {
