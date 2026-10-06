@@ -11,6 +11,9 @@ public sealed record GuideCompletionRequest(Guid GuideId, string Title, bool Com
 // changes it. It holds no storage logic.
 public sealed partial class GuideCompletionChoice : UserControl
 {
+    private const int InProgressIndex = 0;
+    private const int CompleteIndex = 1;
+
     private bool showing;
     private bool busy;
     private bool shownComplete;
@@ -20,9 +23,12 @@ public sealed partial class GuideCompletionChoice : UserControl
     public GuideCompletionChoice()
     {
         InitializeComponent();
-        InProgressItem.Content = GuideCompletionPresentation.InProgressLabel;
-        CompleteItem.Content = GuideCompletionPresentation.CompleteLabel;
-        Choice.SelectionChanged += SelectionChanged;
+        Choice.SetOptions(
+        [
+            new BoundedChoiceOption(GuideCompletionPresentation.InProgressLabel, "CompletionInProgress"),
+            new BoundedChoiceOption(GuideCompletionPresentation.CompleteLabel, "CompletionComplete"),
+        ]);
+        Choice.ChoiceChanged += ChoiceChanged;
     }
 
     // Raised only by a user change of selection.
@@ -55,17 +61,18 @@ public sealed partial class GuideCompletionChoice : UserControl
     public void SetBusy(bool value)
     {
         busy = value;
-        pendingComplete = ReferenceEquals(Choice.SelectedItem, CompleteItem);
+        pendingComplete = Choice.SelectedIndex == CompleteIndex;
         Choice.IsHitTestVisible = !value;
     }
 
     public void FocusSelection()
     {
-        Control item = shownComplete ? CompleteItem : InProgressItem;
-        if (!item.Focus(FocusState.Programmatic))
+        int index = shownComplete ? CompleteIndex : InProgressIndex;
+        if (Choice.ContainerAt(index)?.Focus(FocusState.Programmatic) != true)
         {
-            // The panel was just shown; focus after its first layout.
-            DispatcherQueue.TryEnqueue(() => item.Focus(FocusState.Programmatic));
+            // The panel was just shown; its containers exist after layout.
+            DispatcherQueue.TryEnqueue(
+                () => Choice.ContainerAt(index)?.Focus(FocusState.Programmatic));
         }
     }
 
@@ -74,7 +81,7 @@ public sealed partial class GuideCompletionChoice : UserControl
         showing = true;
         try
         {
-            Choice.SelectedItem = complete ? CompleteItem : InProgressItem;
+            Choice.SelectedIndex = complete ? CompleteIndex : InProgressIndex;
         }
         finally
         {
@@ -82,20 +89,13 @@ public sealed partial class GuideCompletionChoice : UserControl
         }
     }
 
-    private void SelectionChanged(object sender, SelectionChangedEventArgs args)
+    private void ChoiceChanged(object? sender, EventArgs args)
     {
         if (showing)
         {
             return;
         }
-        bool restore = busy ? pendingComplete : shownComplete;
-        if (Choice.SelectedIndex < 0)
-        {
-            // A choice always has one selected item.
-            DispatcherQueue.TryEnqueue(() => Select(restore));
-            return;
-        }
-        bool complete = ReferenceEquals(Choice.SelectedItem, CompleteItem);
+        bool complete = Choice.SelectedIndex == CompleteIndex;
         if (busy)
         {
             if (complete != pendingComplete)

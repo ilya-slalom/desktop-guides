@@ -2892,8 +2892,8 @@ try {
             }
 
             if ($Mode -eq 'completion-segmented') {
-                # The UIA gate: two radio buttons with their names, the selected
-                # state matching storage and following the arrow keys.
+                # The UIA gate: two Segmented list items with their names, the
+                # selected state matching storage and following the arrow keys.
                 Anchor-Guide $numbered
                 $choice = Wait-VisibleById 'CompletionChoice'
                 if ($choice.Current.Name -ne "Completion for $numbered") {
@@ -2901,7 +2901,7 @@ try {
                 }
                 foreach ($pair in @(@('CompletionInProgress', 'In progress'), @('CompletionComplete', 'Complete'))) {
                     $item = Wait-VisibleById $pair[0]
-                    if ($item.Current.ControlType -ne [System.Windows.Automation.ControlType]::RadioButton -or
+                    if ($item.Current.ControlType -ne [System.Windows.Automation.ControlType]::ListItem -or
                         $item.Current.Name -ne $pair[1]) {
                         throw "$($pair[0]) is a $($item.Current.ControlType.ProgrammaticName) named '$($item.Current.Name)'."
                     }

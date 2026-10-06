@@ -2,16 +2,9 @@
     x:Class="DesktopGuides.Production.GuideCompletionChoice"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:DesktopGuides.Production"
     Visibility="Collapsed">
-    <!-- Native radio buttons: Toolkit Segmented items declared in XAML expose
-         no SelectionItem pattern to UI Automation (T13.1 gate). -->
-    <RadioButtons x:Name="Choice"
-                  MaxColumns="2"
-                  VerticalAlignment="Top"
-                  AutomationProperties.AutomationId="CompletionChoice">
-        <RadioButton x:Name="InProgressItem"
-                     AutomationProperties.AutomationId="CompletionInProgress" />
-        <RadioButton x:Name="CompleteItem"
-                     AutomationProperties.AutomationId="CompletionComplete" />
-    </RadioButtons>
+    <local:BoundedChoice x:Name="Choice"
+                         VerticalAlignment="Top"
+                         AutomationProperties.AutomationId="CompletionChoice" />
 </UserControl>
