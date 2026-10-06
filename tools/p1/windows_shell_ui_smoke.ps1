@@ -2176,7 +2176,7 @@ try {
             Back-ToTextGame
             Open-TextGuide 'Scanned PDF Guide'
             [void](Wait-Status 'Guide ready.')
-            [void](Wait-PdfZoom 'Fit width')
+            [void](Wait-Name 'PdfPageStatus' ('Page 1 of 1' + $pdfDot + 'Fit width'))
             [void](Wait-Name 'PdfTextStatus' 'Image-only page; OCR is unavailable')
             $scanText = Get-PdfText
             if ($scanText) { throw "Expected no text for an image-only page; read '$scanText'." }
@@ -2282,6 +2282,15 @@ try {
             Open-TextGuide 'Long PDF Guide'
             [void](Wait-Status 'Guide ready.')
             [void](Wait-PdfPage 1 200 'page 1 of 200')
+            # Scroll page 1 down first, so a jump that keeps the offset fails.
+            $scroll = Get-PdfScroll
+            if (-not $scroll.Current.VerticallyScrollable) { throw 'Page 1 does not scroll; pdf-jump needs it to.' }
+            $scroll.SetScrollPercent([System.Windows.Automation.ScrollPattern]::NoScroll, 50)
+            Start-Sleep -Milliseconds 300
+            $before = Get-PdfFraction
+            if ($before -lt 0.05) {
+                throw "Scrolling page 1 reached fraction $([Math]::Round($before, 3)); expected clearly below its top."
+            }
             Invoke-OverflowCommand 'Go to page'
             $range = 'Enter a page from 1 to 200.'
             foreach ($value in @('0', '201', '', '1.5', 'x')) {
@@ -2378,10 +2387,14 @@ try {
             }
             if ($zoom -ne '400%') { throw "Zoom in never reached 400%; it stopped at $zoom." }
             $deadline = (Get-Date).AddSeconds(5)
-            while ((Find-VisibleName 'Zoom in').Current.IsEnabled -and (Get-Date) -lt $deadline) {
+            $zoomIn = $null
+            do {
+                $zoomIn = Find-VisibleName 'Zoom in'
+                if (-not $zoomIn) { throw 'The Reader toolbar has no visible Zoom in at 400%.' }
+                if (-not $zoomIn.Current.IsEnabled) { break }
                 Start-Sleep -Milliseconds 100
-            }
-            if ((Find-VisibleName 'Zoom in').Current.IsEnabled) { throw 'Zoom in stayed enabled at 400%.' }
+            } while ((Get-Date) -lt $deadline)
+            if ($zoomIn.Current.IsEnabled) { throw 'Zoom in stayed enabled at 400%.' }
             Invoke-OverflowCommand 'Fit to width'
             [void](Wait-PdfZoom 'Fit width')
             Start-Sleep -Milliseconds 300
@@ -2492,7 +2505,8 @@ try {
             # "guide" is the fixture's public test password.
             function Unlock-LockedGuide {
                 Enter-Secret 'PdfPasswordInput' 'guide'
-                Invoke-Element (Wait-EnabledById 'PdfUnlockButton')
+                [void](Wait-EnabledById 'PdfUnlockButton')
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
                 [void](Wait-Status 'Guide ready.')
                 [void](Wait-PdfPage 1 1 'Locked guide secret page')
                 Assert-Absent 'PdfUnlockPanel'
@@ -2506,8 +2520,12 @@ try {
                 $report.pdfLockedScreenshot = Save-WindowScreenshot 'pdf-locked'
 
                 # A wrong attempt explains itself and leaves an empty box with
-                # focus, ready for the next try. Enter submits.
+                # focus, ready for the next try. Enter in the box submits the right one.
+                # Submitted from the focused Unlock button, so the refocus
+                # after Unlock is disabled (P13) is what returns focus.
                 Enter-Secret 'PdfPasswordInput' 'wrong-7Q2x'
+                (Wait-EnabledById 'PdfUnlockButton').SetFocus()
+                [void](Wait-FocusedId 'PdfUnlockButton')
                 [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
                 [void](Wait-Name 'PdfUnlockError' $wrongPassword)
                 [void](Wait-FocusedId 'PdfPasswordInput')
