@@ -378,7 +378,7 @@ The recorded UI tasks were reviewed as one set:
 | T06.1–T06.4, T07.2 | Add `HeaderedContentControl` only for repeated import-preview groups. Keep file picking, validation `InfoBar`, progress, encoding choice, duplicate choice, and confirmation native. |
 | T07.3, T09.1–T09.3 | Keep WebView2 security, external-link actions, and host-owned appearance in the reader adapter; no Toolkit control changes the trust boundary. |
 | T08.2–T08.3 | Keep the virtualized TXT surface and reader commands native so long-guide realization and stable locators remain under app control. |
-| T10.2 | Keep PDF movement, `NumberBox` page entry, zoom, fit, and `CommandBar` overflow native. |
+| T10.2 | Keep PDF movement, page entry in a checked `TextBox` (a `NumberBox` rounds and clamps, which hides the refusal), zoom, fit, and `CommandBar` overflow native. |
 | T11.1–T11.4 | Keep `NavigationView` and `CommandBar`; move shell Back and pane-toggle actions into native `TitleBar`, use Mica behind transparent route backgrounds, fill the available width, and auto-hide routine native `InfoBar` messages. |
 | T11.4 | Use `SettingsCard` for the local-storage row and retain semantic app resources around it. |
 | T13.1 | Native `RadioButtons` for the two explicit completion states: `Segmented` failed the UIA selected-state gate (see the [T13.1 design](p1/t13-1-completion-actions-design.md)). |
@@ -566,9 +566,10 @@ project uses a provisional package identity until T17.1 sets the public one.
 - **T06.2** Validate extension **and** readable format. TXT tries BOM and
   strict UTF-8, then requires an explicit CP437/Windows-1252 choice when
   decode fails; store the code page. HTML runs the static dependency scan
-  from S07. PDF checks readable pages and whether a password is required;
-  a password is never persisted. If the selected PDF engine cannot handle
-  an encrypted file, reject it before publication with a concrete reason.
+  from S07. PDF checks readable pages and whether a password is required.
+  A locked PDF imports after its password is checked in the preview; the
+  password is never persisted, and the managed copy stays encrypted. The
+  Reader asks for it on every open.
   Produce a typed validated ImportManifest rather than passing raw picker
   paths into reader code.
 - **T06.3** Allocate Guide and Operation IDs, commit the prepared journal row,
@@ -719,7 +720,9 @@ project uses a provisional package identity until T17.1 sets the public one.
   fit-width, zoom, and visible matching keyboard commands. Keep toolbar
   focus and reading focus separate so a page turn does not strand Narrator.
   Wrong password shows a retryable message; clear the attempted password
-  after each attempt and never write it to storage/logs.
+  after each attempt and never write it to storage/logs. Implemented as described in
+  [p1/t10-2-pdf-controls-design.md](p1/t10-2-pdf-controls-design.md); zoom
+  lasts only while the guide is open.
 - **T10.3** Persist zero-based page index, within-page fraction, document
   fingerprint, and locator version through the common reader envelope.
   Clamp old/out-of-range pages to valid bounds and return `Approximate` on

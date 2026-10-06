@@ -1,0 +1,24 @@
+﻿{
+    "mode":  "pdf-zoom",
+    "invocationId":  "c78924051f734c6fb27f02197a1e4185",
+    "observedAt":  "2026-10-06T06:52:19.7133786Z",
+    "processId":  2004,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "pdf-zoom"
+               ],
+    "pdfZoom":  {
+                    "set":  0.30000000662225923,
+                    "75%":  0.30000000662225929,
+                    "100%":  0.30000000662225923,
+                    "fit":  0.30000000662225923,
+                    "horizontalViewSize":  {
+                                               "page121":  26.16421568627451,
+                                               "page122":  20.217803030303031
+                                           }
+                },
+    "pdfZoomScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\pdf-zoom-dark.pdf-zoom.png"
+}

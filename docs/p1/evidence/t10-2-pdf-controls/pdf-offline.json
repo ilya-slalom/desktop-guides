@@ -1,0 +1,14 @@
+﻿{
+    "mode":  "pdf-offline",
+    "invocationId":  "ecdae019d87548e9915c1ff6774232f9",
+    "observedAt":  "2026-10-06T06:53:11.3299447Z",
+    "processId":  8856,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "pdf-offline"
+               ],
+    "remoteConnections":  0
+}

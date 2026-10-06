@@ -120,7 +120,7 @@ Same shape as `HtmlGuideLoadMessages`: `For(error)`, `ActionFor(error)`,
 | `Changed` | The path is a link, a folder, or resolves outside the guide root | "This guide's files have changed. Re-import it to read it." | None |
 | `Unreadable` | IO or access error while opening | "This guide's file can't be opened. Close any app that's using it, then open the guide again." | Reopen |
 | `Damaged` | Either engine can't parse it, it has zero pages, or the engines' page counts differ | "This PDF is damaged, so it can't be opened. Re-import it from the original file." | None |
-| `PasswordProtected` | The managed copy is encrypted | "This PDF now needs a password, which isn't supported. Remove the password and re-import it." | None |
+| `PasswordProtected` | The managed copy is encrypted | "This PDF's protection isn't supported. Remove the password and re-import it." | None |
 | `Failed` | The open session stopped working | "This guide stopped responding." | Reopen |
 
 `Missing` and `Unreadable` use the TXT wording; a Core test pins `Missing`.
@@ -344,7 +344,8 @@ A new `pdf-reader` scenario runs with the diagnostics gate open:
 5. Back to the game, the TXT guide opens and shows its rows.
 
 Process working set isn't app-controlled and isn't asserted. Narrator
-(T16.3) and the installed offline relaunch (T17.3) are out of scope. The PR
+(T16.3) and a physical offline relaunch (T17.3) are out of scope; T10.2's
+`pdf-offline` mode checks that no remote connection is made. The PR
 includes light and dark screenshots of the side-by-side Reader and the PDF
 error surface.
 
@@ -360,9 +361,9 @@ error surface.
 ## Out of scope
 
 - Passwords, page entry, page count control, fit-width, zoom and keyboard
-  parity (T10.2).
+  parity (T10.2). Done in T10.2.
 - Within-page fraction restore and changed-byte detection (T10.3, T12.3).
-- Narrator verification (T16.3) and installed offline relaunch (T17.3).
+- Narrator verification (T16.3) and a physical offline relaunch (T17.3).
 - OCR for scanned pages (P2).
 - Prefetching neighboring pages.
 - The T10.0 probes under `src/DesktopGuides.App/Probes/` stay as they are.
@@ -405,12 +406,12 @@ Execution notes:
   says `Unreadable`.
 - Known limit. Text extraction checks cancellation only when PdfPig reads
   the file, so closing a guide waits for a running page extraction to
-  finish. A pathologically slow page delays Back until it does. A bounded
-  close is left for T10.2.
+  finish. A pathologically slow page delays Back until it does. T10.2
+  bounds the close at 2 s and records an abandoned extraction.
 - Known limit. Process memory on large publisher PDFs (100 MB to 1 GiB) was
   not measured. T10.1 bounds the render cache and page text, and PdfPig
   reads lazily from the stream. A large-file working-set measurement is
-  left for T10.2's installed cases.
+  moved to T17.3.
 - The 96 MiB cap counts cached images only. The image on screen stays alive
   after it is evicted, so real image memory can briefly reach the cap plus
   one page raster.
