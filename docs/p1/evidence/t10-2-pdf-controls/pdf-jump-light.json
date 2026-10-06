@@ -1,0 +1,14 @@
+﻿{
+    "mode":  "pdf-jump",
+    "invocationId":  "7cddeb81ab424ed1bdce8611010e5948",
+    "observedAt":  "2026-10-06T06:51:26.4073954Z",
+    "processId":  5216,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "pdf-jump"
+               ],
+    "pdfJumpScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\pdf-jump-light.pdf-jump.png"
+}

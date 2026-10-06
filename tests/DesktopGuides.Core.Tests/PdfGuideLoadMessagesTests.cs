@@ -12,8 +12,10 @@ public sealed class PdfGuideLoadMessagesTests
     [InlineData(PdfGuideLoadError.Changed, "This guide's files have changed. Re-import it to read it.")]
     [InlineData(PdfGuideLoadError.Unreadable, "This guide's file can't be opened. Close any app that's using it, then open the guide again.")]
     [InlineData(PdfGuideLoadError.Damaged, "This PDF is damaged, so it can't be opened. Re-import it from the original file.")]
-    [InlineData(PdfGuideLoadError.PasswordProtected, "This PDF now needs a password, which isn't supported. Remove the password and re-import it.")]
+    [InlineData(PdfGuideLoadError.PasswordProtected, "This PDF's protection isn't supported. Remove the password and re-import it.")]
     [InlineData(PdfGuideLoadError.Failed, "This guide stopped responding.")]
+    [InlineData(PdfGuideLoadError.PasswordRequired, "This PDF needs a password.")]
+    [InlineData(PdfGuideLoadError.PasswordIncorrect, "That password didn't open this PDF. Try again.")]
     public void EachErrorHasItsMessage(PdfGuideLoadError error, string message) =>
         Assert.Equal(message, PdfGuideLoadMessages.For(error));
 
@@ -24,6 +26,8 @@ public sealed class PdfGuideLoadMessagesTests
     [InlineData(PdfGuideLoadError.Damaged, HtmlGuideLoadAction.None)]
     [InlineData(PdfGuideLoadError.PasswordProtected, HtmlGuideLoadAction.None)]
     [InlineData(PdfGuideLoadError.Failed, HtmlGuideLoadAction.Reopen)]
+    [InlineData(PdfGuideLoadError.PasswordRequired, HtmlGuideLoadAction.None)]
+    [InlineData(PdfGuideLoadError.PasswordIncorrect, HtmlGuideLoadAction.None)]
     public void EachErrorHasItsAction(PdfGuideLoadError error, HtmlGuideLoadAction action) =>
         Assert.Equal(action, PdfGuideLoadMessages.ActionFor(error));
 

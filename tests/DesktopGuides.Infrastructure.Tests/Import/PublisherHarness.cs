@@ -47,7 +47,7 @@ internal sealed class PublisherHarness : IAsyncDisposable
             rollBack ?? ((journal, operationId) => journal.RollBack(operationId)));
     }
 
-    public async Task<ImportManifest> InspectAsync(string path, int? codePage = null)
+    public async Task<ImportManifest> InspectAsync(string path, int? codePage = null, string? password = null)
     {
         ImportInspection inspection = await Validator.InspectAsync(path, CancellationToken.None);
         return inspection switch
@@ -55,6 +55,8 @@ internal sealed class PublisherHarness : IAsyncDisposable
             ImportReady ready => ready.Manifest,
             ImportNeedsTxtEncoding needs => await Validator.ResolveTxtEncodingAsync(
                 needs, codePage ?? throw new InvalidOperationException("A code page is required."), CancellationToken.None),
+            ImportNeedsPdfPassword needs => await Validator.ResolvePdfPasswordAsync(
+                needs, password ?? throw new InvalidOperationException("A password is required."), CancellationToken.None),
             _ => throw new InvalidOperationException(),
         };
     }

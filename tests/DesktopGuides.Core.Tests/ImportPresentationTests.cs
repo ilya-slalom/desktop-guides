@@ -9,6 +9,13 @@ public sealed class ImportPresentationTests
 {
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
 
+    [Fact]
+    public void PdfPasswordCopy()
+    {
+        Assert.Equal("That password didn't open this PDF. Try again.", ImportPresentation.PdfPasswordIncorrect);
+        Assert.Equal("Password protected", ImportPresentation.PasswordProtectedFact);
+    }
+
     [Theory]
     [InlineData(GuideFormat.Txt, "Text (TXT)")]
     [InlineData(GuideFormat.Html, "Web page (HTML)")]

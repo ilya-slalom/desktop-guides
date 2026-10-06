@@ -1,0 +1,16 @@
+﻿{
+    "mode":  "pdf-locked",
+    "invocationId":  "27981aadf5324bc3a590ae2139c17a1b",
+    "observedAt":  "2026-10-06T06:51:37.4086993Z",
+    "processId":  1332,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "pdf-locked",
+                   "pdf-locked-reopen"
+               ],
+    "pdfLockedScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\pdf-locked-light.pdf-locked.png",
+    "pdfLockedWrongScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\pdf-locked-light.pdf-locked-wrong.png"
+}

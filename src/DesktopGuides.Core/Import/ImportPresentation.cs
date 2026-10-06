@@ -7,6 +7,8 @@ public static class ImportPresentation
 {
     public const int MaxShownWarnings = 20;
     public const int MaxTargetLength = 80;
+    public const string PdfPasswordIncorrect = "That password didn't open this PDF. Try again.";
+    public const string PasswordProtectedFact = "Password protected";
 
     public static string FormatLabel(GuideFormat format) => format switch
     {

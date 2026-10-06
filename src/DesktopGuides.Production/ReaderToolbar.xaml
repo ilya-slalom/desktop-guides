@@ -10,6 +10,8 @@
         <CommandBar.PrimaryCommands>
             <AppBarButton x:Name="PageStart"
                           Label="Go to start"
+                          ToolTipService.ToolTip="Go to start (Ctrl+Home)"
+                          AutomationProperties.AcceleratorKey="Ctrl+Home"
                           AutomationProperties.AutomationId="ReaderStart"
                           Visibility="Collapsed"
                           Click="PageStartClicked">
@@ -20,15 +22,21 @@
             <AppBarButton x:Name="PreviousPage"
                           Icon="Back"
                           Label="Previous page"
+                          ToolTipService.ToolTip="Previous page (Page Up)"
+                          AutomationProperties.AcceleratorKey="Page Up"
                           Visibility="Collapsed"
                           Click="PreviousPageClicked" />
             <AppBarButton x:Name="NextPage"
                           Icon="Forward"
                           Label="Next page"
+                          ToolTipService.ToolTip="Next page (Page Down)"
+                          AutomationProperties.AcceleratorKey="Page Down"
                           Visibility="Collapsed"
                           Click="NextPageClicked" />
             <AppBarButton x:Name="PageEnd"
                           Label="Go to end"
+                          ToolTipService.ToolTip="Go to end (Ctrl+End)"
+                          AutomationProperties.AcceleratorKey="Ctrl+End"
                           AutomationProperties.AutomationId="ReaderEnd"
                           Visibility="Collapsed"
                           Click="PageEndClicked">
@@ -49,21 +57,29 @@
             <AppBarButton x:Name="ZoomOut"
                           Icon="ZoomOut"
                           Label="Zoom out"
+                          ToolTipService.ToolTip="Zoom out (Ctrl+Minus)"
+                          AutomationProperties.AcceleratorKey="Ctrl+Minus"
                           Visibility="Collapsed"
                           Click="ZoomOutClicked" />
             <AppBarButton x:Name="ZoomIn"
                           Icon="ZoomIn"
                           Label="Zoom in"
+                          ToolTipService.ToolTip="Zoom in (Ctrl+Plus)"
+                          AutomationProperties.AcceleratorKey="Ctrl+Plus"
                           Visibility="Collapsed"
                           Click="ZoomInClicked" />
         </CommandBar.PrimaryCommands>
         <CommandBar.SecondaryCommands>
             <AppBarButton x:Name="GoToPage"
                           Label="Go to page"
+                          ToolTipService.ToolTip="Go to page (Ctrl+G)"
+                          AutomationProperties.AcceleratorKey="Ctrl+G"
                           Visibility="Collapsed"
                           Click="GoToPageClicked" />
             <AppBarButton x:Name="FitToWidth"
                           Label="Fit to width"
+                          ToolTipService.ToolTip="Fit to width (Ctrl+0)"
+                          AutomationProperties.AcceleratorKey="Ctrl+0"
                           Visibility="Collapsed"
                           Click="FitToWidthClicked" />
             <AppBarButton x:Name="FindInGuide"

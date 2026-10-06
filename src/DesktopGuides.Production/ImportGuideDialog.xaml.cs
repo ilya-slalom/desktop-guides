@@ -2,7 +2,10 @@ using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Windows.System;
 
 namespace DesktopGuides.Production;
 
@@ -25,6 +28,7 @@ public sealed partial class ImportGuideDialog : ContentDialog
     private CancellationTokenSource? check;
     private Task running = Task.CompletedTask;
     private ImportNeedsTxtEncoding? needsEncoding;
+    private ImportNeedsPdfPassword? needsPassword;
     private int generation;
     private bool closing;
     private bool picking;
@@ -262,6 +266,7 @@ public sealed partial class ImportGuideDialog : ContentDialog
         string name = Path.GetFileName(path);
         Manifest = null;
         needsEncoding = null;
+        needsPassword = null;
         ShowDuplicate(null);
         ImportPreview.Visibility = Visibility.Collapsed;
         Track(RunAsync($"Checking {name}…", async (current, token) =>
@@ -287,6 +292,11 @@ public sealed partial class ImportGuideDialog : ContentDialog
                     ShowPreview(needs.Source, needs.SuggestedTitle, GuideFormat.Txt);
                     ShowEncodingChoice(needs);
                     break;
+                case ImportNeedsPdfPassword locked:
+                    ShowPreview(locked.Source, locked.SuggestedTitle, GuideFormat.Pdf);
+                    ShowPasswordStep(locked);
+                    ImportPdfPasswordInput.Focus(FocusState.Programmatic);
+                    return;
             }
             GuideTitleInput.Focus(FocusState.Programmatic);
         }));
@@ -393,6 +403,7 @@ public sealed partial class ImportGuideDialog : ContentDialog
     {
         Manifest = null;
         needsEncoding = null;
+        needsPassword = null;
         ShowDuplicate(null);
         ImportPreview.Visibility = Visibility.Collapsed;
         ShowMessage(severity, message);
@@ -429,6 +440,10 @@ public sealed partial class ImportGuideDialog : ContentDialog
         ImportEncodingRow.Visibility = Visibility.Collapsed;
         ImportAssetsRow.Visibility = Visibility.Collapsed;
         ImportPagesRow.Visibility = Visibility.Collapsed;
+        ImportProtectedRow.Visibility = Visibility.Collapsed;
+        ImportPdfPasswordStep.Visibility = Visibility.Collapsed;
+        ImportPdfPasswordError.Visibility = Visibility.Collapsed;
+        ImportPdfPasswordInput.Password = string.Empty;
         ImportNoTextWarning.IsOpen = false;
         EncodingOptions.Visibility = Visibility.Collapsed;
         settingEncoding = true;
@@ -452,6 +467,85 @@ public sealed partial class ImportGuideDialog : ContentDialog
         EncodingOptions.Visibility = Visibility.Visible;
     }
 
+    private void ShowPasswordStep(ImportNeedsPdfPassword needs)
+    {
+        needsPassword = needs;
+        ImportPdfPasswordInput.Password = string.Empty;
+        ImportPdfPasswordError.Visibility = Visibility.Collapsed;
+        ImportPdfUnlock.IsEnabled = false;
+        ImportPdfPasswordStep.Visibility = Visibility.Visible;
+    }
+
+    // P13: Unlock needs text in the box.
+    private void ImportPdfPasswordChanged(object sender, RoutedEventArgs args) =>
+        ImportPdfUnlock.IsEnabled = ImportPdfPasswordInput.Password.Length > 0;
+
+    // Enter unlocks; it never reaches the dialog's default button.
+    private void ImportPdfPasswordKeyDown(object sender, KeyRoutedEventArgs args)
+    {
+        if (args.Key == VirtualKey.Enter)
+        {
+            args.Handled = true;
+            UnlockPdf();
+        }
+    }
+
+    private void ImportPdfUnlockClicked(object sender, RoutedEventArgs args) => UnlockPdf();
+
+    private void UnlockPdf()
+    {
+        if (closing || needsPassword is not { } needs || ImportPdfPasswordInput.Password.Length == 0)
+        {
+            return;
+        }
+        // The box is cleared before the attempt; the copy lives only in this
+        // call and is never shown, stored or logged.
+        string password = ImportPdfPasswordInput.Password;
+        ImportPdfPasswordInput.Password = string.Empty;
+        ImportPdfPasswordError.Visibility = Visibility.Collapsed;
+        Track(RunAsync($"Checking {needs.Source.FileName}…", async (current, token) =>
+        {
+            PdfImportManifest manifest;
+            try
+            {
+                manifest = await validator.ResolvePdfPasswordAsync(needs, password, token);
+            }
+            catch (GuideImportException error) when (error.Issue == ImportIssue.PasswordIncorrect)
+            {
+                // A wrong password keeps the preview; RunAsync's handler would
+                // replace it with a status.
+                if (current == generation && !closing)
+                {
+                    ShowPasswordError(error.Message);
+                }
+                return;
+            }
+            if (current != generation || closing)
+            {
+                return;
+            }
+            Guide? existing = await findDuplicate(manifest, token);
+            if (current != generation || closing)
+            {
+                return;
+            }
+            needsPassword = null;
+            ImportPdfPasswordStep.Visibility = Visibility.Collapsed;
+            ShowManifest(manifest);
+            ShowDuplicate(existing);
+            GuideTitleInput.Focus(FocusState.Programmatic);
+        }, keepPreview: true));
+    }
+
+    private void ShowPasswordError(string message)
+    {
+        ImportPdfPasswordError.Text = message;
+        ImportPdfPasswordError.Visibility = Visibility.Visible;
+        FrameworkElementAutomationPeer.CreatePeerForElement(ImportPdfPasswordError)
+            ?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+        ImportPdfPasswordInput.Focus(FocusState.Programmatic);
+    }
+
     private void ShowManifest(ImportManifest manifest)
     {
         Manifest = manifest;
@@ -471,6 +565,8 @@ public sealed partial class ImportGuideDialog : ContentDialog
                 ImportPages.Text = pdf.PageCount == 1 ? "1 page" : $"{pdf.PageCount} pages";
                 ImportPagesRow.Visibility = Visibility.Visible;
                 ImportNoTextWarning.IsOpen = !pdf.HasText;
+                ImportProtected.Text = ImportPresentation.PasswordProtectedFact;
+                ImportProtectedRow.Visibility = pdf.PasswordRequired ? Visibility.Visible : Visibility.Collapsed;
                 break;
         }
     }

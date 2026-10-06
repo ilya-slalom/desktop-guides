@@ -13,7 +13,8 @@ param(
         'remove-guide-cancel', 'remove-guide',
         'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted', 'txt-reader',
         'txt-load-paused', 'txt-back-during-load', 'txt-load-released', 'html-reader',
-        'html-runtime-missing', 'pdf-reader', 'html-position',
+        'html-runtime-missing', 'pdf-reader', 'pdf-jump', 'pdf-zoom', 'pdf-keys', 'pdf-locked', 'pdf-offline',
+        'html-position',
         'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed',
         'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry')]
     [string] $Mode,
@@ -1198,12 +1199,13 @@ try {
         # These modes continue a shell left on Reader, Game, or Library.
     }
     elseif ($Mode -in @('txt-reader', 'txt-load-paused', 'txt-back-during-load',
-        'txt-load-released', 'html-reader', 'html-runtime-missing', 'pdf-reader', 'html-position',
+        'txt-load-released', 'html-reader', 'html-runtime-missing', 'pdf-reader', 'pdf-jump', 'pdf-zoom', 'pdf-keys', 'pdf-locked', 'pdf-offline',
+        'html-position',
         'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed',
         'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
-            elseif ($Mode -eq 'pdf-reader') { 'PDF Reader Game' }
+            elseif ($Mode -like 'pdf-*') { 'PDF Reader Game' }
             elseif ($Mode -like 'progress-*' -or $Mode -like 'completion-*') { 'Progress Game' }
             else { 'Text Reader Game' }
         $missingMessage = "This guide's file is missing from the library."
@@ -1481,6 +1483,10 @@ try {
             return $status.Current.Name
         }
 
+        # P6: the status reads "Page N of M <dot> <zoom>", so pages match by
+        # prefix and the zoom by suffix.
+        $pdfDot = ' ' + [char]0x00B7 + ' '
+
         # Waits until the page status, the preview's name and the text all
         # show one page.
         function Wait-PdfPage([int] $page, [int] $count, [string] $text, [int] $seconds = 15) {
@@ -1490,7 +1496,7 @@ try {
                 try {
                     $status = Find-ById 'PdfPageStatus'
                     $preview = Find-ById 'PdfPreviewImage'
-                    if ($status -and $preview -and $status.Current.Name -eq $label -and
+                    if ($status -and $preview -and $status.Current.Name.StartsWith($label + $pdfDot) -and
                         $preview.Current.Name -eq "$label preview") {
                         $read = Get-PdfText
                         if ($read -and $read.Contains($text)) { return $preview }
@@ -1504,17 +1510,164 @@ try {
             throw "Expected $label with its preview, and text containing '$text'."
         }
 
+        # Waits for the status's zoom to match $pattern (a regex) and differ
+        # from $not, and returns it.
+        function Wait-PdfZoom([string] $pattern, [string] $not = '', [int] $seconds = 15) {
+            $regex = '^Page \d+ of \d+' + [regex]::Escape($pdfDot) + "($pattern)$"
+            $seen = ''
+            $deadline = (Get-Date).AddSeconds($seconds)
+            do {
+                try {
+                    $status = Find-ById 'PdfPageStatus'
+                    if ($status) {
+                        $seen = $status.Current.Name
+                        $match = [regex]::Match($seen, $regex)
+                        if ($match.Success -and $match.Groups[1].Value -ne $not) {
+                            return $match.Groups[1].Value
+                        }
+                    }
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            throw "Expected the PDF zoom to match '$pattern'; the status read '$seen'."
+        }
+
+        function Find-VisibleName([string] $name) {
+            $element = Find-ByName $name
+            if ($element -and -not $element.Current.IsOffscreen) { return $element }
+            return $null
+        }
+
+        # Go to page and Fit to width sit in the CommandBar overflow.
+        function Invoke-OverflowCommand([string] $name) {
+            $more = $null
+            foreach ($candidate in @('More', 'More options', 'More commands', 'Show more', 'See more')) {
+                $more = Find-VisibleName $candidate
+                if ($more) { break }
+            }
+            if (-not $more) { throw 'The Reader toolbar has no visible overflow button.' }
+            Invoke-Element $more
+            $deadline = (Get-Date).AddSeconds(5)
+            do {
+                $command = Find-VisibleName $name
+                if ($command) { Invoke-Element $command; return }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            throw "The Reader toolbar overflow has no visible '$name'."
+        }
+
+        function Wait-FocusedName([string] $name) {
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+                if ($focused -and $focused.Current.Name -eq $name) { return }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            throw "Keyboard focus did not reach '$name'."
+        }
+
+        function Submit-PageNumber([string] $value) {
+            $box = Wait-VisibleById 'ReaderCommandInput'
+            $box.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue($value)
+            $go = Find-VisibleName 'Go'
+            if (-not $go) { throw 'The Go to page dialog has no visible Go.' }
+            Invoke-Element $go
+        }
+
+        # A refused entry keeps the dialog open with the range message, and
+        # the Reader stays on its page.
+        function Assert-PageRefused([string] $value, [string] $message, [int] $page, [int] $count) {
+            Submit-PageNumber $value
+            $line = ''
+            $deadline = (Get-Date).AddSeconds(5)
+            do {
+                Start-Sleep -Milliseconds 100
+                $box = Find-ById 'ReaderCommandInput'
+                if (-not $box -or $box.Current.IsOffscreen) {
+                    throw "The Go to page dialog closed after '$value'."
+                }
+                $shown = Find-ById 'ReaderCommandError'
+                if ($shown -and -not $shown.Current.IsOffscreen) { $line = $shown.Current.Name }
+            } while ($line -ne $message -and (Get-Date) -lt $deadline)
+            if ($line -ne $message) {
+                throw "After '$value' the dialog showed '$line'; expected '$message'."
+            }
+            [void](Wait-PdfPage $page $count "page $page of $count")
+        }
+
+        function Open-PdfGame {
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            Resize-ShellWindow 1500 720
+            Select-Element $textGame
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+        }
+
+        # The command bar can re-lay out after the commands are shown, so wait
+        # briefly for a command that is on screen and enabled. The caller's
+        # failure still stands when it never gets there.
+        function Wait-ReaderCommand([string] $name) {
+            $deadline = (Get-Date).AddSeconds(5)
+            do {
+                $command = Find-ByName $name
+                try {
+                    if ($command -and -not $command.Current.IsOffscreen -and
+                        $command.Current.IsEnabled) {
+                        return $command
+                    }
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                    # Replaced mid-check; look it up again.
+                }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            return $null
+        }
+
+        # Says why a command is missing. Never throws: the caller's message
+        # is the failure.
+        function Write-ReaderCommandDiagnostics([string] $name, [string] $view) {
+            try { [void](Save-WindowScreenshot $view) } catch { }
+            try {
+                $condition = [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::NameProperty, $name)
+                $found = @($root.FindAll($scope, $condition))
+                Write-Host "'$name' elements: $($found.Count)"
+                foreach ($element in $found) {
+                    Write-Host "  '$name' IsOffscreen=$($element.Current.IsOffscreen) IsEnabled=$($element.Current.IsEnabled)"
+                }
+            }
+            catch { Write-Host "Could not list '$name' elements." }
+            try {
+                $bar = Find-ById 'ReaderCommands'
+                if ($bar) {
+                    Write-Host "ReaderCommands bounds: $($bar.Current.BoundingRectangle)"
+                }
+                else { Write-Host 'ReaderCommands was not found.' }
+            }
+            catch { Write-Host 'Could not read the ReaderCommands bounds.' }
+        }
+
         function Invoke-NextPages([int] $count) {
-            $next = Find-ByName 'Next page'
-            if (-not $next -or $next.Current.IsOffscreen) {
+            $next = Wait-ReaderCommand 'Next page'
+            if (-not $next) {
+                Write-ReaderCommandDiagnostics 'Next page' 'pdf-next-page-missing'
                 throw "The PDF reader has no visible 'Next page' command."
             }
             # No waiting between turns: superseded pages must be dropped.
             for ($i = 0; $i -lt $count; $i++) { Invoke-Element $next }
         }
 
+        # The view can replace the scroller mid-lookup, so retry briefly.
         function Get-PdfScroll {
+            $deadline = (Get-Date).AddSeconds(3)
             $scroller = Find-ById 'PdfPreviewScroller'
+            while (-not $scroller -and (Get-Date) -lt $deadline) {
+                Start-Sleep -Milliseconds 100
+                $scroller = Find-ById 'PdfPreviewScroller'
+            }
             if (-not $scroller) { throw 'The PDF preview has no scroller.' }
             return $scroller.GetCurrentPattern(
                 [System.Windows.Automation.ScrollPattern]::Pattern)
@@ -1672,8 +1825,9 @@ try {
         }
 
         function Invoke-ReaderCommand([string] $name) {
-            $button = Find-ByName $name
-            if (-not $button -or $button.Current.IsOffscreen) {
+            $button = Wait-ReaderCommand $name
+            if (-not $button) {
+                Write-ReaderCommandDiagnostics $name 'txt-command-missing'
                 throw "The TXT reader has no visible '$name' command."
             }
             Invoke-Element $button
@@ -2046,11 +2200,7 @@ try {
             $report.phases += 'position-unimported-link'
         }
         elseif ($Mode -eq 'pdf-reader') {
-            [void](Wait-Name 'LibraryHeading' 'Library')
-            Resize-ShellWindow 1500 720
-            Select-Element $textGame
-            [void](Wait-Name 'GameHeading' $textGame)
-            [void](Wait-Status 'Game ready.')
+            Open-PdfGame
 
             # Tagged text is readable through UI Automation beside its preview.
             Open-TextGuide 'Tagged PDF Guide'
@@ -2079,7 +2229,7 @@ try {
             Back-ToTextGame
             Open-TextGuide 'Scanned PDF Guide'
             [void](Wait-Status 'Guide ready.')
-            [void](Wait-Name 'PdfPageStatus' 'Page 1 of 1')
+            [void](Wait-Name 'PdfPageStatus' ('Page 1 of 1' + $pdfDot + 'Fit width'))
             [void](Wait-Name 'PdfTextStatus' 'Image-only page; OCR is unavailable')
             $scanText = Get-PdfText
             if ($scanText) { throw "Expected no text for an image-only page; read '$scanText'." }
@@ -2177,6 +2327,298 @@ try {
             Assert-Absent 'ReaderLoadError'
             $report.phases += 'pdf-txt'
             Back-ToTextGame
+        }
+        elseif ($Mode -eq 'pdf-jump') {
+            # TR10.1: Go to page refuses 0, M+1, blank and non-whole entries
+            # with the range message and doesn't move; 150 jumps to its top.
+            Open-PdfGame
+            Open-TextGuide 'Long PDF Guide'
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PdfPage 1 200 'page 1 of 200')
+            # Scroll page 1 down first, so a jump that keeps the offset fails.
+            $scroll = Get-PdfScroll
+            if (-not $scroll.Current.VerticallyScrollable) { throw 'Page 1 does not scroll; pdf-jump needs it to.' }
+            $scroll.SetScrollPercent([System.Windows.Automation.ScrollPattern]::NoScroll, 50)
+            Start-Sleep -Milliseconds 300
+            $before = Get-PdfFraction
+            if ($before -lt 0.05) {
+                throw "Scrolling page 1 reached fraction $([Math]::Round($before, 3)); expected clearly below its top."
+            }
+            Invoke-OverflowCommand 'Go to page'
+            $range = 'Enter a page from 1 to 200.'
+            foreach ($value in @('0', '201', '', '1.5', 'x')) {
+                Assert-PageRefused $value $range 1 200
+            }
+            $report.pdfJumpScreenshot = Save-WindowScreenshot 'pdf-jump'
+            Submit-PageNumber '150'
+            [void](Wait-PdfPage 150 200 'page 150 of 200')
+            Start-Sleep -Milliseconds 300
+            $top = Get-PdfFraction
+            if ($top -ge 0.02) {
+                throw "Page 150 opened at fraction $([Math]::Round($top, 3)); expected its top."
+            }
+            # Started from the overflow, so focus returns to the command.
+            Wait-FocusedName 'Go to page'
+            $report.phases += 'pdf-jump'
+            Back-ToTextGame
+        }
+        elseif ($Mode -eq 'pdf-zoom') {
+            # A point 30% down page 121 survives Zoom in, Zoom in, Zoom out and
+            # Fit (T10.3 tolerance). A percent gives landscape page 122 a wider
+            # image than portrait page 121; Fit gives both the viewport.
+            Open-PdfGame
+            Open-TextGuide 'Long PDF Guide'
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PdfPage 1 200 'page 1 of 200')
+            [void](Wait-PdfZoom 'Fit width')
+            if ((Get-PdfScroll).Current.HorizontallyScrollable) {
+                throw 'At Fit width the page scrolls sideways.'
+            }
+            Invoke-NextPages 120
+            [void](Wait-PdfPage 121 200 'page 121 of 200' 60)
+            $scroll = Get-PdfScroll
+            $room = 1 - $scroll.Current.VerticalViewSize / 100
+            if (-not $scroll.Current.VerticallyScrollable -or $room -lt 0.3) {
+                throw "Page 121 scrolls only $([Math]::Round($room, 3)) of its height; pdf-zoom needs 0.3."
+            }
+            $scroll.SetScrollPercent(
+                [System.Windows.Automation.ScrollPattern]::NoScroll, 0.3 / $room * 100)
+            Start-Sleep -Milliseconds 300
+            $report.pdfZoom = [ordered]@{ set = Get-PdfFraction }
+
+            Invoke-ReaderCommand 'Zoom in'
+            $first = Wait-PdfZoom '\d+%'
+            $report.pdfZoom[$first] = Wait-PdfFraction 0.3 "Zoom in to $first"
+            [void](Wait-PdfPage 121 200 'page 121 of 200')
+            Invoke-ReaderCommand 'Zoom in'
+            $second = Wait-PdfZoom '\d+%' $first
+            if ([int] $second.TrimEnd('%') -le [int] $first.TrimEnd('%')) {
+                throw "Zoom in went from $first to $second."
+            }
+            $report.pdfZoom[$second] = Wait-PdfFraction 0.3 "Zoom in to $second"
+            [void](Wait-PdfPage 121 200 'page 121 of 200')
+            $report.pdfZoomScreenshot = Save-WindowScreenshot 'pdf-zoom'
+            Invoke-ReaderCommand 'Zoom out'
+            $back = Wait-PdfZoom '\d+%' $second
+            if ($back -ne $first) { throw "Zoom out from $second went to $back; expected $first." }
+            [void](Wait-PdfFraction 0.3 "Zoom out to $back")
+            [void](Wait-PdfPage 121 200 'page 121 of 200')
+            Invoke-OverflowCommand 'Fit to width'
+            [void](Wait-PdfZoom 'Fit width')
+            $report.pdfZoom.fit = Wait-PdfFraction 0.3 'Fit to width'
+            [void](Wait-PdfPage 121 200 'page 121 of 200')
+
+            # 200%: the page is wider than the viewport, so it scrolls sideways.
+            $zoom = 'Fit width'
+            for ($i = 0; $i -lt 8 -and $zoom -ne '200%'; $i++) {
+                Invoke-ReaderCommand 'Zoom in'
+                $zoom = Wait-PdfZoom '\d+%' $zoom
+            }
+            if ($zoom -ne '200%') { throw "Zoom in never reached 200%; it stopped at $zoom." }
+            [void](Wait-PdfPage 121 200 'page 121 of 200')
+            Start-Sleep -Milliseconds 300
+            $portrait = Get-PdfScroll
+            if (-not $portrait.Current.HorizontallyScrollable) {
+                throw 'At 200% page 121 does not scroll sideways.'
+            }
+            $portraitView = $portrait.Current.HorizontalViewSize
+            Invoke-NextPages 1
+            [void](Wait-PdfPage 122 200 'page 122 of 200')
+            [void](Wait-PdfZoom '200%')
+            Start-Sleep -Milliseconds 300
+            $landscapeView = (Get-PdfScroll).Current.HorizontalViewSize
+            $report.pdfZoom.horizontalViewSize = [ordered]@{ page121 = $portraitView; page122 = $landscapeView }
+            if ($landscapeView -ge 0.95 * $portraitView) {
+                throw ("At 200% landscape page 122 shows $([Math]::Round($landscapeView, 1))% of its width " +
+                    "and portrait page 121 $([Math]::Round($portraitView, 1))%; the landscape page should be wider.")
+            }
+
+            # 400% is the last step, so Zoom in turns off there.
+            for ($i = 0; $i -lt 4 -and $zoom -ne '400%'; $i++) {
+                Invoke-ReaderCommand 'Zoom in'
+                $zoom = Wait-PdfZoom '\d+%' $zoom
+            }
+            if ($zoom -ne '400%') { throw "Zoom in never reached 400%; it stopped at $zoom." }
+            $deadline = (Get-Date).AddSeconds(5)
+            $zoomIn = $null
+            do {
+                $zoomIn = Find-VisibleName 'Zoom in'
+                if (-not $zoomIn) { throw 'The Reader toolbar has no visible Zoom in at 400%.' }
+                if (-not $zoomIn.Current.IsEnabled) { break }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            if ($zoomIn.Current.IsEnabled) { throw 'Zoom in stayed enabled at 400%.' }
+            Invoke-OverflowCommand 'Fit to width'
+            [void](Wait-PdfZoom 'Fit width')
+            Start-Sleep -Milliseconds 300
+            if ((Get-PdfScroll).Current.HorizontallyScrollable) {
+                throw 'Back at Fit width page 122 still scrolls sideways.'
+            }
+            $report.phases += 'pdf-zoom'
+            Back-ToTextGame
+        }
+        elseif ($Mode -eq 'pdf-keys') {
+            # Every key in the design's table runs its command and leaves focus
+            # where it was. Page keys stay with a focused text box; Ctrl+G and
+            # the zoom keys still work there.
+            function Send-ReaderKeys([string] $keys, [string] $focusId) {
+                [System.Windows.Forms.SendKeys]::SendWait($keys)
+                Start-Sleep -Milliseconds 150
+                [void](Wait-FocusedId $focusId)
+            }
+
+            # Gives a page turn time to land, then checks none did.
+            function Assert-PdfStays([int] $page, [int] $count, [string] $context) {
+                Start-Sleep -Milliseconds 700
+                $name = (Find-ById 'PdfPageStatus').Current.Name
+                if (-not $name.StartsWith("Page $page of $count" + $pdfDot)) {
+                    throw "$context moved the Reader: the status reads '$name'."
+                }
+            }
+
+            Open-PdfGame
+            Open-TextGuide 'Long PDF Guide'
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PdfPage 1 200 'page 1 of 200')
+            (Find-ById 'PdfPreviewScroller').SetFocus()
+            [void](Wait-FocusedId 'PdfPreviewScroller')
+
+            $preview = 'PdfPreviewScroller'
+            Send-ReaderKeys '{PGDN}' $preview
+            [void](Wait-PdfPage 2 200 'page 2 of 200')
+            Send-ReaderKeys '{PGUP}' $preview
+            [void](Wait-PdfPage 1 200 'page 1 of 200')
+            Send-ReaderKeys '^{END}' $preview
+            [void](Wait-PdfPage 200 200 'page 200 of 200')
+            Send-ReaderKeys '^{HOME}' $preview
+            [void](Wait-PdfPage 1 200 'page 1 of 200')
+
+            Send-ReaderKeys '^=' $preview
+            $first = Wait-PdfZoom '\d+%'
+            Send-ReaderKeys '^{ADD}' $preview
+            $second = Wait-PdfZoom '\d+%' $first
+            Send-ReaderKeys '^-' $preview
+            [void](Wait-PdfZoom ([regex]::Escape($first)))
+            Send-ReaderKeys '^{SUBTRACT}' $preview
+            $lower = Wait-PdfZoom '(\d+%|Fit width)' $first
+            Send-ReaderKeys '^0' $preview
+            [void](Wait-PdfZoom 'Fit width')
+            $report.pdfKeys = [ordered]@{ zoomIn = $first; zoomInAgain = $second; zoomOutTwice = $lower }
+
+            # Ctrl+G opens the dialog. Page Down there stays in its box; Esc
+            # closes it, and focus goes to the preview.
+            [System.Windows.Forms.SendKeys]::SendWait('^g')
+            [void](Wait-FocusedId 'ReaderCommandInput')
+            [System.Windows.Forms.SendKeys]::SendWait('{PGDN}')
+            Assert-PdfStays 1 200 'Page Down in the Go to page box'
+            [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+            [void](Wait-FocusedId $preview)
+            Assert-Absent 'ReaderCommandInput'
+            # A keyboard jump also returns focus to the preview.
+            [System.Windows.Forms.SendKeys]::SendWait('^g')
+            [void](Wait-FocusedId 'ReaderCommandInput')
+            Submit-PageNumber '150'
+            [void](Wait-PdfPage 150 200 'page 150 of 200')
+            [void](Wait-FocusedId $preview)
+
+            # In the read-only page text, Page Down scrolls the text, not the
+            # page; Ctrl+= still zooms.
+            (Find-ById 'PdfDocumentText').SetFocus()
+            [void](Wait-FocusedId 'PdfDocumentText')
+            Send-ReaderKeys '{PGDN}' 'PdfDocumentText'
+            Assert-PdfStays 150 200 'Page Down in the page text'
+            Send-ReaderKeys '^{END}' 'PdfDocumentText'
+            Assert-PdfStays 150 200 'Ctrl+End in the page text'
+            Send-ReaderKeys '^=' 'PdfDocumentText'
+            [void](Wait-PdfZoom '\d+%')
+            Send-ReaderKeys '^0' 'PdfDocumentText'
+            [void](Wait-PdfZoom 'Fit width')
+            $report.phases += 'pdf-keys'
+            Back-ToTextGame
+        }
+        elseif ($Mode -in @('pdf-locked', 'pdf-offline')) {
+            $needsPassword = 'This PDF needs a password.'
+            $wrongPassword = "That password didn't open this PDF. Try again."
+
+            # The panel is up, focus is in the empty box, and no page shows.
+            function Wait-UnlockPanel {
+                [void](Wait-VisibleById 'PdfUnlockPanel')
+                if (-not (Find-VisibleName $needsPassword)) {
+                    throw "The unlock panel doesn't say '$needsPassword'."
+                }
+                [void](Wait-FocusedId 'PdfPasswordInput')
+                # P13: Unlock is enabled only when the box has text.
+                if ((Wait-VisibleById 'PdfUnlockButton').Current.IsEnabled) {
+                    throw 'Unlock was enabled with an empty password box.'
+                }
+                Assert-Absent 'PdfDocumentText'
+                Assert-Absent 'ReaderLoadError'
+            }
+
+            # "guide" is the fixture's public test password.
+            function Unlock-LockedGuide {
+                Enter-Secret 'PdfPasswordInput' 'guide'
+                [void](Wait-EnabledById 'PdfUnlockButton')
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-PdfPage 1 1 'Locked guide secret page')
+                Assert-Absent 'PdfUnlockPanel'
+                [void](Wait-FocusedId 'PdfPreviewScroller')
+            }
+
+            Open-PdfGame
+            if ($Mode -eq 'pdf-locked') {
+                Open-TextGuide 'Locked PDF Guide'
+                Wait-UnlockPanel
+                $report.pdfLockedScreenshot = Save-WindowScreenshot 'pdf-locked'
+
+                # A wrong attempt explains itself and leaves an empty box with
+                # focus, ready for the next try. Enter in the box submits the right one.
+                # Submitted from the focused Unlock button, so the refocus
+                # after Unlock is disabled (P13) is what returns focus.
+                Enter-Secret 'PdfPasswordInput' 'wrong-7Q2x'
+                (Wait-EnabledById 'PdfUnlockButton').SetFocus()
+                [void](Wait-FocusedId 'PdfUnlockButton')
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                [void](Wait-Name 'PdfUnlockError' $wrongPassword)
+                [void](Wait-FocusedId 'PdfPasswordInput')
+                if ((Wait-VisibleById 'PdfUnlockButton').Current.IsEnabled) {
+                    throw 'The password box kept the wrong attempt: Unlock is still enabled.'
+                }
+                Assert-Absent 'PdfDocumentText'
+                $report.pdfLockedWrongScreenshot = Save-WindowScreenshot 'pdf-locked-wrong'
+
+                Unlock-LockedGuide
+                $report.phases += 'pdf-locked'
+
+                # The password isn't remembered: reopening asks again.
+                Back-ToTextGame
+                Open-TextGuide 'Locked PDF Guide'
+                Wait-UnlockPanel
+                if (Find-VisibleName $wrongPassword) { throw 'A reopened guide showed the last error.' }
+                $report.phases += 'pdf-locked-reopen'
+                Back-ToTextGame
+            }
+            else {
+                # TR10.2: the installer deleted the originals and relaunched;
+                # each guide opens from its managed copy with no remote
+                # connection.
+                foreach ($guide in @(
+                    @{ name = 'Tagged PDF Guide'; page = 1; count = 1; text = 'Tagged guide paragraph for Narrator' },
+                    @{ name = 'Long PDF Guide'; page = 1; count = 200; text = 'page 1 of 200' })) {
+                    Open-TextGuide $guide.name
+                    [void](Wait-Status 'Guide ready.')
+                    [void](Wait-PdfPage $guide.page $guide.count $guide.text)
+                    Assert-NoRemoteConnections "PDF reader for $($guide.name)"
+                    Back-ToTextGame
+                }
+                Open-TextGuide 'Locked PDF Guide'
+                Wait-UnlockPanel
+                Unlock-LockedGuide
+                Assert-NoRemoteConnections 'PDF reader for Locked PDF Guide'
+                $report.phases += 'pdf-offline'
+                Back-ToTextGame
+            }
         }
         elseif ($Mode -like 'progress-*') {
             $saveFailed = "Couldn't save your place in this guide."
@@ -3782,9 +4224,45 @@ try {
 
             Click-Element (Wait-EnabledById 'SecondaryButton')
             Choose-PickerFile 'pdf-locked.pdf'
-            [void](Wait-Name 'ImportStatus' "Password-protected PDFs aren't supported. Remove the password and import again.")
-            Assert-Absent 'ImportPreview'
+            [void](Wait-Text 'ImportFileName' 'pdf-locked.pdf')
+            [void](Wait-Text 'ImportFormat' 'PDF')
+            [void](Wait-FocusedId 'ImportPdfPasswordInput')
+            if ((Wait-PresentById 'ImportPdfUnlock').Current.IsEnabled) {
+                throw 'Unlock was enabled with an empty password box.'
+            }
+            foreach ($id in @('ImportPages', 'ImportProtected', 'ImportPdfPasswordError')) {
+                if (Find-ById $id) { throw "'$id' was shown before the password was checked." }
+            }
+            if ((Wait-VisibleById 'PrimaryButton').Current.IsEnabled) {
+                throw 'Import was enabled before the password was checked.'
+            }
+
+            # A wrong attempt explains itself under the box, leaves it empty
+            # with focus, and keeps the preview. Enter submits.
+            Enter-Secret 'ImportPdfPasswordInput' 'wrong-7Q2x'
+            [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+            [void](Wait-Text 'ImportPdfPasswordError' "That password didn't open this PDF. Try again.")
+            [void](Wait-FocusedId 'ImportPdfPasswordInput')
+            if ((Wait-PresentById 'ImportPdfUnlock').Current.IsEnabled) {
+                throw 'The password box kept the wrong attempt: Unlock is still enabled.'
+            }
+            [void](Wait-Text 'ImportFileName' 'pdf-locked.pdf')
+            if ((Find-ById 'ImportStatus')) { throw 'A wrong password replaced the preview with a status.' }
+            $report.importPdfLockedScreenshot = Save-WindowScreenshot 'import-pdf-locked'
             $report.phases += 'import-pdf-locked'
+
+            # The right password fills in the facts and enables Import.
+            Enter-Secret 'ImportPdfPasswordInput' 'guide'
+            Invoke-Element (Wait-PresentById 'ImportPdfUnlock')
+            [void](Wait-Text 'ImportProtected' 'Password protected')
+            [void](Wait-Text 'ImportPages' '1 page')
+            [void](Wait-EnabledById 'PrimaryButton')
+            [void](Wait-FocusedId 'GuideTitleInput')
+            foreach ($id in @('ImportPdfPasswordInput', 'ImportPdfPasswordError')) {
+                if (Find-ById $id) { throw "'$id' stayed after the password was accepted." }
+            }
+            $report.importPdfUnlockedScreenshot = Save-WindowScreenshot 'import-pdf-unlocked'
+            $report.phases += 'import-pdf-unlocked'
 
             Invoke-Element (Wait-EnabledById 'CloseButton')
             [void](Wait-HiddenById 'ImportGuideDialog')

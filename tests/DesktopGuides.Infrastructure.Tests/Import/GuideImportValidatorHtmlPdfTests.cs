@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using DesktopGuides.Core.Import;
 using DesktopGuides.Infrastructure.Import;
 using Xunit;
@@ -263,15 +264,87 @@ public sealed class GuideImportValidatorHtmlPdfTests
         Assert.True(manifest.HasText);
     }
 
-    [Fact]
-    public async Task PasswordProtectedPdfIsEncrypted()
-    {
-        GuideImportException error = await Rejected(P0Fixtures.Resolve("pdf-locked.pdf"));
+    private const string WrongAttempt = "wrong-7Q2x";
 
-        Assert.Equal(ImportIssue.Encrypted, error.Issue);
-        Assert.Equal(
-            "Password-protected PDFs aren't supported. Remove the password and import again.",
-            error.Message);
+    [Fact]
+    public async Task PasswordProtectedPdfNeedsAPassword()
+    {
+        string path = P0Fixtures.Resolve("pdf-locked.pdf");
+
+        ImportNeedsPdfPassword needs = Assert.IsType<ImportNeedsPdfPassword>(await Inspect(path));
+
+        Assert.Equal("pdf-locked", needs.SuggestedTitle);
+        Assert.Equal(new FileInfo(path).Length, needs.Source.ByteCount);
+        Assert.Equal(Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path))), needs.Fingerprint);
+    }
+
+    [Fact]
+    public async Task TheRightPasswordGivesAProtectedManifest()
+    {
+        GuideImportValidator validator = new();
+        ImportNeedsPdfPassword needs = Assert.IsType<ImportNeedsPdfPassword>(
+            await validator.InspectAsync(P0Fixtures.Resolve("pdf-locked.pdf"), CancellationToken.None));
+
+        PdfImportManifest manifest = await validator.ResolvePdfPasswordAsync(needs, "guide", CancellationToken.None);
+
+        Assert.True(manifest.PasswordRequired);
+        Assert.Equal(1, manifest.PageCount);
+        Assert.True(manifest.HasText);
+        Assert.Equal(needs.Fingerprint, manifest.Fingerprint);
+        Assert.Equal(needs.SuggestedTitle, manifest.SuggestedTitle);
+    }
+
+    [Fact]
+    public async Task WrongPasswordLeavesNoTraceOfTheAttempt()
+    {
+        GuideImportValidator validator = new();
+        ImportNeedsPdfPassword needs = Assert.IsType<ImportNeedsPdfPassword>(
+            await validator.InspectAsync(P0Fixtures.Resolve("pdf-locked.pdf"), CancellationToken.None));
+
+        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(
+            () => validator.ResolvePdfPasswordAsync(needs, WrongAttempt, CancellationToken.None));
+
+        Assert.Equal(ImportIssue.PasswordIncorrect, error.Issue);
+        Assert.Equal("That password didn't open this PDF. Try again.", error.Message);
+        Assert.DoesNotContain(WrongAttempt, error.ToString());
+        Assert.Null(error.InnerException);
+    }
+
+    [Fact]
+    public async Task ChangedSourceAfterInspectionIsChanged()
+    {
+        using ImportTestDirectory files = new();
+        string path = files.Copy("pdf-locked.pdf", "locked.pdf");
+        GuideImportValidator validator = new();
+        ImportNeedsPdfPassword needs = Assert.IsType<ImportNeedsPdfPassword>(
+            await validator.InspectAsync(path, CancellationToken.None));
+        File.SetLastWriteTimeUtc(path, File.GetLastWriteTimeUtc(path).AddMinutes(-5));
+
+        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(
+            () => validator.ResolvePdfPasswordAsync(needs, "guide", CancellationToken.None));
+
+        Assert.Equal(ImportIssue.Changed, error.Issue);
+        Assert.Equal("locked.pdf changed after it was checked. Choose it again.", error.Message);
+    }
+
+    [Fact]
+    public async Task ReplacedBytesWithTheSameSizeAndTimeAreChanged()
+    {
+        using ImportTestDirectory files = new();
+        string path = files.Copy("pdf-locked.pdf", "locked.pdf");
+        GuideImportValidator validator = new();
+        ImportNeedsPdfPassword needs = Assert.IsType<ImportNeedsPdfPassword>(
+            await validator.InspectAsync(path, CancellationToken.None));
+        DateTime written = File.GetLastWriteTimeUtc(path);
+        byte[] bytes = File.ReadAllBytes(path);
+        bytes[^2] ^= 0x01;   // inside the trailing whitespace or %%EOF
+        File.WriteAllBytes(path, bytes);
+        File.SetLastWriteTimeUtc(path, written);
+
+        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(
+            () => validator.ResolvePdfPasswordAsync(needs, "guide", CancellationToken.None));
+
+        Assert.Equal(ImportIssue.Changed, error.Issue);
     }
 
     [Fact]
@@ -428,12 +501,12 @@ public sealed class GuideImportValidatorHtmlPdfTests
         [
             await Rejected(Path.Combine(files.Root, "gone.txt")),
             await Rejected(files.Write("notes.doc", "text")),
-            await Rejected(P0Fixtures.Resolve("pdf-locked.pdf")),
+            await Rejected(files.Write("empty.txt", "")),
             await Rejected(files.Copy("txt-ascii.txt", "notes.pdf")),
         ];
 
         Assert.Equal(
-            [ImportIssue.Missing, ImportIssue.Unsupported, ImportIssue.Encrypted, ImportIssue.Unreadable],
+            [ImportIssue.Missing, ImportIssue.Unsupported, ImportIssue.Empty, ImportIssue.Unreadable],
             errors.Select(error => error.Issue));
         Assert.Equal(errors.Length, errors.Select(error => error.Message).Distinct().Count());
     }

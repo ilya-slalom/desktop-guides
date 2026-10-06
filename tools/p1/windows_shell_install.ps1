@@ -1270,13 +1270,13 @@ function Run-HtmlPositionScenarios {
     }
 }
 
-function Invoke-PdfReaderPass([string] $resultName) {
+function Invoke-PdfReaderPass([string] $resultName, [string] $mode = 'pdf-reader') {
     Start-InstalledShell
     $diagnosticsGate = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
         "Local\DesktopGuides.Preview.PdfDiagnostics.$($report.launchedProcessId)")
     try {
-        $report.pdfReader[$resultName] = Run-ShellSmoke 'pdf-reader' -ResultName $resultName
+        $report.pdfReader[$resultName] = Run-ShellSmoke $mode -ResultName $resultName
         Close-InstalledShell
     }
     finally {
@@ -1290,11 +1290,10 @@ function Assert-PdfDiagnostics([string] $pass, [string] $diagnostics, [string] $
     if (-not (Test-Path -LiteralPath $path)) {
         throw "The $pass pass wrote no diagnostics for the long PDF guide."
     }
-    Copy-Item -LiteralPath $path -Destination (Join-Path $ResultDirectory "$pass.pdf-long.json")
     $counts = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
     foreach ($f in @('requests', 'loads', 'staleResults', 'peakCacheBytes', 'maxCacheBytes',
         'cachedPagesAtClose', 'peakTextPages', 'peakTextCharacters', 'disposedCleanly',
-        'evictions')) {
+        'evictions', 'abandonedExtraction')) {
         if ($counts.PSObject.Properties.Name -notcontains $f) {
             throw "The $pass pass diagnostics have no '$f'."
         }
@@ -1331,37 +1330,117 @@ function Assert-PdfDiagnostics([string] $pass, [string] $diagnostics, [string] $
     if ($peakTextPages -gt 8) {
         throw "The $pass pass kept the text of $peakTextPages pages; expected at most 8."
     }
-    if ($counts.disposedCleanly -isnot [bool] -or $counts.disposedCleanly -ne $true) {
-        throw "The $pass pass did not close the long PDF guide cleanly."
-    }
+    # Checks disposedCleanly and abandonedExtraction for every PDF the pass
+    # opened, and copies each pdf-*.json to the results.
+    Assert-PdfClosedCleanly $pass $diagnostics
     return $counts
+}
+
+# P7: every PDF a pass opened closed cleanly, with no extraction left behind.
+function Assert-PdfClosedCleanly([string] $pass, [string] $diagnostics) {
+    $files = @(Get-ChildItem -LiteralPath $diagnostics -Filter 'pdf-*.json' -File -ErrorAction SilentlyContinue)
+    if ($files.Count -eq 0) { throw "The $pass pass wrote no PDF diagnostics." }
+    foreach ($file in $files) {
+        $counts = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json
+        if ($counts.disposedCleanly -isnot [bool] -or $counts.disposedCleanly -ne $true) {
+            throw "The $pass pass did not close $($file.Name) cleanly."
+        }
+        if ($counts.abandonedExtraction -isnot [bool] -or $counts.abandonedExtraction -ne $false) {
+            throw "The $pass pass abandoned a page-text extraction in $($file.Name)."
+        }
+        Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $ResultDirectory "$pass.$($file.Name)")
+    }
+}
+
+# Review Focus 1: the wrong attempt reaches no file the app wrote, in ASCII
+# or UTF-16. Bytes are compared through Latin-1, which maps each byte to one
+# character.
+function Assert-NoPasswordTrace([string] $attempt) {
+    $latin1 = [System.Text.Encoding]::GetEncoding(28591)
+    $needles = @(
+        $latin1.GetString([System.Text.Encoding]::ASCII.GetBytes($attempt)),
+        $latin1.GetString([System.Text.Encoding]::Unicode.GetBytes($attempt)))
+    $unreadable = @()
+    foreach ($root in @($dataRoot, (Get-HtmlCacheRoot))) {
+        foreach ($file in @(Get-ChildItem -LiteralPath $root -Recurse -File -Force -ErrorAction SilentlyContinue)) {
+            try { $text = $latin1.GetString([System.IO.File]::ReadAllBytes($file.FullName)) }
+            catch {
+                # WebView2 can hold a lock file in the cache root; the app
+                # data must scan fully.
+                if ($file.FullName.StartsWith($dataRoot, [StringComparison]::OrdinalIgnoreCase)) {
+                    throw "Couldn't scan $($file.Name) in the app data for the password attempt."
+                }
+                $unreadable += $file.Name
+                continue
+            }
+            foreach ($needle in $needles) {
+                if ($text.IndexOf($needle, [StringComparison]::Ordinal) -ge 0) {
+                    throw "The wrong password attempt was written to $($file.Name)."
+                }
+            }
+        }
+    }
+    # The comma keeps an empty list a list.
+    return ,$unreadable
+}
+
+# P8: deletes only the folder seed-pdf-reader printed, directly under %TEMP%.
+function Remove-PdfOriginals([string] $path) {
+    $temp = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd('\')
+    $full = [System.IO.Path]::GetFullPath($path)
+    $leaf = Split-Path -Leaf $full
+    if ((Split-Path -Parent $full).TrimEnd('\') -ne $temp -or
+        $leaf -notmatch '^desktop-guides-pdf-originals-[0-9a-f]{32}$') {
+        throw "Refusing to delete '$full': it isn't the PDF seed's originals folder."
+    }
+    Remove-Item -LiteralPath $full -Recurse -Force
+    if (Test-Path -LiteralPath $full) { throw "The PDF originals at '$full' are still there." }
 }
 
 function Run-PdfReaderScenarios {
     # TR10.2-TR10.3: tagged text in UI Automation, an image-only page, 200
     # rapid page turns with a bounded cache, typed errors, and TXT still
-    # opening. Light then dark.
+    # opening (pdf-reader); then zoom, keys, Go to page and locked PDFs, each
+    # in its own launch (pdf-zoom, pdf-keys, pdf-jump, pdf-locked). Light
+    # then dark. A final pdf-offline launch runs with the originals deleted.
     $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
     if (-not (Test-Path -LiteralPath (Join-Path $fixtureRoot 'p0\generated\pdf-long.pdf'))) {
         throw 'pdf-long.pdf is missing; run tools/p0/make_fixtures.py first.'
     }
     $ids = Invoke-ShellSeed @('seed-pdf-reader', $dataRoot, $fixtureRoot) | ConvertFrom-Json
     $diagnostics = Join-Path (Get-HtmlCacheRoot) 'diagnostics'
-    $report.pdfReader = [ordered]@{ pdfLong = $ids.pdfLong }
+    $report.pdfReader = [ordered]@{ pdfLong = $ids.pdfLong; pdfLocked = $ids.pdfLocked }
     $originalTheme = Get-AppThemePreference
     try {
-        foreach ($pass in @(
-            @{ name = 'pdf-reader-light'; light = $true },
-            @{ name = 'pdf-reader-dark'; light = $false })) {
-            Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
-            Set-AppThemePreference $pass.light
-            Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
-            Invoke-PdfReaderPass $pass.name
-            $report.pdfReader["$($pass.name)-diagnostics"] = Assert-PdfDiagnostics $pass.name $diagnostics $ids.pdfLong
+        foreach ($theme in @(@{ name = 'light'; light = $true }, @{ name = 'dark'; light = $false })) {
+            Set-AppThemePreference $theme.light
+            foreach ($mode in @('pdf-reader', 'pdf-zoom', 'pdf-keys', 'pdf-jump', 'pdf-locked')) {
+                $pass = "$mode-$($theme.name)"
+                Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
+                Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+                Invoke-PdfReaderPass $pass $mode
+                if ($mode -eq 'pdf-reader') {
+                    # Also runs Assert-PdfClosedCleanly for this pass.
+                    $report.pdfReader["$pass-diagnostics"] = Assert-PdfDiagnostics $pass $diagnostics $ids.pdfLong
+                }
+                else {
+                    Assert-PdfClosedCleanly $pass $diagnostics
+                }
+            }
         }
+        $report.pdfReader.passwordScanUnreadable = Assert-NoPasswordTrace 'wrong-7Q2x'
+
+        # TR10.2: with the originals gone, a fresh launch reads the managed copies.
+        Remove-PdfOriginals $ids.originals
+        Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
+        Invoke-PdfReaderPass 'pdf-offline' 'pdf-offline'
+        Assert-PdfClosedCleanly 'pdf-offline' $diagnostics
     }
     finally {
         Restore-AppThemePreference $originalTheme
+        if ($ids.originals -and (Test-Path -LiteralPath $ids.originals)) {
+            Remove-PdfOriginals $ids.originals
+        }
     }
 }
 
@@ -1583,6 +1662,9 @@ function Run-ImportScenarios {
                 throw "The import preview left $($state.$name) $name; expected none."
             }
         }
+
+        # Review Focus 1: the wrong import attempt reached no file either.
+        $report.importPasswordScanUnreadable = Assert-NoPasswordTrace 'wrong-7Q2x'
 
         Set-AppThemePreference $true
         Start-InstalledShell

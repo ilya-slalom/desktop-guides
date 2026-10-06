@@ -16,6 +16,7 @@
                    Grid.ColumnSpan="2"
                    Margin="0,0,0,12"
                    AutomationProperties.AutomationId="PdfPageStatus"
+                   AutomationProperties.LiveSetting="Polite"
                    Style="{StaticResource DesktopGuidesBodyStyle}"
                    Foreground="{ThemeResource DesktopGuidesPrimaryTextBrush}" />
         <Grid x:Name="PreviewPane" Grid.Row="1">
@@ -33,6 +34,7 @@
             <ScrollViewer x:Name="PreviewScroller"
                           Grid.Row="1"
                           AutomationProperties.AutomationId="PdfPreviewScroller"
+                          IsTabStop="True"
                           HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
                 <Image x:Name="Preview"

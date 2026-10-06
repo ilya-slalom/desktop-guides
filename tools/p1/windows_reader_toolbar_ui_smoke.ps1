@@ -256,6 +256,57 @@ try {
         Invoke-Element (Wait-VisibleByName $submit)
     }
 
+    function Wait-FocusedId([string] $id) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $element = Find-ById $id
+            if ($element -and $element.Current.HasKeyboardFocus) { return $element }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+        $actual = if ($focused) { "$($focused.Current.AutomationId) '$($focused.Current.Name)'" } else { 'nothing' }
+        throw "Expected keyboard focus on '$id', got $actual."
+    }
+
+    # P15: the key is on the command itself, where Narrator reads it.
+    function Assert-AcceleratorKey([string] $name, [string] $key) {
+        $element = Wait-VisibleByName $name
+        $actual = $element.Current.AcceleratorKey
+        if ($actual -ne $key) { throw "Expected '$name' to name the key '$key', got '$actual'." }
+    }
+
+    # P2: a bad entry keeps the dialog open and says why.
+    function Assert-DialogRefuses([string] $value) {
+        Enter-DialogText $value 'Go'
+        $expected = 'Enter a page from 1 to 5.'
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $message = Find-ById 'ReaderCommandError'
+            if ($message -and -not $message.Current.IsOffscreen -and
+                    $message.Current.Name -eq $expected) { break }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        $box = Find-ById 'ReaderCommandInput'
+        if (-not $box -or $box.Current.IsOffscreen) {
+            throw "The Go to page dialog closed after '$value'."
+        }
+        $actual = if ($message) { $message.Current.Name } else { 'missing' }
+        if ($actual -ne $expected) { throw "Expected '$expected' after '$value', got '$actual'." }
+    }
+
+    function Send-ToolbarKeys([string] $keys, [string] $focusId) {
+        [System.Windows.Forms.SendKeys]::SendWait($keys)
+        Start-Sleep -Milliseconds 150
+        [void](Wait-FocusedId $focusId)
+    }
+
+    # Gives a key time to land, then checks it ran nothing.
+    function Assert-ActionStays([string] $expected, [string] $context) {
+        Start-Sleep -Milliseconds 700
+        $actual = (Find-ById 'LastReaderAction').Current.Name
+        if ($actual -ne $expected) { throw "$context ran '$actual'." }
+    }
+
     Wait-ToolbarVisibility $false
     [void](Wait-HiddenByName 'Next page')
     [void](Wait-HiddenByName 'Larger text')
@@ -278,9 +329,11 @@ try {
     Invoke-Command 'Zoom in' 'Zoom 1.1'
     Open-Overflow
     Invoke-Element (Wait-VisibleByName 'Go to page')
+    foreach ($refused in @('0', '6', '')) { Assert-DialogRefuses $refused }
     Enter-DialogText '3' 'Go'
     Wait-Action 'Page jump 3'
     [void](Wait-FocusedCommand 'Go to page')
+    $report.phases += 'page-dialog-refuses-out-of-range'
     $report.phases += 'page-dialog-restores-overflow-focus'
     Close-Overflow
     Open-Overflow
@@ -293,6 +346,84 @@ try {
     $report.phases += 'find-dialog-restores-overflow-focus'
     Close-Overflow
     $report.phases += 'all-capabilities-dispatch'
+
+    foreach ($pair in @(@('Previous page', 'Page Up'), @('Next page', 'Page Down'),
+            @('Go to start', 'Ctrl+Home'), @('Go to end', 'Ctrl+End'),
+            @('Zoom in', 'Ctrl+Plus'), @('Zoom out', 'Ctrl+Minus'))) {
+        Assert-AcceleratorKey $pair[0] $pair[1]
+    }
+    Open-Overflow
+    Assert-AcceleratorKey 'Go to page' 'Ctrl+G'
+    Assert-AcceleratorKey 'Fit to width' 'Ctrl+0'
+    Close-Overflow
+    $report.phases += 'shortcut-names'
+
+    # Keys stay off until the shell turns them on (TXT until T16.1).
+    $stand = 'ContentStandIn'
+    (Find-ById $stand).SetFocus()
+    [void](Wait-FocusedId $stand)
+    Send-ToolbarKeys '{PGDN}' $stand
+    Assert-ActionStays 'Find boss' 'Page Down with keys off'
+    Invoke-Id 'KeysOn'
+    (Find-ById $stand).SetFocus()
+    foreach ($pair in @(@('{PGDN}', 'Page turn 1'), @('{PGUP}', 'Page turn -1'),
+            @('^{HOME}', 'Page edge Start'), @('^{END}', 'Page edge End'),
+            @('^=', 'Zoom 1.1'), @('^-', 'Zoom 0.9'), @('^{ADD}', 'Zoom 1.1'),
+            @('^{SUBTRACT}', 'Zoom 0.9'), @('^0', 'Fit to width'))) {
+        Send-ToolbarKeys $pair[0] $stand
+        Wait-Action $pair[1]
+    }
+    $report.phases += 'keys-run-commands-without-moving-focus'
+
+    # Ctrl+G: Esc, or a jump, hands focus to the content. Each starts in
+    # the notes box, so the dialog's own focus restore lands there and
+    # only ContentFocusRequested can move focus to the stand-in.
+    (Find-ById 'HostNotes').SetFocus()
+    [void](Wait-FocusedId 'HostNotes')
+    [System.Windows.Forms.SendKeys]::SendWait('^g')
+    [void](Wait-FocusedId 'ReaderCommandInput')
+    Send-ToolbarKeys '{PGDN}' 'ReaderCommandInput'
+    Assert-ActionStays 'Fit to width' 'Page Down in the Go to page box'
+    [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+    [void](Wait-FocusedId $stand)
+    (Find-ById 'HostNotes').SetFocus()
+    [void](Wait-FocusedId 'HostNotes')
+    [System.Windows.Forms.SendKeys]::SendWait('^g')
+    [void](Wait-FocusedId 'ReaderCommandInput')
+    Enter-DialogText '4' 'Go'
+    Wait-Action 'Page jump 4'
+    [void](Wait-FocusedId $stand)
+    $report.phases += 'keyboard-dialog-focuses-content'
+
+    # A text box keeps its page keys; zoom keys still run.
+    (Find-ById 'HostNotes').SetFocus()
+    [void](Wait-FocusedId 'HostNotes')
+    Send-ToolbarKeys '{PGDN}' 'HostNotes'
+    Send-ToolbarKeys '^{END}' 'HostNotes'
+    Assert-ActionStays 'Page jump 4' 'Page keys in a text box'
+    Send-ToolbarKeys '^=' 'HostNotes'
+    Wait-Action 'Zoom 1.1'
+    $report.phases += 'text-box-keeps-page-keys'
+
+    # At the last step Zoom in is disabled, and its key does nothing.
+    # Focus on Zoom in moves to Zoom out instead of leaving the toolbar.
+    (Wait-VisibleByName 'Zoom in').SetFocus()
+    Invoke-Id 'ZoomAtEnd'
+    if ((Wait-VisibleByName 'Zoom in').Current.IsEnabled) { throw 'Zoom in stayed enabled at its end.' }
+    $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+    if (-not $focused -or $focused.Current.Name -ne 'Zoom out') {
+        $actual = if ($focused) { "'$($focused.Current.Name)'" } else { 'nothing' }
+        throw "Disabling Zoom in moved focus to $actual, not 'Zoom out'."
+    }
+    (Find-ById $stand).SetFocus()
+    Send-ToolbarKeys '^0' $stand
+    Wait-Action 'Fit to width'
+    Send-ToolbarKeys '^=' $stand
+    Assert-ActionStays 'Fit to width' 'Ctrl+= with Zoom in disabled'
+    Send-ToolbarKeys '^-' $stand
+    Wait-Action 'Zoom 0.9'
+    Invoke-Id 'ZoomBothWays'
+    $report.phases += 'zoom-end-disables-command-and-key'
 
     Invoke-Id 'NarrowToolbar'
     $deadline = (Get-Date).AddSeconds(15)

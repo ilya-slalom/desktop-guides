@@ -16,6 +16,17 @@ public sealed class ManagedPdfGuideLoaderTests
         return ((await harness.Repository.GetGuideAsync(id))!, source);
     }
 
+    private const string WrongAttempt = "wrong-7Q2x";
+
+    private static async Task<Guide> PublishLockedAsync(PublisherHarness harness)
+    {
+        string source = harness.Sources.Copy("pdf-locked.pdf", "guide.pdf");
+        Guid id = await harness.PublishAsync(harness.Publisher(), await harness.InspectAsync(source, password: "guide"));
+        return (await harness.Repository.GetGuideAsync(id))!;
+    }
+
+    private static ManagedPdfGuideLoader Loader(PublisherHarness harness) => new(harness.Paths);
+
     private static string ManagedFile(PublisherHarness harness, Guide guide) =>
         harness.Paths.ResolveExistingGuideFile(guide.Id, guide.PrimaryRelativePath);
 
@@ -161,13 +172,59 @@ public sealed class ManagedPdfGuideLoaderTests
     }
 
     [Fact]
-    public async Task AnEncryptedCopyIsPasswordProtected()
+    public async Task AnEncryptedCopyNeedsAPassword()
     {
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         (Guide guide, _) = await PublishAsync(harness);
         File.Copy(P0Fixtures.Resolve("pdf-locked.pdf"), ManagedFile(harness, guide), overwrite: true);
 
-        Assert.Equal(PdfGuideLoadError.PasswordProtected, await FailedAsync(harness, guide));
+        Assert.Equal(PdfGuideLoadError.PasswordRequired, await FailedAsync(harness, guide));
+    }
+
+    [Fact]
+    public async Task AWrongPasswordIsIncorrect()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        Guide guide = await PublishLockedAsync(harness);
+
+        PdfGuideLoad load = await Loader(harness).LoadAsync(guide, WrongAttempt, CancellationToken.None);
+
+        // The failure holds only an error code, so the attempt has nowhere to be echoed.
+        Assert.Equal(PdfGuideLoadError.PasswordIncorrect, Assert.IsType<PdfGuideLoadFailed>(load).Error);
+        // The managed copy is closed again: it can be opened for writing.
+        // Only Windows locks a file that is open elsewhere.
+        if (OperatingSystem.IsWindows())
+        {
+            using FileStream exclusive = new(ManagedFile(harness, guide), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        }
+    }
+
+    [Fact]
+    public async Task TheRightPasswordGivesThePageText()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        Guide guide = await PublishLockedAsync(harness);
+
+        PdfGuideLoaded loaded = Assert.IsType<PdfGuideLoaded>(
+            await Loader(harness).LoadAsync(guide, "guide", CancellationToken.None));
+        using PdfPageTextSource text = loaded.Text;
+
+        Assert.Equal(1, text.PageCount);
+        Assert.Contains("Locked guide secret page", (await text.GetPageTextAsync(0, CancellationToken.None)).Text);
+    }
+
+    [Fact]
+    public async Task AChangedLockedCopyIsStillChanged()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        Guide guide = await PublishLockedAsync(harness);
+        string managed = ManagedFile(harness, guide);
+        File.Delete(managed);
+        Directory.CreateDirectory(managed);
+
+        PdfGuideLoad load = await Loader(harness).LoadAsync(guide, "guide", CancellationToken.None);
+
+        Assert.Equal(PdfGuideLoadError.Changed, Assert.IsType<PdfGuideLoadFailed>(load).Error);
     }
 
     [Fact]

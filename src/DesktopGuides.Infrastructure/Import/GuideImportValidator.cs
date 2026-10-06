@@ -84,8 +84,7 @@ public sealed class GuideImportValidator : IGuideImportValidator
         if (file.Length != source.ByteCount ||
             file.LastWriteTimeUtc != source.LastWriteUtc.UtcDateTime)
         {
-            throw new GuideImportException(ImportIssue.Changed,
-                $"{source.FileName} changed after it was checked. Choose it again.");
+            throw Changed(source);
         }
         return await Task.Run(async () =>
         {
@@ -95,6 +94,49 @@ public sealed class GuideImportValidator : IGuideImportValidator
             return new TxtImportManifest(source, inspection.SuggestedTitle, codePage, GuideFingerprint.OfBytes(bytes));
         }, token).ConfigureAwait(false);
     }
+
+    public async Task<PdfImportManifest> ResolvePdfPasswordAsync(
+        ImportNeedsPdfPassword inspection, string password, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(inspection);
+        ArgumentException.ThrowIfNullOrEmpty(password);
+        token.ThrowIfCancellationRequested();
+        ImportSource source = inspection.Source;
+        FileInfo file = new(source.FullPath);
+        if (!file.Exists)
+        {
+            throw Missing(source.FileName);
+        }
+        if (file.Length != source.ByteCount ||
+            file.LastWriteTimeUtc != source.LastWriteUtc.UtcDateTime)
+        {
+            throw Changed(source);
+        }
+        return await Task.Run(() =>
+        {
+            using FileStream stream = OpenSource(source.FullPath, source.FileName, asyncIo: false);
+            string fingerprint;
+            try
+            {
+                fingerprint = GuideFingerprint.OfStream(stream, token);
+            }
+            catch (IOException)
+            {
+                throw Unreadable(source.FileName);
+            }
+            // The size and time can survive an edit; the bytes can't.
+            if (fingerprint != inspection.Fingerprint)
+            {
+                throw Changed(source);
+            }
+            stream.Position = 0;
+            return ReadPdf(stream, source, inspection.SuggestedTitle, fingerprint, token, password) is
+                ImportReady { Manifest: PdfImportManifest manifest } ? manifest : throw NotPdf();
+        }, token).ConfigureAwait(false);
+    }
+
+    private static GuideImportException Changed(ImportSource source) =>
+        new(ImportIssue.Changed, $"{source.FileName} changed after it was checked. Choose it again.");
 
     private async Task<ImportInspection> InspectTxtAsync(
         ImportSource source, string title, CancellationToken token)
@@ -202,7 +244,8 @@ public sealed class GuideImportValidator : IGuideImportValidator
         }, token);
 
     internal static ImportInspection ReadPdf(
-        Stream stream, ImportSource source, string title, string fingerprint, CancellationToken token)
+        Stream stream, ImportSource source, string title, string fingerprint, CancellationToken token,
+        string? password = null)
     {
         try
         {
@@ -212,7 +255,10 @@ public sealed class GuideImportValidator : IGuideImportValidator
             }
             stream.Position = 0;
             // PdfPig ignores the token, so the stream checks it on each read.
-            using PdfDocument document = PdfDocument.Open(new CancellableReadStream(stream, token));
+            CancellableReadStream reader = new(stream, token);
+            using PdfDocument document = password is null
+                ? PdfDocument.Open(reader)
+                : PdfDocument.Open(reader, new ParsingOptions { Password = password });
             int pages = document.NumberOfPages;
             if (pages == 0)
             {
@@ -224,12 +270,16 @@ public sealed class GuideImportValidator : IGuideImportValidator
                 token.ThrowIfCancellationRequested();
                 hasText = document.GetPage(number).Text.Any(char.IsLetter);
             }
-            return new ImportReady(new PdfImportManifest(source, title, pages, hasText, fingerprint));
+            return new ImportReady(new PdfImportManifest(
+                source, title, pages, hasText, fingerprint, PasswordRequired: password is not null));
         }
         catch (PdfDocumentEncryptedException)
         {
-            throw new GuideImportException(ImportIssue.Encrypted,
-                "Password-protected PDFs aren't supported. Remove the password and import again.");
+            // PdfPig raises the same exception with no password and a wrong one.
+            // The exception never carries the attempt.
+            return password is null
+                ? new ImportNeedsPdfPassword(source, title, fingerprint)
+                : throw new GuideImportException(ImportIssue.PasswordIncorrect, ImportPresentation.PdfPasswordIncorrect);
         }
         catch (Exception error) when (error is not (GuideImportException or OperationCanceledException))
         {

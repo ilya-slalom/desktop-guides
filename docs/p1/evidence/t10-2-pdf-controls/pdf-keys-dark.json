@@ -1,0 +1,18 @@
+﻿{
+    "mode":  "pdf-keys",
+    "invocationId":  "df809ecc392d4067aa1e71da6b20496a",
+    "observedAt":  "2026-10-06T06:52:36.8370754Z",
+    "processId":  7648,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "pdf-keys"
+               ],
+    "pdfKeys":  {
+                    "zoomIn":  "75%",
+                    "zoomInAgain":  "100%",
+                    "zoomOutTwice":  "50%"
+                }
+}

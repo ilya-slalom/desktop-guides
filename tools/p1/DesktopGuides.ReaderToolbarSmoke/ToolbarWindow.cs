@@ -21,6 +21,8 @@ public sealed class ToolbarWindow : Window
         Text = "No action",
         FontSize = 18
     };
+    private readonly Button contentStandIn = new() { Content = "Content" };
+    private readonly TextBox hostNotes = new() { Header = "Notes", Width = 240 };
 
     public ToolbarWindow()
     {
@@ -29,6 +31,11 @@ public sealed class ToolbarWindow : Window
         session.ActionExecuted += action => lastAction.Text = Describe(action);
         toolbar.CommandFailed += message => lastAction.Text = message;
         toolbar.SetSession(session);
+        // A five-page document, so the dialog's range is 1 to 5.
+        toolbar.PageCount = 5;
+        AutomationProperties.SetAutomationId(contentStandIn, "ContentStandIn");
+        AutomationProperties.SetAutomationId(hostNotes, "HostNotes");
+        toolbar.ContentFocusRequested += (_, _) => contentStandIn.Focus(FocusState.Programmatic);
 
         StackPanel controls = new()
         {
@@ -39,13 +46,19 @@ public sealed class ToolbarWindow : Window
             async () => await ChangeCapabilitiesAsync(ReaderCapabilities.TextSize |
                 ReaderCapabilities.Find)));
         controls.Children.Add(ControlButton("All controls", "AllControls",
-            async () => await ChangeCapabilitiesAsync(
-                ReaderCapabilities.PageNavigation |
-                ReaderCapabilities.PageJump |
-                ReaderCapabilities.FitWidth |
-                ReaderCapabilities.Zoom |
-                ReaderCapabilities.TextSize |
-                ReaderCapabilities.Find)));
+            async () =>
+            {
+                // Capability changes keep the session, so the page count stays set;
+                // set it here too, so the dialog's 1-to-5 range doesn't depend on order.
+                toolbar.PageCount = 5;
+                await ChangeCapabilitiesAsync(
+                    ReaderCapabilities.PageNavigation |
+                    ReaderCapabilities.PageJump |
+                    ReaderCapabilities.FitWidth |
+                    ReaderCapabilities.Zoom |
+                    ReaderCapabilities.TextSize |
+                    ReaderCapabilities.Find);
+            }));
         controls.Children.Add(ControlButton("No controls", "NoControls",
             async () => await ChangeCapabilitiesAsync(ReaderCapabilities.None)));
         controls.Children.Add(ControlButton("Detach reader", "DetachReader",
@@ -68,6 +81,36 @@ public sealed class ToolbarWindow : Window
                 return Task.CompletedTask;
             }));
 
+        StackPanel keyControls = new()
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8
+        };
+        keyControls.Children.Add(ControlButton("Keys on", "KeysOn",
+            () =>
+            {
+                toolbar.KeysEnabled = true;
+                return Task.CompletedTask;
+            }));
+        keyControls.Children.Add(ControlButton("Zoom at end", "ZoomAtEnd",
+            () =>
+            {
+                toolbar.SetZoomAvailability(canZoomIn: false, canZoomOut: true);
+                return Task.CompletedTask;
+            }));
+        keyControls.Children.Add(ControlButton("Zoom both ways", "ZoomBothWays",
+            () =>
+            {
+                toolbar.SetZoomAvailability(canZoomIn: true, canZoomOut: true);
+                return Task.CompletedTask;
+            }));
+        // Invoking these takes keyboard focus, which would hide where the
+        // toolbar itself moves it; the smoke checks focus right after.
+        foreach (UIElement button in keyControls.Children)
+        {
+            ((Control)button).IsTabStop = false;
+        }
+
         StackPanel content = new()
         {
             Padding = new Thickness(24),
@@ -80,8 +123,11 @@ public sealed class ToolbarWindow : Window
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
         });
         content.Children.Add(controls);
+        content.Children.Add(keyControls);
         content.Children.Add(toolbar);
         content.Children.Add(lastAction);
+        content.Children.Add(contentStandIn);
+        content.Children.Add(hostNotes);
         Content = content;
     }
 

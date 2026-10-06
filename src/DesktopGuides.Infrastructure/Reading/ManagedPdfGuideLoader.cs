@@ -17,7 +17,12 @@ public sealed record PdfGuideLoadFailed(PdfGuideLoadError Error) : PdfGuideLoad;
 /// </summary>
 public sealed class ManagedPdfGuideLoader(ManagedPathResolver paths)
 {
-    public async Task<PdfGuideLoad> LoadAsync(Guide guide, CancellationToken token)
+    public Task<PdfGuideLoad> LoadAsync(Guide guide, CancellationToken token) =>
+        LoadAsync(guide, null, token);
+
+    // The password opens PdfPig once; it isn't stored, and a wrong one
+    // reports PasswordIncorrect without echoing it.
+    public async Task<PdfGuideLoad> LoadAsync(Guide guide, string? password, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         // The resolver reports links and access errors as missing too, so
@@ -50,10 +55,10 @@ public sealed class ManagedPdfGuideLoader(ManagedPathResolver paths)
         {
             return Failed(PdfGuideLoadError.Unreadable);
         }
-        return await Task.Run(() => Open(path, token), token).ConfigureAwait(false);
+        return await Task.Run(() => Open(path, password, token), token).ConfigureAwait(false);
     }
 
-    private static PdfGuideLoad Open(string path, CancellationToken token)
+    private static PdfGuideLoad Open(string path, string? password, CancellationToken token)
     {
         FileStream file;
         try
@@ -86,7 +91,7 @@ public sealed class ManagedPdfGuideLoader(ManagedPathResolver paths)
                 return Failed(PdfGuideLoadError.Unreadable);
             }
             file.Position = 0;
-            PdfPageTextSource text = PdfPageTextSource.Open(file, token);
+            PdfPageTextSource text = PdfPageTextSource.Open(file, token, password);
             if (text.PageCount == 0)
             {
                 text.Dispose();
@@ -97,7 +102,7 @@ public sealed class ManagedPdfGuideLoader(ManagedPathResolver paths)
         catch (PdfDocumentEncryptedException)
         {
             file.Dispose();
-            return Failed(PdfGuideLoadError.PasswordProtected);
+            return Failed(password is null ? PdfGuideLoadError.PasswordRequired : PdfGuideLoadError.PasswordIncorrect);
         }
         catch (OperationCanceledException)
         {
