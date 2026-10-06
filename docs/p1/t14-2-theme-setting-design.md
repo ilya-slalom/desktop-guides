@@ -109,6 +109,20 @@ public sealed partial class BoundedChoice : Segmented
 option's id. Selection stays the `Segmented` `SelectedIndex`, so callers
 keep the selection logic they have today.
 
+The gate found two Toolkit behaviors that `BoundedChoice` corrects:
+
+- `Segmented`'s Left and Right keys move keyboard focus only. A
+  container selects itself when it receives keyboard focus, so the
+  arrow keys select, as in a radio group. Tab and programmatic focus
+  don't change the selection.
+- `Segmented.OnApplyTemplate` resets `SelectedIndex` to the first index
+  it ever held. `BoundedChoice` keeps the selection it had before the
+  template pass.
+
+Callers listen to `ChoiceChanged`, which is raised when the selected
+option changes. It isn't raised by the template pass or by a cleared
+selection that `BoundedChoice` puts back.
+
 Package: `CommunityToolkit.WinUI.Controls.Segmented` at `8.2.251219`, the
 version of the other Toolkit pins, in `Directory.Packages.props`, the
 Production project and its lock file.

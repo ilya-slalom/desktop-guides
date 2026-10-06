@@ -3,7 +3,6 @@ using Microsoft.UI.System;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
-using Microsoft.UI.Xaml.Controls;
 
 namespace DesktopGuides.Production;
 
@@ -25,6 +24,7 @@ public sealed partial class ShellWindow
                 .Select(option => new BoundedChoiceOption(option.Label, option.AutomationId))
                 .ToList());
         // System follows Windows, so its status follows the resolved theme.
+        AppThemeChoice.ChoiceChanged += AppThemeChoiceChanged;
         ShellRoot.ActualThemeChanged += (_, _) => UpdateThemeStatus();
         // Queued to the UI thread; the event's thread is not documented.
         themeSettings = ThemeSettings.CreateForWindowId(AppWindow.Id);
@@ -64,9 +64,8 @@ public sealed partial class ShellWindow
             AppThemeChoice,
             ThemePresentation.Status(requestedTheme, appliedTheme, ShellRoot.ActualTheme.ToString()));
 
-    private async void AppThemeSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void AppThemeChoiceChanged(object? sender, EventArgs e)
     {
-        // A cleared selection is put back by BoundedChoice.
         if (applyingThemeSelection || repository is null || AppThemeChoice.SelectedIndex < 0)
         {
             return;

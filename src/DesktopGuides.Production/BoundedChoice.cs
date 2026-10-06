@@ -14,16 +14,41 @@ public sealed record BoundedChoiceOption(string Label, string AutomationId);
 public partial class BoundedChoice : Segmented
 {
     private int lastSelectedIndex = -1;
+    private bool applyingTemplate;
 
     public BoundedChoice()
     {
         SelectionChanged += KeepOneSelected;
     }
 
+    // Raised when the selected option changes, but not when the template
+    // reset or a cleared selection briefly moves SelectedIndex.
+    public event EventHandler? ChoiceChanged;
+
     public void SetOptions(IReadOnlyList<BoundedChoiceOption> options) =>
         ItemsSource = options;
 
     public Control? ContainerAt(int index) => ContainerFromIndex(index) as Control;
+
+    // Segmented's first template pass resets SelectedIndex to the first
+    // index it ever held, which can be an older choice than the one shown.
+    protected override void OnApplyTemplate()
+    {
+        int selected = SelectedIndex;
+        applyingTemplate = true;
+        try
+        {
+            base.OnApplyTemplate();
+            if (selected >= 0)
+            {
+                SelectedIndex = selected;
+            }
+        }
+        finally
+        {
+            applyingTemplate = false;
+        }
+    }
 
     protected override DependencyObject GetContainerForItemOverride() => new BoundedChoiceItem();
 
@@ -43,9 +68,18 @@ public partial class BoundedChoice : Segmented
     // Ctrl+Space can clear a ListViewBase selection; a choice always has one.
     private void KeepOneSelected(object sender, SelectionChangedEventArgs args)
     {
+        if (applyingTemplate)
+        {
+            return;
+        }
         if (SelectedIndex >= 0)
         {
+            bool changed = SelectedIndex != lastSelectedIndex;
             lastSelectedIndex = SelectedIndex;
+            if (changed)
+            {
+                ChoiceChanged?.Invoke(this, EventArgs.Empty);
+            }
             return;
         }
         if (lastSelectedIndex >= 0)
@@ -60,6 +94,17 @@ public partial class BoundedChoice : Segmented
 public partial class BoundedChoiceItem : SegmentedItem
 {
     protected override AutomationPeer OnCreateAutomationPeer() => new BoundedChoiceItemPeer(this);
+
+    // Segmented's arrow keys move keyboard focus only; a choice selects with
+    // it, as a radio group does.
+    protected override void OnGotFocus(RoutedEventArgs e)
+    {
+        base.OnGotFocus(e);
+        if (FocusState == FocusState.Keyboard && !IsSelected)
+        {
+            IsSelected = true;
+        }
+    }
 }
 
 internal sealed partial class BoundedChoiceItemPeer(BoundedChoiceItem owner)
