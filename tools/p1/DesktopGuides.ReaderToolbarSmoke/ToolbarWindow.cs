@@ -104,6 +104,12 @@ public sealed class ToolbarWindow : Window
                 toolbar.SetZoomAvailability(canZoomIn: true, canZoomOut: true);
                 return Task.CompletedTask;
             }));
+        // Invoking these takes keyboard focus, which would hide where the
+        // toolbar itself moves it; the smoke checks focus right after.
+        foreach (UIElement button in keyControls.Children)
+        {
+            ((Control)button).IsTabStop = false;
+        }
 
         StackPanel content = new()
         {
