@@ -147,8 +147,9 @@ public sealed partial class ShellWindow
                 ?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
         }
         // The box was cleared before the attempt, so Unlock is disabled
-        // (P13); focus goes back to the box for the next try.
-        ShowTransientStatus(PdfUnlockMessage.Text);
+        // (P13); focus goes back to the box for the next try. The panel says
+        // what is wrong, so the render's "Loading guide…" status just closes.
+        HideStatus();
         DispatcherQueue.TryEnqueue(() =>
         {
             if (generation == renderGeneration && PdfUnlockPanel.Visibility == Visibility.Visible)

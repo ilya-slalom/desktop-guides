@@ -209,6 +209,13 @@ public sealed partial class ShellWindow : Window
     private void ShowErrorStatus(string message) =>
         ShowStatus(message, InfoBarSeverity.Error, true, false);
 
+    // Drops the busy status when the panel on screen already says what is wrong.
+    private void HideStatus()
+    {
+        statusDismissTimer.Stop();
+        ShellStatusInfoBar.IsOpen = false;
+    }
+
     private void ShowStatus(
         string message,
         InfoBarSeverity severity,
