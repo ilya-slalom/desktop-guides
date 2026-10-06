@@ -759,7 +759,7 @@ observed again in the actual adapter, beyond the T10.0 prototype.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
-| T14.2 | T03.2, T11.1 | Persisted System/Light/Dark setting and local theme styles presented through Toolkit `Segmented`, with accessible native-radio fallback. Restart and disconnected-session checks pass; high contrast keeps system colors. | TR14.2 |
+| T14.2 | T03.2, T11.1 | Persisted System/Light/Dark setting and local theme styles presented through Toolkit `Segmented`, bound to data, with a custom selection automation peer as the fallback. Restart and disconnected-session checks pass; high contrast keeps system colors. | TR14.2 |
 | T07.3 | T06.3, T07.2, T11.2 | Per-guide WebView2 manifest responder, navigation/popup/resource deny rules, and explicit external-link action. Fresh-profile online/offline canary tests record zero guide-originated network requests and block cross-guide loads. | TR07.1–TR07.3 |
 | T08.1 | T06.3, T11.2 | Managed TXT decoding and stored encoding choice. BOM, strict UTF-8, CP437, Windows-1252, newline, and truncation tests pass with untouched originals. | TR08.1 |
 | T08.2 | T08.1 | Virtualized monospace no-wrap TXT view. ASCII diagrams survive; 10 MiB response and realized-item measures meet the P0 reference checks without a persistent control per line. | TR08.1, TR08.2 |
@@ -902,10 +902,17 @@ T13.1 is implemented; see the
 [design and implementation notes](t13-1-completion-actions-design.md).
 The Game page and the Reader header show an `In progress` / `Complete`
 choice that calls `GuideCompletionService`, shows the committed state, and
-announces it. Toolkit `Segmented` failed the selected-state UIA gate, so the
-choice uses native `RadioButtons`. Reaching the last line or page leaves a
-guide not complete, and a failed write reverts the choice and explains the
-error.
+announces it. T14.2 later moved the choice to the shared data-bound `Segmented`
+(`BoundedChoice`), which passes the gate. Reaching the last line or page
+leaves a guide not complete, and a failed write reverts the choice and
+explains the error.
+
+T14.2 is implemented; see the
+[design and implementation notes](t14-2-theme-setting-design.md).
+Settings has an *App theme* choice (System, Light, Dark) on the shared
+`BoundedChoice` Segmented. It applies at once to the shell, dialogs and
+title bar, is stored, survives a relaunch, and puts back a failed save.
+Windows high contrast always wins.
 
 ## M5 — errors, accessibility, and portable backup
 

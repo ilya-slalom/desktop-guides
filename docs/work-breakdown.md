@@ -447,8 +447,9 @@ behavior, or high-contrast system colors.
 
 - **T14.1** Add per-guide TXT/HTML font-size controls and saved preferences.
 - **T14.2** Add global theme setting with a Windows theme default. Present the
-  bounded `System` / `Light` / `Dark` choice with Toolkit `Segmented`, with an
-  accessible native-radio fallback if installed testing finds a regression.
+  bounded `System` / `Light` / `Dark` choice with Toolkit `Segmented`, bound to data
+  so each item exposes its selected state, with a custom automation peer as
+  the fallback.
 - **T14.3** Recheck location restoration after changing appearance.
 - **T14.4** Apply the shared design language to reader and Settings surfaces
   after their functional controls exist. Adopt suitable Gallery command,

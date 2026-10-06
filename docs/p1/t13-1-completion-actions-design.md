@@ -287,6 +287,11 @@ In the implementing branch:
   7. The error check spans three smoke modes. The installer owns the lock
      helper, so it takes the lock between `completion-error-prepare` and
      `completion-error`, and releases it before `completion-error-retry`.
+- **2026-10: moved to `Segmented` in T14.2.** The completion choice now
+  hosts the shared `BoundedChoice`, a data-bound Toolkit `Segmented`
+  whose generated items expose `SelectionItem`. The smoke checks
+  `ListItem`s again. See the
+  [T14.2 design](t14-2-theme-setting-design.md).
 
 ## Verification
 

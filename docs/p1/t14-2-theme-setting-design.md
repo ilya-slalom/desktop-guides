@@ -243,6 +243,48 @@ In the implementing branch:
   [p1-technical-design.md](../p1-technical-design.md) §8, and the T13.1
   implementation note, once completion uses `Segmented`.
 
+## Implementation notes
+
+- **The gate needed the custom peer.** The `ItemsSource`-bound `Segmented`
+  still lacked `SelectionItem` (run 37447327137, patterns
+  `ScrollItemPatternIdentifiers.Pattern` on `ListItem`s named System, Light
+  and Dark); `BoundedChoiceItem` supplies a peer that implements
+  `ISelectionItemProvider` (run 37448537276, patterns SelectionItem and
+  ScrollItem).
+- **Selection follows keyboard focus.** The Toolkit's arrow keys move focus
+  only, so `BoundedChoiceItem` selects itself on keyboard focus, as a radio
+  group does. `Segmented.OnApplyTemplate` resets `SelectedIndex` to the
+  first index it ever held, so `BoundedChoice` keeps the selection through
+  it and raises `ChoiceChanged` instead of `SelectionChanged` for callers.
+  The gate passed with both (run 37450456193).
+- **The items panel names `BoundedChoice`.** The Toolkit's panel finds its
+  control by exact type, so a subclass lost the control's alignment and
+  stretched across the Game page. An implicit `BoundedChoice` style in
+  `Styles/Controls.xaml` repeats the Toolkit panel with
+  `AncestorType="local:BoundedChoice"`.
+- `ThemePresentation` in Core holds the labels, ids, `Resolve`, and the
+  status and failure texts.
+- The applied theme goes on `ShellRoot.RequestedTheme`, dialogs get it
+  through `DialogSurface.Apply`, and the title bar through
+  `PreferredTheme`. The tests read `ItemStatus` on `AppThemeChoice`
+  (`<Label>` or `System (<Windows theme>)`), `AppTitleBar` and each
+  dialog. UIA shows a `ContentDialog` through its `Popup` host, which
+  takes the dialog's AutomationId but not its ItemStatus, so
+  `DialogSurface` sets the status on the open `Popup` too.
+- The saves are serialized, and a failed save reverts only when no newer
+  choice is pending.
+- **High contrast** comes from `ThemeSettings.CreateForWindowId`; the
+  status reads `<Label> (high contrast)`. Subscribing to
+  `AccessibilitySettings.HighContrastChanged` threw `0x80070490` in a WinUI
+  3 desktop window and closed the app at launch. The high contrast pass
+  itself is deferred to T16.2.
+- `DisplayMemberPath` isn't used. The container's `Content` is set to the
+  label in `PrepareContainerForItemOverride`.
+- Completion moved to `BoundedChoice`, and only `BoundedChoice` restores a
+  cleared selection.
+- The theme-change popup screenshot is the open Window background
+  drop-down: the TXT design guide's Reader overflow menu is empty.
+
 ## Risks
 
 - **The gate fails even with the custom peer.** Then the user decides; no
