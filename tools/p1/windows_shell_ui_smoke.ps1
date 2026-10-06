@@ -15,6 +15,7 @@ param(
         'txt-load-paused', 'txt-back-during-load', 'txt-load-released', 'html-reader',
         'html-runtime-missing', 'pdf-reader', 'pdf-jump', 'pdf-zoom', 'pdf-keys', 'pdf-locked', 'pdf-offline',
         'html-position',
+        'html-theme-open', 'html-theme-light', 'html-theme-switch',
         'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed',
         'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry',
         'theme-segmented', 'theme-change', 'theme-restored', 'theme-error', 'theme-error-retry')]
@@ -1226,10 +1227,12 @@ try {
     elseif ($Mode -in @('txt-reader', 'txt-load-paused', 'txt-back-during-load',
         'txt-load-released', 'html-reader', 'html-runtime-missing', 'pdf-reader', 'pdf-jump', 'pdf-zoom', 'pdf-keys', 'pdf-locked', 'pdf-offline',
         'html-position',
+        'html-theme-open', 'html-theme-light', 'html-theme-switch',
         'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed',
         'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
+            elseif ($Mode -like 'html-theme-*') { 'Web Theme Game' }
             elseif ($Mode -like 'pdf-*') { 'PDF Reader Game' }
             elseif ($Mode -like 'progress-*' -or $Mode -like 'completion-*') { 'Progress Game' }
             else { 'Text Reader Game' }
@@ -1432,6 +1435,47 @@ try {
             } while ((Get-Date) -lt $deadline)
             [void](Save-WindowScreenshot 'html-position-timeout')
             throw "The HTML position never showed $what. Last: offset=$($position.offset) kind=$($position.kind) step=$($position.step)."
+        }
+
+        # The app's applied style, written after each application while the
+        # HtmlDiagnostics gate is open (T09.2).
+        function Read-HtmlAppearance {
+            $path = Join-Path $AppCacheRoot "diagnostics\html-appearance-$ProcessId.json"
+            if (-not (Test-Path -LiteralPath $path)) { return $null }
+            try {
+                return Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+            }
+            catch {
+                return $null
+            }
+        }
+
+        function Wait-HtmlAppearance([int] $applications, [string] $what) {
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $file = Read-HtmlAppearance
+                # The open writes the file once mid-open (opacity 0) and again
+                # once the view is shown; a view that stays hidden times out here.
+                if ($file -and [int] $file.session.appearance.applications -ge $applications -and
+                    [double] $file.opacity -eq 1) { return $file }
+                Start-Sleep -Milliseconds 250
+            } while ((Get-Date) -lt $deadline)
+            [void](Save-WindowScreenshot 'html-appearance-missing')
+            throw "The app applied no style for $what (file: $(Read-HtmlAppearance | ConvertTo-Json -Compress -Depth 5))."
+        }
+
+        function Assert-HtmlAppearance($file, [string] $theme, [int] $applications,
+            [string] $background, [string] $color, [string] $zoom, [string] $what) {
+            $a = $file.session.appearance
+            $seen = "theme=$($a.theme) applications=$($a.applications) failures=$($a.failures) " +
+                "background=$($a.bodyBackground) color=$($a.bodyColor) zoom=$($a.rootZoom) opacity=$($file.opacity)"
+            if ($a.theme -cne $theme -or [int] $a.applications -ne $applications -or [int] $a.failures -ne 0 -or
+                $a.bodyBackground -cne $background -or $a.bodyColor -cne $color -or $a.rootZoom -cne $zoom -or
+                [double] $file.opacity -ne 1) {
+                throw "After $what the app reported $seen; expected theme=$theme applications=$applications " +
+                    "failures=0 background=$background color=$color zoom=$zoom opacity=1."
+            }
+            return $seen
         }
 
         # The page's tree has no TextPattern, and a point hit-test stops at
@@ -2217,6 +2261,82 @@ try {
             Wait-HiddenById 'ReaderUnavailableLinkBar'
             Back-ToTextGame
             $report.phases += 'position-unimported-link'
+        }
+        elseif ($Mode -in @('html-theme-open', 'html-theme-light')) {
+            if (-not $AppCacheRoot -or -not $AppDataRoot) {
+                throw "$Mode needs -AppDataRoot and -AppCacheRoot."
+            }
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            Select-Element $textGame
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+            Open-TextGuide 'Theme Web Guide'
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PageName 'Theme Web Guide')
+            $applied = Wait-HtmlAppearance 1 'the open'
+            if ($Mode -eq 'html-theme-open') {
+                # Dark is stored and the scale is 1.5; Windows is light.
+                $report.htmlAppearance = Assert-HtmlAppearance $applied 'Dark' 1 `
+                    'rgb(30, 30, 30)' 'rgb(230, 230, 230)' '1.5' 'a Dark open at 1.5'
+                # The page's own element with the style's id keeps its text.
+                [void](Wait-PageName 'Route notes stay visible.')
+                $report.htmlThemeScreenshot = Save-WindowScreenshot 'html-theme-dark-1.5'
+            }
+            else {
+                # Light is stored and no scale; Windows is dark.
+                $report.htmlAppearance = Assert-HtmlAppearance $applied 'Light' 1 `
+                    'rgb(255, 255, 255)' 'rgb(34, 34, 34)' '1' 'a Light open'
+                $report.htmlThemeScreenshot = Save-WindowScreenshot 'html-theme-light'
+            }
+            Assert-NoRemoteConnections 'themed HTML guide'
+            Back-ToTextGame
+            $report.phases += $Mode
+        }
+        elseif ($Mode -eq 'html-theme-switch') {
+            if (-not $AppCacheRoot -or -not $AppDataRoot) {
+                throw 'html-theme-switch needs -AppDataRoot and -AppCacheRoot.'
+            }
+            . (Join-Path $PSScriptRoot 'windows_shell_theme_preference.ps1')
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            Select-Element $textGame
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+            Open-TextGuide 'Theme Web Guide'
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-PageName 'Theme Web Guide')
+            # System is stored and Windows is light.
+            $before = Wait-HtmlAppearance 1 'the open'
+            $report.htmlAppearanceBefore = Assert-HtmlAppearance $before 'Light' 1 `
+                'rgb(255, 255, 255)' 'rgb(34, 34, 34)' '1' 'a System open with Windows light'
+            [void](Wait-HtmlPosition { param($p) $p.locator } 'a first capture')
+            $placeBefore = (Read-HtmlPosition).locator
+            $report.htmlThemeLightScreenshot = Save-WindowScreenshot 'html-theme-system-light'
+
+            # The install side restores the user's value in its finally.
+            Set-AppThemePreference $false
+            $report.themeBroadcast = [DesktopGuidesForegroundProbe]::BroadcastThemeChange()
+            $after = Wait-HtmlAppearance 2 'the Windows dark switch'
+            $report.htmlAppearanceAfter = Assert-HtmlAppearance $after 'Dark' 2 `
+                'rgb(30, 30, 30)' 'rgb(230, 230, 230)' '1' 'the Windows dark switch'
+            # No reload and no new request: the same entry load and the same files.
+            $servedBefore = @($before.session.served) -join ','
+            $servedAfter = @($after.session.served) -join ','
+            if ($servedAfter -cne $servedBefore -or @($after.session.denied).Count -ne @($before.session.denied).Count -or
+                [int] $after.session.entryNavigations -ne 1) {
+                throw "The switch changed the session: served '$servedBefore' to '$servedAfter', " +
+                    "denied $(@($before.session.denied).Count) to $(@($after.session.denied).Count), " +
+                    "entry navigations $($after.session.entryNavigations)."
+            }
+            # Two polls past the switch, the reading place is the same.
+            Start-Sleep -Milliseconds 1200
+            $placeAfter = (Read-HtmlPosition).locator
+            if ($placeAfter -cne $placeBefore) {
+                throw "The switch moved the reading place from $placeBefore to $placeAfter."
+            }
+            $report.htmlThemeDarkScreenshot = Save-WindowScreenshot 'html-theme-system-dark'
+            Assert-NoRemoteConnections 'themed HTML guide'
+            Back-ToTextGame
+            $report.phases += $Mode
         }
         elseif ($Mode -eq 'pdf-reader') {
             Open-PdfGame

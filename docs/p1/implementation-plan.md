@@ -914,6 +914,13 @@ Settings has an *App theme* choice (System, Light, Dark) on the shared
 title bar, is stored, survives a relaunch, and puts back a failed save.
 Windows high contrast always wins.
 
+T09.2 is implemented; see the
+[design and implementation notes](t09-2-html-theme-style-design.md).
+An HTML guide gets one fixed local style through DevTools: Light keeps the
+page's colors, Dark forces a dark palette, and high contrast is left to
+Windows. It follows a theme or Windows change without a reload, and the
+guide's stored text scale applies at open. The style makes no request.
+
 ## M5 — errors, accessibility, and portable backup
 
 Exit: interrupted operations recover without damaging unrelated content;

@@ -64,4 +64,65 @@ public sealed class HtmlSessionDiagnosticsTests
         Assert.Equal(0, json.RootElement.GetProperty("rejectedCaptures").GetInt32());
         Assert.Empty(json.RootElement.GetProperty("restores").EnumerateObject());
     }
+
+    [Fact]
+    public void RecordsTheLastAppearanceAndCountsApplications()
+    {
+        HtmlSessionDiagnostics diagnostics = new();
+        diagnostics.RecordAppearance("Light", 1.0, new HtmlAppliedStyle("rgb(255, 255, 255)", "rgb(34, 34, 34)", "1"));
+        diagnostics.RecordAppearanceFailed();
+        diagnostics.RecordAppearance("Dark", 1.5, new HtmlAppliedStyle("rgb(30, 30, 30)", "rgb(230, 230, 230)", "1.5"));
+
+        using JsonDocument json = JsonDocument.Parse(diagnostics.ToJson(Guid.NewGuid()));
+        JsonElement appearance = json.RootElement.GetProperty("appearance");
+
+        Assert.Equal("Dark", appearance.GetProperty("theme").GetString());
+        Assert.Equal(1.5, appearance.GetProperty("scale").GetDouble());
+        Assert.Equal(2, appearance.GetProperty("applications").GetInt32());
+        Assert.Equal(1, appearance.GetProperty("failures").GetInt32());
+        Assert.Equal("rgb(30, 30, 30)", appearance.GetProperty("bodyBackground").GetString());
+        Assert.Equal("rgb(230, 230, 230)", appearance.GetProperty("bodyColor").GetString());
+        Assert.Equal("1.5", appearance.GetProperty("rootZoom").GetString());
+    }
+
+    [Fact]
+    public void AnApplicationWithoutAReadbackHasNoComputedValues()
+    {
+        HtmlSessionDiagnostics diagnostics = new();
+        diagnostics.RecordAppearance("Dark", 1.0, new HtmlAppliedStyle("rgb(30, 30, 30)", "rgb(230, 230, 230)", "1"));
+        diagnostics.RecordAppearance("Light", 1.0, null);
+
+        using JsonDocument json = JsonDocument.Parse(diagnostics.ToJson(Guid.NewGuid()));
+        JsonElement appearance = json.RootElement.GetProperty("appearance");
+
+        Assert.Equal(2, appearance.GetProperty("applications").GetInt32());
+        Assert.Equal(JsonValueKind.Null, appearance.GetProperty("bodyBackground").ValueKind);
+        Assert.Equal(JsonValueKind.Null, appearance.GetProperty("bodyColor").ValueKind);
+        Assert.Equal(JsonValueKind.Null, appearance.GetProperty("rootZoom").ValueKind);
+    }
+
+    [Fact]
+    public void ANewSessionHasNoAppearanceAndNoNavigations()
+    {
+        using JsonDocument json = JsonDocument.Parse(new HtmlSessionDiagnostics().ToJson(Guid.NewGuid()));
+        JsonElement appearance = json.RootElement.GetProperty("appearance");
+
+        Assert.Equal(0, json.RootElement.GetProperty("entryNavigations").GetInt32());
+        Assert.Equal(JsonValueKind.Null, appearance.GetProperty("theme").ValueKind);
+        Assert.Equal(JsonValueKind.Null, appearance.GetProperty("scale").ValueKind);
+        Assert.Equal(0, appearance.GetProperty("applications").GetInt32());
+        Assert.Equal(0, appearance.GetProperty("failures").GetInt32());
+    }
+
+    [Fact]
+    public void CountsEntryNavigations()
+    {
+        HtmlSessionDiagnostics diagnostics = new();
+        diagnostics.RecordEntryNavigation();
+        diagnostics.RecordEntryNavigation();
+
+        using JsonDocument json = JsonDocument.Parse(diagnostics.ToJson(Guid.NewGuid()));
+
+        Assert.Equal(2, json.RootElement.GetProperty("entryNavigations").GetInt32());
+    }
 }

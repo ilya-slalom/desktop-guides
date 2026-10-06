@@ -88,7 +88,11 @@ public static class ReaderCommandPolicy
 
 public sealed record ManagedGuideSource(Guide Guide, string PrimaryFilePath);
 
-public sealed record ReaderAppearance(ThemePreference Theme, double TextScale);
+// The theme a reader paints with. The shell resolves System before it
+// calls a reader, so a reader never reads the Windows theme itself.
+public enum ReaderTheme { Light, Dark, HighContrast }
+
+public sealed record ReaderAppearance(ReaderTheme Theme, double TextScale);
 
 public sealed class LocationChangedEventArgs : EventArgs;
 

@@ -37,6 +37,11 @@ public sealed partial class ShellWindow
             return true;
         }
         HtmlGuideLoaded loaded = (HtmlGuideLoaded)load;
+        htmlTextScale = await ReadTextScaleAsync(guide.Id);
+        if (generation != renderGeneration)
+        {
+            return false;
+        }
         HtmlReaderSession session = new(loaded, cacheRoot!, HtmlReaderSession.DiagnosticsForTest());
         // The next render disposes it if this one is cancelled.
         readerSession = session;
@@ -46,7 +51,9 @@ public sealed partial class ShellWindow
         ShowReaderSurface(placeholder: false, view: session.View);
         try
         {
-            await session.OpenAsync(new ManagedGuideSource(guide, loaded.EntryFilePath), token);
+            await session.OpenAsync(
+                new ManagedGuideSource(guide, loaded.EntryFilePath),
+                new ReaderAppearance(ReaderThemeNow(), htmlTextScale), token);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -72,6 +79,21 @@ public sealed partial class ShellWindow
         return await OpenAtSavedPlaceAsync(
             guide, session, generation, guide.ContentSha256.ToLowerInvariant(),
             loaded.Policy.Entry.RequestPath, token);
+    }
+
+    // T14.1 adds the controls; until then the stored scale only applies.
+    // A failed read gives the default: the scale never blocks reading.
+    private async Task<double> ReadTextScaleAsync(Guid guideId)
+    {
+        try
+        {
+            ReaderPreferences? preferences = await RequireRepository().GetReaderPreferencesAsync(guideId);
+            return HtmlReaderStyle.ClampScale(preferences?.TextScale ?? 1.0);
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            return 1.0;
+        }
     }
 
     private void ShowHtmlLoadError(HtmlGuideLoadError error)

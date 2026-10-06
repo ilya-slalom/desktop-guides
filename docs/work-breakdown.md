@@ -295,6 +295,8 @@ with a visible approximate fallback if the document changed.
   Implemented in PR #35; see
   [p1/t09-1-html-adapter-design.md](p1/t09-1-html-adapter-design.md).
 - **T09.2** Apply host-owned theme/font styling without requiring page scripts.
+  Implemented; see
+  [p1/t09-2-html-theme-style-design.md](p1/t09-2-html-theme-style-design.md).
 - **T09.3** Capture and restore document-relative path, visible text/element
   context, and scroll-ratio fallback.
   Implemented in PR #39 (in-session capture and restore; saving is T12.2); see

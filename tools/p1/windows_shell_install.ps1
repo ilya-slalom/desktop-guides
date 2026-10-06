@@ -1312,6 +1312,85 @@ function Run-HtmlPositionScenarios {
     }
 }
 
+function Invoke-HtmlThemePass([string] $mode) {
+    Start-InstalledShell
+    $processId = $report.launchedProcessId
+    $gates = @(
+        foreach ($name in @('HtmlDiagnostics', 'HtmlPosition', 'ProgressOverride')) {
+            [System.Threading.EventWaitHandle]::new(
+                $false, [System.Threading.EventResetMode]::ManualReset,
+                "Local\DesktopGuides.Preview.$name.$processId")
+        })
+    try {
+        $result = Run-ShellSmoke $mode -ResultName $mode `
+            -AppDataRoot $dataRoot -AppCacheRoot (Get-HtmlCacheRoot)
+        Close-InstalledShell
+        return $result
+    }
+    finally {
+        foreach ($gate in $gates) { $gate.Dispose() }
+    }
+}
+
+function Assert-HtmlThemePass($pass, [string] $diagnostics) {
+    # One session, one entry load, the fixture's own files, and no denied
+    # request but the browser's own (its favicon, NotInManifest as Other):
+    # the style adds no request (TR14.2).
+    $files = @(Get-ChildItem -LiteralPath $diagnostics -Filter 'html-session-*.json' -ErrorAction SilentlyContinue)
+    if ($files.Count -ne 1) {
+        throw "The $($pass.mode) pass wrote $($files.Count) HTML session diagnostics; expected 1."
+    }
+    $session = Get-Content -LiteralPath $files[0].FullName -Raw | ConvertFrom-Json
+    $served = @($session.served) -join ','
+    if ($served -cne 'guide.html,images/route.png,style.css') {
+        throw "The $($pass.mode) pass served '$served'."
+    }
+    $pageDenied = @($session.denied | Where-Object { $_.reason -cne 'NotInManifest' -or $_.context -cne 'Other' })
+    if ($pageDenied.Count -ne 0) {
+        throw "The $($pass.mode) pass denied $(@($session.denied) | ConvertTo-Json -Compress)."
+    }
+    $a = $session.appearance
+    if ([int] $session.entryNavigations -ne 1 -or $a.theme -cne $pass.theme -or
+        [int] $a.applications -ne $pass.applications -or [int] $a.failures -ne 0) {
+        throw "The $($pass.mode) pass recorded entry navigations $($session.entryNavigations), " +
+            "theme $($a.theme), applications $($a.applications), failures $($a.failures)."
+    }
+    return $session
+}
+
+function Run-HtmlThemeScenarios {
+    # T09.2: the stored Dark theme and scale at open (Windows light), the
+    # stored Light theme keeps the page's colors (Windows dark), and a
+    # Windows switch restyles an open guide that follows System.
+    $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
+    $ids = Invoke-ShellSeed @('seed-html-theme', $dataRoot, $fixtureRoot) | ConvertFrom-Json
+    $diagnostics = Join-Path (Get-HtmlCacheRoot) 'diagnostics'
+    $report.htmlTheme = [ordered]@{ guide = $ids.guide }
+    $originalTheme = Get-AppThemePreference
+    try {
+        foreach ($pass in @(
+                @{ mode = 'html-theme-open'; stored = 'Dark'; scale = '1.5'; light = $true; theme = 'Dark'; applications = 1 },
+                @{ mode = 'html-theme-light'; stored = 'Light'; scale = 'default'; light = $false; theme = 'Light'; applications = 1 },
+                @{ mode = 'html-theme-switch'; stored = 'System'; scale = 'default'; light = $true; theme = 'Dark'; applications = 2 })) {
+            Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
+            Invoke-ShellSeed @('set-html-appearance', $dataRoot, $ids.guide, $pass.stored, $pass.scale) | Out-Null
+            Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+            Set-AppThemePreference $pass.light
+            try {
+                $report.htmlTheme[$pass.mode] = Invoke-HtmlThemePass $pass.mode
+            }
+            finally {
+                Save-HtmlDiagnostics $pass.mode (Get-HtmlCacheRoot)
+            }
+            $report.htmlTheme["$($pass.mode)-session"] = Assert-HtmlThemePass $pass $diagnostics
+        }
+    }
+    finally {
+        Restore-AppThemePreference $originalTheme
+        Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Invoke-PdfReaderPass([string] $resultName, [string] $mode = 'pdf-reader') {
     Start-InstalledShell
     $diagnosticsGate = [System.Threading.EventWaitHandle]::new(
@@ -2337,6 +2416,8 @@ try {
         Run-HtmlReaderScenarios
         Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
         Run-HtmlPositionScenarios
+        Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+        Run-HtmlThemeScenarios
     }
 
     if (Enter-ScenarioGroup 'pdf') { Run-PdfReaderScenarios }

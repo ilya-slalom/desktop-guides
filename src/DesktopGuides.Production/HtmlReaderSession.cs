@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
@@ -56,6 +57,11 @@ internal sealed class HtmlReaderSession : IReaderSession
     private bool restoring;
     private RestoreOutcome? lastOutcome;
     private HtmlRestoreStep? lastStep;
+    // The appearance the shell asked for last, and the last one on the page.
+    private ReaderAppearance appearance = new(ReaderTheme.Light, 1.0);
+    private ReaderAppearance? applied;
+    private bool writingAppearance;
+    private readonly Windows.UI.Color defaultPageColor;
 
     public HtmlReaderSession(
         HtmlGuideLoaded loaded, string cacheRoot, HtmlSessionDiagnostics? diagnostics)
@@ -68,6 +74,7 @@ internal sealed class HtmlReaderSession : IReaderSession
         this.diagnostics = diagnostics;
         profile = Path.Combine(cacheRoot, "WebView2", Guid.NewGuid().ToString("N"));
         View = new WebView2();
+        defaultPageColor = View.DefaultBackgroundColor;
         positionForTest = TestGate.IsOpen($@"Local\DesktopGuides.Preview.HtmlPosition.{Environment.ProcessId}");
         delayImagesForTest = TestGate.IsOpen($@"Local\DesktopGuides.Preview.HtmlAssetDelay.{Environment.ProcessId}");
         tracker = View.DispatcherQueue.CreateTimer();
@@ -104,19 +111,32 @@ internal sealed class HtmlReaderSession : IReaderSession
             ? Path.Combine(cacheRoot, "missing-runtime-test")
             : null;
 
+    public Task OpenAsync(ManagedGuideSource source, CancellationToken token) =>
+        OpenAsync(source, new ReaderAppearance(ReaderTheme.Light, 1.0), token);
+
     // A saved point can be restored only once the entry has loaded;
-    // RestoreLocationAsync waits on entryLoad.
-    public async Task OpenAsync(ManagedGuideSource source, CancellationToken token)
+    // RestoreLocationAsync waits on entryLoad. The style goes on first, so
+    // the restore sees the final layout.
+    public async Task OpenAsync(ManagedGuideSource source, ReaderAppearance first, CancellationToken token)
     {
+        ArgumentNullException.ThrowIfNull(first);
+        appearance = first;
+        SetPageColor(first.Theme);
+        // Shown once the style is on the page, so Dark never flashes white.
+        View.Opacity = 0;
         bool entryLoaded = false;
         try
         {
             await OpenEntryAsync(source, token);
+            await WriteAppearanceAsync();
             entryLoaded = true;
         }
         finally
         {
+            // Whatever the outcome; a failed open replaces the view anyway.
+            if (!disposed) View.Opacity = 1;
             entryLoad.TrySetResult(entryLoaded);
+            WriteAppearanceForTest();
         }
         token.ThrowIfCancellationRequested();
         if (disposed) return;
@@ -243,7 +263,64 @@ internal sealed class HtmlReaderSession : IReaderSession
         return await RestoreAsync(HtmlLocationRules.Decode(location, contentSha256, policy.Entry.RequestPath));
     }
 
-    public Task ApplyAppearanceAsync(ReaderAppearance appearance, CancellationToken token) => Task.CompletedTask;
+    // Before the open's write, the open picks the appearance up; during a
+    // write, the running write does.
+    public async Task ApplyAppearanceAsync(ReaderAppearance next, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(next);
+        appearance = next;
+        if (!opened || disposed) return;
+        await WriteAppearanceAsync();
+    }
+
+    // Writes until the page has the latest appearance; an unchanged one is
+    // never rewritten. A failed write leaves the page as authored and isn't
+    // retried until the next refresh: the style is cosmetic.
+    private async Task WriteAppearanceAsync()
+    {
+        if (writingAppearance) return;
+        writingAppearance = true;
+        try
+        {
+            while (!disposed && !failed && appearance != applied)
+            {
+                ReaderAppearance next = appearance;
+                double scale = HtmlReaderStyle.ClampScale(next.TextScale);
+                SetPageColor(next.Theme);
+                if (await RunScriptAsync(HtmlReaderStyle.WriteScript(next.Theme, scale)) != "true")
+                {
+                    diagnostics?.RecordAppearanceFailed();
+                    WriteAppearanceForTest();
+                    return;
+                }
+                applied = next;
+                if (diagnostics is not null)
+                {
+                    HtmlAppliedStyle? computed =
+                        HtmlReaderStyle.ParseApplied(await RunScriptAsync(HtmlReaderStyle.ReadbackScript));
+                    diagnostics.RecordAppearance(next.Theme.ToString(), scale, computed);
+                    WriteAppearanceForTest();
+                }
+            }
+        }
+        finally
+        {
+            writingAppearance = false;
+        }
+    }
+
+    // The color before the first paint. High contrast keeps the view's own.
+    private void SetPageColor(ReaderTheme theme)
+    {
+        if (disposed) return;
+        View.DefaultBackgroundColor = HtmlReaderStyle.PageColor(theme) is string hex
+            ? Microsoft.UI.ColorHelper.FromArgb(
+                255,
+                Convert.ToByte(hex[1..3], 16),
+                Convert.ToByte(hex[3..5], 16),
+                Convert.ToByte(hex[5..7], 16))
+            : defaultPageColor;
+    }
 
     public Task ExecuteAsync(ReaderAction action, CancellationToken token) =>
         throw new NotSupportedException("HTML guides have no reader commands yet.");
@@ -531,6 +608,7 @@ internal sealed class HtmlReaderSession : IReaderSession
         switch (navigation.Kind)
         {
             case HtmlNavigationKind.Entry:
+                diagnostics?.RecordEntryNavigation();
                 entryNavigated = true;
                 break;
             case HtmlNavigationKind.SameDocument:
@@ -699,6 +777,28 @@ internal sealed class HtmlReaderSession : IReaderSession
             string folder = Path.Combine(cacheRoot, "diagnostics");
             Directory.CreateDirectory(folder);
             string path = Path.Combine(folder, $"html-position-{Environment.ProcessId}.json");
+            string temporary = path + ".tmp";
+            File.WriteAllText(temporary, json);
+            File.Move(temporary, path, overwrite: true);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            // Test diagnostics must never affect reading.
+        }
+    }
+
+    // Test gate only: the applied style while the guide is open. Written to
+    // a temporary file and moved, so the smoke never reads half a file.
+    private void WriteAppearanceForTest()
+    {
+        if (diagnostics is null || disposed) return;
+        try
+        {
+            string json = "{\"opacity\":" + View.Opacity.ToString(CultureInfo.InvariantCulture) +
+                ",\"session\":" + diagnostics.ToJson(policy.GuideId) + "}";
+            string folder = Path.Combine(cacheRoot, "diagnostics");
+            Directory.CreateDirectory(folder);
+            string path = Path.Combine(folder, $"html-appearance-{Environment.ProcessId}.json");
             string temporary = path + ".tmp";
             File.WriteAllText(temporary, json);
             File.Move(temporary, path, overwrite: true);

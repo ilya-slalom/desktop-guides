@@ -1,0 +1,16 @@
+﻿{
+    "mode":  "html-theme-light",
+    "invocationId":  "7730c3bc5ad64730bab7749e3a55a485",
+    "observedAt":  "2026-10-06T14:59:35.6543782Z",
+    "processId":  8388,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "html-theme-light"
+               ],
+    "htmlAppearance":  "theme=Light applications=1 failures=0 background=rgb(255, 255, 255) color=rgb(34, 34, 34) zoom=1 opacity=1",
+    "htmlThemeScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\html-theme-light.html-theme-light.png",
+    "remoteConnections":  0
+}

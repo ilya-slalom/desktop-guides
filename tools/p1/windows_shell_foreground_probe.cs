@@ -42,6 +42,22 @@ public static class DesktopGuidesForegroundProbe
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
 
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr SendMessageTimeout(
+        IntPtr window, uint message, IntPtr wParam, string lParam,
+        uint flags, uint timeout, out IntPtr result);
+
+    // What Settings sends after it changes AppsUseLightTheme, so running
+    // apps re-read the app theme. HWND_BROADCAST, WM_SETTINGCHANGE,
+    // SMTO_ABORTIFHUNG.
+    public static bool BroadcastThemeChange()
+    {
+        IntPtr result;
+        return SendMessageTimeout(
+            new IntPtr(0xFFFF), 0x001A, IntPtr.Zero, "ImmersiveColorSet",
+            0x0002, 5000, out result) != IntPtr.Zero;
+    }
+
     public static void Click(int x, int y)
     {
         if (!SetCursorPos(x, y))

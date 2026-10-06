@@ -1,0 +1,19 @@
+﻿{
+    "mode":  "html-theme-switch",
+    "invocationId":  "54225b5650194e2486af77bb4ec0a7ff",
+    "observedAt":  "2026-10-06T14:59:43.5551418Z",
+    "processId":  6544,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "html-theme-switch"
+               ],
+    "htmlAppearanceBefore":  "theme=Light applications=1 failures=0 background=rgb(255, 255, 255) color=rgb(34, 34, 34) zoom=1 opacity=1",
+    "htmlThemeLightScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\html-theme-switch.html-theme-system-light.png",
+    "themeBroadcast":  true,
+    "htmlAppearanceAfter":  "theme=Dark applications=2 failures=0 background=rgb(30, 30, 30) color=rgb(230, 230, 230) zoom=1 opacity=1",
+    "htmlThemeDarkScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\html-theme-switch.html-theme-system-dark.png",
+    "remoteConnections":  0
+}
