@@ -111,10 +111,10 @@ keep the selection logic they have today.
 
 The gate found two Toolkit behaviors that `BoundedChoice` corrects:
 
-- `Segmented`'s Left and Right keys move keyboard focus only. A
-  container selects itself when it receives keyboard focus, so the
-  arrow keys select, as in a radio group. Tab and programmatic focus
-  don't change the selection.
+- `Segmented`'s Left and Right keys move keyboard focus only.
+  `BoundedChoice` handles the arrow keys first and moves the selection
+  with focus, as in a radio group. Tab and programmatic focus don't
+  change the selection.
 - `Segmented.OnApplyTemplate` resets `SelectedIndex` to the first index
   it ever held. `BoundedChoice` keeps the selection it had before the
   template pass.
@@ -251,9 +251,12 @@ In the implementing branch:
   and Dark); `BoundedChoiceItem` supplies a peer that implements
   `ISelectionItemProvider` (run 37448537276, patterns SelectionItem and
   ScrollItem).
-- **Selection follows keyboard focus.** The Toolkit's arrow keys move focus
-  only, so `BoundedChoiceItem` selects itself on keyboard focus, as a radio
-  group does. `Segmented.OnApplyTemplate` resets `SelectedIndex` to the
+- **Selection follows the arrow keys.** The Toolkit's arrow keys move focus
+  only, so `BoundedChoice` handles them in `PreviewKeyDown`, ahead of
+  `Segmented`, and selects the item it focuses. The first version selected
+  any item that got keyboard focus, so tabbing back onto an item that a
+  failed save had put back chose it again; `theme-error` now tabs out and
+  back in and checks the choice is unchanged. `Segmented.OnApplyTemplate` resets `SelectedIndex` to the
   first index it ever held, so `BoundedChoice` keeps the selection through
   it and raises `ChoiceChanged` instead of `SelectionChanged` for callers.
   The gate passed with both (run 37450456193).

@@ -4,6 +4,8 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Automation.Provider;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Windows.System;
 
 namespace DesktopGuides.Production;
 
@@ -19,6 +21,8 @@ public partial class BoundedChoice : Segmented
     public BoundedChoice()
     {
         SelectionChanged += KeepOneSelected;
+        // Added before Segmented's own handler, which only moves focus.
+        PreviewKeyDown += SelectWithArrows;
     }
 
     // Raised when the selected option changes, but not when the template
@@ -65,6 +69,34 @@ public partial class BoundedChoice : Segmented
         }
     }
 
+    // The arrow keys move the selection with focus, as in a radio group.
+    // Focus alone never selects, so tabbing in can't change the choice.
+    private void SelectWithArrows(object sender, KeyRoutedEventArgs args)
+    {
+        bool rightToLeft = FlowDirection == FlowDirection.RightToLeft;
+        int step = args.Key switch
+        {
+            VirtualKey.Left => rightToLeft ? 1 : -1,
+            VirtualKey.Right => rightToLeft ? -1 : 1,
+            VirtualKey.Up => -1,
+            VirtualKey.Down => 1,
+            _ => 0
+        };
+        if (step == 0 || XamlRoot is null ||
+            FocusManager.GetFocusedElement(XamlRoot) is not BoundedChoiceItem focused)
+        {
+            return;
+        }
+        int index = IndexFromContainer(focused) + step;
+        if (index < 0 || index >= Items.Count || ContainerFromIndex(index) is not BoundedChoiceItem next)
+        {
+            return;
+        }
+        args.Handled = true;
+        SelectedIndex = index;
+        next.Focus(FocusState.Keyboard);
+    }
+
     // Ctrl+Space can clear a ListViewBase selection; a choice always has one.
     private void KeepOneSelected(object sender, SelectionChangedEventArgs args)
     {
@@ -94,17 +126,6 @@ public partial class BoundedChoice : Segmented
 public partial class BoundedChoiceItem : SegmentedItem
 {
     protected override AutomationPeer OnCreateAutomationPeer() => new BoundedChoiceItemPeer(this);
-
-    // Segmented's arrow keys move keyboard focus only; a choice selects with
-    // it, as a radio group does.
-    protected override void OnGotFocus(RoutedEventArgs e)
-    {
-        base.OnGotFocus(e);
-        if (FocusState == FocusState.Keyboard && !IsSelected)
-        {
-            IsSelected = true;
-        }
-    }
 }
 
 internal sealed partial class BoundedChoiceItemPeer(BoundedChoiceItem owner)
