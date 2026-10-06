@@ -3489,16 +3489,21 @@ try {
             [System.Windows.Forms.SendKeys]::SendWait($keys)
         }
 
+        # A ContentDialog's Popup host takes the dialog's AutomationId but not
+        # its ItemStatus, so every element with the id is checked.
         function Wait-ItemStatus([string] $id, [string] $expected, [string] $step) {
+            $condition = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::AutomationIdProperty, $id)
             $deadline = (Get-Date).AddSeconds(10)
             do {
-                $element = Find-ById $id
-                $status = if ($element) { $element.Current.ItemStatus } else { '' }
-                if ($status -ceq $expected) { return }
+                $elements = @($root.FindAll($scope, $condition))
+                if (@($elements | Where-Object { $_.Current.ItemStatus -ceq $expected }).Count -gt 0) { return }
                 Start-Sleep -Milliseconds 100
             } while ((Get-Date) -lt $deadline)
-            $found = if ($element) {
-                "'$status' on a $($element.Current.ControlType.ProgrammaticName) ($($element.Current.ClassName))"
+            $found = if ($elements.Count -gt 0) {
+                ($elements | ForEach-Object {
+                    "'$($_.Current.ItemStatus)' on a $($_.Current.ControlType.ProgrammaticName) ($($_.Current.ClassName))"
+                }) -join ', '
             } else { 'no element' }
             throw "$step expected $id to report '$expected', found $found."
         }
