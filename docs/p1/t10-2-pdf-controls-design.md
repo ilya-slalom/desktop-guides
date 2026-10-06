@@ -530,15 +530,15 @@ rerun (the intermittent below). The counts below are test methods in each class
   `CloseDuringAnExtractionReturnsAndClosesWhenItEnds` pin Review Focus 1, 2
   and 5.
 
-That run passed every job: `core-tests`, `reader-toolbar-ui`, both
-`packages` and `production-packages` jobs (x64 and ARM64), `native-arm64-core`,
+The final run, 37432552738 at `52b0fca`, passed every job on its first
+attempt: `core-tests`, `reader-toolbar-ui`, both `packages` and
+`production-packages` jobs (x64 and ARM64), `native-arm64-core`,
 `native-arm64-ui` and `production-shell-ui` (all groups, including `pdf` and
-`import`). `production-shell-ui` passed on the second attempt of that run; see
-the intermittent below. The run had one warning, the existing CA1416 at
-`ManagedPdfGuideLoaderTests.cs:305` (`FileStream.Lock`), which predates T10.2.
+`import`). The run had one warning, the existing CA1416 at
+`ManagedPdfGuideLoaderTests.cs:309` (`FileStream.Lock`), which predates T10.2.
 
-Installed modes in the run's `production-shell-ui` job, each in light and dark
-unless noted. Every `pdf-*` diagnostics file shows `disposedCleanly` true and
+Installed modes in the final run's `production-shell-ui` job, each in light
+and dark unless noted. Every `pdf-*` diagnostics file shows `disposedCleanly` true and
 `abandonedExtraction` false:
 
 - `pdf-jump`: *Go to page* refuses 0, 201 and blank with `Enter a page from 1
