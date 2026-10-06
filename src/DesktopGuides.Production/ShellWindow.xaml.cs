@@ -89,6 +89,7 @@ public sealed partial class ShellWindow : Window
     private Task refreshTask = Task.CompletedTask;
 
     internal WindowMaterial EffectiveMaterial { get; private set; } = WindowMaterial.Solid;
+    internal ElementTheme DialogTheme { get; private set; } = ElementTheme.Default;
 
     public ShellWindow()
     {
@@ -112,7 +113,7 @@ public sealed partial class ShellWindow : Window
         };
         InitializeThemeChoice();
         ApplyWindowMaterial(WindowMaterial.Mica);
-        ShowTheme(ThemePreference.System);
+        ApplyTheme(ThemePreference.System);
         Navigation.SelectedItem = LibraryItem;
         gameArtwork = ArtworkListLoader.Attach(GameList, LoadRowArtworkAsync);
         GameList.AddHandler(
@@ -314,7 +315,9 @@ public sealed partial class ShellWindow : Window
                 // An invalid setting; RenderCurrentAsync reports it.
             }
             WindowMaterial requestedMaterial = settings?.WindowMaterial ?? WindowMaterial.Mica;
-            ShowTheme(settings?.Theme ?? ThemePreference.System);
+            ThemePreference storedTheme = settings?.Theme ?? ThemePreference.System;
+            committedTheme = storedTheme;
+            ApplyTheme(storedTheme);
             ApplyWindowMaterial(requestedMaterial);
             WindowMaterialSelector.IsEnabled = true;
             AppThemeChoice.IsEnabled = true;
@@ -728,7 +731,7 @@ public sealed partial class ShellWindow : Window
                 {
                     XamlRoot = Navigation.XamlRoot
                 };
-                DialogSurface.Apply(search, EffectiveMaterial);
+                DialogSurface.Apply(search, EffectiveMaterial, DialogTheme);
                 activeAddGameDialog = search;
                 try
                 {
@@ -787,7 +790,7 @@ public sealed partial class ShellWindow : Window
         {
             XamlRoot = Navigation.XamlRoot
         };
-        DialogSurface.Apply(editor, EffectiveMaterial);
+        DialogSurface.Apply(editor, EffectiveMaterial, DialogTheme);
         activeGameEditor = editor;
         ContentDialogResult result;
         try
@@ -858,7 +861,7 @@ public sealed partial class ShellWindow : Window
                 {
                     XamlRoot = Navigation.XamlRoot
                 };
-                DialogSurface.Apply(editor, EffectiveMaterial);
+                DialogSurface.Apply(editor, EffectiveMaterial, DialogTheme);
                 activeGameEditor = editor;
                 try
                 {
@@ -948,7 +951,7 @@ public sealed partial class ShellWindow : Window
                 {
                     XamlRoot = Navigation.XamlRoot
                 };
-                DialogSurface.Apply(dialog, EffectiveMaterial);
+                DialogSurface.Apply(dialog, EffectiveMaterial, DialogTheme);
                 activeImportDialog = dialog;
                 try
                 {
@@ -1044,7 +1047,7 @@ public sealed partial class ShellWindow : Window
                     return;
                 }
                 ContentDialog dialog = RemoveGuideDialog.Create(preview, Navigation.XamlRoot);
-                DialogSurface.Apply(dialog, EffectiveMaterial);
+                DialogSurface.Apply(dialog, EffectiveMaterial, DialogTheme);
                 activeRemoveDialog = dialog;
                 ContentDialogResult choice;
                 try
@@ -1166,7 +1169,7 @@ public sealed partial class ShellWindow : Window
                 {
                     title = preview.Title;
                     ContentDialog dialog = RemoveGameDialog.Create(preview, countChanged, Navigation.XamlRoot);
-                    DialogSurface.Apply(dialog, EffectiveMaterial);
+                    DialogSurface.Apply(dialog, EffectiveMaterial, DialogTheme);
                     activeRemoveDialog = dialog;
                     ContentDialogResult choice;
                     try

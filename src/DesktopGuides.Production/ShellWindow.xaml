@@ -603,6 +603,7 @@
                             </toolkit:SettingsCard.HeaderIcon>
                             <local:BoundedChoice x:Name="AppThemeChoice"
                                                  IsEnabled="False"
+                                                 SelectionChanged="AppThemeSelectionChanged"
                                                  AutomationProperties.AutomationId="AppThemeChoice"
                                                  AutomationProperties.Name="App theme" />
                         </toolkit:SettingsCard>
