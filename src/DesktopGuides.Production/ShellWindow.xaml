@@ -518,12 +518,13 @@
                                     HorizontalAlignment="Left"
                                     Click="ReaderLoadErrorActionClicked"
                                     AutomationProperties.AutomationId="ReaderLoadErrorAction" />
-                            <StackPanel x:Name="PdfUnlockPanel"
-                                        Visibility="Collapsed"
-                                        MaxWidth="360"
-                                        HorizontalAlignment="Left"
-                                        Spacing="{StaticResource DesktopGuidesSpacing12}"
-                                        AutomationProperties.AutomationId="PdfUnlockPanel">
+                            <!-- A StackPanel has no automation peer, so the group carries the AutomationId. -->
+                            <local:AutomationGroup x:Name="PdfUnlockPanel"
+                                                   Visibility="Collapsed"
+                                                   MaxWidth="360"
+                                                   HorizontalAlignment="Left"
+                                                   AutomationProperties.AutomationId="PdfUnlockPanel">
+                            <StackPanel Spacing="{StaticResource DesktopGuidesSpacing12}">
                                 <TextBlock x:Name="PdfUnlockMessage"
                                            TextWrapping="Wrap"
                                            Style="{StaticResource DesktopGuidesSecondaryBodyStyle}" />
@@ -545,6 +546,7 @@
                                         Click="PdfUnlockClicked"
                                         AutomationProperties.AutomationId="PdfUnlockButton" />
                             </StackPanel>
+                            </local:AutomationGroup>
                         </StackPanel>
                         <ContentControl x:Name="ReaderSurface"
                                         HorizontalAlignment="Stretch"
