@@ -3663,6 +3663,14 @@ try {
             Assert-ThemeShown $ExpectedTheme $ExpectedThemeStatus 'After the failed save'
             Assert-ShellForeground
             $report.themeErrorScreenshot = Save-WindowScreenshot 'theme-error'
+            # Focus stays on the item the save put back; leaving and tabbing
+            # back in must not choose it again.
+            Wait-FocusedId $themeIds[$SwitchToTheme]
+            Send-ThemeKeys '+{TAB}'
+            Send-ThemeKeys '{TAB}'
+            Start-Sleep -Milliseconds 1000
+            $report.themeErrorTabInFocus = [System.Windows.Automation.AutomationElement]::FocusedElement.Current.AutomationId
+            Assert-ThemeShown $ExpectedTheme $ExpectedThemeStatus 'Tabbing back into the choice'
             $report.phases += 'theme-error'
         }
         elseif ($Mode -eq 'theme-error-retry') {
