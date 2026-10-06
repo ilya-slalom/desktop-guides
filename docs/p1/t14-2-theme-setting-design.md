@@ -138,7 +138,7 @@ private void ApplyTheme(ThemePreference requested);
 ```
 
 It resolves the applied theme with the current high-contrast state
-(`AccessibilitySettings.HighContrast`) and then:
+(`ThemeSettings.HighContrast` from `Microsoft.UI.System`) and then:
 
 - sets the root element's `RequestedTheme`, `Default` for `FollowSystem`;
 - sets `AppWindow.TitleBar.PreferredTheme` (`UseDefaultAppMode`, `Light`
@@ -154,7 +154,7 @@ It resolves the applied theme with the current high-contrast state
   `Dark` or `System (Light)`, where the part in brackets is the root's
   `ActualTheme`.
 
-`AccessibilitySettings.HighContrastChanged` calls `ApplyTheme` again with
+`ThemeSettings.Changed` calls `ApplyTheme` again with
 the stored preference.
 
 ### Startup and changes

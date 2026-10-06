@@ -1,15 +1,16 @@
 using DesktopGuides.Core.Library;
+using Microsoft.UI.System;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
-using Windows.UI.ViewManagement;
 
 namespace DesktopGuides.Production;
 
 public sealed partial class ShellWindow
 {
-    private readonly AccessibilitySettings accessibility = new();
+    // AccessibilitySettings events need a CoreWindow, which a desktop window lacks.
+    private ThemeSettings? themeSettings;
     private readonly SemaphoreSlim themeSaveGate = new(1, 1);
     private bool applyingThemeSelection;
     // The choice on screen, and the last one storage accepted.
@@ -25,15 +26,16 @@ public sealed partial class ShellWindow
                 .ToList());
         // System follows Windows, so its status follows the resolved theme.
         ShellRoot.ActualThemeChanged += (_, _) => UpdateThemeStatus();
-        // Raised off the UI thread.
-        accessibility.HighContrastChanged += (_, _) =>
+        // Queued to the UI thread; the event's thread is not documented.
+        themeSettings = ThemeSettings.CreateForWindowId(AppWindow.Id);
+        themeSettings.Changed += (_, _) =>
             DispatcherQueue.TryEnqueue(() => ApplyTheme(requestedTheme));
     }
 
     private void ApplyTheme(ThemePreference requested)
     {
         requestedTheme = requested;
-        appliedTheme = ThemePresentation.Resolve(requested, accessibility.HighContrast);
+        appliedTheme = ThemePresentation.Resolve(requested, themeSettings?.HighContrast == true);
         ElementTheme element = appliedTheme switch
         {
             AppliedTheme.Light => ElementTheme.Light,
