@@ -317,7 +317,7 @@ public sealed partial class ReaderToolbar : UserControl
         {
             if (ReferenceEquals(session, expectedSession))
             {
-                // ContentFocusRequested?.Invoke(this, EventArgs.Empty); // THROWAWAY
+                ContentFocusRequested?.Invoke(this, EventArgs.Empty);
             }
         });
 
