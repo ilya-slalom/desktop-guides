@@ -323,6 +323,8 @@ selection and a screen reader; a scanned PDF is labeled image-only.
   Implemented in PR #36; see
   [p1/t10-1-pdf-adapter-design.md](p1/t10-1-pdf-adapter-design.md).
 - **T10.2** Add page count, page jump, fit-to-width, zoom, and keyboard commands.
+  Implemented in PR #46 (with password retry at import and in the Reader); see
+  [p1/t10-2-pdf-controls-design.md](p1/t10-2-pdf-controls-design.md).
 - **T10.3** Persist zero-based page index and within-page fraction.
   Implemented in PR #37 (in-session capture and restore; saving is
   T12.2); see [p1/t10-3-pdf-locator-design.md](p1/t10-3-pdf-locator-design.md).
