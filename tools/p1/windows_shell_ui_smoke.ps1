@@ -1219,8 +1219,8 @@ try {
     }
     elseif ($Mode -in @('later-guide-result', 'later-guide-failed-result',
         'reader-render-error-observed', 'reader-render-error-result',
-        'switch-game-loading', 'switch-game')) {
-        # These modes continue a shell left on Reader, Game, or Library.
+        'switch-game-loading', 'switch-game', 'theme-error', 'theme-error-retry')) {
+        # These modes continue a shell left on Reader, Game, Library, or Settings.
     }
     elseif ($Mode -in @('txt-reader', 'txt-load-paused', 'txt-back-during-load',
         'txt-load-released', 'html-reader', 'html-runtime-missing', 'pdf-reader', 'pdf-jump', 'pdf-zoom', 'pdf-keys', 'pdf-locked', 'pdf-offline',
