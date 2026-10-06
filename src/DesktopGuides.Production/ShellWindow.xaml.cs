@@ -127,6 +127,9 @@ public sealed partial class ShellWindow : Window
             NavigationView.IsPaneOpenProperty, (_, _) => UpdatePaneStatus());
         UpdatePaneStatus();
         ReaderActions.CommandFailed += ShowErrorStatus;
+        // After Ctrl+G the Reader content takes focus back (P2).
+        ReaderActions.ContentFocusRequested += (_, _) =>
+            (readerSession as PdfReaderSession)?.View.FocusPreview();
         GameCompletionChoice.CompletionRequested += CompletionChoiceRequested;
         ReaderCompletionChoice.CompletionRequested += CompletionChoiceRequested;
         AppWindow.Closing += WindowClosing;
@@ -1282,6 +1285,9 @@ public sealed partial class ShellWindow : Window
         ReaderLoadErrorAction.Visibility = readerErrorAction == HtmlGuideLoadAction.None
             ? Visibility.Collapsed
             : Visibility.Visible;
+        PdfUnlockPanel.Visibility = Visibility.Collapsed;
+        PdfUnlockError.Visibility = Visibility.Collapsed;
+        PdfPasswordInput.Password = string.Empty;
         ReaderSurface.Content = view;
         ReaderSurface.Visibility = view is null ? Visibility.Collapsed : Visibility.Visible;
     }
