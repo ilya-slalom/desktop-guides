@@ -192,6 +192,9 @@ public sealed partial class ShellWindow
             {
                 return;
             }
+            // This attempt consumes the prompt, so one queued behind it can't
+            // reopen over its session. A wrong password re-arms it.
+            pdfUnlockGuide = null;
             await OpenPdfGuideAsync(guide, generation, password);
         });
     }
