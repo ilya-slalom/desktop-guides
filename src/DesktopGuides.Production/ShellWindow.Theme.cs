@@ -1,4 +1,5 @@
 using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Reading;
 using Microsoft.UI.System;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -16,6 +17,8 @@ public sealed partial class ShellWindow
     private ThemePreference requestedTheme = ThemePreference.System;
     private ThemePreference committedTheme = ThemePreference.System;
     private AppliedTheme appliedTheme = AppliedTheme.FollowSystem;
+    // The open HTML guide's stored scale, read once at open.
+    private double htmlTextScale = 1.0;
 
     private void InitializeThemeChoice()
     {
@@ -25,7 +28,11 @@ public sealed partial class ShellWindow
                 .ToList());
         // System follows Windows, so its status follows the resolved theme.
         AppThemeChoice.ChoiceChanged += AppThemeChoiceChanged;
-        ShellRoot.ActualThemeChanged += (_, _) => UpdateThemeStatus();
+        ShellRoot.ActualThemeChanged += (_, _) =>
+        {
+            UpdateThemeStatus();
+            RefreshReaderAppearance();
+        };
         // Queued to the UI thread; the event's thread is not documented.
         themeSettings = ThemeSettings.CreateForWindowId(AppWindow.Id);
         themeSettings.Changed += (_, _) =>
@@ -57,6 +64,32 @@ public sealed partial class ShellWindow
         AppThemeChoice.SelectedIndex = ThemePresentation.IndexOf(requested);
         applyingThemeSelection = false;
         UpdateThemeStatus();
+        RefreshReaderAppearance();
+    }
+
+    // System resolves to the root's theme here, so a reader never reads
+    // the Windows theme itself.
+    private ReaderTheme ReaderThemeNow() => appliedTheme switch
+    {
+        _ when themeSettings?.HighContrast == true => ReaderTheme.HighContrast,
+        AppliedTheme.Light => ReaderTheme.Light,
+        AppliedTheme.Dark => ReaderTheme.Dark,
+        _ => ShellRoot.ActualTheme == ElementTheme.Dark ? ReaderTheme.Dark : ReaderTheme.Light
+    };
+
+    // Restyles the open guide; TXT and PDF sessions ignore it.
+    private async void RefreshReaderAppearance()
+    {
+        if (readerSession is not IReaderSession session) return;
+        try
+        {
+            await session.ApplyAppearanceAsync(
+                new ReaderAppearance(ReaderThemeNow(), htmlTextScale), CancellationToken.None);
+        }
+        catch (Exception error) when (error is OperationCanceledException or ObjectDisposedException)
+        {
+            // A session closed mid-write has nothing left to style.
+        }
     }
 
     private void UpdateThemeStatus() =>
