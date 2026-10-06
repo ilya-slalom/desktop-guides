@@ -110,7 +110,9 @@ public sealed partial class ShellWindow : Window
                 ApplyLibrarySearch(announce: true);
             }
         };
+        InitializeThemeChoice();
         ApplyWindowMaterial(WindowMaterial.Mica);
+        ShowTheme(ThemePreference.System);
         Navigation.SelectedItem = LibraryItem;
         gameArtwork = ArtworkListLoader.Attach(GameList, LoadRowArtworkAsync);
         GameList.AddHandler(
@@ -302,17 +304,20 @@ public sealed partial class ShellWindow : Window
             providers = new ProviderServices(dataRoot);
             await ProviderSettings.InitializeAsync(providers);
             importer = providers.CreateImporter(repository, artwork);
-            WindowMaterial requestedMaterial = WindowMaterial.Mica;
+            AppSettings? settings = null;
             try
             {
-                requestedMaterial = (await repository.GetSettingsAsync()).WindowMaterial;
+                settings = await repository.GetSettingsAsync();
             }
             catch (InvalidDataException)
             {
-                // Another invalid setting; RenderCurrentAsync reports it.
+                // An invalid setting; RenderCurrentAsync reports it.
             }
+            WindowMaterial requestedMaterial = settings?.WindowMaterial ?? WindowMaterial.Mica;
+            ShowTheme(settings?.Theme ?? ThemePreference.System);
             ApplyWindowMaterial(requestedMaterial);
             WindowMaterialSelector.IsEnabled = true;
+            AppThemeChoice.IsEnabled = true;
             ready = true;
             // Queued like every other render, so a quick first click can't be overwritten.
             await RunNavigationAsync(() => RenderCurrentAsync());

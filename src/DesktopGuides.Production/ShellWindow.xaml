@@ -591,6 +591,22 @@
                             </toolkit:SettingsCard.HeaderIcon>
                         </toolkit:SettingsCard>
                         <toolkit:SettingsCard
+                            x:Name="AppThemeSettingsCard"
+                            Header="App theme"
+                            Description="Choose light or dark, or follow Windows."
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="AppThemeSettingsCard"
+                            AutomationProperties.Name="App theme. Choose light or dark, or follow Windows.">
+                            <toolkit:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE771;"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                            </toolkit:SettingsCard.HeaderIcon>
+                            <local:BoundedChoice x:Name="AppThemeChoice"
+                                                 IsEnabled="False"
+                                                 AutomationProperties.AutomationId="AppThemeChoice"
+                                                 AutomationProperties.Name="App theme" />
+                        </toolkit:SettingsCard>
+                        <toolkit:SettingsCard
                             x:Name="WindowMaterialSettingsCard"
                             Header="Window background"
                             Description="Choose how much of your desktop shows behind the app."
