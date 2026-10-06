@@ -375,13 +375,19 @@ try {
     }
     $report.phases += 'keys-run-commands-without-moving-focus'
 
-    # Ctrl+G: Esc, or a jump, hands focus to the content.
+    # Ctrl+G: Esc, or a jump, hands focus to the content. Each starts in
+    # the notes box, so the dialog's own focus restore lands there and
+    # only ContentFocusRequested can move focus to the stand-in.
+    (Find-ById 'HostNotes').SetFocus()
+    [void](Wait-FocusedId 'HostNotes')
     [System.Windows.Forms.SendKeys]::SendWait('^g')
     [void](Wait-FocusedId 'ReaderCommandInput')
     Send-ToolbarKeys '{PGDN}' 'ReaderCommandInput'
     Assert-ActionStays 'Fit to width' 'Page Down in the Go to page box'
     [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
     [void](Wait-FocusedId $stand)
+    (Find-ById 'HostNotes').SetFocus()
+    [void](Wait-FocusedId 'HostNotes')
     [System.Windows.Forms.SendKeys]::SendWait('^g')
     [void](Wait-FocusedId 'ReaderCommandInput')
     Enter-DialogText '4' 'Go'
