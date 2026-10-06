@@ -48,6 +48,48 @@ public sealed class GuideImportPublisherTests
     }
 
     [Fact]
+    public async Task PublishesALockedPdfWithoutItsPassword()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        string source = harness.Sources.Copy("pdf-locked.pdf", "locked.pdf");
+
+        Guid id = await harness.PublishAsync(harness.Publisher(), await harness.InspectAsync(source, password: "guide"));
+
+        Guide guide = (await harness.Repository.GetGuideAsync(id))!;
+        Assert.Equal((GuideFormat.Pdf, "guide.pdf"), (guide.Format, guide.PrimaryRelativePath));
+        Assert.Equal(File.ReadAllBytes(source), File.ReadAllBytes(harness.Paths.ResolveExistingGuideFile(id, "guide.pdf")));
+    }
+
+    [Fact]
+    public async Task PublishingAChangedLockedSourceIsChanged()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        string source = harness.Sources.Copy("pdf-locked.pdf", "locked.pdf");
+        ImportManifest manifest = await harness.InspectAsync(source, password: "guide");
+        File.AppendAllText(source, "\n");
+
+        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(
+            () => harness.PublishAsync(harness.Publisher(), manifest));
+
+        Assert.Equal(ImportIssue.Changed, error.Issue);
+        harness.AssertNothingLeft();
+    }
+
+    [Fact]
+    public async Task AnUnlockedPdfClaimingAPasswordIsRefused()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        string source = harness.Sources.Copy("pdf-short.pdf", "short.pdf");
+        PdfImportManifest manifest = (PdfImportManifest)await harness.InspectAsync(source);
+
+        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(
+            () => harness.PublishAsync(harness.Publisher(), manifest with { PasswordRequired = true }));
+
+        Assert.Equal(ImportIssue.Unreadable, error.Issue);
+        harness.AssertNothingLeft();
+    }
+
+    [Fact]
     public async Task PublishesPdfGuide()
     {
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
