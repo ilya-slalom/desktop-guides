@@ -1608,7 +1608,14 @@ try {
         function Invoke-NextPages([int] $count) {
             $next = Find-ByName 'Next page'
             if (-not $next -or $next.Current.IsOffscreen) {
-                throw "The PDF reader has no visible 'Next page' command."
+                [void](Save-WindowScreenshot 'debug-next')
+                $all = $root.FindAll($scope, [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::NameProperty, 'Next page'))
+                $info = @($all | ForEach-Object { "$($_.Current.ControlType.ProgrammaticName)|off=$($_.Current.IsOffscreen)|$($_.Current.BoundingRectangle)|id=$($_.Current.AutomationId)|cls=$($_.Current.ClassName)" }) -join ' ;; '
+                $f = [System.Windows.Automation.AutomationElement]::FocusedElement
+                $cmds = Find-ById 'ReaderCommands'
+                $cinfo = if ($cmds) { "cmds off=$($cmds.Current.IsOffscreen) $($cmds.Current.BoundingRectangle)" } else { 'no cmds' }
+                throw "DEBUG next missing; found=[$info]; focus=$($f.Current.Name)|$($f.Current.AutomationId)|$($f.Current.ClassName); $cinfo"
             }
             # No waiting between turns: superseded pages must be dropped.
             for ($i = 0; $i -lt $count; $i++) { Invoke-Element $next }
