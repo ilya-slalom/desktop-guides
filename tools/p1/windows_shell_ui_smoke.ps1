@@ -535,7 +535,9 @@ try {
             if ($focused -and $focused.Current.AutomationId -eq $id) { return }
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
-        throw "Expected keyboard focus on '$id'."
+        $f = [System.Windows.Automation.AutomationElement]::FocusedElement
+        [void](Save-WindowScreenshot "debug-focus-$id")
+        throw "Expected keyboard focus on '$id'. DEBUG focus=$($f.Current.Name)|$($f.Current.AutomationId)|$($f.Current.ClassName)|$($f.Current.ControlType.ProgrammaticName)"
     }
 
     # Focus in an AutoSuggestBox lands on its inner edit box.
