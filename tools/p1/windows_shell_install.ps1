@@ -1333,8 +1333,9 @@ function Invoke-HtmlThemePass([string] $mode) {
 }
 
 function Assert-HtmlThemePass($pass, [string] $diagnostics) {
-    # One session, one entry load, the fixture's own files and nothing
-    # denied: the style adds no request (TR14.2).
+    # One session, one entry load, the fixture's own files, and no denied
+    # request but the browser's own (its favicon, NotInManifest as Other):
+    # the style adds no request (TR14.2).
     $files = @(Get-ChildItem -LiteralPath $diagnostics -Filter 'html-session-*.json' -ErrorAction SilentlyContinue)
     if ($files.Count -ne 1) {
         throw "The $($pass.mode) pass wrote $($files.Count) HTML session diagnostics; expected 1."
@@ -1344,7 +1345,8 @@ function Assert-HtmlThemePass($pass, [string] $diagnostics) {
     if ($served -cne 'guide.html,images/route.png,style.css') {
         throw "The $($pass.mode) pass served '$served'."
     }
-    if (@($session.denied).Count -ne 0) {
+    $pageDenied = @($session.denied | Where-Object { $_.reason -cne 'NotInManifest' -or $_.context -cne 'Other' })
+    if ($pageDenied.Count -ne 0) {
         throw "The $($pass.mode) pass denied $(@($session.denied) | ConvertTo-Json -Compress)."
     }
     $a = $session.appearance
