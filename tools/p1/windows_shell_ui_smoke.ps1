@@ -4177,9 +4177,45 @@ try {
 
             Click-Element (Wait-EnabledById 'SecondaryButton')
             Choose-PickerFile 'pdf-locked.pdf'
-            [void](Wait-Name 'ImportStatus' "Password-protected PDFs aren't supported. Remove the password and import again.")
-            Assert-Absent 'ImportPreview'
+            [void](Wait-Text 'ImportFileName' 'pdf-locked.pdf')
+            [void](Wait-Text 'ImportFormat' 'PDF')
+            [void](Wait-FocusedId 'ImportPdfPasswordInput')
+            if ((Wait-PresentById 'ImportPdfUnlock').Current.IsEnabled) {
+                throw 'Unlock was enabled with an empty password box.'
+            }
+            foreach ($id in @('ImportPages', 'ImportProtected', 'ImportPdfPasswordError')) {
+                if (Find-ById $id) { throw "'$id' was shown before the password was checked." }
+            }
+            if ((Wait-VisibleById 'PrimaryButton').Current.IsEnabled) {
+                throw 'Import was enabled before the password was checked.'
+            }
+
+            # A wrong attempt explains itself under the box, leaves it empty
+            # with focus, and keeps the preview. Enter submits.
+            Enter-Secret 'ImportPdfPasswordInput' 'wrong-7Q2x'
+            [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+            [void](Wait-Text 'ImportPdfPasswordError' "That password didn't open this PDF. Try again.")
+            [void](Wait-FocusedId 'ImportPdfPasswordInput')
+            if ((Wait-PresentById 'ImportPdfUnlock').Current.IsEnabled) {
+                throw 'The password box kept the wrong attempt: Unlock is still enabled.'
+            }
+            [void](Wait-VisibleById 'ImportPreview')
+            if ((Find-ById 'ImportStatus')) { throw 'A wrong password replaced the preview with a status.' }
+            $report.importPdfLockedScreenshot = Save-WindowScreenshot 'import-pdf-locked'
             $report.phases += 'import-pdf-locked'
+
+            # The right password fills in the facts and enables Import.
+            Enter-Secret 'ImportPdfPasswordInput' 'guide'
+            Invoke-Element (Wait-PresentById 'ImportPdfUnlock')
+            [void](Wait-Text 'ImportProtected' 'Password protected')
+            [void](Wait-Text 'ImportPages' '1 page')
+            [void](Wait-EnabledById 'PrimaryButton')
+            [void](Wait-FocusedId 'GuideTitleInput')
+            foreach ($id in @('ImportPdfPasswordInput', 'ImportPdfPasswordError')) {
+                if (Find-ById $id) { throw "'$id' stayed after the password was accepted." }
+            }
+            $report.importPdfUnlockedScreenshot = Save-WindowScreenshot 'import-pdf-unlocked'
+            $report.phases += 'import-pdf-unlocked'
 
             Invoke-Element (Wait-EnabledById 'CloseButton')
             [void](Wait-HiddenById 'ImportGuideDialog')

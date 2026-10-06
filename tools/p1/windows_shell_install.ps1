@@ -1663,6 +1663,9 @@ function Run-ImportScenarios {
             }
         }
 
+        # Review Focus 1: the wrong import attempt reached no file either.
+        $report.importPasswordScanUnreadable = Assert-NoPasswordTrace 'wrong-7Q2x'
+
         Set-AppThemePreference $true
         Start-InstalledShell
         $report.importPublishLight = Run-ShellSmoke 'import-publish' -ResultName 'import-publish-light'
