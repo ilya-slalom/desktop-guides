@@ -55,6 +55,10 @@ public static class PdfLocationRules
             : new PdfRestore(page, fraction, new RestoreOutcome(RestoreKind.Exact));
     }
 
+    // 1-based, like the page number the user types.
+    public static bool IsPageInRange(int pageNumber, int pageCount) =>
+        pageNumber >= 1 && pageNumber <= pageCount;
+
     // NaN fails both comparisons.
     private static bool ValidFraction(double fraction) => fraction is >= 0 and <= 1;
 }

@@ -15,7 +15,8 @@ public sealed record PdfSessionDiagnostics(
     int PeakTextPages,
     long PeakTextCharacters,
     bool DisposedCleanly,
-    int Evictions)
+    int Evictions,
+    bool AbandonedExtraction)
 {
     public string ToJson() => JsonSerializer.Serialize(new
     {
@@ -28,6 +29,7 @@ public sealed record PdfSessionDiagnostics(
         peakTextPages = PeakTextPages,
         peakTextCharacters = PeakTextCharacters,
         disposedCleanly = DisposedCleanly,
-        evictions = Evictions
+        evictions = Evictions,
+        abandonedExtraction = AbandonedExtraction
     });
 }
