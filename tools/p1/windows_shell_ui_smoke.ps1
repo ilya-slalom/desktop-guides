@@ -3497,7 +3497,10 @@ try {
                 if ($status -ceq $expected) { return }
                 Start-Sleep -Milliseconds 100
             } while ((Get-Date) -lt $deadline)
-            throw "$step expected $id to report '$expected', found '$status'."
+            $found = if ($element) {
+                "'$status' on a $($element.Current.ControlType.ProgrammaticName) ($($element.Current.ClassName))"
+            } else { 'no element' }
+            throw "$step expected $id to report '$expected', found $found."
         }
 
         # The theme the window, title bar and choice report now.
