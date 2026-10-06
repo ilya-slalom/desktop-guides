@@ -65,6 +65,7 @@ public sealed partial class ReaderToolbar : UserControl
     public event Action<string>? CommandFailed;
 
     internal WindowMaterial DialogMaterial { get; set; } = WindowMaterial.Mica;
+    internal ElementTheme DialogTheme { get; set; } = ElementTheme.Default;
 
     public void SetSession(IReaderSession? value)
     {
@@ -269,7 +270,7 @@ public sealed partial class ReaderToolbar : UserControl
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = XamlRoot
         };
-        DialogSurface.Apply(dialog, DialogMaterial);
+        DialogSurface.Apply(dialog, DialogMaterial, DialogTheme);
         dialog.Opened += (_, _) => input.Focus(FocusState.Programmatic);
         if (validate is not null)
         {

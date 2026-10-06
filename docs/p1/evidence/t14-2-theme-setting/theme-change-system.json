@@ -1,0 +1,22 @@
+﻿{
+    "mode":  "theme-change",
+    "invocationId":  "4b0faf3a2053413fa9e9f106b15394c1",
+    "observedAt":  "2026-10-06T13:00:02.0258012Z",
+    "processId":  5280,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "theme-change"
+               ],
+    "themeAtLaunch":  "Light",
+    "themeSettingsScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\theme-change-system.theme-System-settings.png",
+    "themePopupScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\theme-change-system.theme-System-drop-down.png",
+    "themeLibraryScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\theme-change-system.theme-System-library.png",
+    "themeDialogScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\theme-change-system.theme-System-edit-game.png",
+    "themeReaderScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\theme-change-system.theme-System-reader.png",
+    "themeAfter":  "System (Dark)",
+    "remoteConnections":  0
+}

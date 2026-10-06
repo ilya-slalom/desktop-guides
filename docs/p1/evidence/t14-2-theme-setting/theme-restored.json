@@ -1,0 +1,16 @@
+﻿{
+    "mode":  "theme-restored",
+    "invocationId":  "37e1b6cd94df4b77bfb92550587a701d",
+    "observedAt":  "2026-10-06T13:00:16.1618349Z",
+    "processId":  8416,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "theme-restored"
+               ],
+    "themeAtLaunch":  "System (Light)",
+    "remoteConnections":  0
+}

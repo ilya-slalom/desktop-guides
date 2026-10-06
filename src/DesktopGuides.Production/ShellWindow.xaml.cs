@@ -89,6 +89,7 @@ public sealed partial class ShellWindow : Window
     private Task refreshTask = Task.CompletedTask;
 
     internal WindowMaterial EffectiveMaterial { get; private set; } = WindowMaterial.Solid;
+    internal ElementTheme DialogTheme { get; private set; } = ElementTheme.Default;
 
     public ShellWindow()
     {
@@ -110,7 +111,9 @@ public sealed partial class ShellWindow : Window
                 ApplyLibrarySearch(announce: true);
             }
         };
+        InitializeThemeChoice();
         ApplyWindowMaterial(WindowMaterial.Mica);
+        ApplyTheme(ThemePreference.System);
         Navigation.SelectedItem = LibraryItem;
         gameArtwork = ArtworkListLoader.Attach(GameList, LoadRowArtworkAsync);
         GameList.AddHandler(
@@ -302,17 +305,22 @@ public sealed partial class ShellWindow : Window
             providers = new ProviderServices(dataRoot);
             await ProviderSettings.InitializeAsync(providers);
             importer = providers.CreateImporter(repository, artwork);
-            WindowMaterial requestedMaterial = WindowMaterial.Mica;
+            AppSettings? settings = null;
             try
             {
-                requestedMaterial = (await repository.GetSettingsAsync()).WindowMaterial;
+                settings = await repository.GetSettingsAsync();
             }
             catch (InvalidDataException)
             {
-                // Another invalid setting; RenderCurrentAsync reports it.
+                // An invalid setting; RenderCurrentAsync reports it.
             }
+            WindowMaterial requestedMaterial = settings?.WindowMaterial ?? WindowMaterial.Mica;
+            ThemePreference storedTheme = settings?.Theme ?? ThemePreference.System;
+            committedTheme = storedTheme;
+            ApplyTheme(storedTheme);
             ApplyWindowMaterial(requestedMaterial);
             WindowMaterialSelector.IsEnabled = true;
+            AppThemeChoice.IsEnabled = true;
             ready = true;
             // Queued like every other render, so a quick first click can't be overwritten.
             await RunNavigationAsync(() => RenderCurrentAsync());
@@ -723,7 +731,7 @@ public sealed partial class ShellWindow : Window
                 {
                     XamlRoot = Navigation.XamlRoot
                 };
-                DialogSurface.Apply(search, EffectiveMaterial);
+                DialogSurface.Apply(search, EffectiveMaterial, DialogTheme);
                 activeAddGameDialog = search;
                 try
                 {
@@ -782,7 +790,7 @@ public sealed partial class ShellWindow : Window
         {
             XamlRoot = Navigation.XamlRoot
         };
-        DialogSurface.Apply(editor, EffectiveMaterial);
+        DialogSurface.Apply(editor, EffectiveMaterial, DialogTheme);
         activeGameEditor = editor;
         ContentDialogResult result;
         try
@@ -853,7 +861,7 @@ public sealed partial class ShellWindow : Window
                 {
                     XamlRoot = Navigation.XamlRoot
                 };
-                DialogSurface.Apply(editor, EffectiveMaterial);
+                DialogSurface.Apply(editor, EffectiveMaterial, DialogTheme);
                 activeGameEditor = editor;
                 try
                 {
@@ -943,7 +951,7 @@ public sealed partial class ShellWindow : Window
                 {
                     XamlRoot = Navigation.XamlRoot
                 };
-                DialogSurface.Apply(dialog, EffectiveMaterial);
+                DialogSurface.Apply(dialog, EffectiveMaterial, DialogTheme);
                 activeImportDialog = dialog;
                 try
                 {
@@ -1039,7 +1047,7 @@ public sealed partial class ShellWindow : Window
                     return;
                 }
                 ContentDialog dialog = RemoveGuideDialog.Create(preview, Navigation.XamlRoot);
-                DialogSurface.Apply(dialog, EffectiveMaterial);
+                DialogSurface.Apply(dialog, EffectiveMaterial, DialogTheme);
                 activeRemoveDialog = dialog;
                 ContentDialogResult choice;
                 try
@@ -1161,7 +1169,7 @@ public sealed partial class ShellWindow : Window
                 {
                     title = preview.Title;
                     ContentDialog dialog = RemoveGameDialog.Create(preview, countChanged, Navigation.XamlRoot);
-                    DialogSurface.Apply(dialog, EffectiveMaterial);
+                    DialogSurface.Apply(dialog, EffectiveMaterial, DialogTheme);
                     activeRemoveDialog = dialog;
                     ContentDialogResult choice;
                     try

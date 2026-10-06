@@ -86,6 +86,15 @@ if (args.Length == 3 && args[0] == "set-material")
     return 0;
 }
 
+if (args.Length == 2 && args[0] == "describe-theme")
+{
+    await using SqliteLibraryRepository themeRepository =
+        new(new ManagedPathResolver(args[1]));
+    await themeRepository.InitializeAsync();
+    Console.WriteLine((await themeRepository.GetSettingsAsync()).Theme);
+    return 0;
+}
+
 if (args.Length == 2 && args[0] == "seed-linked-game")
 {
     ManagedPathResolver linkedPaths = new(args[1]);
@@ -724,7 +733,7 @@ if (args.Length != 2 ||
     Console.Error.WriteLine(
         "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-search|seed-import|seed-actions|seed-navigation " +
         "<app-data-root> " +
-        "or seed-linked-game|describe-providers|describe-import|describe-actions|describe-progress <app-data-root> " +
+        "or seed-linked-game|describe-providers|describe-import|describe-actions|describe-progress|describe-theme <app-data-root> " +
         "or seed-txt-reader|seed-html-reader|seed-html-position|seed-pdf-reader|seed-progress <app-data-root> <fixtures-root> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
         "or invalidate-blocked-guide <app-data-root> " +

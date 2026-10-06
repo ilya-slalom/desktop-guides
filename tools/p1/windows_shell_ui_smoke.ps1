@@ -16,7 +16,8 @@ param(
         'html-runtime-missing', 'pdf-reader', 'pdf-jump', 'pdf-zoom', 'pdf-keys', 'pdf-locked', 'pdf-offline',
         'html-position',
         'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed',
-        'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry')]
+        'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry',
+        'theme-segmented', 'theme-change', 'theme-restored', 'theme-error', 'theme-error-retry')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -51,6 +52,19 @@ param(
 
     [ValidateSet('', 'Mica', 'Acrylic', 'Solid')]
     [string] $SwitchToMaterial = '',
+
+    [ValidateSet('System', 'Light', 'Dark')]
+    [string] $ExpectedTheme = 'System',
+
+    # The choice's ItemStatus at the start, for example 'System (Light)'.
+    [string] $ExpectedThemeStatus = '',
+
+    [ValidateSet('', 'System', 'Light', 'Dark')]
+    [string] $SwitchToTheme = '',
+
+    # The Windows app theme, needed when the start status doesn't name it.
+    [ValidateSet('', 'Light', 'Dark')]
+    [string] $WindowsTheme = '',
 
     [string] $IgdbCredentialFile = '',
 
@@ -217,6 +231,7 @@ try {
     function Wait-Status(
         [string[]] $expected,
         [switch] $AllowHidden,
+        [switch] $Prefix,
         [int] $Seconds = 15) {
         $transient = @($expected | Where-Object { $_ -in @(
             'Library ready.',
@@ -239,7 +254,10 @@ try {
                     $status.Substring(0, $separator), [ref] $sequence)) {
                 $message = $status.Substring($separator + 1)
             }
-            if ($message -in $expected -and
+            $matched = if ($Prefix) {
+                @($expected | Where-Object { $message.StartsWith($_) }).Count -gt 0
+            } else { $message -in $expected }
+            if ($matched -and
                 $sequence -gt $script:lastStatusSequence) {
                 if ($message -eq 'Library ready.') { Assert-Absent 'LibraryLoading' }
                 if ($transient -or $AllowHidden) {
@@ -272,6 +290,12 @@ try {
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
         throw "Expected visible '$id'."
+    }
+
+    function Find-VisibleName([string] $name) {
+        $element = Find-ByName $name
+        if ($element -and -not $element.Current.IsOffscreen) { return $element }
+        return $null
     }
 
     function Wait-HiddenById([string] $id) {
@@ -535,7 +559,8 @@ try {
             if ($focused -and $focused.Current.AutomationId -eq $id) { return }
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
-        throw "Expected keyboard focus on '$id'."
+        $found = if ($focused) { "'$($focused.Current.AutomationId)' ($($focused.Current.ControlType.ProgrammaticName))" } else { 'nothing' }
+        throw "Expected keyboard focus on '$id', found $found."
     }
 
     # Focus in an AutoSuggestBox lands on its inner edit box.
@@ -1195,8 +1220,8 @@ try {
     }
     elseif ($Mode -in @('later-guide-result', 'later-guide-failed-result',
         'reader-render-error-observed', 'reader-render-error-result',
-        'switch-game-loading', 'switch-game')) {
-        # These modes continue a shell left on Reader, Game, or Library.
+        'switch-game-loading', 'switch-game', 'theme-error', 'theme-error-retry')) {
+        # These modes continue a shell left on Reader, Game, Library, or Settings.
     }
     elseif ($Mode -in @('txt-reader', 'txt-load-paused', 'txt-back-during-load',
         'txt-load-released', 'html-reader', 'html-runtime-missing', 'pdf-reader', 'pdf-jump', 'pdf-zoom', 'pdf-keys', 'pdf-locked', 'pdf-offline',
@@ -1532,12 +1557,6 @@ try {
                 Start-Sleep -Milliseconds 100
             } while ((Get-Date) -lt $deadline)
             throw "Expected the PDF zoom to match '$pattern'; the status read '$seen'."
-        }
-
-        function Find-VisibleName([string] $name) {
-            $element = Find-ByName $name
-            if ($element -and -not $element.Current.IsOffscreen) { return $element }
-            return $null
         }
 
         # Go to page and Fit to width sit in the CommandBar overflow.
@@ -2874,8 +2893,8 @@ try {
             }
 
             if ($Mode -eq 'completion-segmented') {
-                # The UIA gate: two radio buttons with their names, the selected
-                # state matching storage and following the arrow keys.
+                # The UIA gate: two Segmented list items with their names, the
+                # selected state matching storage and following the arrow keys.
                 Anchor-Guide $numbered
                 $choice = Wait-VisibleById 'CompletionChoice'
                 if ($choice.Current.Name -ne "Completion for $numbered") {
@@ -2883,7 +2902,7 @@ try {
                 }
                 foreach ($pair in @(@('CompletionInProgress', 'In progress'), @('CompletionComplete', 'Complete'))) {
                     $item = Wait-VisibleById $pair[0]
-                    if ($item.Current.ControlType -ne [System.Windows.Automation.ControlType]::RadioButton -or
+                    if ($item.Current.ControlType -ne [System.Windows.Automation.ControlType]::ListItem -or
                         $item.Current.Name -ne $pair[1]) {
                         throw "$($pair[0]) is a $($item.Current.ControlType.ProgrammaticName) named '$($item.Current.Name)'."
                     }
@@ -2955,6 +2974,14 @@ try {
                 Wait-CompletionShown $true 'Marking complete on the Game page'
                 Wait-FocusedId 'CompletionComplete'
                 $report.completionGameScreenshot = Save-WindowScreenshot 'completion-game'
+                # The choice keeps its items' width; a lost panel alignment
+                # stretches it across the page.
+                $choiceWidth = (Wait-VisibleById 'CompletionChoice').Current.BoundingRectangle.Width
+                $windowWidth = $root.Current.BoundingRectangle.Width
+                $report.completionGameChoiceWidth = "$choiceWidth of $windowWidth"
+                if ($choiceWidth -ge $windowWidth / 2) {
+                    throw "The Game page's completion choice is $choiceWidth px wide in a $windowWidth px window."
+                }
                 Send-Keys '{LEFT}'
                 [void](Wait-Status "$numbered marked in progress.")
                 $after = Wait-RowHelp $numbered $before -Exact
@@ -3445,6 +3472,215 @@ try {
         $report.settingsWideScreenshot =
             Save-WindowScreenshot 'settings-wide'
         $report.phases += 'settings-wide'
+    }
+    elseif ($Mode -like 'theme-*') {
+        $themeIds = [ordered]@{ System = 'ThemeSystem'; Light = 'ThemeLight'; Dark = 'ThemeDark' }
+
+        function Test-ThemeSelected([string] $id) {
+            $item = Find-ById $id
+            if (-not $item -or $item.Current.IsOffscreen) { return $false }
+            return $item.GetCurrentPattern(
+                [System.Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected
+        }
+
+        # The shown theme is the only selected item.
+        function Wait-ThemeShown([string] $label, [string] $step) {
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                $selected = @($themeIds.Keys | Where-Object { Test-ThemeSelected $themeIds[$_] })
+                if ($selected.Count -eq 1 -and $selected[0] -eq $label) { return }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            throw "$step expected '$label' as the only selected theme; found '$($selected -join ',')'."
+        }
+
+        function Send-ThemeKeys([string] $keys) {
+            [System.Windows.Forms.SendKeys]::SendWait($keys)
+        }
+
+        # Every element with the id is checked and, on failure, listed.
+        function Wait-ItemStatus([string] $id, [string] $expected, [string] $step) {
+            $condition = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::AutomationIdProperty, $id)
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                $elements = @($root.FindAll($scope, $condition))
+                if (@($elements | Where-Object { $_.Current.ItemStatus -ceq $expected }).Count -gt 0) { return }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            $found = if ($elements.Count -gt 0) {
+                ($elements | ForEach-Object {
+                    "'$($_.Current.ItemStatus)' on a $($_.Current.ControlType.ProgrammaticName) ($($_.Current.ClassName))"
+                }) -join ', '
+            } else { 'no element' }
+            throw "$step expected $id to report '$expected', found $found."
+        }
+
+        # The theme the window, title bar and choice report now.
+        function Assert-ThemeShown([string] $label, [string] $status, [string] $step) {
+            Wait-ThemeShown $label $step
+            Wait-ItemStatus 'AppThemeChoice' $status $step
+            $titleBar = if ($label -eq 'System') { 'UseDefaultAppMode' } else { $label }
+            Wait-ItemStatus 'AppTitleBar' $titleBar $step
+        }
+
+        # Keyboard only: focus the shown item, then arrow to the target.
+        function Select-ThemeByKeys([string] $from, [string] $to) {
+            $order = @('System', 'Light', 'Dark')
+            $steps = $order.IndexOf($to) - $order.IndexOf($from)
+            (Wait-VisibleById $themeIds[$from]).SetFocus()
+            Wait-FocusedId $themeIds[$from]
+            $key = if ($steps -gt 0) { '{RIGHT}' } else { '{LEFT}' }
+            for ($i = 0; $i -lt [Math]::Abs($steps); $i++) { Send-ThemeKeys $key }
+        }
+
+        $windowsTheme = if ($WindowsTheme) { $WindowsTheme }
+            elseif ($ExpectedThemeStatus -like 'System (*)') {
+                $ExpectedThemeStatus.Substring(8).TrimEnd(')') }
+            else { '' }
+
+        function Open-ThemeSettings {
+            Select-Element 'Settings'
+            [void](Wait-Name 'AppThemeSettingsCard' 'App theme. Choose light or dark, or follow Windows.')
+            [void](Wait-EnabledById 'AppThemeChoice')
+        }
+
+        Resize-ShellWindow 1500 720
+        Open-ThemeSettings
+
+        if ($Mode -eq 'theme-segmented') {
+            # The UIA gate: three list items with their names, a readable
+            # selected state, and selection that follows the arrow keys.
+            $choice = Wait-VisibleById 'AppThemeChoice'
+            if ($choice.Current.Name -ne 'App theme') {
+                throw "The theme choice is named '$($choice.Current.Name)'."
+            }
+            $report.themeItems = [ordered]@{}
+            foreach ($label in $themeIds.Keys) {
+                $item = Wait-VisibleById $themeIds[$label]
+                $report.themeItems[$label] = [ordered]@{
+                    name = $item.Current.Name
+                    controlType = $item.Current.ControlType.ProgrammaticName
+                    patterns = @($item.GetSupportedPatterns() | ForEach-Object { $_.ProgrammaticName })
+                }
+            }
+            foreach ($label in $themeIds.Keys) {
+                $item = Wait-VisibleById $themeIds[$label]
+                if ($item.Current.ControlType -ne [System.Windows.Automation.ControlType]::ListItem -or
+                    $item.Current.Name -ne $label) {
+                    throw "$($themeIds[$label]) is a $($item.Current.ControlType.ProgrammaticName) named '$($item.Current.Name)'."
+                }
+            }
+            Wait-ThemeShown 'System' 'A new library'
+            (Wait-VisibleById 'ThemeSystem').SetFocus()
+            Wait-FocusedId 'ThemeSystem'
+            Send-ThemeKeys '{RIGHT}'
+            Wait-ThemeShown 'Light' 'Right'
+            Wait-FocusedId 'ThemeLight'
+            Send-ThemeKeys '{LEFT}'
+            Wait-ThemeShown 'System' 'Left'
+            Wait-FocusedId 'ThemeSystem'
+            # The CI launch size: the three items stay whole on the card.
+            Resize-ShellWindow 768 519
+            Start-Sleep -Milliseconds 400
+            foreach ($id in $themeIds.Values) {
+                $bounds = (Wait-VisibleById $id).Current.BoundingRectangle
+                if ($bounds.Width -lt 24 -or $bounds.Height -lt 24) {
+                    throw "At 768x519 $id is $bounds."
+                }
+            }
+            $report.themeNarrowScreenshot = Save-WindowScreenshot 'theme-segmented-narrow'
+            Resize-ShellWindow 1500 720
+            $report.phases += 'theme-segmented'
+        }
+        elseif ($Mode -in @('theme-change', 'theme-restored')) {
+            # TR14.2: the stored theme is applied at launch, and a keyboard
+            # change applies at once and is confirmed.
+            Assert-ThemeShown $ExpectedTheme $ExpectedThemeStatus 'Launch'
+            $report.themeAtLaunch = $ExpectedThemeStatus
+            if ($Mode -eq 'theme-change') {
+                Select-ThemeByKeys $ExpectedTheme $SwitchToTheme
+                [void](Wait-Status "App theme set to $SwitchToTheme.")
+                if ($SwitchToTheme -eq 'System' -and -not $windowsTheme) {
+                    throw 'Switching to System needs -WindowsTheme or a System start status.'
+                }
+                $after = if ($SwitchToTheme -eq 'System') { "System ($windowsTheme)" } else { $SwitchToTheme }
+                Assert-ThemeShown $SwitchToTheme $after 'Change'
+                $dialogTheme = if ($SwitchToTheme -eq 'System') { $windowsTheme } else { $SwitchToTheme }
+                [void](Wait-HiddenById 'ShellStatus')
+                Assert-ShellForeground
+                $report.themeSettingsScreenshot = Save-WindowScreenshot "theme-$SwitchToTheme-settings"
+                # An open drop-down is a popup outside the shell root; the
+                # screenshot shows its theme. The TXT Reader has no overflow menu.
+                $selector = Wait-EnabledById 'WindowMaterialSelector'
+                $dropDown = $selector.GetCurrentPattern(
+                    [System.Windows.Automation.ExpandCollapsePattern]::Pattern)
+                $dropDown.Expand()
+                $deadline = (Get-Date).AddSeconds(5)
+                while (-not (Find-VisibleName 'Acrylic') -and (Get-Date) -lt $deadline) {
+                    Start-Sleep -Milliseconds 100
+                }
+                Start-Sleep -Milliseconds 400
+                if ($dropDown.Current.ExpandCollapseState -ne
+                    [System.Windows.Automation.ExpandCollapseState]::Expanded) {
+                    throw 'The Window background drop-down did not stay open.'
+                }
+                Assert-ShellForeground
+                $report.themePopupScreenshot = Save-WindowScreenshot "theme-$SwitchToTheme-drop-down"
+                $dropDown.Collapse()
+
+                $designGame = 'The Legend of Zelda: Tears of the Kingdom'
+                $designGuide = 'Complete Story Walkthrough'
+                Select-Element 'Library'
+                [void](Wait-GameRow $designGame)
+                Start-Sleep -Milliseconds 400
+                Assert-ShellForeground
+                $report.themeLibraryScreenshot = Save-WindowScreenshot "theme-$SwitchToTheme-library"
+                Press-Enter (Wait-GameRow $designGame)
+                [void](Wait-Name 'GameHeading' $designGame)
+                Invoke-Element (Wait-EnabledById 'EditGameButton')
+                [void](Wait-VisibleById 'GameTitleInput')
+                Wait-ItemStatus 'GameEditorDialog' $dialogTheme 'Edit game'
+                Assert-ShellForeground
+                $report.themeDialogScreenshot = Save-WindowScreenshot "theme-$SwitchToTheme-edit-game"
+                Send-ThemeKeys '{ESC}'
+                Wait-EditorClosed
+                Press-Enter (Wait-GuideRow $designGuide)
+                [void](Wait-Name 'ReaderHeading' $designGuide)
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-HiddenById 'ShellStatus')
+                Assert-ShellForeground
+                $report.themeReaderScreenshot = Save-WindowScreenshot "theme-$SwitchToTheme-reader"
+                $report.themeAfter = $after
+            }
+            Assert-NoRemoteConnections "theme ($Mode)"
+            $report.phases += $Mode
+        }
+        elseif ($Mode -eq 'theme-error') {
+            # The installer holds the write lock, so the save times out.
+            Assert-ThemeShown $ExpectedTheme $ExpectedThemeStatus 'Before the failed save'
+            Select-ThemeByKeys $ExpectedTheme $SwitchToTheme
+            [void](Wait-Status 'Could not save the app theme: ' -Prefix -Seconds 60)
+            Assert-ThemeShown $ExpectedTheme $ExpectedThemeStatus 'After the failed save'
+            Assert-ShellForeground
+            $report.themeErrorScreenshot = Save-WindowScreenshot 'theme-error'
+            # Putting the choice back moves focus to it. Leaving and tabbing
+            # back in lands on it again and changes nothing.
+            Wait-FocusedId $themeIds[$ExpectedTheme]
+            Send-ThemeKeys '+{TAB}'
+            Send-ThemeKeys '{TAB}'
+            Wait-FocusedId $themeIds[$ExpectedTheme]
+            Start-Sleep -Milliseconds 1000
+            $report.themeErrorTabInFocus = [System.Windows.Automation.AutomationElement]::FocusedElement.Current.AutomationId
+            Assert-ThemeShown $ExpectedTheme $ExpectedThemeStatus 'Tabbing back into the choice'
+            $report.phases += 'theme-error'
+        }
+        elseif ($Mode -eq 'theme-error-retry') {
+            Select-ThemeByKeys $ExpectedTheme $SwitchToTheme
+            [void](Wait-Status "App theme set to $SwitchToTheme.")
+            Assert-ThemeShown $SwitchToTheme $SwitchToTheme 'Retry'
+            $report.phases += 'theme-error-retry'
+        }
     }
     elseif ($Mode -eq 'material') {
         $designGame = 'The Legend of Zelda: Tears of the Kingdom'
