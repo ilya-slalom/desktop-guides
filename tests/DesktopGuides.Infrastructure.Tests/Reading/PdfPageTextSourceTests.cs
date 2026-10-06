@@ -12,7 +12,7 @@ public sealed class PdfPageTextSourceTests
     private static PdfPageTextSource Open(string fixture, int maxPageCharacters = PdfPageTextSource.DefaultMaxPageCharacters,
         int maxPages = PdfPageTextSource.DefaultMaxPages, long maxCharacters = PdfPageTextSource.DefaultMaxCharacters) =>
         PdfPageTextSource.Open(File.OpenRead(P0Fixtures.Resolve(fixture)), CancellationToken.None,
-            maxPageCharacters, maxPages, maxCharacters);
+            maxPageCharacters: maxPageCharacters, maxPages: maxPages, maxCharacters: maxCharacters);
 
     [Fact]
     public async Task ATaggedPageHasItsParagraph()
@@ -117,7 +117,8 @@ public sealed class PdfPageTextSourceTests
         using FileStream file = File.OpenRead(P0Fixtures.Resolve("pdf-access.pdf"));
 
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            PdfPageTextSource.Open(file, CancellationToken.None, maxPageCharacters, maxPages, maxCharacters));
+            PdfPageTextSource.Open(file, CancellationToken.None,
+                maxPageCharacters: maxPageCharacters, maxPages: maxPages, maxCharacters: maxCharacters));
     }
 
     [Fact]
@@ -145,6 +146,41 @@ public sealed class PdfPageTextSourceTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reading);
         PdfPageText later = await source.GetPageTextAsync(151, CancellationToken.None);
         Assert.Contains("page 152 of 200", later.Text);
+    }
+
+    [Fact]
+    public async Task CloseDuringAnExtractionReturnsAndClosesWhenItEnds()
+    {
+        GatedStream file = new(File.ReadAllBytes(P0Fixtures.Resolve(Long)));
+        PdfPageTextSource source = PdfPageTextSource.Open(file, CancellationToken.None);
+        file.Hold();
+        Task<PdfPageText> reading = source.GetPageTextAsync(150, CancellationToken.None);
+        Assert.True(await file.ReadSeen.WaitAsync(TimeSpan.FromSeconds(5)), "Extraction never read the file.");
+
+        Task<bool> closing = source.CloseAsync(TimeSpan.FromMilliseconds(200));
+        Assert.Same(closing, await Task.WhenAny(closing, Task.Delay(TimeSpan.FromSeconds(5))));
+        Assert.False(await closing);
+        Assert.False(file.Disposed);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => source.GetPageTextAsync(0, CancellationToken.None));
+
+        file.Release();
+        await reading;
+        Assert.Same(file.DisposedSignal, await Task.WhenAny(file.DisposedSignal, Task.Delay(TimeSpan.FromSeconds(5))));
+        source.Dispose();
+        Assert.Equal(1, file.DisposeCount);
+    }
+
+    [Fact]
+    public async Task CloseWithNoExtractionClosesAtOnce()
+    {
+        GatedStream file = new(File.ReadAllBytes(P0Fixtures.Resolve(Long)));
+        PdfPageTextSource source = PdfPageTextSource.Open(file, CancellationToken.None);
+
+        Assert.True(await source.CloseAsync(TimeSpan.Zero));
+        Assert.True(file.Disposed);
+        Assert.True(await source.CloseAsync(TimeSpan.Zero));
+        source.Dispose();
+        Assert.Equal(1, file.DisposeCount);
     }
 
     [Fact]
@@ -210,9 +246,12 @@ public sealed class PdfPageTextSourceTests
     {
         private readonly MemoryStream inner = new(bytes, writable: false);
         private readonly ManualResetEventSlim open = new(true);
+        private readonly TaskCompletionSource disposedSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public SemaphoreSlim ReadSeen { get; } = new(0);
         public bool Disposed { get; private set; }
+        public int DisposeCount { get; private set; }
+        public Task DisposedSignal => disposedSignal.Task;
 
         public void Hold() => open.Reset();
         public void Release() => open.Set();
@@ -254,8 +293,10 @@ public sealed class PdfPageTextSourceTests
         protected override void Dispose(bool disposing)
         {
             Disposed = true;
+            if (disposing) DisposeCount++;
             inner.Dispose();
             base.Dispose(disposing);
+            disposedSignal.TrySetResult();
         }
 
         private void Wait()
