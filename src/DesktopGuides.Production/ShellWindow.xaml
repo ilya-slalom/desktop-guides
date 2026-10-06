@@ -524,28 +524,28 @@
                                                    MaxWidth="360"
                                                    HorizontalAlignment="Left"
                                                    AutomationProperties.AutomationId="PdfUnlockPanel">
-                            <StackPanel Spacing="{StaticResource DesktopGuidesSpacing12}">
-                                <TextBlock x:Name="PdfUnlockMessage"
-                                           TextWrapping="Wrap"
-                                           Style="{StaticResource DesktopGuidesSecondaryBodyStyle}" />
-                                <PasswordBox x:Name="PdfPasswordInput"
-                                             Header="Password"
-                                             PasswordChanged="PdfPasswordChanged"
-                                             KeyDown="PdfPasswordKeyDown"
-                                             AutomationProperties.AutomationId="PdfPasswordInput" />
-                                <TextBlock x:Name="PdfUnlockError"
-                                           Visibility="Collapsed"
-                                           TextWrapping="Wrap"
-                                           Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                                           AutomationProperties.LiveSetting="Polite"
-                                           AutomationProperties.AutomationId="PdfUnlockError" />
-                                <Button x:Name="PdfUnlockButton"
-                                        Content="Unlock"
-                                        IsEnabled="False"
-                                        Style="{StaticResource AccentButtonStyle}"
-                                        Click="PdfUnlockClicked"
-                                        AutomationProperties.AutomationId="PdfUnlockButton" />
-                            </StackPanel>
+                                <StackPanel Spacing="{StaticResource DesktopGuidesSpacing12}">
+                                    <TextBlock x:Name="PdfUnlockMessage"
+                                               TextWrapping="Wrap"
+                                               Style="{StaticResource DesktopGuidesSecondaryBodyStyle}" />
+                                    <PasswordBox x:Name="PdfPasswordInput"
+                                                 Header="Password"
+                                                 PasswordChanged="PdfPasswordChanged"
+                                                 KeyDown="PdfPasswordKeyDown"
+                                                 AutomationProperties.AutomationId="PdfPasswordInput" />
+                                    <TextBlock x:Name="PdfUnlockError"
+                                               Visibility="Collapsed"
+                                               TextWrapping="Wrap"
+                                               Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                               AutomationProperties.LiveSetting="Polite"
+                                               AutomationProperties.AutomationId="PdfUnlockError" />
+                                    <Button x:Name="PdfUnlockButton"
+                                            Content="Unlock"
+                                            IsEnabled="False"
+                                            Style="{StaticResource AccentButtonStyle}"
+                                            Click="PdfUnlockClicked"
+                                            AutomationProperties.AutomationId="PdfUnlockButton" />
+                                </StackPanel>
                             </local:AutomationGroup>
                         </StackPanel>
                         <ContentControl x:Name="ReaderSurface"
