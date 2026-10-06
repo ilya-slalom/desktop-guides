@@ -1,6 +1,8 @@
 using CommunityToolkit.WinUI.Controls;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
+using Microsoft.UI.Xaml.Automation.Provider;
 using Microsoft.UI.Xaml.Controls;
 
 namespace DesktopGuides.Production;
@@ -22,6 +24,10 @@ public partial class BoundedChoice : Segmented
         ItemsSource = options;
 
     public Control? ContainerAt(int index) => ContainerFromIndex(index) as Control;
+
+    protected override DependencyObject GetContainerForItemOverride() => new BoundedChoiceItem();
+
+    protected override bool IsItemItsOwnContainerOverride(object item) => item is BoundedChoiceItem;
 
     protected override void PrepareContainerForItemOverride(DependencyObject element, object item)
     {
@@ -48,4 +54,32 @@ public partial class BoundedChoice : Segmented
             DispatcherQueue.TryEnqueue(() => SelectedIndex = restore);
         }
     }
+}
+
+// Exposes SelectionItem on each generated container (the T14.2 gate fallback).
+public partial class BoundedChoiceItem : SegmentedItem
+{
+    protected override AutomationPeer OnCreateAutomationPeer() => new BoundedChoiceItemPeer(this);
+}
+
+internal sealed partial class BoundedChoiceItemPeer(BoundedChoiceItem owner)
+    : ListViewItemAutomationPeer(owner), ISelectionItemProvider
+{
+    public bool IsSelected => owner.IsSelected;
+
+    public IRawElementProviderSimple? SelectionContainer =>
+        ItemsControl.ItemsControlFromItemContainer(owner) is { } choice &&
+        FrameworkElementAutomationPeer.FromElement(choice) is { } peer
+            ? ProviderFromPeer(peer)
+            : null;
+
+    public void Select() => owner.IsSelected = true;
+
+    public void AddToSelection() => owner.IsSelected = true;
+
+    // A choice always has one selected item.
+    public void RemoveFromSelection() { }
+
+    protected override object GetPatternCore(PatternInterface patternInterface) =>
+        patternInterface == PatternInterface.SelectionItem ? this : base.GetPatternCore(patternInterface);
 }
