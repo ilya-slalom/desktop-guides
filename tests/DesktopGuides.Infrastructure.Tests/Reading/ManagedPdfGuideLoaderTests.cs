@@ -192,7 +192,11 @@ public sealed class ManagedPdfGuideLoaderTests
         // The failure holds only an error code, so the attempt has nowhere to be echoed.
         Assert.Equal(PdfGuideLoadError.PasswordIncorrect, Assert.IsType<PdfGuideLoadFailed>(load).Error);
         // The managed copy is closed again: it can be opened for writing.
-        using FileStream exclusive = new(ManagedFile(harness, guide), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        // Only Windows locks a file that is open elsewhere.
+        if (OperatingSystem.IsWindows())
+        {
+            using FileStream exclusive = new(ManagedFile(harness, guide), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        }
     }
 
     [Fact]

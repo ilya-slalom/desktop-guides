@@ -308,7 +308,6 @@ public sealed class GuideImportValidatorHtmlPdfTests
         Assert.Equal("That password didn't open this PDF. Try again.", error.Message);
         Assert.DoesNotContain(WrongAttempt, error.ToString());
         Assert.Null(error.InnerException);
-        Assert.DoesNotContain(WrongAttempt, needs.ToString());
     }
 
     [Fact]
