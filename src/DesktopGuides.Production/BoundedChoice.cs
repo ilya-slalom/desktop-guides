@@ -21,8 +21,6 @@ public partial class BoundedChoice : Segmented
     public BoundedChoice()
     {
         SelectionChanged += KeepOneSelected;
-        // Runs before Segmented's own handler, which then moves focus to
-        // the same item. Handled doesn't stop a handler on the same element.
         PreviewKeyDown += SelectWithArrows;
     }
 
@@ -72,27 +70,24 @@ public partial class BoundedChoice : Segmented
 
     // The arrow keys move the selection with focus, as in a radio group.
     // Focus alone never selects, so tabbing in can't change the choice.
+    // Segmented's handler moves the focus after this one. Selecting here
+    // would move focus to the new item first and make Segmented skip one,
+    // so the focused item is selected once the key has been handled.
     private void SelectWithArrows(object sender, KeyRoutedEventArgs args)
     {
-        bool rightToLeft = FlowDirection == FlowDirection.RightToLeft;
-        int step = args.Key switch
-        {
-            VirtualKey.Left => rightToLeft ? 1 : -1,
-            VirtualKey.Right => rightToLeft ? -1 : 1,
-            VirtualKey.Up => -1,
-            VirtualKey.Down => 1,
-            _ => 0
-        };
-        if (step == 0 || XamlRoot is null ||
-            FocusManager.GetFocusedElement(XamlRoot) is not BoundedChoiceItem focused)
+        if (args.Key is not (VirtualKey.Left or VirtualKey.Right or VirtualKey.Up or VirtualKey.Down))
         {
             return;
         }
-        int index = IndexFromContainer(focused) + step;
-        if (index >= 0 && index < Items.Count)
+        DispatcherQueue.TryEnqueue(() =>
         {
-            SelectedIndex = index;
-        }
+            if (XamlRoot is not null &&
+                FocusManager.GetFocusedElement(XamlRoot) is BoundedChoiceItem focused &&
+                IndexFromContainer(focused) is int index and >= 0)
+            {
+                SelectedIndex = index;
+            }
+        });
     }
 
     // Ctrl+Space can clear a ListViewBase selection; a choice always has one.
