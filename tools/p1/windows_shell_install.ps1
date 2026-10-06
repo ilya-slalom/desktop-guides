@@ -18,6 +18,7 @@ param(
     [switch] $PdfOnly,
     [switch] $ProgressOnly,
     [switch] $CompletionOnly,
+    [switch] $ThemeOnly,
     [switch] $ImportOnly,
     [switch] $GameActionsOnly,
     [switch] $ProviderOnly,
@@ -53,6 +54,7 @@ $scenarioGroups = [ordered]@{
     'pdf' = $PdfOnly.IsPresent
     'progress' = $ProgressOnly.IsPresent
     'completion' = $CompletionOnly.IsPresent
+    'theme' = $ThemeOnly.IsPresent
     'import' = $ImportOnly.IsPresent
     'game-actions' = $GameActionsOnly.IsPresent
     'provider' = $ProviderOnly.IsPresent
@@ -768,7 +770,7 @@ function Run-ShellSmoke(
         -Principal $principal -Force | Out-Null
     Start-ScheduledTask -TaskName $smokeTask
     $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*' -or $mode -like 'completion-*') { 240 }
-        elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*') { 120 }
+        elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*' -or $mode -like 'theme-*') { 120 }
         else { 60 }
     $deadline = (Get-Date).AddSeconds($timeoutSeconds)
     do {
@@ -1675,6 +1677,24 @@ function Run-CompletionScenarios {
     }
 }
 
+function Run-ThemeScenarios {
+    # TR14.2: the App theme choice. The UIA gate runs first.
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    [void](Invoke-ShellSeed @('seed-design', $dataRoot))
+    $report.theme = [ordered]@{}
+    $originalTheme = Get-AppThemePreference
+    try {
+        Set-AppThemePreference $true
+        Start-InstalledShell
+        $report.theme.segmented = Run-ShellSmoke 'theme-segmented'
+        Close-InstalledShell
+    }
+    finally {
+        Restore-AppThemePreference $originalTheme
+        $report.theme.restoredAppTheme = Get-AppThemePreference
+    }
+}
+
 function Run-ImportScenarios {
     Invoke-ShellSeed @('seed-import', $dataRoot) | Out-Null
     $originalTheme = Get-AppThemePreference
@@ -2252,6 +2272,7 @@ try {
 
     if (Enter-ScenarioGroup 'progress') { Run-ProgressScenarios }
     if (Enter-ScenarioGroup 'completion') { Run-CompletionScenarios }
+    if (Enter-ScenarioGroup 'theme') { Run-ThemeScenarios }
 
     if (Enter-ScenarioGroup 'import') {
         Run-ImportScenarios

@@ -16,7 +16,8 @@ param(
         'html-runtime-missing', 'pdf-reader', 'pdf-jump', 'pdf-zoom', 'pdf-keys', 'pdf-locked', 'pdf-offline',
         'html-position',
         'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed',
-        'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry')]
+        'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry',
+        'theme-segmented')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -3445,6 +3446,86 @@ try {
         $report.settingsWideScreenshot =
             Save-WindowScreenshot 'settings-wide'
         $report.phases += 'settings-wide'
+    }
+    elseif ($Mode -like 'theme-*') {
+        $themeIds = [ordered]@{ System = 'ThemeSystem'; Light = 'ThemeLight'; Dark = 'ThemeDark' }
+
+        function Test-ThemeSelected([string] $id) {
+            $item = Find-ById $id
+            if (-not $item -or $item.Current.IsOffscreen) { return $false }
+            return $item.GetCurrentPattern(
+                [System.Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected
+        }
+
+        # The shown theme is the only selected item.
+        function Wait-ThemeShown([string] $label, [string] $step) {
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                $selected = @($themeIds.Keys | Where-Object { Test-ThemeSelected $themeIds[$_] })
+                if ($selected.Count -eq 1 -and $selected[0] -eq $label) { return }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            throw "$step expected '$label' as the only selected theme; found '$($selected -join ',')'."
+        }
+
+        function Send-ThemeKeys([string] $keys) {
+            [System.Windows.Forms.SendKeys]::SendWait($keys)
+        }
+
+        function Open-ThemeSettings {
+            Select-Element 'Settings'
+            [void](Wait-Name 'AppThemeSettingsCard' 'App theme. Choose light or dark, or follow Windows.')
+            [void](Wait-EnabledById 'AppThemeChoice')
+        }
+
+        Resize-ShellWindow 1500 720
+        Open-ThemeSettings
+
+        if ($Mode -eq 'theme-segmented') {
+            # The UIA gate: three list items with their names, a readable
+            # selected state, and selection that follows the arrow keys.
+            $choice = Wait-VisibleById 'AppThemeChoice'
+            if ($choice.Current.Name -ne 'App theme') {
+                throw "The theme choice is named '$($choice.Current.Name)'."
+            }
+            $report.themeItems = [ordered]@{}
+            foreach ($label in $themeIds.Keys) {
+                $item = Wait-VisibleById $themeIds[$label]
+                $report.themeItems[$label] = [ordered]@{
+                    name = $item.Current.Name
+                    controlType = $item.Current.ControlType.ProgrammaticName
+                    patterns = @($item.GetSupportedPatterns() | ForEach-Object { $_.ProgrammaticName })
+                }
+            }
+            foreach ($label in $themeIds.Keys) {
+                $item = Wait-VisibleById $themeIds[$label]
+                if ($item.Current.ControlType -ne [System.Windows.Automation.ControlType]::ListItem -or
+                    $item.Current.Name -ne $label) {
+                    throw "$($themeIds[$label]) is a $($item.Current.ControlType.ProgrammaticName) named '$($item.Current.Name)'."
+                }
+            }
+            Wait-ThemeShown 'System' 'A new library'
+            (Wait-VisibleById 'ThemeSystem').SetFocus()
+            Wait-FocusedId 'ThemeSystem'
+            Send-ThemeKeys '{RIGHT}'
+            Wait-ThemeShown 'Light' 'Right'
+            Wait-FocusedId 'ThemeLight'
+            Send-ThemeKeys '{LEFT}'
+            Wait-ThemeShown 'System' 'Left'
+            Wait-FocusedId 'ThemeSystem'
+            # The CI launch size: the three items stay whole on the card.
+            Resize-ShellWindow 768 519
+            Start-Sleep -Milliseconds 400
+            foreach ($id in $themeIds.Values) {
+                $bounds = (Wait-VisibleById $id).Current.BoundingRectangle
+                if ($bounds.Width -lt 24 -or $bounds.Height -lt 24) {
+                    throw "At 768x519 $id is $bounds."
+                }
+            }
+            $report.themeNarrowScreenshot = Save-WindowScreenshot 'theme-segmented-narrow'
+            Resize-ShellWindow 1500 720
+            $report.phases += 'theme-segmented'
+        }
     }
     elseif ($Mode -eq 'material') {
         $designGame = 'The Legend of Zelda: Tears of the Kingdom'
