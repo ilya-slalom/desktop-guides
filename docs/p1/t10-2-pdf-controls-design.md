@@ -298,7 +298,8 @@ owner is the Reader route, and the tooltips show the key.
       tolerance.
     - At 200% the horizontal scroll bar is present, and at Fit it's absent.
     - The status names the zoom.
-    - Screenshots in light and dark.
+    - Screenshots in light and dark, taken at 100%: the 200% horizontal
+      scroll bar is asserted by the smoke, not shown in the PNG.
   - `pdf-keys`: each key in the table runs its command with focus
     unchanged. With focus in `PdfDocumentText`, Page Down doesn't turn the
     page.
@@ -541,7 +542,8 @@ unless noted. Every `pdf-*` diagnostics file shows `disposedCleanly` true and
 - `pdf-zoom`: from page 121 at fraction 0.3, 75%, 100% and Fit keep the page
   and the fraction (all 0.300); at 200% the horizontal scroll bar shows for
   pages 121 and 122 at different widths (view sizes 26.2 and 20.2); at 400%
-  *Zoom in* is disabled.
+  *Zoom in* is disabled. The screenshot is taken at 100%: the 200%
+  scroll bar is asserted by the smoke, not shown in the PNG.
 - `pdf-keys`: the page, Home/End, Ctrl+G, zoom and Fit keys run their
   commands with focus unchanged; Page Down in the page text and in the Go to
   page box doesn't turn the page.
@@ -586,14 +588,20 @@ RED and GREEN runs, by task:
 Runs other than 37421797876 used `dev-fast` or a `shell-scope`; 37421797876
 is the full matrix.
 
-An intermittent, not explained: at `9dedf06`, `pdf-reader-light` failed twice
-(run 37413047727, attempts 1 and 2) with `The PDF reader has no visible 'Next
-page' command.`, and passed on every later run. In 37421797876's first
-attempt `pdf-reader-dark` failed the same way, and the rerun of the failed job
-passed. It is the smoke's first `Invoke-NextPages 199` on the Long guide, a
-single lookup with no retry. A reviewer suspects the `CommandBar`'s dynamic
-overflow at first layout, which predates T10.2; nothing in the T10.2 wiring
-touches the commands' visibility. The cause is unproven.
+An intermittent, not explained: `The PDF reader has no visible 'Next page'
+command.` failed twice, in `pdf-reader-light` at `9dedf06` (run 37413047727,
+attempt 1) and in `pdf-reader-dark` at `48a17ff` (run 37421797876, attempt 1).
+Both reruns passed. The failed-job logs don't show which `Invoke-NextPages`
+call failed. The smoke did a single UIA lookup with no wait. T10.2 changed
+this bar: the PDF session now reports Zoom, PageJump and FitWidth, so it shows
+six primary commands and a More button, where T10.1 showed four. The
+suspected cause is the `CommandBar` dynamic-overflow re-layout when the
+commands are shown again after the previous guide, briefly leaving Next page
+offscreen or in overflow. Steady-state screenshots at full and 600-wide
+windows show Next page on the bar. The cause is unproven. The smoke now waits
+up to 5 s for a visible, enabled Next page and records diagnostics on failure
+(a `pdf-next-page-missing` screenshot, every 'Next page' element with its
+`IsOffscreen` and `IsEnabled`, and the `ReaderCommands` bounds).
 
 Screenshots and results are in
 [evidence/t10-2-pdf-controls](evidence/t10-2-pdf-controls/).
