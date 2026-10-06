@@ -223,14 +223,25 @@ former 30-second cutoff.
 
 CI `production-shell-ui` runs the full installed harness on every PR and is the
 gate of record for the shell, design-language, material and catalog scenarios.
-It uploads the JSON results and screenshots, and PRs link to that artifact.
+It runs as four parallel shards, each a fresh install on its own runner:
+`core` (core, txt, game-actions), `design` (design, catalog), `pdf` (pdf,
+progress) and `html` (html, completion, import, provider). Each shard
+uploads its JSON results and screenshots as `production-shell-ui-<shard>`,
+and PRs link to those artifacts. A shard failing doesn't cancel the others.
 Provider live scenarios skip on CI, because the runner has no credential files.
 Run them on the Windows host with `-ProviderOnly`, using the user's keys and
 normal provider requests. Use the host for other scenarios only to debug a CI
 failure. One `*Only` switch runs a single scenario group against a fresh
 install: `-CoreOnly`, `-DesignOnly`, `-CatalogOnly`, `-TxtOnly`, `-HtmlOnly`,
 `-PdfOnly`, `-ProgressOnly`, `-CompletionOnly`, `-ImportOnly`, `-GameActionsOnly` or `-ProviderOnly`. With none,
-all groups run in that order. The `progress` group opens two test gates:
+all groups run in that order. `-Groups core,txt` names several groups instead;
+they still run in that order, each from an empty data root. With the `pdf`
+group alone, `-PassFilter` runs only the PDF passes whose names match one of
+its wildcards, for example `-PdfOnly -PassFilter pdf-zoom-*,pdf-locked-light`.
+Pass names are `<mode>-light`, `<mode>-dark` and `pdf-offline`. Other groups
+carry state from one mode to the next, so they don't take a filter. The
+harness builds `DesktopGuides.ShellSeed` once and runs its DLL for each seed
+step. The `progress` group opens two test gates:
 `ProgressDiagnostics` writes `progress-<pid>.json` counts (saves, unchanged
 skips, failures, opens; no locator text) to the cache's diagnostics folder after each
 save attempt, and `ProgressOverride` replaces a guide's stored locator with
@@ -238,13 +249,19 @@ save attempt, and `ProgressOverride` replaces a guide's stored locator with
 CI scheduled-task entry point are T17.2 work.
 
 For faster CI iteration, dispatch the workflow manually.
-`shell-scope` picks one group, for example
+`shell-scope` picks one group, which runs as a single shard, for example
 `gh workflow run windows-ci.yml --ref <branch> -f shell-scope=html -f dev-fast=true`.
+With `shell-scope=pdf`, `shell-pass` takes comma-separated pass wildcards,
+for example `-f shell-pass=pdf-locked-*`.
 `dev-fast` runs only the x64 production build and shell smoke, next to
 `core-tests` instead of after it, and skips the app-package, toolbar and
 ARM64 jobs. It is ignored when `verify-test-gate` is set. A dev-fast run is not
 PR evidence: push and pull_request runs always use the full job graph and all
-scenario groups.
+scenario groups. A new push to a PR cancels that PR's older run; dispatches
+and pushes to `main` are never cancelled. Pushes and PRs that change only
+`docs/**` or Markdown files don't run the workflow, so a docs-only PR has no
+check run. Run the unit tests locally first; see the
+[toolchain notes](../p0/toolchain.md#unit-tests-on-macos).
 
 When a host run installs a CI-built MSIX, stage the source with Windows line
 endings before building `DesktopGuides.ShellSeed`. The schema SQL is a raw
