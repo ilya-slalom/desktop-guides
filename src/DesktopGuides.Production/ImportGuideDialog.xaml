@@ -85,6 +85,26 @@
                                AutomationProperties.LiveSetting="Polite"
                                AutomationProperties.AutomationId="GuideTitleFeedback" />
                 </StackPanel>
+                <StackPanel x:Name="ImportPdfPasswordStep"
+                            Visibility="Collapsed"
+                            Spacing="{StaticResource DesktopGuidesSpacing4}">
+                    <PasswordBox x:Name="ImportPdfPasswordInput"
+                                 Header="PDF password"
+                                 PasswordChanged="ImportPdfPasswordChanged"
+                                 KeyDown="ImportPdfPasswordKeyDown"
+                                 AutomationProperties.AutomationId="ImportPdfPasswordInput" />
+                    <TextBlock x:Name="ImportPdfPasswordError"
+                               Visibility="Collapsed"
+                               TextWrapping="Wrap"
+                               Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                               AutomationProperties.LiveSetting="Polite"
+                               AutomationProperties.AutomationId="ImportPdfPasswordError" />
+                    <Button x:Name="ImportPdfUnlock"
+                            Content="Unlock"
+                            IsEnabled="False"
+                            Click="ImportPdfUnlockClicked"
+                            AutomationProperties.AutomationId="ImportPdfUnlock" />
+                </StackPanel>
 
                 <InfoBar x:Name="ImportNoTextWarning"
                          Severity="Warning"
@@ -196,6 +216,19 @@
                             <TextBlock x:Name="ImportPages" Grid.Column="1"
                                        Style="{StaticResource DesktopGuidesBodyStyle}"
                                        AutomationProperties.AutomationId="ImportPages" />
+                        </Grid>
+                        <Grid x:Name="ImportProtectedRow"
+                              Visibility="Collapsed"
+                              ColumnSpacing="{StaticResource DesktopGuidesSpacing12}"
+                              AutomationProperties.AutomationId="ImportProtectedRow">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Protection" Style="{StaticResource DesktopGuidesMetadataStyle}" />
+                            <TextBlock x:Name="ImportProtected" Grid.Column="1"
+                                       Style="{StaticResource DesktopGuidesBodyStyle}"
+                                       AutomationProperties.AutomationId="ImportProtected" />
                         </Grid>
                     </StackPanel>
                 </StackPanel>
