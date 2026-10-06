@@ -2,6 +2,8 @@ using DesktopGuides.Core.Library;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Media;
 
 namespace DesktopGuides.Production.Materials;
 
@@ -16,8 +18,18 @@ internal static class DialogSurface
                 ? "DesktopGuidesAcrylicDialogStyle"
                 : "DefaultContentDialogStyle"];
         dialog.RequestedTheme = theme;
-        // The installed checks read the theme the dialog resolved.
+        // The installed checks read the theme the dialog resolved. UIA shows
+        // the dialog through its Popup host, which takes the dialog's
+        // AutomationId but not its ItemStatus.
         dialog.Opened += (sender, _) =>
-            AutomationProperties.SetItemStatus(sender, sender.ActualTheme.ToString());
+        {
+            string resolved = sender.ActualTheme.ToString();
+            AutomationProperties.SetItemStatus(sender, resolved);
+            foreach (Popup popup in VisualTreeHelper.GetOpenPopupsForXamlRoot(sender.XamlRoot)
+                .Where(popup => popup.Child == sender))
+            {
+                AutomationProperties.SetItemStatus(popup, resolved);
+            }
+        };
     }
 }

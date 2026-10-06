@@ -3489,8 +3489,7 @@ try {
             [System.Windows.Forms.SendKeys]::SendWait($keys)
         }
 
-        # A ContentDialog's Popup host takes the dialog's AutomationId but not
-        # its ItemStatus, so every element with the id is checked.
+        # Every element with the id is checked and, on failure, listed.
         function Wait-ItemStatus([string] $id, [string] $expected, [string] $step) {
             $condition = [System.Windows.Automation.PropertyCondition]::new(
                 [System.Windows.Automation.AutomationElement]::AutomationIdProperty, $id)
