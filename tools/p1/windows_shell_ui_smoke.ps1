@@ -1623,8 +1623,14 @@ try {
             for ($i = 0; $i -lt $count; $i++) { Invoke-Element $next }
         }
 
+        # The view can replace the scroller mid-lookup, so retry briefly.
         function Get-PdfScroll {
+            $deadline = (Get-Date).AddSeconds(3)
             $scroller = Find-ById 'PdfPreviewScroller'
+            while (-not $scroller -and (Get-Date) -lt $deadline) {
+                Start-Sleep -Milliseconds 100
+                $scroller = Find-ById 'PdfPreviewScroller'
+            }
             if (-not $scroller) { throw 'The PDF preview has no scroller.' }
             return $scroller.GetCurrentPattern(
                 [System.Windows.Automation.ScrollPattern]::Pattern)
