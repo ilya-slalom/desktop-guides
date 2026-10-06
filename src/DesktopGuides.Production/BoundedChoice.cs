@@ -21,7 +21,8 @@ public partial class BoundedChoice : Segmented
     public BoundedChoice()
     {
         SelectionChanged += KeepOneSelected;
-        // Added before Segmented's own handler, which only moves focus.
+        // Runs before Segmented's own handler, which then moves focus to
+        // the same item. Handled doesn't stop a handler on the same element.
         PreviewKeyDown += SelectWithArrows;
     }
 
@@ -88,13 +89,10 @@ public partial class BoundedChoice : Segmented
             return;
         }
         int index = IndexFromContainer(focused) + step;
-        if (index < 0 || index >= Items.Count || ContainerFromIndex(index) is not BoundedChoiceItem next)
+        if (index >= 0 && index < Items.Count)
         {
-            return;
+            SelectedIndex = index;
         }
-        args.Handled = true;
-        SelectedIndex = index;
-        next.Focus(FocusState.Keyboard);
     }
 
     // Ctrl+Space can clear a ListViewBase selection; a choice always has one.
