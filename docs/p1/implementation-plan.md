@@ -823,6 +823,14 @@ Rendered pages are cached by measured bytes under 96 MiB, page loads run
 one at a time with the newest request winning, and damaged, missing,
 changed, unreadable and encrypted managed copies show typed errors.
 
+T10.2 was merged through PR #46 on 6 October 2026 (merge commit `303a0ee`;
+CI run 37432552738); see the
+[design and implementation notes](t10-2-pdf-controls-design.md). The PDF
+Reader has page, Go to page, zoom and Fit commands with keyboard parity,
+and asks for the password of a locked PDF at import and on each open. A
+password is never stored, logged or passed as an argument, and the box is
+cleared before each attempt.
+
 T10.3 was merged through PR #37 on 4 October 2026 (merge commit
 `541c245`; CI run 37178208319); see the
 [design and implementation notes](t10-3-pdf-locator-design.md). A PDF

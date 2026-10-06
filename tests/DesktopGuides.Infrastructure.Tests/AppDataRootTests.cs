@@ -33,7 +33,12 @@ public sealed class AppDataRootTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => AppDataRoot.Resolve(packaged: false, () => "", value));
 
     [Fact]
-    public void TestProcessHasNoPackageIdentity() => Assert.False(AppDataRoot.HasPackageIdentity());
+    public void TestProcessHasNoPackageIdentity()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        Assert.False(AppDataRoot.HasPackageIdentity());
+    }
 
     public void Dispose() => Directory.Delete(localAppData, recursive: true);
 }

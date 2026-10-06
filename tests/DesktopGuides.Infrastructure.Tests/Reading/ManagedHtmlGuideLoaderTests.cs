@@ -28,6 +28,8 @@ public sealed class ManagedHtmlGuideLoaderTests
     [Fact]
     public async Task LoadsAPublishedGuideAtItsOwnOrigin()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         Guide guide = await PublishAsync(harness);
 
@@ -41,6 +43,8 @@ public sealed class ManagedHtmlGuideLoaderTests
     [Fact]
     public async Task GuideWithoutRowsNeedsReimport()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         Guide guide = await PublishAsync(harness);
         harness.Execute("DELETE FROM GuideAssets WHERE GuideId = $id", guide.Id);
@@ -51,6 +55,8 @@ public sealed class ManagedHtmlGuideLoaderTests
     [Fact]
     public async Task ChangedEntryIsChanged()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         Guide guide = await PublishAsync(harness);
         File.AppendAllText(harness.Paths.ResolveExistingGuideFile(guide.Id, "guide.html"), "<p>edit</p>");
@@ -61,6 +67,8 @@ public sealed class ManagedHtmlGuideLoaderTests
     [Fact]
     public async Task MissingEntryIsMissing()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         Guide guide = await PublishAsync(harness);
         File.Delete(harness.Paths.ResolveExistingGuideFile(guide.Id, "guide.html"));
@@ -71,6 +79,8 @@ public sealed class ManagedHtmlGuideLoaderTests
     [Fact]
     public async Task DeletedGuideFolderIsMissing()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         Guide guide = await PublishAsync(harness);
         Directory.Delete(harness.Paths.GetGuideRoot(guide.Id), recursive: true);
@@ -81,6 +91,8 @@ public sealed class ManagedHtmlGuideLoaderTests
     [Fact]
     public async Task EntryThatIsAFolderIsChanged()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         Guide guide = await PublishAsync(harness);
         string entry = harness.Paths.ResolveExistingGuideFile(guide.Id, "guide.html");
@@ -115,6 +127,8 @@ public sealed class ManagedHtmlGuideLoaderTests
     [Fact]
     public async Task EntryRowThatIsNotThePrimaryFileIsChanged()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         Guide guide = await PublishAsync(harness);
 

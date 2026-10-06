@@ -28,6 +28,8 @@ public sealed class GuideImportValidatorHtmlPdfTests
     [Fact]
     public async Task HtmlManifestCarriesTheContentFingerprint()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         HtmlImportManifest html = await Manifest<HtmlImportManifest>(
             P0Fixtures.Resolve("html-static/guide.html"));
 
@@ -39,6 +41,8 @@ public sealed class GuideImportValidatorHtmlPdfTests
     [Fact]
     public async Task StaticHtmlMapsEntryAssetsAndSize()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         string root = P0Fixtures.Resolve("html-static");
 
         HtmlImportManifest manifest = await Manifest<HtmlImportManifest>(Path.Combine(root, "guide.html"));
@@ -55,6 +59,8 @@ public sealed class GuideImportValidatorHtmlPdfTests
     [Fact]
     public async Task HostileHtmlIsReadyWithWarnings()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         HtmlImportManifest manifest = await Manifest<HtmlImportManifest>(
             P0Fixtures.Resolve("html-hostile/guide.html"));
 
@@ -70,6 +76,8 @@ public sealed class GuideImportValidatorHtmlPdfTests
     [Fact]
     public async Task PercentNamedEntryKeepsTitleAndMapsEntry()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         using ImportTestDirectory files = new();
         string entry = files.Copy("html-static/guide.html", "100% Walkthrough.html");
         files.Copy("html-static/images/map.png", "images/map.png");
@@ -89,6 +97,8 @@ public sealed class GuideImportValidatorHtmlPdfTests
     [InlineData("Guide.Html")]
     public async Task UpperCaseHtmlExtensionsAreAccepted(string name)
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         using ImportTestDirectory files = new();
 
         HtmlImportManifest manifest = await Manifest<HtmlImportManifest>(
@@ -100,6 +110,8 @@ public sealed class GuideImportValidatorHtmlPdfTests
     [Fact]
     public async Task CaseCollisionIsUnreadable()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         using ImportTestDirectory files = new();
         string entry = files.Write("guide.html", "<img src=\"map.png\"><img src=\"MAP.png\">");
         files.Write("map.png", "image");
@@ -141,6 +153,8 @@ public sealed class GuideImportValidatorHtmlPdfTests
     [MemberData(nameof(HtmlLimitCases))]
     public async Task HtmlLimitsMapToTooLarge(StaticScanLimit limit, string message)
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         using ImportTestDirectory files = new();
         string entry = files.Write("guide.html",
             "<link rel=\"stylesheet\" href=\"a.css\">\n<img src=\"one.png\">\n<img src=\"two.png\">");
@@ -169,6 +183,8 @@ public sealed class GuideImportValidatorHtmlPdfTests
     [Fact]
     public async Task HtmlEntryAtTheLimitPassesAndOneByteMoreIsTooLarge()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         using ImportTestDirectory files = new();
         string entry = files.Write("guide.html", "<p>Route</p>");
         long size = new FileInfo(entry).Length;
@@ -185,6 +201,8 @@ public sealed class GuideImportValidatorHtmlPdfTests
     [Fact]
     public async Task ManyRemoteReferencesAllComeThrough()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         using ImportTestDirectory files = new();
         string body = string.Concat(Enumerable.Range(0, 250)
             .Select(n => $"<img src=\"https://cdn.example.com/maps/area-{n}.png\">\n"));
@@ -211,6 +229,8 @@ public sealed class GuideImportValidatorHtmlPdfTests
     [Fact]
     public async Task UndecodableStyleSheetIsExplained()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         using ImportTestDirectory files = new();
         string entry = files.Write("guide.html", "<link rel=\"stylesheet\" href=\"main.css\"><p>Route</p>");
         // Declares UTF-8 but holds a Windows-1252 "©" (0xA9).
@@ -466,6 +486,8 @@ public sealed class GuideImportValidatorHtmlPdfTests
     [Fact]
     public async Task InspectingLeavesHtmlAndPdfFixturesUnchanged()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         string[] sources = ["html-static", "html-hostile", "pdf-short.pdf", "pdf-scan.pdf", "pdf-access.pdf", "pdf-locked.pdf"];
         string[] picked = ["html-static/guide.html", "html-hostile/guide.html", "pdf-short.pdf", "pdf-scan.pdf", "pdf-access.pdf", "pdf-locked.pdf"];
         var before = sources.SelectMany(s => FileFingerprint.Of(P0Fixtures.Resolve(s))).ToArray();

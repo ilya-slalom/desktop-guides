@@ -296,6 +296,8 @@ public sealed class ManagedPdfGuideLoaderTests
     [Fact]
     public async Task HashReadFailureIsUnreadable()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         (Guide guide, _) = await PublishAsync(harness);
         string managed = ManagedFile(harness, guide);

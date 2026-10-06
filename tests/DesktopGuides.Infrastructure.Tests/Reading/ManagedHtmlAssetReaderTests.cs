@@ -24,6 +24,8 @@ public sealed class ManagedHtmlAssetReaderTests
     [Fact]
     public async Task ServesEveryPublishedRowWithItsManagedBytes()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         (Guid id, IReadOnlyList<GuideAsset> assets) = await PublishAsync(harness);
         ManagedHtmlAssetReader reader = new(harness.Paths, id);
@@ -39,6 +41,8 @@ public sealed class ManagedHtmlAssetReaderTests
     [Fact]
     public async Task SameLengthEditIsChanged()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         (Guid id, IReadOnlyList<GuideAsset> assets) = await PublishAsync(harness);
         GuideAsset css = assets.First(asset => asset.Kind == GuideAssetKind.StyleSheet);
@@ -52,6 +56,8 @@ public sealed class ManagedHtmlAssetReaderTests
     [Fact]
     public async Task LengthChangeIsChanged()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         (Guid id, IReadOnlyList<GuideAsset> assets) = await PublishAsync(harness);
         GuideAsset css = assets.First(asset => asset.Kind == GuideAssetKind.StyleSheet);
@@ -63,6 +69,8 @@ public sealed class ManagedHtmlAssetReaderTests
     [Fact]
     public async Task DeletedFileIsMissing()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         (Guid id, IReadOnlyList<GuideAsset> assets) = await PublishAsync(harness);
         GuideAsset image = assets.First(asset => asset.Kind == GuideAssetKind.Image);
@@ -77,6 +85,8 @@ public sealed class ManagedHtmlAssetReaderTests
     [InlineData("")]
     public async Task RowsThatEscapeTheGuideRootAreMissing(string relativePath)
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         (Guid id, IReadOnlyList<GuideAsset> assets) = await PublishAsync(harness);
         GuideAsset escaping = assets[0] with { RelativePath = relativePath };
@@ -87,6 +97,8 @@ public sealed class ManagedHtmlAssetReaderTests
     [Fact]
     public async Task ReadingLeavesTheManagedCopyUntouched()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         await using PublisherHarness harness = await PublisherHarness.CreateAsync();
         (Guid id, IReadOnlyList<GuideAsset> assets) = await PublishAsync(harness);
         IReadOnlyList<FileFingerprint> before = FileFingerprint.Of(harness.Paths.GetGuideRoot(id));

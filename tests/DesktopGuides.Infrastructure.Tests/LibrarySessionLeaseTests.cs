@@ -8,6 +8,8 @@ public sealed class LibrarySessionLeaseTests
     [Fact]
     public async Task SecondSessionWaitsForFirstAndCanCancelItsWait()
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         string root = Path.Combine(
             Path.GetTempPath(), $"desktop-guides-lease-{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);

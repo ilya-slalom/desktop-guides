@@ -22,6 +22,15 @@ param(
     [switch] $GameActionsOnly,
     [switch] $ProviderOnly,
 
+    # Or name several groups, as CI shards do. They still run in the order
+    # listed below. Don't combine with an *Only switch.
+    [string[]] $Groups,
+
+    # With the pdf group alone, run only the PDF passes whose names match one
+    # of these wildcards, for example pdf-zoom-* or pdf-locked-light. Other
+    # groups chain state from one mode to the next, so they can't be filtered.
+    [string[]] $PassFilter,
+
     # Paths only. The values are read in memory and never passed on.
     [string] $IgdbCredentialFile = 'E:\work\igdb_credentials.txt',
 
@@ -52,7 +61,26 @@ $selectedGroups = @($scenarioGroups.Keys | Where-Object { $scenarioGroups[$_] })
 if ($selectedGroups.Count -gt 1) {
     throw "Pass at most one *Only switch; got $($selectedGroups.Count)."
 }
-$scenarioScope = if ($selectedGroups.Count -eq 1) { $selectedGroups[0] } else { 'all' }
+if ($Groups) {
+    if ($selectedGroups.Count -gt 0) { throw 'Pass either -Groups or one *Only switch.' }
+    $unknown = @($Groups | Where-Object { $_ -notin $scenarioGroups.Keys })
+    if ($unknown.Count -gt 0) { throw "Unknown scenario group: $($unknown -join ', ')." }
+    $selectedGroups = @($scenarioGroups.Keys | Where-Object { $_ -in $Groups })
+}
+$scenarioScope = if ($selectedGroups.Count -gt 0) { $selectedGroups -join ',' } else { 'all' }
+$pdfModes = @('pdf-reader', 'pdf-zoom', 'pdf-keys', 'pdf-jump', 'pdf-locked')
+function Test-PdfPassSelected([string] $pass) {
+    if (-not $PassFilter) { return $true }
+    return [bool]@($PassFilter | Where-Object { $pass -like $_ })
+}
+if ($PassFilter) {
+    if ($scenarioScope -ne 'pdf') { throw '-PassFilter needs the pdf group alone.' }
+    $pdfPasses = @(foreach ($theme in 'light', 'dark') {
+            foreach ($mode in $pdfModes) { "$mode-$theme" } }) + 'pdf-offline'
+    if (-not @($pdfPasses | Where-Object { Test-PdfPassSelected $_ })) {
+        throw "-PassFilter matched none of: $($pdfPasses -join ', ')."
+    }
+}
 $targetSessionId = [System.Diagnostics.Process]::GetCurrentProcess().SessionId
 if ($targetSessionId -eq 0 -or
     -not @(Get-Process explorer -ErrorAction SilentlyContinue |
@@ -94,6 +122,8 @@ else {
 
 New-Item -ItemType Directory -Force $ResultDirectory | Out-Null
 $ResultDirectory = (Resolve-Path $ResultDirectory).Path
+$seedProject = Join-Path $PSScriptRoot 'DesktopGuides.ShellSeed\DesktopGuides.ShellSeed.csproj'
+$seedDll = Join-Path $PSScriptRoot 'DesktopGuides.ShellSeed\bin\Release\net10.0\DesktopGuides.ShellSeed.dll'
 $signed = Join-Path $ResultDirectory 'desktop-guides-production-signed-x64.msix'
 $public = Join-Path $ResultDirectory 'test-certificate.cer'
 $runId = [Guid]::NewGuid().ToString('N')
@@ -365,8 +395,6 @@ function Start-ShellDatabaseLock(
     if ($Mode -notin @('hold-write-lock', 'hold-read-lock')) {
         throw "Unsupported shell database lock mode $Mode."
     }
-    $seedDll = Join-Path $PSScriptRoot `
-        'DesktopGuides.ShellSeed\bin\Release\net10.0\DesktopGuides.ShellSeed.dll'
     if (-not (Test-Path $seedDll)) {
         throw 'Shell seed executable is unavailable for the database lock.'
     }
@@ -497,9 +525,7 @@ function Assert-LateGuideAfterClose {
 function Assert-FailedLaterGuideDoesNotSaveEarlier {
     Start-InstalledShell
     $report.normalBeforeFailedGuide = Run-ShellSmoke 'normal' 'Blocked Write Guide'
-    $seedProject = Join-Path $PSScriptRoot `
-        'DesktopGuides.ShellSeed\DesktopGuides.ShellSeed.csproj'
-    dotnet run --project $seedProject -c Release --no-restore -- `
+    dotnet $seedDll `
         invalidate-blocked-guide $dataRoot
     if ($LASTEXITCODE -ne 0) {
         throw 'Could not invalidate the displayed guide for the failure case.'
@@ -527,15 +553,13 @@ function Assert-ReaderRenderErrorDoesNotSaveResume {
     $resume = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
         "Local\DesktopGuides.Preview.ReaderLoad.$($processId).Continue")
-    $seedProject = Join-Path $PSScriptRoot `
-        'DesktopGuides.ShellSeed\DesktopGuides.ShellSeed.csproj'
     $fixtureCorrupted = $false
     try {
         $report.queuedBeforeRenderError = Run-ShellSmoke 'queue-reader-render-error'
         if (-not $reached.WaitOne(15000)) {
             throw 'Reader route did not reach its second metadata read.'
         }
-        dotnet run --project $seedProject -c Release --no-restore -- `
+        dotnet $seedDll `
             corrupt-reader-guide $dataRoot
         if ($LASTEXITCODE -ne 0) {
             throw 'Could not corrupt the disposable Reader metadata fixture.'
@@ -543,7 +567,7 @@ function Assert-ReaderRenderErrorDoesNotSaveResume {
         $fixtureCorrupted = $true
         $resume.Set() | Out-Null
         $report.readerRenderError = Run-ShellSmoke 'reader-render-error-observed'
-        dotnet run --project $seedProject -c Release --no-restore -- `
+        dotnet $seedDll `
             restore-reader-guide $dataRoot
         if ($LASTEXITCODE -ne 0) {
             throw 'Could not restore the Reader metadata fixture.'
@@ -556,7 +580,7 @@ function Assert-ReaderRenderErrorDoesNotSaveResume {
         try {
             $resume.Set() | Out-Null
             if ($fixtureCorrupted) {
-                dotnet run --project $seedProject -c Release --no-restore -- `
+                dotnet $seedDll `
                     restore-reader-guide $dataRoot
                 if ($LASTEXITCODE -ne 0) {
                     throw 'Reader metadata fixture recovery failed during cleanup.'
@@ -1409,13 +1433,20 @@ function Run-PdfReaderScenarios {
     }
     $ids = Invoke-ShellSeed @('seed-pdf-reader', $dataRoot, $fixtureRoot) | ConvertFrom-Json
     $diagnostics = Join-Path (Get-HtmlCacheRoot) 'diagnostics'
-    $report.pdfReader = [ordered]@{ pdfLong = $ids.pdfLong; pdfLocked = $ids.pdfLocked }
+    $report.pdfReader = [ordered]@{
+        pdfLong = $ids.pdfLong
+        pdfLocked = $ids.pdfLocked
+        passFilter = @($PassFilter)
+        passesRun = [System.Collections.Generic.List[string]]::new()
+    }
     $originalTheme = Get-AppThemePreference
     try {
         foreach ($theme in @(@{ name = 'light'; light = $true }, @{ name = 'dark'; light = $false })) {
             Set-AppThemePreference $theme.light
-            foreach ($mode in @('pdf-reader', 'pdf-zoom', 'pdf-keys', 'pdf-jump', 'pdf-locked')) {
+            foreach ($mode in $pdfModes) {
                 $pass = "$mode-$($theme.name)"
+                if (-not (Test-PdfPassSelected $pass)) { continue }
+                $report.pdfReader.passesRun.Add($pass)
                 Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
                 Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
                 Invoke-PdfReaderPass $pass $mode
@@ -1432,9 +1463,12 @@ function Run-PdfReaderScenarios {
 
         # TR10.2: with the originals gone, a fresh launch reads the managed copies.
         Remove-PdfOriginals $ids.originals
-        Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
-        Invoke-PdfReaderPass 'pdf-offline' 'pdf-offline'
-        Assert-PdfClosedCleanly 'pdf-offline' $diagnostics
+        if (Test-PdfPassSelected 'pdf-offline') {
+            $report.pdfReader.passesRun.Add('pdf-offline')
+            Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
+            Invoke-PdfReaderPass 'pdf-offline' 'pdf-offline'
+            Assert-PdfClosedCleanly 'pdf-offline' $diagnostics
+        }
     }
     finally {
         Restore-AppThemePreference $originalTheme
@@ -1821,7 +1855,7 @@ function Run-GameActionsScenarios {
 }
 
 function Set-StoredMaterial([string] $material) {
-    dotnet run --project $seedProject -c Release --no-restore -- `
+    dotnet $seedDll `
         set-material $dataRoot $material
     if ($LASTEXITCODE -ne 0) { throw "Could not store the $material window background." }
 }
@@ -1901,7 +1935,7 @@ function Run-MaterialScenarios {
 }
 
 function Invoke-ShellSeed([string[]] $SeedArguments) {
-    $output = @(dotnet run --project $seedProject -c Release --no-restore -- @SeedArguments)
+    $output = @(dotnet $seedDll @SeedArguments)
     if ($LASTEXITCODE -ne 0) {
         throw "ShellSeed $($SeedArguments[0]) failed: $($output | Select-Object -Last 3)"
     }
@@ -2117,8 +2151,9 @@ try {
             "Packages\$($installed.PackageFamilyName)\LocalState"
     }
     New-Item -ItemType Directory -Force $dataRoot | Out-Null
-    $seedProject = Join-Path $PSScriptRoot `
-        'DesktopGuides.ShellSeed\DesktopGuides.ShellSeed.csproj'
+    # Build the seed tool once; each call then starts the DLL directly.
+    dotnet build $seedProject -c Release --no-restore | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw 'Could not build DesktopGuides.ShellSeed.' }
 
     $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
         -LogonType Interactive -RunLevel Limited
@@ -2130,7 +2165,7 @@ try {
     # Each group after the first starts from an empty data root, so a single
     # group run against a fresh install sees what the full run gives it.
     function Enter-ScenarioGroup([string] $name) {
-        if ($scenarioScope -ne 'all' -and $scenarioScope -ne $name) { return $false }
+        if ($scenarioScope -ne 'all' -and $selectedGroups -notcontains $name) { return $false }
         if ($report.scenarioGroupsRun.Count -gt 0) {
             Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
         }
@@ -2150,7 +2185,7 @@ try {
         $report.gameEditorPersisted = Run-ShellSmoke 'game-editor-persisted'
 
         Stop-InstalledShell
-        dotnet run --project $seedProject -c Release --no-restore -- seed $dataRoot
+        dotnet $seedDll seed $dataRoot
         if ($LASTEXITCODE -ne 0) { throw 'Could not seed shell route metadata.' }
         Start-InstalledShell
         $report.gameEditorClosePrepared =
@@ -2167,19 +2202,19 @@ try {
         Assert-ReaderRenderErrorDoesNotSaveResume
 
         Stop-InstalledShell
-        dotnet run --project $seedProject -c Release --no-restore -- stale $dataRoot
+        dotnet $seedDll stale $dataRoot
         if ($LASTEXITCODE -ne 0) { throw 'Could not set stale last-guide ID.' }
         Start-InstalledShell
         $report.stale = Run-ShellSmoke 'stale'
         Close-InstalledShell
 
-        dotnet run --project $seedProject -c Release --no-restore -- seed-long $dataRoot
+        dotnet $seedDll seed-long $dataRoot
         if ($LASTEXITCODE -ne 0) { throw 'Could not seed the long guide list.' }
         Start-InstalledShell
         $report.longList = Run-ShellSmoke 'long-list'
         Close-InstalledShell
 
-        dotnet run --project $seedProject -c Release --no-restore -- seed-second $dataRoot
+        dotnet $seedDll seed-second $dataRoot
         if ($LASTEXITCODE -ne 0) { throw 'Could not seed the second game.' }
         Start-InstalledShell
         Assert-GameSwitchClearsWhileLoading
@@ -2187,7 +2222,7 @@ try {
     }
 
     if (Enter-ScenarioGroup 'design') {
-        dotnet run --project $seedProject -c Release --no-restore -- `
+        dotnet $seedDll `
             seed-design $dataRoot
         if ($LASTEXITCODE -ne 0) {
             throw 'Could not seed the design-language metadata.'

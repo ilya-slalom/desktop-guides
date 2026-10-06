@@ -2,9 +2,12 @@ name: Windows
 
 on:
   # PR branches run through pull_request; push covers main after a merge.
+  # Docs-only changes don't run CI; main has no required checks.
   push:
     branches: [main]
+    paths-ignore: &docs-only ['docs/**', '**/*.md']
   pull_request:
+    paths-ignore: *docs-only
   workflow_dispatch:
     inputs:
       verify-test-gate:
@@ -28,6 +31,13 @@ on:
           - import
           - game-actions
           - provider
+      shell-pass:
+        description: >-
+          With shell-scope pdf only, comma-separated wildcards naming the PDF
+          passes to run, for example pdf-zoom-*,pdf-locked-light. Empty runs
+          every pass.
+        type: string
+        default: ''
       dev-fast:
         description: >-
           Run only the x64 production shell smoke, building it alongside
@@ -37,6 +47,12 @@ on:
 
 permissions:
   contents: read
+
+# A new push to a PR cancels its older run. Dispatches and main pushes each get
+# their own group, so they are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   core-tests:
@@ -301,8 +317,16 @@ jobs:
           if-no-files-found: error
 
   production-shell-ui:
+    name: production-shell-ui (${{ matrix.shard }})
     needs: production-packages
     runs-on: windows-2025
+    strategy: &production-shell-ui-strategy
+      fail-fast: false
+      matrix:
+        # Scenario groups are independent, so they shard across runners of
+        # about six minutes each. A dispatch with one shell-scope runs only
+        # that group.
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.shell-scope != 'all' && format('[{{"shard":"{0}","groups":"{0}"}}]', inputs.shell-scope) || '[{"shard":"core","groups":"core,txt,game-actions"},{"shard":"design","groups":"design,catalog"},{"shard":"pdf","groups":"pdf,progress"},{"shard":"html","groups":"html,completion,import,provider"}]') }}
     steps: &production-shell-ui-steps
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
@@ -360,36 +384,29 @@ jobs:
       - name: Sign, install, and test production shell
         shell: pwsh
         env:
-          # push and pull_request always run every scenario group.
-          SHELL_SCOPE: ${{ github.event_name == 'workflow_dispatch' && inputs.shell-scope || 'all' }}
+          SHELL_GROUPS: ${{ matrix.groups }}
+          # push and pull_request always run every pass.
+          SHELL_PASS: ${{ github.event_name == 'workflow_dispatch' && inputs.shell-pass || '' }}
         run: |
           $package = Get-ChildItem artifacts/production-shell/download `
             -Filter 'DesktopGuides.Production_*_x64.msix' |
             Select-Object -First 1
-          $groupSwitches = [ordered]@{
-            'all' = $null; 'core' = 'CoreOnly'; 'design' = 'DesignOnly'
-            'catalog' = 'CatalogOnly'; 'txt' = 'TxtOnly'; 'html' = 'HtmlOnly'
-            'pdf' = 'PdfOnly'; 'progress' = 'ProgressOnly'; 'completion' = 'CompletionOnly'; 'import' = 'ImportOnly'
-            'game-actions' = 'GameActionsOnly'; 'provider' = 'ProviderOnly'
+          $filter = @{}
+          if ($env:SHELL_PASS) {
+            $filter.PassFilter = @($env:SHELL_PASS -split ',' | ForEach-Object { $_.Trim() })
           }
-          if (-not $groupSwitches.Contains($env:SHELL_SCOPE)) {
-            throw "Unknown shell-scope '$env:SHELL_SCOPE'."
-          }
-          $scopeSwitch = @{}
-          if ($groupSwitches[$env:SHELL_SCOPE]) {
-            $scopeSwitch[$groupSwitches[$env:SHELL_SCOPE]] = $true
-          }
-          Write-Output "Scenario scope: $env:SHELL_SCOPE"
+          Write-Output "Scenario groups: $env:SHELL_GROUPS; passes: $(if ($env:SHELL_PASS) { $env:SHELL_PASS } else { 'all' })"
           & ./tools/p1/windows_shell_install.ps1 `
             -PackagePath $package.FullName `
             -ResultDirectory artifacts/production-shell/installed `
-            @scopeSwitch
+            -Groups @($env:SHELL_GROUPS -split ',') `
+            @filter
           exit $LASTEXITCODE
       - name: Upload installed shell evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: production-shell-ui
+          name: production-shell-ui-${{ matrix.shard }}
           path: |
             artifacts/production-shell/installed/*.json
             artifacts/production-shell/installed/*.png
@@ -407,8 +424,10 @@ jobs:
     steps: *production-packages-steps
 
   dev-production-shell-ui:
+    name: dev-production-shell-ui (${{ matrix.shard }})
     needs: dev-production-packages
     runs-on: windows-2025
+    strategy: *production-shell-ui-strategy
     steps: *production-shell-ui-steps
 
   reader-toolbar-ui:
