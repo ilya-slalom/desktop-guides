@@ -220,7 +220,7 @@ How the dialog reports its theme is settled in the plan, for example its
 `ActualTheme` in an automation property set by `DialogSurface`. High
 contrast isn't switched on in CI: it changes the user's theme, and the
 plan leaves that pass to T16.2 with its restore rules. The Core
-`Resolve` test and the `HighContrastChanged` path cover it here.
+`Resolve` test and the `ThemeSettings.Changed` path cover it here.
 
 Runs: the `theme` group on CI with `shell-scope=theme` (gate first); the
 `completion` group after the completion switch; then a full run. Host runs
@@ -252,14 +252,17 @@ In the implementing branch:
   `ISelectionItemProvider` (run 37448537276, patterns SelectionItem and
   ScrollItem).
 - **Selection follows the arrow keys.** The Toolkit's arrow keys move focus
-  only, so `BoundedChoice` handles them in `PreviewKeyDown`, ahead of
-  `Segmented`, and selects the item it focuses. The first version selected
-  any item that got keyboard focus, so tabbing back onto an item that a
-  failed save had put back chose it again; `theme-error` now tabs out and
-  back in and checks the choice is unchanged. `Segmented.OnApplyTemplate` resets `SelectedIndex` to the
-  first index it ever held, so `BoundedChoice` keeps the selection through
-  it and raises `ChoiceChanged` instead of `SelectionChanged` for callers.
-  The gate passed with both (run 37450456193).
+  only. `BoundedChoice` notes an arrow key in `PreviewKeyDown` and, once
+  `Segmented` has moved focus, selects the focused item. Selecting inside
+  the key handler moved focus first, so `Segmented` skipped an item (runs
+  37462702749 and 37463448838). The first version selected any item that
+  got keyboard focus, which let a Tab choose an item; `theme-error` now
+  tabs out and back in after the revert and checks the choice is
+  unchanged. Putting a choice back moves focus to it.
+  `Segmented.OnApplyTemplate` resets `SelectedIndex` to the first index it
+  ever held, so `BoundedChoice` keeps the selection through it and raises
+  `ChoiceChanged` instead of `SelectionChanged` for callers. The gate
+  passes with both (run 37464169606).
 - **The items panel names `BoundedChoice`.** The Toolkit's panel finds its
   control by exact type, so a subclass lost the control's alignment and
   stretched across the Game page. An implicit `BoundedChoice` style in
