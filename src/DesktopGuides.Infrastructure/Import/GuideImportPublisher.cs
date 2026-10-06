@@ -348,7 +348,12 @@ public sealed class GuideImportPublisher
     {
         using FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         ImportInspection staged = GuideImportValidator.ReadPdf(stream, pdf.Source, pdf.SuggestedTitle, pdf.Fingerprint, token);
-        if (staged is not ImportReady { Manifest: PdfImportManifest copy } || copy.PageCount != pdf.PageCount)
+        // A locked copy can't be read without its password, which isn't kept;
+        // the fingerprint check before this one ties it to the checked bytes.
+        bool matches = pdf.PasswordRequired
+            ? staged is ImportNeedsPdfPassword
+            : staged is ImportReady { Manifest: PdfImportManifest copy } && copy.PageCount == pdf.PageCount;
+        if (!matches)
         {
             throw GuideImportValidator.NotPdf();
         }
