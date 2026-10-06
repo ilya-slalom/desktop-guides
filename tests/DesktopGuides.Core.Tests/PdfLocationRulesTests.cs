@@ -152,6 +152,15 @@ public sealed class PdfLocationRulesTests
     public void NoPagesIsRejected() =>
         Assert.Throws<ArgumentOutOfRangeException>(() => PdfLocationRules.Restore(At(0), Sha, 0));
 
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, true)]
+    [InlineData(200, true)]
+    [InlineData(201, false)]
+    [InlineData(-1, false)]
+    public void IsPageInRangeIsOneBased(int pageNumber, bool expected) =>
+        Assert.Equal(expected, PdfLocationRules.IsPageInRange(pageNumber, 200));
+
     private static void AssertUnavailable(ReaderLocation location)
     {
         PdfRestore restore = PdfLocationRules.Restore(location, Sha, 200);
