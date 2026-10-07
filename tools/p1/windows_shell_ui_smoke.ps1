@@ -3067,7 +3067,10 @@ try {
                 }
                 $after = Read-ProgressCounts
                 $saves = $after.saves - $before.saves
-                $allowed = [Math]::Floor($elapsed / 4) + 1
+                # T14.4: a deadline can also fire just after the last press,
+                # while its page turn is still arriving, so the window counts
+                # the quiet second too. The T12.2 ceiling of 2 still holds.
+                $allowed = [Math]::Min(2, [Math]::Floor(($elapsed + 1) / 4) + 1)
                 if ($saves -lt 1 -or $saves -gt $allowed) {
                     throw "The burst made $saves saves in $([Math]::Round($elapsed, 1)) s; expected 1 to $allowed."
                 }
