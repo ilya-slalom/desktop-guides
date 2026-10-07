@@ -41,7 +41,7 @@ public static class ThemePresentation
 
     public static string Saved(ThemePreference preference) => $"App theme set to {Label(preference)}.";
 
-    public static string SaveFailed(string message) => $"Could not save the app theme: {message}";
+    public static string SaveFailed(string message) => $"Couldn't save the app theme: {message}";
 
     private static string Label(ThemePreference preference) => Options[IndexOf(preference)].Label;
 }

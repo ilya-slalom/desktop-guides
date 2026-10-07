@@ -57,6 +57,6 @@ public sealed class ThemePresentationTests
 
     [Fact]
     public void SaveFailedCarriesTheMessage() =>
-        Assert.Equal("Could not save the app theme: database is locked",
+        Assert.Equal("Couldn't save the app theme: database is locked",
             ThemePresentation.SaveFailed("database is locked"));
 }

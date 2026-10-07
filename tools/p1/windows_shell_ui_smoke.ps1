@@ -3300,7 +3300,7 @@ try {
                 Send-Keys '{LEFT}'
                 Start-Sleep -Seconds 1
                 Wait-CompletionShown $true 'Left while the write is pending'
-                [void](Wait-Status "Could not update completion for $numbered. Try again." -Seconds 60)
+                [void](Wait-Status "Couldn't update completion for $numbered. Try again." -Seconds 60)
                 Wait-CompletionShown $false 'After the failed write'
                 [void](Wait-RowHelp $numbered 'Text (TXT), *' -NotCompleted)
                 $report.completionErrorScreenshot = Save-WindowScreenshot 'completion-error'
@@ -3577,7 +3577,7 @@ try {
                 Invoke-Element (Find-VisibleName 'Larger text')
                 Wait-TextSize '150%'
                 [void](Wait-TextDiagnostics 1.5 'the pending save')
-                [void](Wait-Status 'Could not save the text size: ' -Prefix -Seconds 60)
+                [void](Wait-Status "Couldn't save the text size: " -Prefix -Seconds 60)
                 Wait-TextSize '125%'
                 [void](Wait-TextDiagnostics 1.25 'the failed save')
                 $report.textSizeErrorScreenshot = Save-WindowScreenshot 'text-size-error'
@@ -4185,7 +4185,7 @@ try {
             # The installer holds the write lock, so the save times out.
             Assert-ThemeShown $ExpectedTheme $ExpectedThemeStatus 'Before the failed save'
             Select-ThemeByKeys $ExpectedTheme $SwitchToTheme
-            [void](Wait-Status 'Could not save the app theme: ' -Prefix -Seconds 60)
+            [void](Wait-Status "Couldn't save the app theme: " -Prefix -Seconds 60)
             Assert-ThemeShown $ExpectedTheme $ExpectedThemeStatus 'After the failed save'
             Assert-ShellForeground
             $report.themeErrorScreenshot = Save-WindowScreenshot 'theme-error'
