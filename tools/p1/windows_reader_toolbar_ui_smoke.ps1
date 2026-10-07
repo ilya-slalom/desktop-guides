@@ -349,12 +349,14 @@ try {
 
     foreach ($pair in @(@('Previous page', 'Page Up'), @('Next page', 'Page Down'),
             @('Go to start', 'Ctrl+Home'), @('Go to end', 'Ctrl+End'),
+            @('Smaller text', 'Ctrl+Minus'), @('Larger text', 'Ctrl+Plus'),
             @('Zoom in', 'Ctrl+Plus'), @('Zoom out', 'Ctrl+Minus'))) {
         Assert-AcceleratorKey $pair[0] $pair[1]
     }
     Open-Overflow
     Assert-AcceleratorKey 'Go to page' 'Ctrl+G'
     Assert-AcceleratorKey 'Fit to width' 'Ctrl+0'
+    Assert-AcceleratorKey 'Reset text size' 'Ctrl+0'
     Close-Overflow
     $report.phases += 'shortcut-names'
 
