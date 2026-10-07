@@ -147,6 +147,7 @@ public sealed partial class ReaderToolbar : UserControl
         GoToPage.Visibility = Show(pageJump);
         FitToWidth.Visibility = Show(fitWidth);
         FindInGuide.Visibility = Show(find);
+        GroupSeparator.Visibility = Show(ReaderCommandPolicy.ShowsGroupSeparator(supported));
         Commands.Visibility = Show(
             pages || edges || textSize || zoom || pageJump || fitWidth || find);
     }

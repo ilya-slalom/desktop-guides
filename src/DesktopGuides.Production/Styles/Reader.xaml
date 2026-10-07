@@ -6,6 +6,8 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="HorizontalAlignment" Value="Left" />
         <Setter Property="IsDynamicOverflowEnabled" Value="True" />
+        <!-- No label strip under compact icons, so the size label centers on them. -->
+        <Setter Property="DefaultLabelPosition" Value="Collapsed" />
     </Style>
 
     <x:Double x:Key="DesktopGuidesTextSizeValueMinWidth">44</x:Double>
