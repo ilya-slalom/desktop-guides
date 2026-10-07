@@ -130,6 +130,7 @@ public sealed partial class ShellWindow : Window
             NavigationView.IsPaneOpenProperty, (_, _) => UpdatePaneStatus());
         UpdatePaneStatus();
         ReaderActions.CommandFailed += ShowErrorStatus;
+        ReaderActions.TextSizeChanged += OnTextSizeChanged;
         // After Ctrl+G the Reader content takes focus back (P2).
         ReaderActions.ContentFocusRequested += (_, _) =>
             (readerSession as PdfReaderSession)?.View.FocusPreview();
@@ -1767,12 +1768,18 @@ public sealed partial class ShellWindow : Window
                     {
                         return false;
                     }
+                    double textScale = await ReadTextScaleAsync(guide.Id);
+                    if (generation != renderGeneration)
+                    {
+                        return false;
+                    }
                     TextReaderSession session = new(
-                        document, maxColumns, TextSizeSteps.Default,
+                        document, maxColumns, textScale,
                         TextReaderSession.DiagnosticsFolderForTest(cacheRoot!));
                     readerSession = session;
                     ShowReaderSurface(placeholder: false, view: session.View);
                     ReaderActions.SetSession(session);
+                    BeginTextSize(guide.Id, textScale);
                     if (!await OpenAtSavedPlaceAsync(
                         guide, session, generation, document.ContentSha256.ToLowerInvariant(),
                         null, readerToken))

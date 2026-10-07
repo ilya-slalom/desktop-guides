@@ -17,8 +17,6 @@ public sealed partial class ShellWindow
     private ThemePreference requestedTheme = ThemePreference.System;
     private ThemePreference committedTheme = ThemePreference.System;
     private AppliedTheme appliedTheme = AppliedTheme.FollowSystem;
-    // The open HTML guide's stored scale, read once at open.
-    private double htmlTextScale = 1.0;
 
     private void InitializeThemeChoice()
     {
@@ -84,7 +82,7 @@ public sealed partial class ShellWindow
         try
         {
             await session.ApplyAppearanceAsync(
-                new ReaderAppearance(ReaderThemeNow(), htmlTextScale), CancellationToken.None);
+                new ReaderAppearance(ReaderThemeNow(), readerTextScale), CancellationToken.None);
         }
         catch (Exception error) when (error is OperationCanceledException or ObjectDisposedException)
         {
