@@ -1430,6 +1430,9 @@ try {
             $position = [ordered]@{
                 locator = $file.locator; offset = $null; quote = $null
                 kind = $file.kind; step = $file.step; reason = $file.reason
+                appearanceKind = $file.appearanceKind; appearanceStep = $file.appearanceStep
+                appearanceScale = $file.appearanceScale
+                appearanceRestores = [int] $file.appearanceRestores
             }
             if ($file.locator) {
                 $payload = ($file.locator | ConvertFrom-Json).payload
@@ -1449,6 +1452,40 @@ try {
             } while ((Get-Date) -lt $deadline)
             [void](Save-WindowScreenshot 'html-position-timeout')
             throw "The HTML position never showed $what. Last: offset=$($position.offset) kind=$($position.kind) step=$($position.step)."
+        }
+
+        function Read-ProgressCounts {
+            $path = Join-Path $AppCacheRoot "diagnostics\progress-$ProcessId.json"
+            $deadline = (Get-Date).AddSeconds(2)
+            do {
+                try {
+                    if (Test-Path -LiteralPath $path) {
+                        return Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+                    }
+                }
+                catch {
+                    # Read during the atomic replace; try again.
+                }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            return [pscustomobject] @{ saves = 0; skippedUnchanged = 0; failures = 0 }
+        }
+
+        # T14.3: one burst of quick toolbar clicks, then the restore the
+        # session made after the burst's last write.
+        function Step-HtmlTextSize([string] $command, [int] $clicks, [double] $scale, [string] $status) {
+            $before = [int] (Read-HtmlPosition).appearanceRestores
+            for ($index = 0; $index -lt $clicks; $index++) {
+                $button = Find-VisibleName $command
+                if (-not $button) { throw "The Reader toolbar has no visible '$command'." }
+                Invoke-Element $button
+            }
+            [void](Wait-Status $status)
+            return Wait-HtmlPosition {
+                param($p)
+                $p.appearanceRestores -gt $before -and $null -ne $p.appearanceScale -and
+                    [Math]::Abs([double] $p.appearanceScale - $scale) -lt 0.001
+            } "the restore at $scale"
         }
 
         # The app's applied style, written after each application while the
@@ -2164,8 +2201,92 @@ try {
             }
             $report.phases += 'position-resize'
 
+            # position-text-size: each burst of size steps keeps MARK-0420
+            # on top and the saved offset, by an exact restore, and saves
+            # nothing: a size change isn't reader movement.
+            Start-Sleep -Seconds 2
+            $savesBefore = [int] (Read-ProgressCounts).saves
+            $report.htmlTextSizeMarks = @()
+            foreach ($burst in @(
+                @{ command = 'Larger text'; clicks = 3; scale = 1.5; label = '150%' },
+                @{ command = 'Larger text'; clicks = 2; scale = 2.0; label = '200%' },
+                @{ command = 'Smaller text'; clicks = 7; scale = 0.75; label = '75%' },
+                @{ command = 'Larger text'; clicks = 2; scale = 1.0; label = '100%' })) {
+                $after = Step-HtmlTextSize $burst.command $burst.clicks $burst.scale "Text size $($burst.label)."
+                $report.htmlTextSizeMarks += Wait-TopMark 420 "a size step to $($burst.label)"
+                if ($after.appearanceKind -ne 'Exact') {
+                    throw "A size step to $($burst.label) restored '$($after.appearanceKind)'; expected Exact."
+                }
+                $after = Read-HtmlPosition
+                if ($after.offset -ne $target.offset) {
+                    throw "After a size step to $($burst.label) the position offset was $($after.offset); expected $($target.offset)."
+                }
+            }
+            # Past two polls and the progress timer.
+            Start-Sleep -Seconds 5
+            $report.htmlTextSizeSaves = [int] (Read-ProgressCounts).saves - $savesBefore
+            if ($report.htmlTextSizeSaves -ne 0) {
+                throw "Size steps saved the reading place $($report.htmlTextSizeSaves) times; expected none."
+            }
+            $report.phases += 'position-text-size'
+
             $saved = (Read-HtmlPosition).locator
             Back-ToTextGame
+
+            # position-text-size-fallback: with no text box on screen the
+            # place comes back by fraction, the status says it may have
+            # shifted, and the locator stays the pre-change point.
+            Open-TextGuide 'Picture Web Guide'
+            $report.sessionsOpened++
+            [void](Wait-Status 'Guide ready.')
+            Click-Element (Wait-PageVisible 'Jump to the middle')
+            $middle = Wait-HtmlPosition { param($p) $p.locator -and -not $p.quote } 'a capture with no text'
+            Start-Sleep -Seconds 2
+            $savesBefore = [int] (Read-ProgressCounts).saves
+            foreach ($step in @(
+                @{ command = 'Larger text'; scale = 1.1; label = '110%' },
+                @{ command = 'Smaller text'; scale = 1.0; label = '100%' })) {
+                $after = Step-HtmlTextSize $step.command 1 $step.scale `
+                    "Text size $($step.label). Your place may have shifted."
+                if ($after.appearanceKind -ne 'Approximate' -or $after.appearanceStep -ne 'Fraction') {
+                    throw "A size step to $($step.label) restored '$($after.appearanceKind)/$($after.appearanceStep)'; expected Approximate/Fraction."
+                }
+                if ($after.locator -cne $middle.locator) {
+                    throw "A size step to $($step.label) changed the locator."
+                }
+                if ($step.scale -eq 1.1) {
+                    $report.htmlShiftedScreenshot = Save-WindowScreenshot 'html-place-shifted'
+                }
+            }
+            Start-Sleep -Seconds 5
+            if ([int] (Read-ProgressCounts).saves -ne $savesBefore) {
+                throw 'Size steps on the picture guide saved the reading place.'
+            }
+            Back-ToTextGame
+            $report.phases += 'position-text-size-fallback'
+
+            # position-fixed-header: text that stays on screen (a fixed site
+            # header, a long fixed side menu, a sticky bar) is never the
+            # place, so the capture is the line under them and a size step
+            # keeps it on top. The place is early in the guide, where the
+            # capture's search reaches the pinned text.
+            Open-TextGuide 'Fixed Header Web Guide'
+            $report.sessionsOpened++
+            [void](Wait-Status 'Guide ready.')
+            Click-Element (Wait-PageVisible 'Jump to MARK-0020')
+            $fixedTarget = Wait-HtmlPosition { param($p) $p.quote -like 'MARK-0020 *' } 'the MARK-0020 line under a fixed header'
+            [void](Wait-TopMark 20 'a jump under a fixed header')
+            foreach ($step in @(
+                @{ command = 'Larger text'; scale = 1.1; label = '110%' },
+                @{ command = 'Smaller text'; scale = 1.0; label = '100%' })) {
+                $after = Step-HtmlTextSize $step.command 1 $step.scale "Text size $($step.label)."
+                [void](Wait-TopMark 20 "a size step to $($step.label) under a fixed header")
+                if ($after.appearanceKind -ne 'Exact' -or $after.offset -ne $fixedTarget.offset) {
+                    throw "A size step to $($step.label) under a fixed header restored '$($after.appearanceKind)' at offset $($after.offset); expected Exact at $($fixedTarget.offset)."
+                }
+            }
+            Back-ToTextGame
+            $report.phases += 'position-fixed-header'
 
             # position-restore-exact: the saved locator in a new session, at
             # another width than the capture's, puts the same line on top.
@@ -2786,23 +2907,6 @@ try {
         }
         elseif ($Mode -like 'progress-*') {
             $saveFailed = "Couldn't save your place in this guide."
-
-            function Read-ProgressCounts {
-                $path = Join-Path $AppCacheRoot "diagnostics\progress-$ProcessId.json"
-                $deadline = (Get-Date).AddSeconds(2)
-                do {
-                    try {
-                        if (Test-Path -LiteralPath $path) {
-                            return Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
-                        }
-                    }
-                    catch {
-                        # Read during the atomic replace; try again.
-                    }
-                    Start-Sleep -Milliseconds 100
-                } while ((Get-Date) -lt $deadline)
-                return [pscustomobject] @{ saves = 0; skippedUnchanged = 0; failures = 0 }
-            }
 
             function Assert-NoSaveFailure([string] $step) {
                 $counts = Read-ProgressCounts

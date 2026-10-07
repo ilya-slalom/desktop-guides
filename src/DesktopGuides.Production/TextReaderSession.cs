@@ -38,6 +38,8 @@ internal sealed class TextReaderSession : IReaderSession
 
     // Capabilities don't change during a TXT session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
+    // T14.3: their layout keeps its own place; nothing to report.
+    public event EventHandler<AppearanceRestoredEventArgs>? AppearanceRestored { add { } remove { } }
     public event EventHandler<LocationChangedEventArgs>? LocationChanged;
 
     public Task OpenAsync(ManagedGuideSource source, CancellationToken token) =>

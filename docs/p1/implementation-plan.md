@@ -887,7 +887,7 @@ restart. Theme/font changes preserve or visibly approximate the location.
 | T13.2 | T03.2, T12.2 | Transactional completion timestamp service, independent of locator and estimate. Repeat/toggle/restart tests prove 100% reading never implies complete. | TR13.1, TR13.2 |
 | T13.1 | T05.1, T11.3, T13.2 | Guide and Reader completion actions bound to one service and presented as a two-item Toolkit `Segmented` choice when its selected-state UIA passes, with native radio buttons as fallback. UIA and keyboard checks show immediate committed state and announce changes; final-page reading leaves state unchanged. | TR13.1, TR13.2 |
 | T14.1 | T03.2, T08.2, T09.1, T11.3 | Bounded per-guide TXT/HTML text-size controls and persisted preferences. Two-guide restart test preserves separate sizes and TXT fixed-width layout. Implemented with fixed steps 75–200%, a label and a reset; see [the design](t14-1-text-size-design.md). | TR14.1 |
-| T14.3 | T08.3, T09.3, T10.3, T14.1, T14.2 | Pre-change capture and post-layout restore across text/theme changes. TXT returns within one line, HTML to matching context where present, PDF to page/fraction; fallback is announced. | TR14.1, TR14.2 |
+| T14.3 | T08.3, T09.3, T10.3, T14.1, T14.2 | Pre-change capture and post-layout restore across text/theme changes. TXT returns within one line, HTML to matching context where present, PDF to page/fraction; fallback is announced. Implemented in the HTML session: a restyle captures first, pauses tracking and scrolls back after the write; TXT and PDF already keep their place; see [the design](t14-3-appearance-restore-design.md). | TR14.1, TR14.2 |
 | T14.4 | T05.4, T08.3, T09.2, T10.2, T11.3, T14.2 | Shared design language applied to production Reader and Settings commands, Toolkit `SettingsCard`/`SettingsExpander` groups, the T14.2 `Segmented` choice, and teaching/status surfaces. Installed TXT/HTML/PDF/Settings screenshots and keyboard, theme, high-contrast, text-scale, display-scale, and narrow-width checks pass; every Toolkit dependency is centrally locked. | TR11.3, TR14.3 |
 
 T13.2 is implemented; see the
@@ -929,6 +929,16 @@ Ctrl+Plus and Ctrl+0 keys. The size moves through fixed steps from 75%
 to 200%, applies at once, is saved per guide and survives a relaunch,
 and a failed save puts the stored size back. TXT keeps its fixed-width
 columns; PDF keeps its own zoom.
+
+T14.3 is implemented; see the
+[design and implementation notes](t14-3-appearance-restore-design.md).
+An HTML guide keeps its reading place across a text-size step: the
+session takes the place first, pauses tracking while the style is
+written and scrolls back to the same context afterwards, so progress
+never saves a place that moved only because the size changed. A page
+that can only come back by fraction says `Your place may have shifted.`
+TXT keeps its top line and PDF its page as before, and a theme change
+doesn't move the place in any reader.
 
 ## M5 — errors, accessibility, and portable backup
 

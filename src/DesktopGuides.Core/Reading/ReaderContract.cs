@@ -104,12 +104,20 @@ public sealed record ReaderAppearance(ReaderTheme Theme, double TextScale);
 
 public sealed class LocationChangedEventArgs : EventArgs;
 
+// T14.3: raised after a session scrolled back to its place following an
+// appearance change, with how closely it came back.
+public sealed class AppearanceRestoredEventArgs(RestoreOutcome outcome) : EventArgs
+{
+    public RestoreOutcome Outcome { get; } = outcome;
+}
+
 public interface IReaderSession : IAsyncDisposable
 {
     GuideFormat Format { get; }
     ReaderCapabilities Capabilities { get; }
     event EventHandler? CapabilitiesChanged;
     event EventHandler<LocationChangedEventArgs>? LocationChanged;
+    event EventHandler<AppearanceRestoredEventArgs>? AppearanceRestored;
     Task OpenAsync(ManagedGuideSource source, CancellationToken token);
     Task<ReaderLocation> GetLocationAsync(CancellationToken token);
     Task<RestoreOutcome> RestoreLocationAsync(ReaderLocation location, CancellationToken token);

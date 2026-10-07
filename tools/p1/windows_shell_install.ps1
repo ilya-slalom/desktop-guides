@@ -1219,7 +1219,7 @@ function Invoke-HtmlPositionPass([string] $resultName) {
     Start-InstalledShell
     $processId = $report.launchedProcessId
     $gates = @(
-        foreach ($name in @('HtmlDiagnostics', 'HtmlPosition', 'ProgressOverride')) {
+        foreach ($name in @('HtmlDiagnostics', 'HtmlPosition', 'ProgressDiagnostics', 'ProgressOverride')) {
             [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::ManualReset,
                 "Local\DesktopGuides.Preview.$name.$processId")
@@ -1248,7 +1248,15 @@ function Assert-HtmlPositionPass([string] $pass, [string] $diagnostics, $result)
     foreach ($file in $files) {
         $session = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json
         $served = @($session.served) -join ','
-        if ($served -cne 'guide.html,images/map.png' -and $served -cne 'guide.html,images/map.png,images/route.png') {
+        # T14.3: the picture guide serves its entry and its one tile.
+        $allowed = if ($session.guideId -eq $report.htmlPosition.guidePictures) {
+            @('guide.html,images/tile.png')
+        } elseif ($session.guideId -eq $report.htmlPosition.guideFixedHeader) {
+            @('guide.html')
+        } else {
+            @('guide.html,images/map.png', 'guide.html,images/map.png,images/route.png')
+        }
+        if ($served -cnotin $allowed) {
             throw "Guide $($session.guideId) served '$served' in the $pass pass."
         }
         foreach ($deny in @($session.denied)) {
@@ -1287,7 +1295,10 @@ function Run-HtmlPositionScenarios {
     $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
     $ids = Invoke-ShellSeed @('seed-html-position', $dataRoot, $fixtureRoot) | ConvertFrom-Json
     $diagnostics = Join-Path (Get-HtmlCacheRoot) 'diagnostics'
-    $report.htmlPosition = [ordered]@{ guideLong = $ids.guideLong; guideChanged = $ids.guideChanged }
+    $report.htmlPosition = [ordered]@{
+        guideLong = $ids.guideLong; guideChanged = $ids.guideChanged; guidePictures = $ids.guidePictures
+        guideFixedHeader = $ids.guideFixedHeader
+    }
     $originalTheme = Get-AppThemePreference
     try {
         foreach ($pass in @(

@@ -543,6 +543,7 @@ public sealed class ProgressCoordinatorTests
         public GuideFormat Format => GuideFormat.Txt;
         public ReaderCapabilities Capabilities => ReaderCapabilities.Scroll;
         public event EventHandler? CapabilitiesChanged { add { } remove { } }
+        public event EventHandler<AppearanceRestoredEventArgs>? AppearanceRestored { add { } remove { } }
         public event EventHandler<LocationChangedEventArgs>? LocationChanged
         {
             add => locationChanged += value;

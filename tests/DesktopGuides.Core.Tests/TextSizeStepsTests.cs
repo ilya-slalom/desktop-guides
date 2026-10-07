@@ -108,4 +108,23 @@ public sealed class TextSizeStepsTests
         Assert.Equal(
             "Could not save the text size: database is locked",
             TextSizeSteps.SaveFailed("database is locked"));
+
+    [Fact]
+    public void ShiftedStatusNamesTheSizeAndTheShift() =>
+        Assert.Equal("Text size 150%. Your place may have shifted.", TextSizeSteps.ShiftedStatus(1.5));
+
+    [Fact]
+    public void ShiftedStatusIgnoresTheCurrentCulture()
+    {
+        CultureInfo original = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+            Assert.Equal("Text size 125%. Your place may have shifted.", TextSizeSteps.ShiftedStatus(1.25));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
+    }
 }

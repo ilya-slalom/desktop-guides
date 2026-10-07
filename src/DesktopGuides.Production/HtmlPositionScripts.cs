@@ -54,14 +54,31 @@ internal static class HtmlPositionScripts
           return lo;
         };
         const range = Document.prototype.createRange.call(document);
+        // Text in a fixed or sticky element (a site header, a pinned bar)
+        // stays on screen whatever is read, so it is never the place.
+        const pinnedCache = new Map();
+        const pinned = (element) => {
+          const body = bodyOf.call(document);
+          const seen = [];
+          let result = false;
+          for (let p = element; p && p !== body && p instanceof Element; p = parentOf.call(p)) {
+            if (pinnedCache.has(p)) { result = pinnedCache.get(p); break; }
+            seen.push(p);
+            const position = getComputedStyle(p).position;
+            if (position === 'fixed' || position === 'sticky') { result = true; break; }
+          }
+          for (const p of seen) pinnedCache.set(p, result);
+          return result;
+        };
         // The first character at or after the offset with a box of its own.
         // Line breaks, collapsed spaces and zero-width characters have none,
         // and neither has text CSS hides, which can run for thousands of
-        // characters: a node whose element has no boxes is skipped whole.
+        // characters: a node whose element has no boxes is skipped whole,
+        // as is pinned text.
         const boxAt = (w, offset) => {
           for (let i = offset < w.length ? locate(w, offset) : w.nodes.length; i < w.nodes.length; i++) {
             const node = w.nodes[i], data = dataOf.call(node);
-            if (elementRects.call(parentOf.call(node)).length === 0) continue;
+            if (elementRects.call(parentOf.call(node)).length === 0 || pinned(parentOf.call(node))) continue;
             for (let local = Math.max(0, offset - w.starts[i]); local < data.length; local++) {
               const ch = data[local];
               if (ch === '\n' || ch === '\r') continue;

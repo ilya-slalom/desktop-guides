@@ -837,6 +837,8 @@ project uses a provisional package identity until T17.1 sets the public one.
   TXT should remain within one logical line; HTML should return to the
   same context when it exists; PDF page/fraction behavior is unaffected.
   Record an approximate notice when a stable anchor cannot be found.
+  Implemented; see
+  [the design](p1/t14-3-appearance-restore-design.md).
 - **T14.4** Apply the design resources and reviewed Gallery patterns to the
   production Reader and Settings controls after T08–T10 and T14.2 establish
   their behavior. Keep content dominant, retain capability-based command

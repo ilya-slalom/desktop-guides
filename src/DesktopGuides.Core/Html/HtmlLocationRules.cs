@@ -304,4 +304,22 @@ public static class HtmlLocationRules
         return element.ValueKind == JsonValueKind.Number && element.TryGetDouble(out value) &&
                double.IsFinite(value) && value is >= 0 and <= 1;
     }
+
+    // T14.3: only a new zoom reflows the page; the theme part of the style
+    // sets colors only. A first write is the open's, whose restore owns the
+    // place.
+    public static bool NeedsAppearanceRestore(ReaderAppearance? applied, ReaderAppearance next)
+    {
+        ArgumentNullException.ThrowIfNull(next);
+        return applied is not null &&
+            HtmlReaderStyle.ClampScale(applied.TextScale) != HtmlReaderStyle.ClampScale(next.TextScale);
+    }
+
+    // The content can't change within a session, so no changed reason.
+    public static RestoreOutcome AppearanceOutcome(HtmlRestoreTarget? landed) => landed?.Step switch
+    {
+        null => new RestoreOutcome(RestoreKind.Unavailable, UnavailableReason),
+        HtmlRestoreStep.Fraction => new RestoreOutcome(RestoreKind.Approximate),
+        _ => new RestoreOutcome(RestoreKind.Exact)
+    };
 }

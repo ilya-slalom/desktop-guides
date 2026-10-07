@@ -454,6 +454,7 @@ behavior, or high-contrast system colors.
   so each item exposes its selected state, with a custom automation peer as
   the fallback.
 - **T14.3** Recheck location restoration after changing appearance.
+  Implemented; see [the design](p1/t14-3-appearance-restore-design.md).
 - **T14.4** Apply the shared design language to reader and Settings surfaces
   after their functional controls exist. Adopt suitable Gallery command,
   settings, teaching, and status patterns. Use Toolkit `SettingsCard` and

@@ -103,6 +103,8 @@ internal sealed class PdfReaderSession : IReaderSession
 
     // Capabilities don't change during a PDF session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
+    // T14.3: their layout keeps its own place; nothing to report.
+    public event EventHandler<AppearanceRestoredEventArgs>? AppearanceRestored { add { } remove { } }
     public event EventHandler<LocationChangedEventArgs>? LocationChanged;
     // Raised once, with Failed, after three pages in a row fail both ways.
     public event EventHandler<PdfGuideLoadError>? Failed;
