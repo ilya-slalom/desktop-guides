@@ -3328,6 +3328,10 @@ try {
                 Assert-TextCommand 'Larger text' $true
                 Step-TextSize '^-' '90%'
                 Assert-ResetEnabled $true
+                # The overflow check leaves focus on its button; the hand-off
+                # needs a focused Smaller text, as Larger text was above.
+                (Find-VisibleName 'Smaller text').SetFocus()
+                Wait-FocusedName 'Smaller text'
                 Step-TextSize '^{SUBTRACT}' '75%'
                 Assert-TextCommand 'Smaller text' $false
                 Wait-FocusedName 'Larger text'
