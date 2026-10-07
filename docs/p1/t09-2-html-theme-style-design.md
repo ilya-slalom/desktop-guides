@@ -148,8 +148,13 @@ mark { background-color: #5C4B00 !important; }
 The Dark rules keep these as authored:
 
 - `background-image`, so icon sprites and diagrams stay visible;
-- `img`, `svg`, `video` and `canvas`;
+- `img`, `svg`, `video` and `canvas` pixels;
 - layout, fonts and sizes.
+
+The `body *` reset still clears an authored backdrop behind an image or SVG
+and turns `currentColor` SVG fills and strokes light. The final review
+deferred this as minor; [#50](https://github.com/ilya-slalom/desktop-guides/issues/50)
+tracks it.
 
 **HighContrast:** no color properties, only the zoom rule. WebView2 applies
 Chromium's forced colors from the Windows high-contrast palette.

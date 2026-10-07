@@ -1,7 +1,8 @@
 # P1 implementation plan and exit gates
 
-Status: M0 merged; M1 in progress; M2 in progress; M3–M6 planned,
-28 September 2026.
+Status: 42 of the 54 tasks are merged, 7 October 2026. M0 and M3 are
+complete; M1 still needs T17.1, M2 the optional T11.5, and M4 T14.4. M5–M6
+are planned.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
 This plan orders all **16 P1 stories and 54 tasks** in the
@@ -841,7 +842,7 @@ top, keeps the point as `Approximate` when the bytes changed, and opens at
 the first page for a malformed, wrong-format or future-version locator.
 T12.2 saves it and restores it on reopen.
 
-T09.3 was merged through PR #39 on 5 October 2026 (merge commit `dee44e4`;
+T09.3 was merged through PR #39 on 4 October 2026 (merge commit `dee44e4`;
 final-HEAD CI run 37209771443); see the
 [design and implementation notes](t09-3-html-locator-design.md). An HTML
 position is now a character offset in the entry document with a text
@@ -853,8 +854,8 @@ for a malformed locator. A link to a page that wasn't imported shows an
 informational bar and leaves the point where it was. T12.2 saves it and
 restores it on reopen.
 
-T12.2 is implemented on `feat/p1-t12-2-progress-coordinator` (CI run
-37253787166); see the
+T12.2 was merged through PR #40 on 5 October 2026 (merge commit
+`17bdf48`; CI run 37256476218); see the
 [design and implementation notes](t12-2-progress-coordinator-design.md). A
 guide now reopens where it was left, after leaving the Reader or
 restarting the app. A changed position is saved 1 s after the last
@@ -865,7 +866,8 @@ and a lost place opens at the start and keeps the stored place until the
 reader moves. T12.2 wrote only the locator; T12.3 adds estimates and the
 open time.
 
-T12.3 is implemented; see the
+T12.3 was merged through PR #41 on 5 October 2026 (merge commit
+`a36b058`; CI run 37274977026); see the
 [design and implementation notes](t12-3-progress-estimates-design.md).
 Library rows show the saved estimate (`~N%`) and when a guide was last
 opened; a guide never opened stays `Not started`. Estimates are clamped to
@@ -890,7 +892,8 @@ restart. Theme/font changes preserve or visibly approximate the location.
 | T14.3 | T08.3, T09.3, T10.3, T14.1, T14.2 | Pre-change capture and post-layout restore across text/theme changes. TXT returns within one line, HTML to matching context where present, PDF to page/fraction; fallback is announced. Implemented in the HTML session: a restyle captures first, pauses tracking and scrolls back after the write; TXT and PDF already keep their place; see [the design](t14-3-appearance-restore-design.md). | TR14.1, TR14.2 |
 | T14.4 | T05.4, T08.3, T09.2, T10.2, T11.3, T14.2 | Shared design language applied to production Reader and Settings commands, Toolkit `SettingsCard`/`SettingsExpander` groups, the T14.2 `Segmented` choice, and teaching/status surfaces. Installed TXT/HTML/PDF/Settings screenshots and keyboard, theme, high-contrast, text-scale, display-scale, and narrow-width checks pass; every Toolkit dependency is centrally locked. | TR11.3, TR14.3 |
 
-T13.2 is implemented; see the
+T13.2 was merged through PR #42 on 5 October 2026 (merge commit
+`0807d5a`; CI run 37286991639); see the
 [design and implementation notes](t13-2-completion-service-design.md).
 `GuideCompletionService` marks a guide complete with the clock's time or back
 in progress, and returns the committed state. The write changes only
@@ -898,7 +901,8 @@ in progress, and returns the committed state. The write changes only
 first time, and the locator, estimate, and open time are untouched. A 100%
 estimate never creates a completion time.
 
-T13.1 is implemented; see the
+T13.1 was merged through PR #44 on 5 October 2026 (merge commit
+`72baaeb`; CI run 37315084947); see the
 [design and implementation notes](t13-1-completion-actions-design.md).
 The Game page and the Reader header show an `In progress` / `Complete`
 choice that calls `GuideCompletionService`, shows the committed state, and
@@ -907,21 +911,24 @@ announces it. T14.2 later moved the choice to the shared data-bound `Segmented`
 leaves a guide not complete, and a failed write reverts the choice and
 explains the error.
 
-T14.2 is implemented; see the
+T14.2 was merged through PR #48 on 6 October 2026 (merge commit
+`5ab11f0`; CI run 37465745451); see the
 [design and implementation notes](t14-2-theme-setting-design.md).
 Settings has an *App theme* choice (System, Light, Dark) on the shared
 `BoundedChoice` Segmented. It applies at once to the shell, dialogs and
 title bar, is stored, survives a relaunch, and puts back a failed save.
 Windows high contrast always wins.
 
-T09.2 is implemented; see the
+T09.2 was merged through PR #49 on 7 October 2026 (merge commit
+`a330d39`; CI run 37484041874); see the
 [design and implementation notes](t09-2-html-theme-style-design.md).
 An HTML guide gets one fixed local style through DevTools: Light keeps the
 page's colors, Dark forces a dark palette, and high contrast is left to
 Windows. It follows a theme or Windows change without a reload, and the
 guide's stored text scale applies at open. The style makes no request.
 
-T14.1 is implemented; see the
+T14.1 was merged through PR #51 on 7 October 2026 (merge commit
+`6567c81`; CI run 37561318073); see the
 [design and implementation notes](t14-1-text-size-design.md).
 TXT and HTML guides show *Smaller text*, the current size and *Larger
 text*, with *Reset text size* in the overflow and the Ctrl+Minus,
@@ -930,7 +937,8 @@ to 200%, applies at once, is saved per guide and survives a relaunch,
 and a failed save puts the stored size back. TXT keeps its fixed-width
 columns; PDF keeps its own zoom.
 
-T14.3 is implemented; see the
+T14.3 was merged through PR #52 on 7 October 2026 (merge commit
+`a350d7e`; CI run 37590262774); see the
 [design and implementation notes](t14-3-appearance-restore-design.md).
 An HTML guide keeps its reading place across a text-size step: the
 session takes the place first, pauses tracking while the style is
@@ -978,8 +986,8 @@ entry point and preserve the per-scenario evidence listed in the
 
 | Lane | Required result | Current status |
 | --- | --- | --- |
-| Headless Core/Infrastructure | Schema/migration, locator, path, transaction recovery, archive, import-security, and fault-injection tests on locked Windows CI; NTFS link/junction checks on Windows. | T03.2's merged [PR CI](results.md) passed 61 Core and 24 Infrastructure tests on x64 and native ARM64. T15.2's locked Windows 11 x64 run passed 61 Core and 41 Infrastructure tests after the uppercase-ID review fix, including NTFS junction, prepared-import collision, and retry cases. Earlier PR #5 CI passed 61 Core and 39 Infrastructure tests on x64 and native ARM64; current-head results are in PR checks. Later-task suites are pending. |
-| Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | T11.1 installed shell routes and the T11.3 pointer/keyboard route and capability-toolbar gates passed on a Windows 11 x64 CI runner. A [controlled local retest](evidence/production-shell-host-ssh-reinstall.json) reproduced `0x80070005` from SSH session 0 after uninstall and succeeded through an interactive scheduled task in desktop session 1; the package, backup, and launch were verified. Full P1 flow and release gates remain open. |
+| Headless Core/Infrastructure | Schema/migration, locator, path, transaction recovery, archive, import-security, and fault-injection tests on locked Windows CI; NTFS link/junction checks on Windows. | T03.2's merged [PR CI](results.md) passed 61 Core and 24 Infrastructure tests on x64 and native ARM64. T15.2's locked Windows 11 x64 run passed 61 Core and 41 Infrastructure tests after the uppercase-ID review fix, including NTFS junction, prepared-import collision, and retry cases. Earlier PR #5 CI passed 61 Core and 39 Infrastructure tests on x64 and native ARM64; current-head results are in PR checks. By PR #52 (T14.3) the suites had grown to 899 Core and 540 Infrastructure passes; see the [merged PR summary](results.md#merged-pr-summary). T15.4's fault-injection matrix and T20.1's archive tests are pending. |
+| Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | T11.1 installed shell routes and the T11.3 pointer/keyboard route and capability-toolbar gates passed on a Windows 11 x64 CI runner. A [controlled local retest](evidence/production-shell-host-ssh-reinstall.json) reproduced `0x80070005` from SSH session 0 after uninstall and succeeded through an interactive scheduled task in desktop session 1; the package, backup, and launch were verified. Since PR #47 the `production-shell-ui` job runs 13 installed scenario groups, from `core` and `catalog` to `completion`, `theme` and `text-size`, in four shards. Full P1 flow and release gates remain open. |
 | Runtime-free Windows 11 x64 VM | Actual absent Windows App Runtime and WebView2 failures, prerequisite setup, recovery, and clean restore. | Deferred by user until a disposable VM is available. Do not claim clean-machine support before this lane passes. |
 | Windows 11 ARM64 | Native complete P1 installed workflow, backup, accessibility, and offline evidence before advertising ARM64. | P1 pending; P0 native Core/UI fixtures passed. |
 | Windows 10 x64 | Equivalent signed install and reader workflow before advertising Windows 10. | Deferred by user. |

@@ -1,8 +1,8 @@
 # P1 implementation results
 
 Status: P1 work is merged into `main` through
-[PR #42](https://github.com/ilya-slalom/desktop-guides/pull/42) (T13.2, merge
-commit `0807d5a`) on 5 October 2026. The [merged PR summary](#merged-pr-summary)
+[PR #52](https://github.com/ilya-slalom/desktop-guides/pull/52) (T14.3, merge
+commit `a350d7e`) on 7 October 2026. The [merged PR summary](#merged-pr-summary)
 lists every PR since M0 with its CI run and test counts. The P1 first usable
 release remains in progress: the [dependency plan](implementation-plan.md)
 defines all task exit gates, and this file records only checks actually run.
@@ -24,7 +24,7 @@ PR #16. T14.4 isn't implemented yet.
 
 ## Merged PR summary
 
-One row per PR merged into `main` after M0, through PR #42. The *Record* column
+One row per PR merged into `main` after M0, through PR #52. The *Record* column
 links the task's own verification section, which has the full evidence.
 
 - *Final CI run* is the run the PR cites as decisive. Where no CI run is
@@ -34,8 +34,9 @@ links the task's own verification section, which has the full evidence.
   *(host)* marks counts from a unit-test run on `pcsx2-win`, not CI. *—* means
   the PR states no count.
 - PRs record `shell-scope` only from #38 onward, when the input was added.
+  From #47 a full run splits `production-shell-ui` into four shards.
 - Tasks for #33 (a T08.3 harness follow-up) and #37 are inferred from the PR
-  titles. #15, #21 and #38 aren't task PRs.
+  titles. #15, #21, #38, #43 and #47 aren't task PRs.
 
 | PR | Merged | Commit | Task | Final CI run | Core | Infra | Record | Caveats |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -66,6 +67,14 @@ links the task's own verification section, which has the full evidence.
 | [#40](https://github.com/ilya-slalom/desktop-guides/pull/40) | 2026-10-05 | `17bdf48` | T12.2 | [37256476218](https://github.com/ilya-slalom/desktop-guides/actions/runs/37256476218) | 702 | 515 | [t12-2-progress-coordinator-design](t12-2-progress-coordinator-design.md#verification) | The installed shell job passed on its second attempt after an `html-position-dark` miss. |
 | [#41](https://github.com/ilya-slalom/desktop-guides/pull/41) | 2026-10-05 | `a36b058` | T12.3 | [37274977026](https://github.com/ilya-slalom/desktop-guides/actions/runs/37274977026) | 723 | 520 | [t12-3-progress-estimates-design](t12-3-progress-estimates-design.md#verification) | `shell-scope=all`. `native-arm64-ui` passed on its second attempt after a P0 `pdf-short` timeout. |
 | [#42](https://github.com/ilya-slalom/desktop-guides/pull/42) | 2026-10-05 | `0807d5a` | T13.2 | [37286991639](https://github.com/ilya-slalom/desktop-guides/actions/runs/37286991639) | 728 | 528 | [t13-2-completion-service-design](t13-2-completion-service-design.md#verification) | `shell-scope=core`, full matrix. |
+| [#43](https://github.com/ilya-slalom/desktop-guides/pull/43) | 2026-10-05 | `070250b` | Docs | — | — | — | — | Docs only: adds this summary through PR #42. No CI run cited; its PR run [37297728233](https://github.com/ilya-slalom/desktop-guides/actions/runs/37297728233) passed every job. |
+| [#44](https://github.com/ilya-slalom/desktop-guides/pull/44) | 2026-10-05 | `72baaeb` | T13.1 | [37315084947](https://github.com/ilya-slalom/desktop-guides/actions/runs/37315084947) | 737 | 528 | [t13-1-completion-actions-design](t13-1-completion-actions-design.md#verification) | `shell-scope=completion`, full matrix; PR run [37311359432](https://github.com/ilya-slalom/desktop-guides/actions/runs/37311359432) passed `shell-scope=all`. Six Minor final-review findings are deferred in the PR body. |
+| [#46](https://github.com/ilya-slalom/desktop-guides/pull/46) | 2026-10-06 | `303a0ee` | T10.2 | [37432552738](https://github.com/ilya-slalom/desktop-guides/actions/runs/37432552738) | 788 | 540 | [t10-2-pdf-controls-design](t10-2-pdf-controls-design.md#verification) | Full matrix, passed on its first attempt. An unexplained `Next page` lookup failure hit two earlier runs and passed on rerun. Ctrl+wheel zoom is deferred to [#45](https://github.com/ilya-slalom/desktop-guides/issues/45). |
+| [#47](https://github.com/ilya-slalom/desktop-guides/pull/47) | 2026-10-06 | `974c46d` | CI | [37439569037](https://github.com/ilya-slalom/desktop-guides/actions/runs/37439569037) | — | — | — | Splits `production-shell-ui` into four shards and adds `shell-pass` and the docs-only skip; the full run took 12.0 min, down from 29.5. The docs-only skip and the cancelling of older runs weren't exercised. |
+| [#48](https://github.com/ilya-slalom/desktop-guides/pull/48) | 2026-10-06 | `5ab11f0` | T14.2 | [37465745451](https://github.com/ilya-slalom/desktop-guides/actions/runs/37465745451) | 807 (host) | 540 (host) | [t14-2-theme-setting-design](t14-2-theme-setting-design.md#verification) | High contrast isn't switched on in CI (T16.2). The uncited PR-head run [37468100338](https://github.com/ilya-slalom/desktop-guides/actions/runs/37468100338), on a docs-only last commit, failed the `core` and `pdf` shards; the cause wasn't recorded. |
+| [#49](https://github.com/ilya-slalom/desktop-guides/pull/49) | 2026-10-06 | `a330d39` | T09.2 | [37484041874](https://github.com/ilya-slalom/desktop-guides/actions/runs/37484041874) | 839 (host) | 540 (host) | [t09-2-html-theme-style-design](t09-2-html-theme-style-design.md#verification) | The review fix `368a223` came later: [37486250072](https://github.com/ilya-slalom/desktop-guides/actions/runs/37486250072) checked it with `shell-scope=html` and `dev-fast`, and the PR run [37486234386](https://github.com/ilya-slalom/desktop-guides/actions/runs/37486234386) passed every job. Dark changing image and inline SVG colors is deferred to [#50](https://github.com/ilya-slalom/desktop-guides/issues/50). |
+| [#51](https://github.com/ilya-slalom/desktop-guides/pull/51) | 2026-10-07 | `6567c81` | T14.1 | [37561318073](https://github.com/ilya-slalom/desktop-guides/actions/runs/37561318073) | 888 | 540 | [t14-1-text-size-design](t14-1-text-size-design.md#verification) | The `pdf` shard passed on a rerun after three failed progress saves in `progress-changed`, which looks like a slow-runner flake. The uncited PR-head run [37564016374](https://github.com/ilya-slalom/desktop-guides/actions/runs/37564016374), on a docs-only commit, failed `native-arm64-ui`. |
+| [#52](https://github.com/ilya-slalom/desktop-guides/pull/52) | 2026-10-07 | `a350d7e` | T14.3 | [37590262774](https://github.com/ilya-slalom/desktop-guides/actions/runs/37590262774) | 899 | 540 | [t14-3-appearance-restore-design](t14-3-appearance-restore-design.md#verification) | Run after the final-review fixes; [37583360621](https://github.com/ilya-slalom/desktop-guides/actions/runs/37583360621) passed before them. The fix for a restyle landing during a restore's capture has no failing-first test. |
 
 ## M2 T04.1 game editor — implementation check, 27 September 2026
 

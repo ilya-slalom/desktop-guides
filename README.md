@@ -9,14 +9,21 @@ The [work breakdown](docs/work-breakdown.md) maps those requirements to user
 stories, implementation tasks, and testable technical requirements.
 The [P0 technical design](docs/p0-technical-design.md) details the Windows
 baseline and TXT, HTML, and PDF reader experiments.
-The [progress record](docs/progress.md) distinguishes merged P0 work from
+The [progress record](docs/progress.md) distinguishes merged work from
 deferred environment checks. The [P1 technical design](docs/p1-technical-design.md)
 and [implementation plan](docs/p1/implementation-plan.md) cover the first
 usable library release.
 
 The P0 implementation includes a WinUI 3 reader probe for TXT, static HTML,
 and PDF, a portable core library, self-authored fixtures, unit tests, and
-Windows package builds. It is an evaluation harness; library and tracking
-features are planned for P1. See the [P0 implementation plan](docs/p0/implementation-plan.md),
+Windows package builds. It is an evaluation harness. See the
+[P0 implementation plan](docs/p0/implementation-plan.md),
 [Windows build instructions](docs/p0/toolchain.md), and
 [initial Windows observations](docs/p0/results.md).
+
+P1 is in progress. The production app keeps a library of games, imports TXT,
+static HTML and PDF guides into managed storage, reads those copies in
+format-specific readers, and remembers each guide's place, completion state
+and text size. Backup and restore, the accessibility audit and release
+packaging remain; the [P1 results](docs/p1/results.md) record what has been
+verified on Windows.

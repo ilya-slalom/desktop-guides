@@ -3,13 +3,14 @@
 Status: P0 merged in [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1)
 on 25 September 2026. The clean-VM prerequisite gate and Windows 10 check
 remain deferred. P1 is designed in the [technical design](p1-technical-design.md)
-and [implementation plan](p1/implementation-plan.md). Source:
+and [implementation plan](p1/implementation-plan.md); on 7 October 2026, 42 of
+its 54 tasks are merged, and the plan records each one. Source:
 [initial requirements and high-level design](initial-design.md). The backlog
 defines the acceptance gates; [Windows results](p0/results.md) record
 which checks have been performed. Windows 10 is deferred; native ARM64 CI
 passed the installed reader fixtures. [P1 T10.0](p1/pdf-decision.md) selected
-a text-capable PDF prototype; S10 remains open until the production adapter
-passes its accessibility and installed-offline gates.
+a text-capable PDF prototype, now the production adapter (T10.1–T10.3); S10
+remains open until T16.3 records its accessibility check.
 
 ## How to use this backlog
 
@@ -274,6 +275,8 @@ font-size or window-size change returns near the same text.
   Consolas, unwrapped lines; tabs expand to 8-column stops and other C0
   controls show as a space; a load failure shows one sentence (P1 T08.2).
 - **T08.3** Implement navigation and character-offset/context location APIs.
+  Implemented in PR #31; see
+  [p1/t08-3-txt-position-design.md](p1/t08-3-txt-position-design.md).
 - **TR08.1** Whitespace is never collapsed in the default TXT mode.
 - **TR08.2** Rendering and progress storage do not create one persistent WinUI
   control per source line in a long guide.
@@ -295,7 +298,7 @@ with a visible approximate fallback if the document changed.
   Implemented in PR #35; see
   [p1/t09-1-html-adapter-design.md](p1/t09-1-html-adapter-design.md).
 - **T09.2** Apply host-owned theme/font styling without requiring page scripts.
-  Implemented; see
+  Implemented in PR #49; see
   [p1/t09-2-html-theme-style-design.md](p1/t09-2-html-theme-style-design.md).
 - **T09.3** Capture and restore document-relative path, visible text/element
   context, and scroll-ratio fallback.
@@ -399,11 +402,11 @@ location approximate.
   restoration order: exact/context anchor, then approximate percentage.
 - **T12.2** Save after meaningful movement with throttling; flush on
   navigation away and app deactivation.
-  Implemented; see
+  Implemented in PR #40; see
   [p1/t12-2-progress-coordinator-design.md](p1/t12-2-progress-coordinator-design.md).
 - **T12.3** Compute an estimated percentage per format and detect content
   fingerprint changes.
-  Implemented; see
+  Implemented in PR #41; see
   [p1/t12-3-progress-estimates-design.md](p1/t12-3-progress-estimates-design.md).
 - **TR12.1** `ReadingState` is keyed by guide ID, never only by game or filename.
 - **TR12.2** A normally running app persists a changed location within five
@@ -425,12 +428,12 @@ the final page does not silently mark the guide complete.
   Toolkit `Segmented` control for the bounded `In progress` / `Complete`
   choice when UI Automation exposes the selected state correctly; otherwise
   retain equivalent native radio buttons.
-  Implemented with native radio buttons (`Segmented` failed the UIA gate);
-  see
+  Implemented in PR #44 with native radio buttons (`Segmented` failed the
+  UIA gate); T14.2 moved it to the data-bound `Segmented`, which passes. See
   [p1/t13-1-completion-actions-design.md](p1/t13-1-completion-actions-design.md).
 - **T13.2** Store completion time separately from reading location and
   percentage.
-  Implemented; see
+  Implemented in PR #42; see
   [p1/t13-2-completion-service-design.md](p1/t13-2-completion-service-design.md).
 - **TR13.1** Completion status is derived from an explicit user action, not
   from estimated percentage.
@@ -448,13 +451,15 @@ and shared Settings components without breaking TXT whitespace, HTML offline
 behavior, or high-contrast system colors.
 
 - **T14.1** Add per-guide TXT/HTML font-size controls and saved preferences.
-  Implemented; see [p1/t14-1-text-size-design.md](p1/t14-1-text-size-design.md).
+  Implemented in PR #51; see [p1/t14-1-text-size-design.md](p1/t14-1-text-size-design.md).
 - **T14.2** Add global theme setting with a Windows theme default. Present the
   bounded `System` / `Light` / `Dark` choice with Toolkit `Segmented`, bound to data
   so each item exposes its selected state, with a custom automation peer as
   the fallback.
+  Implemented in PR #48; see
+  [p1/t14-2-theme-setting-design.md](p1/t14-2-theme-setting-design.md).
 - **T14.3** Recheck location restoration after changing appearance.
-  Implemented; see [the design](p1/t14-3-appearance-restore-design.md).
+  Implemented in PR #52; see [the design](p1/t14-3-appearance-restore-design.md).
 - **T14.4** Apply the shared design language to reader and Settings surfaces
   after their functional controls exist. Adopt suitable Gallery command,
   settings, teaching, and status patterns. Use Toolkit `SettingsCard` and
