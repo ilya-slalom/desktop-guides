@@ -1,6 +1,6 @@
 # T14.3 appearance restore design
 
-Status: designed; not yet implemented.
+Status: implemented; CI run 37583360621.
 Prerequisites: T08.3 (TXT locator), T09.3 (HTML locator), T10.3 (PDF
 locator), T14.1 (text size, PR #51) and T14.2 (theme setting) are merged.
 
@@ -100,10 +100,12 @@ In `HtmlLocationRules`, pure and unit-tested:
 write loop (none is running), it:
 
 1. **Takes the pre-change point.** It records the appearance applied so far,
-   then, unless `resizing` or `restoring` is set, takes a fresh
-   `CaptureAsync`. A capture that differs from `current` is a real move the
-   tracker hadn't polled yet: it becomes `current` and raises
-   `LocationChanged`. A failed capture keeps `current`.
+   then, unless `resizing` or `restoring` is set, reads the scroll and,
+   only when the tracker's `Moved(lastScroll, scroll)` test says the reader
+   moved, takes a fresh `CaptureAsync`. A capture that differs from
+   `current` is a real move the tracker hadn't polled yet: it becomes
+   `current` and raises `LocationChanged`. A failed capture keeps
+   `current`.
 2. **Pauses tracking.** It bumps `generation`, stops the tracker and sets
    a `restyling` flag. `GetLocationAsync` skips its fresh capture while the
    flag is set, as it does for `resizing` and `restoring`; a tick already in
@@ -134,9 +136,11 @@ Overlaps:
 - **An open-time restore is running.** Step 4 is skipped. `RestoreAsync`
   sees the generation change and scrolls to its own target again, as it
   does for a resize.
-- **A resize settle is pending.** Step 4 is skipped and the tracker stays
-  stopped; `ReapplyAsync` later scrolls to the same `current` and restarts
-  it.
+- **A resize settle is pending.** Step 4 still runs, and the tracker stays
+  stopped; `ReapplyAsync` later scrolls to the same `current` again and
+  restarts it. (Designed as a skip; changed in implementation, because the
+  size status opening above the reader is itself a resize. See the
+  implementation notes.)
 - **A failed write.** The loop returns as today, with the page as
   authored; step 4 still compares against what was applied, so nothing is
   restored and no event is raised, and tracking resumes.
@@ -197,13 +201,119 @@ page and never shows text size).
 - [e2e-testing.md](e2e-testing.md): the two new phases.
 - Evidence in `docs/p1/evidence/t14-3-appearance-restore/`.
 
+## Implementation notes
+
+Rulings the plan made against this design:
+
+1. **No unsubscribe.** The HTML attach path subscribes its session events
+   without unsubscribing and filters with `ReferenceEquals(sender,
+   readerSession)`; `AppearanceRestored` follows that pattern.
+2. **One flag joins the save status and the restore.** T14.1 shows the
+   size status after the save, so the save and the restore event land in
+   either order. `ShellWindow.TextSize.cs` keeps `double?
+   shiftedTextScale`: a size change clears it, an Approximate or
+   Unavailable event sets it and shows `ShiftedStatus` unless a warning or
+   error is showing, an Exact event clears it, and a successful save shows
+   `ShiftedStatus` when the flag matches its scale. Whichever lands last,
+   the status is right.
+3. **The fallback check reads the locator, not the view.** "Estimated
+   fraction within 0.05" became "the locator is unchanged": the app
+   chooses the locator; the view's fraction after a zoom is Chromium's.
+4. **Two more diagnostics fields.** `appearanceScale` (the clamped scale
+   the restore ran at) and `appearanceRestores` (a count) join
+   `appearanceKind` and `appearanceStep`, so the smoke waits for the
+   restore of a given step.
+5. **Appearance restores aren't counted as restores.**
+   `HtmlSessionDiagnostics.RecordRestore` counts open-time restores only.
+6. **Progress counts in the position passes.** `Invoke-HtmlPositionPass`
+   opens the `ProgressDiagnostics` gate, and `Read-ProgressCounts` moves
+   next to `Read-HtmlPosition`.
+7. **`WriteAppearanceAsync` returns `Task<bool>`.** True when the page has
+   the latest appearance; `OpenAsync` ignores it.
+8. **The tracker and `GetLocationAsync` honor `restyling`.** A resize's
+   `finally` can restart the tracker mid-restyle, so ticks return while the
+   flag is set.
+9. **The image-only guide joins the position seed.** `seed-html-position`
+   also publishes `tests/fixtures/p1/html-pictures` as "Picture Web Guide"
+   (a *Jump to the middle* link and six 900 px local images).
+10. **A theme-only change still pauses.** Capture, pause and write run for
+    every restyle; only the restore depends on the scale.
+11. **A write bumps the generation again.** After each write that changed
+    the scale, so an open-time restore that started during the restyle
+    scrolls to its own target again.
+12. **The fallback steps to 110%.** One *Larger text* from 100% is 110%,
+    so the phase checks `Text size 110%. Your place may have shifted.`,
+    not the 125% of the example above.
+
+Rulings made during implementation:
+
+- **The restyle restores even while a resize settle is pending.** The
+  first run (37579601419) never restored: the size status InfoBar is an
+  `Auto` row above the reader, so showing it resizes the WebView during
+  every restyle. The resize's re-apply scrolls to the same point again and
+  takes the baseline. If wrong, a real resize during a step costs one
+  extra scroll.
+- **The pre-change capture runs only after a real move.** Run 37580359630
+  saved three times in four bursts: at a new zoom the same top character
+  has a new scroll fraction, so a fresh capture always differed from
+  `current`. The capture now runs only when the tracker's own
+  `Moved(lastScroll, scroll)` says the reader moved. If wrong, a move made
+  within 500 ms before a step and within 1 px of the baseline isn't taken
+  first.
+
+Other notes:
+
+- The restore runs after each write that changed the scale, not once per
+  burst; a step that arrives during the restore is written and restored
+  again by the same loop. The four bursts of `position-text-size` show
+  no drift, so the forced layout of the offset script was enough (see
+  Risks).
+- Run 37581077978's first attempt hung opening Picture Web Guide with no
+  request reaching the handler; its second attempt, on the same commit,
+  opened it. Not reproduced since.
+
+## Verification
+
+- Core tests went from 888 to 899: `HtmlLocationRulesTests`
+  (`NeedsAppearanceRestore` for a first write, a theme-only change, a
+  scale change and scales that clamp alike; `AppearanceOutcome` for Exact,
+  Context, Fraction and no target), `TextSizeStepsTests` (`ShiftedStatus`
+  text and culture) and `ReaderContractTests`
+  (`AppearanceRestoredCarriesItsOutcome`). Infrastructure stays at 540.
+- Full CI run 37583360621, artifact `production-shell-ui-html`, in both
+  the light and the dark position pass:
+  - `position-text-size`: with MARK-0420 on top, bursts to 150%
+    (3 × *Larger text*), 200% (2 ×), 75% (7 × *Smaller text*) and 100%
+    (2 ×). After each, MARK-0420 is still the top line, the locator's
+    offset is unchanged, `appearanceKind` is `Exact`, the status is the
+    plain `Text size <label>.`, and the progress save count hasn't grown.
+  - `position-text-size-fallback`: Picture Web Guide, scrolled to its
+    middle by its link; 110% and back to 100% each give `Approximate`
+    with step `Fraction`, an unchanged locator, the status `Text size
+    <label>. Your place may have shifted.` and no progress save
+    ([light](evidence/t14-3-appearance-restore/html-position-light.html-place-shifted.png),
+    [dark](evidence/t14-3-appearance-restore/html-position-dark.html-place-shifted.png),
+    [light report](evidence/t14-3-appearance-restore/html-position-light.json),
+    [dark report](evidence/t14-3-appearance-restore/html-position-dark.json)).
+  - The other position phases (fragment, resize, the restores and the
+    unimported link) still pass.
+- TXT, PDF and theme changes are carried by existing checks in the same
+  run: `text-size-whitespace` and `txt-remeasure` (TXT keeps its top line),
+  `html-theme-switch` (the place survives a theme change), `pdf-zoom` and
+  `text-size-pdf`.
+- `html` group runs on the way: 37578966629 (the new phases, red before the
+  session change), 37579601419 and 37580359630 (the two implementation
+  rulings above), 37581077978 (the session green, the shell notice still
+  red) and 37582559027 (green).
+
 ## Risks
 
 - **Forced layout may not be enough.** The design assumes the offset
   script's measurement lays the page out at the new zoom before it
-  scrolls. If `position-text-size` shows drift (for example from scroll
-  anchoring after the write), the fallback is to wait one animation frame
-  in that script before measuring, and to record the change here.
+  scrolls. `position-text-size` shows no drift, so no frame wait was
+  added; if a guide shows drift (for example from scroll anchoring after
+  the write), the fallback is to wait one animation frame in that script
+  before measuring.
 - **Image-only pages always fall back.** A page with no text has only its
   fraction, so every size step there shows the notice. That is honest and
   rare: game-guide pages on the major sites are text-led, with images

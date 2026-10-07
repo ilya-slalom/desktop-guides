@@ -296,9 +296,9 @@ In the implementing branch:
   the page. If they don't arrive, the buttons and the keys from the shell
   still work, and the page-focus case is recorded here, not worked around
   with page script.
-- **HTML place across a size change.** CSS `zoom` reflows the page, so the
-  view can land elsewhere until T14.3. The status doesn't claim the place
-  was kept.
+- **HTML place across a size change.** CSS `zoom` reflows the page. Since
+  T14.3 the place is kept, and a page that can only come back by fraction
+  says so; see [the T14.3 design](t14-3-appearance-restore-design.md).
 - **TXT re-measure at large sizes.** At 200% a long line's row is twice as
   wide; the horizontal offset scales with it, as it does for a system text
   size change.
