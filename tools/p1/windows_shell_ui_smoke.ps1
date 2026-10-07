@@ -1841,6 +1841,10 @@ try {
         }
 
         # The view can replace the scroller mid-lookup, so retry briefly.
+        # T14.4: the point the PDF place passes scroll to. It must sit inside
+        # page 121's scroll room at 1500x720, which the Reader header sets.
+        $pdfPoint = 0.2
+
         function Get-PdfScroll {
             $deadline = (Get-Date).AddSeconds(3)
             $scroller = Find-ById 'PdfPreviewScroller'
@@ -2619,7 +2623,7 @@ try {
             }
             $report.phases += 'pdf-long'
 
-            # pdf-resize (T10.3): a point 30% down portrait page 121 survives
+            # pdf-resize (T10.3): a point 20% down portrait page 121 survives
             # narrow, medium and wide windows; a page turn starts at the top.
             Invoke-ReaderCommand 'Go to start'
             [void](Wait-PdfPage 1 200 'page 1 of 200')
@@ -2627,22 +2631,22 @@ try {
             [void](Wait-PdfPage 121 200 'page 121 of 200' 60)
             $scroll = Get-PdfScroll
             $room = 1 - $scroll.Current.VerticalViewSize / 100
-            if (-not $scroll.Current.VerticallyScrollable -or $room -lt 0.3) {
-                throw "Page 121 scrolls only $([Math]::Round($room, 3)) of its height; pdf-resize needs 0.3."
+            if (-not $scroll.Current.VerticallyScrollable -or $room -lt $pdfPoint) {
+                throw "Page 121 scrolls only $([Math]::Round($room, 3)) of its height; pdf-resize needs $pdfPoint."
             }
             $scroll.SetScrollPercent(
-                [System.Windows.Automation.ScrollPattern]::NoScroll, 0.3 / $room * 100)
+                [System.Windows.Automation.ScrollPattern]::NoScroll, $pdfPoint / $room * 100)
             Start-Sleep -Milliseconds 300
             $set = Get-PdfFraction
-            if ([Math]::Abs($set - 0.3) -gt 0.02) {
-                throw "Scrolling page 121 reached fraction $([Math]::Round($set, 3)); expected 0.3."
+            if ([Math]::Abs($set - $pdfPoint) -gt 0.02) {
+                throw "Scrolling page 121 reached fraction $([Math]::Round($set, 3)); expected $pdfPoint."
             }
             $report.pdfPosition = [ordered]@{ set = $set }
-            # 1500 last: the page was scrolled there, so 0.3 itself must return
+            # 1500 last: the page was scrolled there, so the point itself must return
             # even if 1100 px clamped it.
             foreach ($size in @(@(600, 'narrow'), @(1100, 'medium'), @(1500, 'wide'))) {
                 Resize-ShellWindow $size[0] 720
-                $report.pdfPosition[$size[1]] = Wait-PdfFraction 0.3 "Resizing to $($size[0]) px"
+                $report.pdfPosition[$size[1]] = Wait-PdfFraction $pdfPoint "Resizing to $($size[0]) px"
                 [void](Wait-PdfPage 121 200 'page 121 of 200')
             }
             $report.pdfResizeScreenshot = Save-WindowScreenshot 'pdf-resize'
@@ -2735,34 +2739,34 @@ try {
             [void](Wait-PdfPage 121 200 'page 121 of 200' 60)
             $scroll = Get-PdfScroll
             $room = 1 - $scroll.Current.VerticalViewSize / 100
-            if (-not $scroll.Current.VerticallyScrollable -or $room -lt 0.3) {
-                throw "Page 121 scrolls only $([Math]::Round($room, 3)) of its height; pdf-zoom needs 0.3."
+            if (-not $scroll.Current.VerticallyScrollable -or $room -lt $pdfPoint) {
+                throw "Page 121 scrolls only $([Math]::Round($room, 3)) of its height; pdf-zoom needs $pdfPoint."
             }
             $scroll.SetScrollPercent(
-                [System.Windows.Automation.ScrollPattern]::NoScroll, 0.3 / $room * 100)
+                [System.Windows.Automation.ScrollPattern]::NoScroll, $pdfPoint / $room * 100)
             Start-Sleep -Milliseconds 300
             $report.pdfZoom = [ordered]@{ set = Get-PdfFraction }
 
             Invoke-ReaderCommand 'Zoom in'
             $first = Wait-PdfZoom '\d+%'
-            $report.pdfZoom[$first] = Wait-PdfFraction 0.3 "Zoom in to $first"
+            $report.pdfZoom[$first] = Wait-PdfFraction $pdfPoint "Zoom in to $first"
             [void](Wait-PdfPage 121 200 'page 121 of 200')
             Invoke-ReaderCommand 'Zoom in'
             $second = Wait-PdfZoom '\d+%' $first
             if ([int] $second.TrimEnd('%') -le [int] $first.TrimEnd('%')) {
                 throw "Zoom in went from $first to $second."
             }
-            $report.pdfZoom[$second] = Wait-PdfFraction 0.3 "Zoom in to $second"
+            $report.pdfZoom[$second] = Wait-PdfFraction $pdfPoint "Zoom in to $second"
             [void](Wait-PdfPage 121 200 'page 121 of 200')
             $report.pdfZoomScreenshot = Save-WindowScreenshot 'pdf-zoom'
             Invoke-ReaderCommand 'Zoom out'
             $back = Wait-PdfZoom '\d+%' $second
             if ($back -ne $first) { throw "Zoom out from $second went to $back; expected $first." }
-            [void](Wait-PdfFraction 0.3 "Zoom out to $back")
+            [void](Wait-PdfFraction $pdfPoint "Zoom out to $back")
             [void](Wait-PdfPage 121 200 'page 121 of 200')
             Invoke-OverflowCommand 'Fit to width'
             [void](Wait-PdfZoom 'Fit width')
-            $report.pdfZoom.fit = Wait-PdfFraction 0.3 'Fit to width'
+            $report.pdfZoom.fit = Wait-PdfFraction $pdfPoint 'Fit to width'
             [void](Wait-PdfPage 121 200 'page 121 of 200')
 
             # 200%: the page is wider than the viewport, so it scrolls sideways.
@@ -3033,16 +3037,16 @@ try {
                 [void](Wait-PdfPage 121 200 'page 121 of 200' 60)
                 $scroll = Get-PdfScroll
                 $room = 1 - $scroll.Current.VerticalViewSize / 100
-                if (-not $scroll.Current.VerticallyScrollable -or $room -lt 0.3) {
-                    throw "Page 121 scrolls only $([Math]::Round($room, 3)) of its height; progress-flush needs 0.3."
+                if (-not $scroll.Current.VerticallyScrollable -or $room -lt $pdfPoint) {
+                    throw "Page 121 scrolls only $([Math]::Round($room, 3)) of its height; progress-flush needs $pdfPoint."
                 }
                 $scroll.SetScrollPercent(
-                    [System.Windows.Automation.ScrollPattern]::NoScroll, 0.3 / $room * 100)
+                    [System.Windows.Automation.ScrollPattern]::NoScroll, $pdfPoint / $room * 100)
                 Back-ToTextGame
                 Open-TextGuide 'Long PDF Guide'
                 [void](Wait-Status 'Guide ready.')
                 [void](Wait-PdfPage 121 200 'page 121 of 200')
-                $report.progressPdfFraction = Wait-PdfFraction 0.3 'Reopening after Back'
+                $report.progressPdfFraction = Wait-PdfFraction $pdfPoint 'Reopening after Back'
                 Back-ToTextGame
                 $report.phases += 'progress-flush'
 
