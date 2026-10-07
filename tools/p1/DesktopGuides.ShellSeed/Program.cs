@@ -528,11 +528,14 @@ if (args.Length == 3 && args[0] == "seed-html-position")
     Guid guideChanged = await PublishLongAsync("html-long-changed", "Changed Long Web Guide");
     // T14.3: an image-only guide, whose place comes back by fraction only.
     Guid guidePictures = await PublishLongAsync("html-pictures", "Picture Web Guide");
+    // A header that stays on screen, as wiki saves have.
+    Guid guideFixedHeader = await PublishLongAsync("html-fixed-header", "Fixed Header Web Guide");
     Console.WriteLine(JsonSerializer.Serialize(new
     {
         guideLong = guideLong.ToString("N"),
         guideChanged = guideChanged.ToString("N"),
-        guidePictures = guidePictures.ToString("N")
+        guidePictures = guidePictures.ToString("N"),
+        guideFixedHeader = guideFixedHeader.ToString("N")
     }));
     return 0;
 }

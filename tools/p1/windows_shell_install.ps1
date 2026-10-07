@@ -1251,6 +1251,8 @@ function Assert-HtmlPositionPass([string] $pass, [string] $diagnostics, $result)
         # T14.3: the picture guide serves its entry and its one tile.
         $allowed = if ($session.guideId -eq $report.htmlPosition.guidePictures) {
             @('guide.html,images/tile.png')
+        } elseif ($session.guideId -eq $report.htmlPosition.guideFixedHeader) {
+            @('guide.html')
         } else {
             @('guide.html,images/map.png', 'guide.html,images/map.png,images/route.png')
         }
@@ -1295,6 +1297,7 @@ function Run-HtmlPositionScenarios {
     $diagnostics = Join-Path (Get-HtmlCacheRoot) 'diagnostics'
     $report.htmlPosition = [ordered]@{
         guideLong = $ids.guideLong; guideChanged = $ids.guideChanged; guidePictures = $ids.guidePictures
+        guideFixedHeader = $ids.guideFixedHeader
     }
     $originalTheme = Get-AppThemePreference
     try {

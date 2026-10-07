@@ -2265,6 +2265,27 @@ try {
             Back-ToTextGame
             $report.phases += 'position-text-size-fallback'
 
+            # position-fixed-header: text that stays on screen (a fixed site
+            # header, a sticky bar) is never the place, so the capture is
+            # the line under them and a size step keeps it on top.
+            Open-TextGuide 'Fixed Header Web Guide'
+            $report.sessionsOpened++
+            [void](Wait-Status 'Guide ready.')
+            Click-Element (Wait-PageVisible 'Jump to MARK-0420')
+            $fixedTarget = Wait-HtmlPosition { param($p) $p.quote -like 'MARK-0420 *' } 'the MARK-0420 line under a fixed header'
+            [void](Wait-TopMark 420 'a jump under a fixed header')
+            foreach ($step in @(
+                @{ command = 'Larger text'; scale = 1.1; label = '110%' },
+                @{ command = 'Smaller text'; scale = 1.0; label = '100%' })) {
+                $after = Step-HtmlTextSize $step.command 1 $step.scale "Text size $($step.label)."
+                [void](Wait-TopMark 420 "a size step to $($step.label) under a fixed header")
+                if ($after.appearanceKind -ne 'Exact' -or $after.offset -ne $fixedTarget.offset) {
+                    throw "A size step to $($step.label) under a fixed header restored '$($after.appearanceKind)' at offset $($after.offset); expected Exact at $($fixedTarget.offset)."
+                }
+            }
+            Back-ToTextGame
+            $report.phases += 'position-fixed-header'
+
             # position-restore-exact: the saved locator in a new session, at
             # another width than the capture's, puts the same line on top.
             Resize-ShellWindow 1100 720
