@@ -3042,6 +3042,14 @@ try {
                 }
                 $scroll.SetScrollPercent(
                     [System.Windows.Automation.ScrollPattern]::NoScroll, $pdfPoint / $room * 100)
+                # T14.4: Back waits until the reader reports the point, so the
+                # flush has it to save; the short poll stays inside the 1 s
+                # quiet delay, so Back's flush is still what saves it.
+                $deadline = (Get-Date).AddSeconds(2)
+                while ([Math]::Abs((Get-PdfFraction) - $pdfPoint) -gt 0.02 -and
+                    (Get-Date) -lt $deadline) {
+                    Start-Sleep -Milliseconds 50
+                }
                 Back-ToTextGame
                 Open-TextGuide 'Long PDF Guide'
                 [void](Wait-Status 'Guide ready.')

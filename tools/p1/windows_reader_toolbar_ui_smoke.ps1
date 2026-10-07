@@ -201,24 +201,21 @@ try {
         Wait-Action $expectedAction
     }
 
-    # T14.4: at 180 px every primary command overflows, so the open menu can
-    # be taller than the window and scroll; step it down until the item shows.
-    function Show-OverflowItem([string] $name) {
-        $scrollable = [System.Windows.Automation.PropertyCondition]::new(
-            [System.Windows.Automation.AutomationElement]::IsScrollPatternAvailableProperty, $true)
-        $deadline = (Get-Date).AddSeconds(10)
-        do {
-            if (Find-VisibleByName $name) { return }
-            foreach ($viewer in $root.FindAll($scope, $scrollable)) {
-                $pattern = $viewer.GetCurrentPattern(
-                    [System.Windows.Automation.ScrollPattern]::Pattern)
-                if ($pattern.Current.VerticallyScrollable -and
-                    $pattern.Current.VerticalScrollPercent -lt 100) {
-                    $pattern.ScrollVertical([System.Windows.Automation.ScrollAmount]::SmallIncrement)
-                }
-            }
+    # T14.4: at 180 px every primary command overflows, so the open menu is
+    # taller than the test window and clips its last rows. The moved command
+    # is still the menu's own: bring it into view when it can, then invoke it.
+    function Invoke-OverflowItem([string] $id, [string] $expectedAction) {
+        $item = Find-ById $id
+        if (-not $item) { throw "The overflow menu has no '$id'." }
+        $report.overflowItemClipped = $item.Current.IsOffscreen
+        $scrollItem = $null
+        if ($item.Current.IsOffscreen -and $item.TryGetCurrentPattern(
+                [System.Windows.Automation.ScrollItemPattern]::Pattern, [ref]$scrollItem)) {
+            $scrollItem.ScrollIntoView()
             Start-Sleep -Milliseconds 200
-        } while ((Get-Date) -lt $deadline)
+        }
+        $item.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+        Wait-Action $expectedAction
     }
 
     function Find-More {
@@ -463,8 +460,7 @@ try {
         throw 'Narrow CommandBar kept Go to start while Zoom in overflowed.'
     }
     Open-Overflow
-    Show-OverflowItem 'Zoom in'
-    Invoke-Command 'Zoom in' 'Zoom 1.1'
+    Invoke-OverflowItem 'ZoomIn' 'Zoom 1.1'
     $report.phases += 'narrow-primary-command-overflow'
 
     # T14.4: where the Previous and Next group fits, page movement is what
