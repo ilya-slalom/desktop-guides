@@ -61,6 +61,14 @@ internal sealed class HtmlReaderSession : IReaderSession
     private ReaderAppearance appearance = new(ReaderTheme.Light, 1.0);
     private ReaderAppearance? applied;
     private bool writingAppearance;
+    // T14.3: set while a restyle runs; the tracker and GetLocationAsync
+    // leave the page alone, as during a resize.
+    private bool restyling;
+    // Test gate only: the last appearance restore.
+    private RestoreOutcome? appearanceOutcome;
+    private HtmlRestoreStep? appearanceStep;
+    private double? appearanceScale;
+    private int appearanceRestores;
     private readonly Windows.UI.Color defaultPageColor;
 
     public HtmlReaderSession(
@@ -243,8 +251,8 @@ internal sealed class HtmlReaderSession : IReaderSession
     public async Task<ReaderLocation> GetLocationAsync(CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        // Mid-reflow or mid-restore, the page's top isn't the reader's point.
-        if (!resizing && !restoring && await CaptureAsync() is HtmlCapture capture && capture != current)
+        // Mid-reflow, mid-restyle or mid-restore, the page's top isn't the reader's point.
+        if (!resizing && !restoring && !restyling && await CaptureAsync() is HtmlCapture capture && capture != current)
         {
             // The caller asked, so no LocationChanged; the test file still follows the point.
             current = capture;
@@ -266,21 +274,90 @@ internal sealed class HtmlReaderSession : IReaderSession
     }
 
     // Before the open's write, the open picks the appearance up; during a
-    // write, the running write does.
+    // restyle, the running restyle does.
     public async Task ApplyAppearanceAsync(ReaderAppearance next, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(next);
         appearance = next;
-        if (!opened || disposed) return;
-        await WriteAppearanceAsync();
+        if (!opened || disposed || restyling) return;
+        await RestyleAsync();
+    }
+
+    // T14.3: a new zoom reflows the page, so a restyle runs like a resize.
+    // The point is taken first, the tracker waits, and after the last write
+    // the page scrolls back to the point. The point isn't re-captured, so
+    // progress keeps the true place even when the view came back by fraction.
+    private async Task RestyleAsync()
+    {
+        if (appearance == applied) return;
+        restyling = true;
+        try
+        {
+            // A move the tracker hadn't polled yet is the reader's own.
+            if (!resizing && !restoring && await CaptureAsync() is HtmlCapture capture &&
+                !disposed && capture != current)
+            {
+                current = capture;
+                WritePositionForTest();
+                RaiseLocationChanged();
+            }
+            // A tick already in flight drops its result.
+            generation++;
+            tracker.Stop();
+            while (!disposed)
+            {
+                ReaderAppearance? before = applied;
+                bool written = await WriteAppearanceAsync();
+                if (disposed) return;
+                if (applied is ReaderAppearance now && HtmlLocationRules.NeedsAppearanceRestore(before, now))
+                {
+                    // An open-time restore that started during the restyle
+                    // sees this and scrolls to its own target again; a
+                    // pending resize's re-apply scrolls to the same point.
+                    generation++;
+                    if (!resizing && !restoring) await RestorePlaceAsync(now);
+                }
+                // A step that arrived during the restore needs another write.
+                if (!written || appearance == applied) break;
+            }
+        }
+        finally
+        {
+            restyling = false;
+            // A pending resize starts the tracker after its re-apply.
+            if (!disposed && !resizing) tracker.Start();
+        }
+    }
+
+    // The offset script measures the target character's box, which lays
+    // the page out at the new zoom first: that is the wait for layout.
+    private async Task RestorePlaceAsync(ReaderAppearance now)
+    {
+        if (current is not HtmlCapture point) return;
+        int started = generation;
+        // A page with no text has only its fraction.
+        HtmlRestoreStep step = point.Quote is null ? HtmlRestoreStep.Fraction : HtmlRestoreStep.Exact;
+        HtmlRestoreTarget? landed = await ScrollToTargetAsync(new HtmlRestoreTarget(step, point.Offset, point.Fraction));
+        if (disposed) return;
+        HtmlScroll? scroll = HtmlLocationRules.ParseScroll(await RunScriptAsync(HtmlPositionScripts.ReadScroll));
+        if (disposed) return;
+        if (scroll is not null && started == generation) lastScroll = scroll;
+        RestoreOutcome outcome = HtmlLocationRules.AppearanceOutcome(landed);
+        appearanceOutcome = outcome;
+        appearanceStep = landed?.Step;
+        appearanceScale = HtmlReaderStyle.ClampScale(now.TextScale);
+        appearanceRestores++;
+        WritePositionForTest();
+        RaiseAppearanceRestored(outcome);
     }
 
     // Writes until the page has the latest appearance; an unchanged one is
     // never rewritten. A failed write leaves the page as authored and isn't
-    // retried until the next refresh: the style is cosmetic.
-    private async Task WriteAppearanceAsync()
+    // retried until the next refresh: the style is cosmetic. True when the
+    // page has the latest appearance.
+    private async Task<bool> WriteAppearanceAsync()
     {
-        if (writingAppearance) return;
+        if (writingAppearance) return false;
         writingAppearance = true;
         try
         {
@@ -293,7 +370,7 @@ internal sealed class HtmlReaderSession : IReaderSession
                 {
                     diagnostics?.RecordAppearanceFailed();
                     WriteAppearanceForTest();
-                    return;
+                    return false;
                 }
                 applied = next;
                 if (diagnostics is not null)
@@ -304,6 +381,7 @@ internal sealed class HtmlReaderSession : IReaderSession
                     WriteAppearanceForTest();
                 }
             }
+            return !disposed && !failed && appearance == applied;
         }
         finally
         {
@@ -384,7 +462,7 @@ internal sealed class HtmlReaderSession : IReaderSession
     // A cheap scroll read every tick; a capture only after a move.
     private async void OnTrackerTick(DispatcherQueueTimer sender, object args)
     {
-        if (ticking || disposed || restoring) return;
+        if (ticking || disposed || restoring || restyling) return;
         ticking = true;
         try
         {
@@ -550,6 +628,18 @@ internal sealed class HtmlReaderSession : IReaderSession
         catch (Exception)
         {
             // A throwing handler must not escape into the timer.
+        }
+    }
+
+    private void RaiseAppearanceRestored(RestoreOutcome outcome)
+    {
+        try
+        {
+            AppearanceRestored?.Invoke(this, new AppearanceRestoredEventArgs(outcome));
+        }
+        catch (Exception)
+        {
+            // A throwing handler must not break the restyle.
         }
     }
 
@@ -783,7 +873,11 @@ internal sealed class HtmlReaderSession : IReaderSession
                 locator,
                 kind = lastOutcome?.Kind.ToString(),
                 step = lastStep?.ToString(),
-                reason = lastOutcome?.Reason
+                reason = lastOutcome?.Reason,
+                appearanceKind = appearanceOutcome?.Kind.ToString(),
+                appearanceStep = appearanceStep?.ToString(),
+                appearanceScale,
+                appearanceRestores
             });
             string folder = Path.Combine(cacheRoot, "diagnostics");
             Directory.CreateDirectory(folder);
