@@ -63,6 +63,7 @@
                                 AutomationProperties.AutomationId="LibraryNavigation" />
         </NavigationView.MenuItems>
 
+        <Grid x:Name="ShellContentHost">
         <Grid x:Name="ShellContent"
               Padding="{StaticResource DesktopGuidesPagePadding}"
               HorizontalAlignment="Stretch"
@@ -79,11 +80,9 @@
             <InfoBar x:Name="ShellStatusInfoBar"
                      Style="{StaticResource DesktopGuidesStatusInfoBarStyle}"
                      Margin="0,0,0,16"
-                     IsOpen="True"
+                     IsOpen="False"
                      Severity="Informational"
-                     Message="Opening library…"
                      AutomationProperties.AutomationId="ShellStatus"
-                     AutomationProperties.Name="Opening library…"
                      AutomationProperties.LiveSetting="Polite" />
 
             <Grid x:Name="LibraryPanel"
@@ -499,15 +498,43 @@
                              AutomationProperties.AutomationId="ReaderUnavailableLinkBar" />
                 </StackPanel>
 
-                <Border Grid.Row="3"
+                <Border x:Name="ReaderSurfaceCard"
+                        Grid.Row="3"
                         Style="{StaticResource DesktopGuidesElevatedSurfaceStyle}"
                         Background="{ThemeResource DesktopGuidesReadingSurfaceBrush}">
                     <Grid>
-                        <TextBlock x:Name="ReaderPlaceholder"
-                                   Text="Reading this guide is unavailable in this preview."
-                                   Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
-                                   AutomationProperties.AutomationId="ReaderPlaceholder" />
-                        <StackPanel Spacing="{StaticResource DesktopGuidesSpacing12}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <!-- T14.4: an approximate place is said here, so the commands above never move. -->
+                        <InfoBar x:Name="ReaderNotice"
+                                 Margin="{StaticResource DesktopGuidesReaderNoticeMargin}"
+                                 Visibility="Collapsed"
+                                 IsOpen="False"
+                                 IsClosable="True"
+                                 Severity="Informational"
+                                 Closed="ReaderNoticeClosed"
+                                 AutomationProperties.AutomationId="ReaderNotice" />
+                        <local:AutomationGroup x:Name="ReaderLoading"
+                                               Grid.Row="1"
+                                               Visibility="Collapsed"
+                                               AutomationProperties.AutomationId="ReaderLoading"
+                                               AutomationProperties.Name="Opening guide…">
+                            <StackPanel Orientation="Horizontal"
+                                        VerticalAlignment="Top"
+                                        Spacing="{StaticResource DesktopGuidesSpacing12}">
+                                <ProgressRing x:Name="ReaderLoadingRing"
+                                              IsActive="False"
+                                              Width="{StaticResource DesktopGuidesInlineProgressSize}"
+                                              Height="{StaticResource DesktopGuidesInlineProgressSize}"
+                                              AutomationProperties.AccessibilityView="Raw" />
+                                <TextBlock Text="Opening guide…"
+                                           Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                                           AutomationProperties.AccessibilityView="Raw" />
+                            </StackPanel>
+                        </local:AutomationGroup>
+                        <StackPanel Grid.Row="1" Spacing="{StaticResource DesktopGuidesSpacing12}">
                             <TextBlock x:Name="ReaderLoadError"
                                        Visibility="Collapsed"
                                        TextWrapping="Wrap"
@@ -549,6 +576,7 @@
                             </local:AutomationGroup>
                         </StackPanel>
                         <ContentControl x:Name="ReaderSurface"
+                                        Grid.Row="1"
                                         HorizontalAlignment="Stretch"
                                         VerticalAlignment="Stretch"
                                         HorizontalContentAlignment="Stretch"
@@ -632,6 +660,13 @@
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
+        </Grid>
+        <!-- T14.4: route loads show here, over the content, so nothing moves. -->
+        <ProgressBar x:Name="RouteProgress"
+                     IsIndeterminate="True"
+                     VerticalAlignment="Top"
+                     AutomationProperties.AutomationId="RouteProgress"
+                     AutomationProperties.Name="Loading" />
         </Grid>
         </NavigationView>
     </Grid>

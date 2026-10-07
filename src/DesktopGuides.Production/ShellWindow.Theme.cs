@@ -115,7 +115,7 @@ public sealed partial class ShellWindow
             committedTheme = requested;
             if (requested == requestedTheme)
             {
-                ShowTransientStatus(ThemePresentation.Saved(requested));
+                AnnounceStatus(ThemePresentation.Saved(requested));
             }
         }
         catch (Exception error)

@@ -301,7 +301,7 @@ public sealed partial class ReaderToolbar : UserControl
         {
             if (ReferenceEquals(current, session))
             {
-                CommandFailed?.Invoke($"Could not {description}: {error.Message}");
+                CommandFailed?.Invoke($"Couldn't {description}: {error.Message}");
             }
         }
     }

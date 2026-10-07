@@ -24,7 +24,7 @@ public sealed partial class ShellWindow
         // An unlock attempt keeps the panel up while it checks.
         if (password is null)
         {
-            ShowReaderSurface(placeholder: false);
+            ShowReaderSurface(loading: true);
         }
         readerLoad?.Dispose();
         readerLoad = new CancellationTokenSource();
@@ -63,7 +63,7 @@ public sealed partial class ShellWindow
         session.Failed += OnPdfSessionFailed;
         session.ZoomChanged += OnPdfZoomChanged;
         session.View.PreviewKeyDown += OnPdfPreviewKeyDown;
-        ShowReaderSurface(placeholder: false, view: session.View);
+        ShowReaderSurface(loading: false, view: session.View);
         try
         {
             await session.OpenAsync(new ManagedGuideSource(guide, loaded.FilePath), password, token);
@@ -79,7 +79,7 @@ public sealed partial class ShellWindow
                 return false;
             }
             readerSession = null;
-            ShowReaderSurface(placeholder: false);
+            ShowReaderSurface(loading: false);
             await session.DisposeAsync();
             ShowPdfLoadError(error.Error);
             return true;
@@ -128,13 +128,13 @@ public sealed partial class ShellWindow
     private void ShowPdfLoadError(PdfGuideLoadError error)
     {
         string message = PdfGuideLoadMessages.For(error);
-        ShowReaderSurface(placeholder: false, error: message, action: PdfGuideLoadMessages.ActionFor(error));
+        ShowReaderSurface(loading: false, error: message, action: PdfGuideLoadMessages.ActionFor(error));
         ShowWarningStatus(message);
     }
 
     private void ShowPdfUnlock(Guide guide, int generation, PdfGuideLoadError error)
     {
-        ShowReaderSurface(placeholder: false);
+        ShowReaderSurface(loading: false);
         pdfUnlockGuide = guide;
         pdfUnlockGeneration = generation;
         PdfUnlockMessage.Text = PdfGuideLoadMessages.For(PdfGuideLoadError.PasswordRequired);
@@ -148,8 +148,8 @@ public sealed partial class ShellWindow
         }
         // The box was cleared before the attempt, so Unlock is disabled
         // (P13); focus goes back to the box for the next try. The panel says
-        // what is wrong, so the render's "Loading guide…" status just closes.
-        HideStatus();
+        // what is wrong, so the progress line just hides.
+        HideRouteProgress();
         DispatcherQueue.TryEnqueue(() =>
         {
             if (generation == renderGeneration && PdfUnlockPanel.Visibility == Visibility.Visible)
@@ -248,7 +248,7 @@ public sealed partial class ShellWindow
             IReaderSession failed = readerSession!;
             readerSession = null;
             ReaderActions.SetSession(null);
-            ShowReaderSurface(placeholder: false);
+            ShowReaderSurface(loading: false);
             await failed.DisposeAsync();
             ShowPdfLoadError(error);
         });

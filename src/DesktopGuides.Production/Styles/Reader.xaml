@@ -9,4 +9,7 @@
     </Style>
 
     <x:Double x:Key="DesktopGuidesTextSizeValueMinWidth">44</x:Double>
+
+    <!-- Collapsed elements take no margin, so a closed notice leaves no gap. -->
+    <Thickness x:Key="DesktopGuidesReaderNoticeMargin">0,0,0,12</Thickness>
 </ResourceDictionary>

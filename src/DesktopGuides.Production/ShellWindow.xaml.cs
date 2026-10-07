@@ -14,6 +14,7 @@ using DesktopGuides.Production.Providers;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -187,7 +188,7 @@ public sealed partial class ShellWindow : Window
             await repository.UpdateSettingsAsync(s => s with { WindowMaterial = requested });
             if (EffectiveMaterial == requested)
             {
-                ShowTransientStatus($"Window background set to {requested}.");
+                AnnounceStatus($"Window background set to {requested}.");
             }
             else
             {
@@ -197,7 +198,7 @@ public sealed partial class ShellWindow : Window
         catch (Exception error)
         {
             ApplyWindowMaterial(previous);
-            ShowErrorStatus($"Could not save the window background: {error.Message}");
+            ShowErrorStatus($"Couldn't save the window background: {error.Message}");
         }
     }
 
@@ -207,11 +208,58 @@ public sealed partial class ShellWindow : Window
     private void ShowTransientStatus(string message) =>
         ShowStatus(message, InfoBarSeverity.Informational, false, true);
 
-    private void ShowWarningStatus(string message) =>
+    private void ShowWarningStatus(string message)
+    {
+        HideRouteProgress();
         ShowStatus(message, InfoBarSeverity.Warning, true, false);
+    }
 
-    private void ShowErrorStatus(string message) =>
+    private void ShowErrorStatus(string message)
+    {
+        HideRouteProgress();
         ShowStatus(message, InfoBarSeverity.Error, true, false);
+    }
+
+    // T14.4: a ready route, or a change the page already shows, is
+    // announced without the bar. The probe still counts it.
+    private void AnnounceStatus(string message)
+    {
+        AutomationProperties.SetItemStatus(
+            ShellContent, $"{++statusSequence}|{message}");
+        AutomationPeer? peer = FrameworkElementAutomationPeer.FromElement(Navigation)
+            ?? FrameworkElementAutomationPeer.CreatePeerForElement(Navigation);
+        peer?.RaiseNotificationEvent(
+            AutomationNotificationKind.Other,
+            AutomationNotificationProcessing.ImportantMostRecent,
+            message,
+            "DesktopGuidesStatus");
+    }
+
+    private void ShowRouteProgress(string message)
+    {
+        RouteProgress.Visibility = Visibility.Visible;
+        AnnounceStatus(message);
+    }
+
+    private void HideRouteProgress() => RouteProgress.Visibility = Visibility.Collapsed;
+
+    private void ShowReaderNotice(string message)
+    {
+        ReaderNotice.Message = message;
+        AutomationProperties.SetName(ReaderNotice, message);
+        ReaderNotice.Visibility = Visibility.Visible;
+        ReaderNotice.IsOpen = true;
+        AnnounceStatus(message);
+    }
+
+    private void HideReaderNotice()
+    {
+        ReaderNotice.IsOpen = false;
+        ReaderNotice.Visibility = Visibility.Collapsed;
+    }
+
+    private void ReaderNoticeClosed(InfoBar sender, InfoBarClosedEventArgs args) =>
+        sender.Visibility = Visibility.Collapsed;
 
     // Drops the busy status when the panel on screen already says what is wrong.
     private void HideStatus()
@@ -280,10 +328,11 @@ public sealed partial class ShellWindow : Window
                 () => ApplicationData.Current.LocalFolder.Path,
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
             this.dataRoot = dataRoot;
-            ShowBusyStatus("Waiting for previous window...");
+            ShowBusyStatus("Waiting for previous window…");
             libraryLease = await LibrarySessionLease.AcquireAsync(
                 dataRoot, leaseWait.Token);
-            ShowBusyStatus("Loading library...");
+            HideStatus();
+            ShowRouteProgress("Loading library…");
             ManagedPathResolver paths = new(dataRoot);
             repository = new SqliteLibraryRepository(paths);
             artwork = new ManagedArtworkStore(paths);
@@ -337,7 +386,7 @@ public sealed partial class ShellWindow : Window
         catch (Exception error)
         {
             ready = false;
-            ShowErrorStatus($"Could not open the library: {error.Message}");
+            ShowErrorStatus($"Couldn't open the library: {error.Message}");
         }
     }
 
@@ -1279,7 +1328,7 @@ public sealed partial class ShellWindow : Window
         }
         catch (Exception error)
         {
-            ShowErrorStatus($"Could not open the game: {error.Message}");
+            ShowErrorStatus($"Couldn't open the game: {error.Message}");
         }
     }
 
@@ -1287,10 +1336,11 @@ public sealed partial class ShellWindow : Window
         intentVersion is long version && version != gameGuideIntentVersion;
 
     private void ShowReaderSurface(
-        bool placeholder, string? error = null, UIElement? view = null,
+        bool loading, string? error = null, UIElement? view = null,
         HtmlGuideLoadAction action = HtmlGuideLoadAction.None)
     {
-        ReaderPlaceholder.Visibility = placeholder ? Visibility.Visible : Visibility.Collapsed;
+        ReaderLoading.Visibility = loading ? Visibility.Visible : Visibility.Collapsed;
+        ReaderLoadingRing.IsActive = loading;
         ReaderLoadError.Text = error ?? string.Empty;
         ReaderLoadError.Visibility = error is null ? Visibility.Collapsed : Visibility.Visible;
         readerErrorAction = error is null ? HtmlGuideLoadAction.None : action;
@@ -1319,11 +1369,12 @@ public sealed partial class ShellWindow : Window
         await DisposeProgressTrackingAsync();
         HideExternalLinkBar();
         HideUnavailableLinkBar();
+        HideReaderNotice();
         readerLoad?.Cancel();
         readerLoad?.Dispose();
         readerLoad = null;
         ReaderActions.SetSession(null);
-        ShowReaderSurface(placeholder: true);
+        ShowReaderSurface(loading: true);
         IReaderSession? closing = readerSession;
         readerSession = null;
         if (closing is not null)
@@ -1417,7 +1468,7 @@ public sealed partial class ShellWindow : Window
         {
             return;
         }
-        ShowBusyStatus("Opening guide...");
+        ShowRouteProgress("Opening guide…");
         try
         {
             SqliteLibraryRepository library = RequireRepository();
@@ -1461,13 +1512,13 @@ public sealed partial class ShellWindow : Window
                 }
                 catch (Exception error)
                 {
-                    ShowErrorStatus($"Could not save Resume: {error.Message}");
+                    ShowErrorStatus($"Couldn't save Resume: {error.Message}");
                 }
             }
         }
         catch (Exception error)
         {
-            ShowErrorStatus($"Could not open the guide: {error.Message}");
+            ShowErrorStatus($"Couldn't open the guide: {error.Message}");
         }
     }
 
@@ -1518,7 +1569,7 @@ public sealed partial class ShellWindow : Window
                     {
                         ShowLibraryView(LibraryView.Loading);
                     }
-                    ShowBusyStatus("Loading library…");
+                    ShowRouteProgress("Loading library…");
                     IReadOnlyList<LibraryGameSummary> games = await library.ListGameSummariesAsync();
                     AppSettings settings = await library.GetSettingsAsync();
                     Guide? resume = settings.LastActiveGuideId is Guid lastId
@@ -1541,12 +1592,12 @@ public sealed partial class ShellWindow : Window
                     {
                         RestoreLibraryFocus(generation);
                     }
-                    ShowTransientStatus("Library ready.");
+                    AnnounceStatus("Library ready.");
                     break;
 
                 case GameRoute gameRoute:
                     GamePanel.Visibility = Visibility.Visible;
-                    ShowBusyStatus("Loading game…");
+                    ShowRouteProgress("Loading game…");
                     // The rows shown before this render, if they belong to this game;
                     // ListAnchor.Resolve uses them to find a removed guide's survivor.
                     bool sameGameList = detailsGameId == gameRoute.GameId;
@@ -1670,12 +1721,12 @@ public sealed partial class ShellWindow : Window
                     {
                         pendingGuideFocus = null;
                     }
-                    ShowTransientStatus("Game ready.");
+                    AnnounceStatus("Game ready.");
                     break;
 
                 case ReaderRoute readerRoute:
                     ReaderPanel.Visibility = Visibility.Visible;
-                    ShowBusyStatus("Loading guide…");
+                    ShowRouteProgress("Loading guide…");
                     await PauseReaderMetadataReadForTestAsync();
                     Guide? guide = await library.GetGuideAsync(readerRoute.GuideId);
                     if (generation != renderGeneration)
@@ -1728,7 +1779,7 @@ public sealed partial class ShellWindow : Window
                         }
                         break;
                     }
-                    ShowReaderSurface(placeholder: false);
+                    ShowReaderSurface(loading: true);
                     readerLoad = new CancellationTokenSource();
                     CancellationToken readerToken = readerLoad.Token;
                     TextGuideLoad textLoad;
@@ -1748,7 +1799,7 @@ public sealed partial class ShellWindow : Window
                     if (textLoad is TextGuideLoadFailed failed)
                     {
                         string message = TextGuideLoadMessages.For(failed.Error);
-                        ShowReaderSurface(placeholder: false, error: message);
+                        ShowReaderSurface(loading: false, error: message);
                         ShowWarningStatus(message);
                         break;
                     }
@@ -1777,7 +1828,7 @@ public sealed partial class ShellWindow : Window
                         document, maxColumns, textScale,
                         TextReaderSession.DiagnosticsFolderForTest(cacheRoot!));
                     readerSession = session;
-                    ShowReaderSurface(placeholder: false, view: session.View);
+                    ShowReaderSurface(loading: false, view: session.View);
                     ReaderActions.SetSession(session);
                     BeginTextSize(guide.Id, textScale);
                     if (!await OpenAtSavedPlaceAsync(
@@ -1791,7 +1842,7 @@ public sealed partial class ShellWindow : Window
                 case SettingsRoute:
                     SettingsPanel.Visibility = Visibility.Visible;
                     await ProviderSettings.ReloadIfUnreadableAsync();
-                    ShowTransientStatus("Settings ready.");
+                    AnnounceStatus("Settings ready.");
                     break;
             }
             return true;
@@ -1802,9 +1853,21 @@ public sealed partial class ShellWindow : Window
             {
                 LibraryLoadingState.Visibility = Visibility.Collapsed;
                 LibraryProgress.IsActive = false;
-                ShowErrorStatus($"Could not load this view: {error.Message}");
+                if (navigator.Current is ReaderRoute)
+                {
+                    ShowReaderSurface(loading: false);
+                }
+                ShowErrorStatus($"Couldn't load this view: {error.Message}");
             }
             return false;
+        }
+        finally
+        {
+            // A newer render owns the line; this one only hides its own.
+            if (generation == renderGeneration)
+            {
+                HideRouteProgress();
+            }
         }
     }
 
@@ -1846,7 +1909,7 @@ public sealed partial class ShellWindow : Window
             : LibraryView.List);
         if (announce && appliedLibraryQuery.Length > 0)
         {
-            ShowTransientStatus(matches.Count == 0
+            AnnounceStatus(matches.Count == 0
                 ? "No games match."
                 : $"{matches.Count} of {librarySummaries.Count} games match.");
         }
@@ -1993,7 +2056,7 @@ public sealed partial class ShellWindow : Window
         }
         catch (Exception failure)
         {
-            error = $"Could not refresh metadata: {failure.Message}";
+            error = $"Couldn't refresh metadata: {failure.Message}";
         }
         finally
         {

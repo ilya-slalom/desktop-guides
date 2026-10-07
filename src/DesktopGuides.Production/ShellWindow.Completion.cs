@@ -80,13 +80,13 @@ public sealed partial class ShellWindow
                     {
                         GameCompletionChoice.FocusSelection();
                     }
-                    ShowTransientStatus(announcement);
+                    AnnounceStatus(announcement);
                 }
                 else if (route is ReaderRoute reader && reader.GuideId == request.GuideId)
                 {
                     ReaderCompletionChoice.Show(
                         request.GuideId, request.Title, GuideCompletionPresentation.IsComplete(committed));
-                    ShowTransientStatus(announcement);
+                    AnnounceStatus(announcement);
                 }
             });
         }

@@ -1202,13 +1202,13 @@ try {
     }
 
     if ($Mode -eq 'waiting-handoff') {
-        [void](Wait-Status 'Waiting for previous window...')
+        [void](Wait-Status ('Waiting for previous window' + [char]0x2026))
         $report.phases += 'waiting-for-library-lease'
     }
     elseif ($Mode -eq 'queue-guide') {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         Open-GuideFromGame 'Blocked Write Guide'
-        [void](Wait-Status 'Opening guide...')
+        [void](Wait-Status ('Opening guide' + [char]0x2026))
         $report.phases += 'guide-action-started'
     }
     elseif ($Mode -eq 'queue-guide-write') {
@@ -1240,7 +1240,7 @@ try {
         [void](Wait-Status 'Game ready.')
         [void](Wait-SelectedGuide 'Route Test Guide')
         Invoke-Element (Wait-Name 'OpenSelectedGuide' 'Open Route Test Guide')
-        [void](Wait-Status 'Opening guide...')
+        [void](Wait-Status ('Opening guide' + [char]0x2026))
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         Select-Element 'Blocked Write Guide'
         [void](Wait-SelectedGuide 'Blocked Write Guide')
@@ -1249,7 +1249,7 @@ try {
     }
     elseif ($Mode -eq 'late-guide-after-close') {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Status 'Opening guide...' -AllowHidden)
+        [void](Wait-Status ('Opening guide' + [char]0x2026) -AllowHidden)
         [void](Wait-SelectedGuide 'Blocked Write Guide')
         Select-Element 'Route Test Guide'
         [void](Wait-SelectedGuide 'Route Test Guide')
@@ -5584,12 +5584,14 @@ try {
     elseif ($Mode -eq 'reader-render-error-observed') {
         [void](Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Status `
-            'Could not load this view: Stored guide format is invalid.')
+            "Couldn't load this view: Stored guide format is invalid.")
+        # T14.4: a failed render stops the card's loading state.
+        Assert-Absent 'ReaderLoading'
         $report.phases += 'reader-render-read-failed-on-reader-route'
     }
     elseif ($Mode -eq 'reader-render-error-result') {
         [void](Wait-Status `
-            'Could not load this view: Stored guide format is invalid.')
+            "Couldn't load this view: Stored guide format is invalid.")
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Status 'Game ready.')
