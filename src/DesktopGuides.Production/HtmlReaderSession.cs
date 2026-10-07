@@ -312,10 +312,13 @@ internal sealed class HtmlReaderSession : IReaderSession
                 if (applied is ReaderAppearance now && HtmlLocationRules.NeedsAppearanceRestore(before, now))
                 {
                     // An open-time restore that started during the restyle
-                    // sees this and scrolls to its own target again; a
-                    // pending resize's re-apply scrolls to the same point.
+                    // sees this and scrolls to its own target again. A
+                    // pending resize doesn't skip the restore: the size
+                    // status opening above the reader is itself a resize.
+                    // Its re-apply scrolls to the same point again and
+                    // takes the baseline.
                     generation++;
-                    if (!resizing && !restoring) await RestorePlaceAsync(now);
+                    if (!restoring) await RestorePlaceAsync(now);
                 }
                 // A step that arrived during the restore needs another write.
                 if (!written || appearance == applied) break;
