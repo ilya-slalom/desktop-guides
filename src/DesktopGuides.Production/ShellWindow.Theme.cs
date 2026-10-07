@@ -78,6 +78,7 @@ public sealed partial class ShellWindow
     // Restyles the open guide; TXT and PDF sessions ignore it.
     private async void RefreshReaderAppearance()
     {
+        UpdateReaderSurfaceChrome();
         if (readerSession is not IReaderSession session) return;
         try
         {

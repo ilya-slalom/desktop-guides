@@ -14,4 +14,7 @@
 
     <!-- Collapsed elements take no margin, so a closed notice leaves no gap. -->
     <Thickness x:Key="DesktopGuidesReaderNoticeMargin">0,0,0,12</Thickness>
+    <Thickness x:Key="DesktopGuidesReaderGapAbove">0,12,0,0</Thickness>
+    <Thickness x:Key="DesktopGuidesReaderGapBelow">0,0,0,12</Thickness>
+    <Thickness x:Key="DesktopGuidesPdfTextPaneMargin">16,0,0,0</Thickness>
 </ResourceDictionary>

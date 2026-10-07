@@ -324,6 +324,7 @@ public sealed partial class ShellWindow : Window
         ReaderHeader.RowSpacing = readerNarrow
             ? (double)resources["DesktopGuidesSpacing12"]
             : 0;
+        UpdateReaderSurfaceChrome();
     }
 
     // The details card scrolls inside whatever height the guide list doesn't need.
@@ -1381,6 +1382,27 @@ public sealed partial class ShellWindow : Window
         PdfPasswordInput.Password = string.Empty;
         ReaderSurface.Content = view;
         ReaderSurface.Visibility = view is null ? Visibility.Collapsed : Visibility.Visible;
+        UpdateReaderSurfaceChrome();
+    }
+
+    // T14.4: an HTML page fills its card in the page's own color; other
+    // readers keep the card's padding, narrower in a narrow window.
+    private void UpdateReaderSurfaceChrome()
+    {
+        bool html = readerSession is HtmlReaderSession;
+        string? pageColor = html ? HtmlReaderStyle.PageColor(ReaderThemeNow()) : null;
+        ReaderPageBackdrop.Background = pageColor is string hex
+            ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(
+                255,
+                Convert.ToByte(hex[1..3], 16),
+                Convert.ToByte(hex[3..5], 16),
+                Convert.ToByte(hex[5..7], 16)))
+            : null;
+        ReaderSurfaceCard.Padding = html
+            ? new Thickness(0)
+            : (Thickness)Application.Current.Resources[readerNarrow
+                ? "DesktopGuidesSurfacePaddingNarrow"
+                : "DesktopGuidesSurfacePadding"];
     }
 
     // A render holds the navigation queue while its TXT guide loads, so a
@@ -1402,6 +1424,7 @@ public sealed partial class ShellWindow : Window
         ShowReaderSurface(loading: true);
         IReaderSession? closing = readerSession;
         readerSession = null;
+        UpdateReaderSurfaceChrome();
         if (closing is not null)
         {
             await closing.DisposeAsync();

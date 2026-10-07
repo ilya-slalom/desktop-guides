@@ -458,7 +458,7 @@
                     <local:ReaderToolbar x:Name="ReaderActions" />
                     <!-- Collapsed while closed, so the Reader's layout is unchanged without a link. -->
                     <InfoBar x:Name="ReaderExternalLinkBar"
-                             Margin="0,12,0,0"
+                             Margin="{StaticResource DesktopGuidesReaderGapAbove}"
                              Visibility="Collapsed"
                              IsOpen="False"
                              IsClosable="True"
@@ -468,7 +468,7 @@
                              AutomationProperties.AutomationId="ReaderExternalLinkBar">
                         <InfoBar.Content>
                             <StackPanel Spacing="{StaticResource DesktopGuidesSpacing12}"
-                                        Margin="0,0,0,12">
+                                        Margin="{StaticResource DesktopGuidesReaderGapBelow}">
                                 <TextBlock x:Name="ReaderExternalLinkUrl"
                                            TextWrapping="Wrap"
                                            IsTextSelectionEnabled="True"
@@ -477,11 +477,12 @@
                                             Spacing="{StaticResource DesktopGuidesSpacing8}">
                                     <Button x:Name="ReaderExternalLinkOpen"
                                             Content="Open in browser"
-                                            Style="{StaticResource AccentButtonStyle}"
+                                            Style="{StaticResource DesktopGuidesPrimaryActionButtonStyle}"
                                             Click="ReaderExternalLinkOpenClicked"
                                             AutomationProperties.AutomationId="ReaderExternalLinkOpen" />
                                     <Button x:Name="ReaderExternalLinkDismiss"
                                             Content="Dismiss"
+                                            Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
                                             Click="ReaderExternalLinkDismissClicked"
                                             AutomationProperties.AutomationId="ReaderExternalLinkDismiss" />
                                 </StackPanel>
@@ -490,7 +491,7 @@
                     </InfoBar>
                     <!-- A fixed message: never the link's target or the page's text. -->
                     <InfoBar x:Name="ReaderUnavailableLinkBar"
-                             Margin="0,12,0,0"
+                             Margin="{StaticResource DesktopGuidesReaderGapAbove}"
                              Visibility="Collapsed"
                              IsOpen="False"
                              IsClosable="True"
@@ -510,6 +511,12 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
+                        <!-- T14.4: an HTML page's own color behind it, so the card is one frame.
+                             A separate border keeps the card's ThemeResource fill. -->
+                        <Border x:Name="ReaderPageBackdrop"
+                                Grid.RowSpan="2"
+                                CornerRadius="{StaticResource DesktopGuidesSurfaceCornerRadius}"
+                                AutomationProperties.AccessibilityView="Raw" />
                         <!-- T14.4: an approximate place is said here, so the commands above never move. -->
                         <InfoBar x:Name="ReaderNotice"
                                  Margin="{StaticResource DesktopGuidesReaderNoticeMargin}"
@@ -544,6 +551,7 @@
                                        Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
                                        AutomationProperties.AutomationId="ReaderLoadError" />
                             <Button x:Name="ReaderLoadErrorAction"
+                                    Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
                                     Visibility="Collapsed"
                                     HorizontalAlignment="Left"
                                     Click="ReaderLoadErrorActionClicked"
@@ -551,7 +559,7 @@
                             <!-- A StackPanel has no automation peer, so the group carries the AutomationId. -->
                             <local:AutomationGroup x:Name="PdfUnlockPanel"
                                                    Visibility="Collapsed"
-                                                   MaxWidth="360"
+                                                   MaxWidth="{StaticResource DesktopGuidesPdfUnlockMaxWidth}"
                                                    HorizontalAlignment="Left"
                                                    AutomationProperties.AutomationId="PdfUnlockPanel">
                                 <StackPanel Spacing="{StaticResource DesktopGuidesSpacing12}">
@@ -566,13 +574,13 @@
                                     <TextBlock x:Name="PdfUnlockError"
                                                Visibility="Collapsed"
                                                TextWrapping="Wrap"
-                                               Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                               Foreground="{ThemeResource DesktopGuidesDestructiveBrush}"
                                                AutomationProperties.LiveSetting="Polite"
                                                AutomationProperties.AutomationId="PdfUnlockError" />
                                     <Button x:Name="PdfUnlockButton"
                                             Content="Unlock"
                                             IsEnabled="False"
-                                            Style="{StaticResource AccentButtonStyle}"
+                                            Style="{StaticResource DesktopGuidesPrimaryActionButtonStyle}"
                                             Click="PdfUnlockClicked"
                                             AutomationProperties.AutomationId="PdfUnlockButton" />
                                 </StackPanel>
