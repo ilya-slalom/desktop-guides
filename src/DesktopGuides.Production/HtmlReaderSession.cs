@@ -91,6 +91,8 @@ internal sealed class HtmlReaderSession : IReaderSession
     // Capabilities don't change during an HTML session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
     public event EventHandler<LocationChangedEventArgs>? LocationChanged;
+    // T14.3: raised after a text-size change scrolled back to the place.
+    public event EventHandler<AppearanceRestoredEventArgs>? AppearanceRestored;
     public event EventHandler<Uri>? ExternalLinkRequested;
     // A person's link to a page of this guide that wasn't imported. It
     // carries nothing: the shell never shows the target.

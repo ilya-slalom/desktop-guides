@@ -1512,6 +1512,7 @@ public sealed class SqliteLibraryRepositoryTests
         public GuideFormat Format => GuideFormat.Txt;
         public ReaderCapabilities Capabilities => ReaderCapabilities.Scroll;
         public event EventHandler? CapabilitiesChanged { add { } remove { } }
+        public event EventHandler<AppearanceRestoredEventArgs>? AppearanceRestored { add { } remove { } }
         public event EventHandler<LocationChangedEventArgs>? LocationChanged;
 
         public ReaderLocation Current => new(

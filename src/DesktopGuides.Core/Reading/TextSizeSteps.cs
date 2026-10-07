@@ -61,6 +61,10 @@ public static class TextSizeSteps
 
     public static string Status(double scale) => $"Text size {Label(scale)}.";
 
+    // T14.3: an HTML page that came back only by fraction.
+    public static string ShiftedStatus(double scale) =>
+        $"Text size {Label(scale)}. Your place may have shifted.";
+
     public static string SaveFailed(string message) =>
         $"Could not save the text size: {message}";
 }

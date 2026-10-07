@@ -378,4 +378,45 @@ public sealed class HtmlLocationRulesTests
         Assert.Equal(TextLocator.ApproximateReason, HtmlLocationRules.ChangedReason);
         Assert.Equal(TextLocator.UnavailableReason, HtmlLocationRules.UnavailableReason);
     }
+
+    // ---- NeedsAppearanceRestore ----
+
+    [Fact]
+    public void AFirstWriteNeedsNoAppearanceRestore() =>
+        Assert.False(HtmlLocationRules.NeedsAppearanceRestore(
+            null, new ReaderAppearance(ReaderTheme.Light, 1.5)));
+
+    [Fact]
+    public void AThemeOnlyChangeNeedsNoAppearanceRestore() =>
+        Assert.False(HtmlLocationRules.NeedsAppearanceRestore(
+            new ReaderAppearance(ReaderTheme.Light, 1.25), new ReaderAppearance(ReaderTheme.Dark, 1.25)));
+
+    [Fact]
+    public void AScaleChangeNeedsAnAppearanceRestore() =>
+        Assert.True(HtmlLocationRules.NeedsAppearanceRestore(
+            new ReaderAppearance(ReaderTheme.Light, 1.0), new ReaderAppearance(ReaderTheme.Light, 1.1)));
+
+    [Fact]
+    public void ScalesThatClampAlikeNeedNoAppearanceRestore() =>
+        Assert.False(HtmlLocationRules.NeedsAppearanceRestore(
+            new ReaderAppearance(ReaderTheme.Light, 2.0), new ReaderAppearance(ReaderTheme.Light, 9.0)));
+
+    // ---- AppearanceOutcome ----
+
+    [Theory]
+    [InlineData(HtmlRestoreStep.Exact)]
+    [InlineData(HtmlRestoreStep.Context)]
+    public void ATextTargetIsAnExactAppearanceRestore(HtmlRestoreStep step) =>
+        Assert.Equal(new RestoreOutcome(RestoreKind.Exact),
+            HtmlLocationRules.AppearanceOutcome(new HtmlRestoreTarget(step, 120, 0.4)));
+
+    [Fact]
+    public void AFractionTargetIsAnApproximateAppearanceRestore() =>
+        Assert.Equal(new RestoreOutcome(RestoreKind.Approximate),
+            HtmlLocationRules.AppearanceOutcome(new HtmlRestoreTarget(HtmlRestoreStep.Fraction, 0, 0.5)));
+
+    [Fact]
+    public void NoTargetIsAnUnavailableAppearanceRestore() =>
+        Assert.Equal(new RestoreOutcome(RestoreKind.Unavailable, HtmlLocationRules.UnavailableReason),
+            HtmlLocationRules.AppearanceOutcome(null));
 }

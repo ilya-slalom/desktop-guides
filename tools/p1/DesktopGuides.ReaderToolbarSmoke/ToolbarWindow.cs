@@ -165,6 +165,7 @@ public sealed class ToolbarWindow : Window
         public ReaderCapabilities Capabilities =>
             (ReaderCapabilities)Volatile.Read(ref capabilities);
         public event EventHandler? CapabilitiesChanged;
+        public event EventHandler<AppearanceRestoredEventArgs>? AppearanceRestored { add { } remove { } }
         public event EventHandler<LocationChangedEventArgs>? LocationChanged
         {
             add { }

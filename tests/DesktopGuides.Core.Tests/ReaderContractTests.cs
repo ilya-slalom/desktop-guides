@@ -92,6 +92,13 @@ public sealed class ReaderContractTests
     public void TextSizeActionRejectsAScaleOutOfRange(double scale) =>
         Assert.Throws<ArgumentOutOfRangeException>(() => new TextSizeAction(scale));
 
+    [Fact]
+    public void AppearanceRestoredCarriesItsOutcome()
+    {
+        RestoreOutcome outcome = new(RestoreKind.Approximate);
+        Assert.Same(outcome, new AppearanceRestoredEventArgs(outcome).Outcome);
+    }
+
     private sealed class FakeReader(GuideFormat format, ReaderCapabilities capabilities)
         : IReaderSession, IDisposable
     {
@@ -99,6 +106,7 @@ public sealed class ReaderContractTests
         public ReaderCapabilities Capabilities { get; private set; } = capabilities;
         public ReaderAction? LastAction { get; private set; }
         public event EventHandler? CapabilitiesChanged;
+        public event EventHandler<AppearanceRestoredEventArgs>? AppearanceRestored { add { } remove { } }
         public event EventHandler<LocationChangedEventArgs>? LocationChanged
         {
             add { }
