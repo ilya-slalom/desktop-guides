@@ -526,10 +526,13 @@ if (args.Length == 3 && args[0] == "seed-html-position")
     }
     Guid guideLong = await PublishLongAsync("html-long", "Long Web Guide");
     Guid guideChanged = await PublishLongAsync("html-long-changed", "Changed Long Web Guide");
+    // T14.3: an image-only guide, whose place comes back by fraction only.
+    Guid guidePictures = await PublishLongAsync("html-pictures", "Picture Web Guide");
     Console.WriteLine(JsonSerializer.Serialize(new
     {
         guideLong = guideLong.ToString("N"),
-        guideChanged = guideChanged.ToString("N")
+        guideChanged = guideChanged.ToString("N"),
+        guidePictures = guidePictures.ToString("N")
     }));
     return 0;
 }
