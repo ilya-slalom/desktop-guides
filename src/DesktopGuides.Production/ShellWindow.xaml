@@ -408,50 +408,53 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <Button x:Name="ReaderBackButton"
-                        Content="Back to game"
-                        HorizontalAlignment="Left"
-                        Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
-                        Click="ReaderBackClicked"
-                        AutomationProperties.AutomationId="ReaderBackToGame" />
-
-                <Grid Grid.Row="1"
+                <Grid x:Name="ReaderHeader"
                       ColumnSpacing="{StaticResource DesktopGuidesSpacing16}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <StackPanel Spacing="{StaticResource DesktopGuidesSpacing4}">
                         <TextBlock x:Name="ReaderHeading"
                                    Style="{StaticResource DesktopGuidesPageTitleStyle}"
                                    AutomationProperties.AutomationId="ReaderHeading" />
-                        <TextBlock x:Name="ReaderGameName"
-                                   Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
-                                   AutomationProperties.AutomationId="ReaderGameName" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1"
-                                Orientation="Horizontal"
-                                VerticalAlignment="Top"
-                                Spacing="{StaticResource DesktopGuidesSpacing16}">
-                        <local:GuideCompletionChoice x:Name="ReaderCompletionChoice" />
-                        <Border Padding="10,4"
-                                VerticalAlignment="Top"
-                                Background="{ThemeResource DesktopGuidesSurfaceBrush}"
-                                BorderBrush="{ThemeResource DesktopGuidesBorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="{StaticResource DesktopGuidesControlCornerRadius}">
+                        <!-- T14.4: a left-aligned grid sizes to its content, so a long
+                             game name trims while the format stays beside it. -->
+                        <Grid HorizontalAlignment="Left"
+                              ColumnSpacing="{StaticResource DesktopGuidesSpacing8}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="ReaderGameName"
+                                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                                       TextWrapping="NoWrap"
+                                       TextTrimming="CharacterEllipsis"
+                                       AutomationProperties.AutomationId="ReaderGameName" />
+                            <TextBlock Grid.Column="1"
+                                       Text="·"
+                                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                                       AutomationProperties.AccessibilityView="Raw" />
                             <TextBlock x:Name="ReaderFormat"
-                                       Style="{StaticResource DesktopGuidesMetadataStyle}"
+                                       Grid.Column="2"
+                                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
                                        AutomationProperties.AutomationId="ReaderFormat" />
-                        </Border>
+                        </Grid>
                     </StackPanel>
+                    <local:GuideCompletionChoice x:Name="ReaderCompletionChoice"
+                                                 Grid.Column="1"
+                                                 VerticalAlignment="Top" />
                 </Grid>
 
-                <StackPanel Grid.Row="2">
+                <StackPanel Grid.Row="1">
                     <local:ReaderToolbar x:Name="ReaderActions" />
                     <!-- Collapsed while closed, so the Reader's layout is unchanged without a link. -->
                     <InfoBar x:Name="ReaderExternalLinkBar"
@@ -499,7 +502,7 @@
                 </StackPanel>
 
                 <Border x:Name="ReaderSurfaceCard"
-                        Grid.Row="3"
+                        Grid.Row="2"
                         Style="{StaticResource DesktopGuidesElevatedSurfaceStyle}"
                         Background="{ThemeResource DesktopGuidesReadingSurfaceBrush}">
                     <Grid>

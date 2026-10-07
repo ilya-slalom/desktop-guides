@@ -58,6 +58,7 @@ public sealed partial class ShellWindow : Window
     private int readerErrorGeneration;
     private long gameGuideIntentVersion;
     private long statusSequence;
+    private bool readerNarrow;
     private bool settingGuideSelection;
     private bool ready;
     private bool closeRequested;
@@ -139,6 +140,15 @@ public sealed partial class ShellWindow : Window
         ReaderCompletionChoice.CompletionRequested += CompletionChoiceRequested;
         AppWindow.Closing += WindowClosing;
         Activated += WindowActivated;
+        // T14.4: Alt+Left goes back wherever the title bar's Back would.
+        KeyboardAccelerator back = new()
+        {
+            Key = VirtualKey.Left,
+            Modifiers = VirtualKeyModifiers.Menu
+        };
+        back.Invoked += BackAcceleratorInvoked;
+        ShellRoot.KeyboardAccelerators.Add(back);
+        ShellRoot.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
     }
 
     private void UpdatePaneStatus() =>
@@ -304,6 +314,16 @@ public sealed partial class ShellWindow : Window
                 ? "DesktopGuidesPagePaddingWide"
                 : "DesktopGuidesPagePadding";
         ShellContent.Padding = (Thickness)resources[paddingKey];
+        // T14.4: a narrow Reader puts the completion choice under the
+        // metadata line.
+        readerNarrow = args.NewSize.Width <= narrowBreakpoint;
+        Grid.SetRow(ReaderCompletionChoice, readerNarrow ? 1 : 0);
+        Grid.SetColumn(ReaderCompletionChoice, readerNarrow ? 0 : 1);
+        ReaderCompletionChoice.HorizontalAlignment =
+            readerNarrow ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+        ReaderHeader.RowSpacing = readerNarrow
+            ? (double)resources["DesktopGuidesSpacing12"]
+            : 0;
     }
 
     // The details card scrolls inside whatever height the guide list doesn't need.
@@ -491,8 +511,11 @@ public sealed partial class ShellWindow : Window
     private void TitleBarPaneToggleRequested(TitleBar sender, object args) =>
         Navigation.IsPaneOpen = !Navigation.IsPaneOpen;
 
-    private async void ReaderBackClicked(object sender, RoutedEventArgs args)
+    private async void BackAcceleratorInvoked(
+        KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
+        if (!AppTitleBar.IsBackButtonEnabled) return;
+        args.Handled = true;
         CancelReaderLoad();
         await RunNavigationAsync(GoBackAsync);
     }
