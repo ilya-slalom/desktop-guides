@@ -293,10 +293,15 @@ internal sealed class HtmlReaderSession : IReaderSession
         restyling = true;
         try
         {
-            // A move the tracker hadn't polled yet is the reader's own.
-            if (!resizing && !restoring && await CaptureAsync() is HtmlCapture capture &&
-                !disposed && capture != current)
+            // A move the tracker hadn't polled yet is the reader's own. The
+            // tracker's own test tells it apart from the last restyle: at a
+            // new zoom the same top has a new fraction, which isn't a move.
+            if (!resizing && !restoring &&
+                HtmlLocationRules.ParseScroll(await RunScriptAsync(HtmlPositionScripts.ReadScroll)) is HtmlScroll scroll &&
+                !disposed && HtmlLocationRules.Moved(lastScroll, scroll) &&
+                await CaptureAsync() is HtmlCapture capture && !disposed && capture != current)
             {
+                lastScroll = scroll;
                 current = capture;
                 WritePositionForTest();
                 RaiseLocationChanged();
