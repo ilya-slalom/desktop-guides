@@ -464,6 +464,9 @@ internal sealed class HtmlReaderSession : IReaderSession
             HtmlRestoreStep step = point.Quote is null ? HtmlRestoreStep.Fraction : HtmlRestoreStep.Exact;
             await ScrollToTargetAsync(new HtmlRestoreTarget(step, point.Offset, point.Fraction));
         }
+        // With no point yet, no baseline either: the next tick takes the
+        // first capture, as it would have without the resize.
+        if (current is null) return;
         HtmlScroll? scroll = HtmlLocationRules.ParseScroll(await RunScriptAsync(HtmlPositionScripts.ReadScroll));
         if (scroll is not null && started == generation && !disposed) lastScroll = scroll;
     }
