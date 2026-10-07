@@ -3309,7 +3309,8 @@ try {
                 [void](Wait-TextDiagnostics 1.0 'the open')
                 Assert-ResetEnabled $false
                 [void](Wait-FirstTextRow)
-                (Find-ById 'ReaderTextLines').SetFocus()
+                # The ListView itself isn't a focus target; its rows are.
+                (Find-ById 'ReaderTextLines').FindFirst($scope, $listItem).SetFocus()
                 Wait-FocusWithin 'ReaderTextLines'
                 Step-TextSize '^=' '110%'
                 Step-TextSize '^{ADD}' '125%'
