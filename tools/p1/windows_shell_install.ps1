@@ -1802,11 +1802,11 @@ function Run-ThemeScenarios {
     try {
         Set-AppThemePreference $true
         Start-InstalledShell
-        $report.theme.segmented = Run-ShellSmoke 'theme-segmented'
+        $report.theme.selector = Run-ShellSmoke 'theme-selector'
         Close-InstalledShell
         [void](Assert-StoredTheme 'System' 'the gate')
 
-        # Windows light: System to Dark (two arrow presses, two saves).
+        # Windows light: System to Dark (one drop-down choice, one save).
         Start-InstalledShell
         $report.theme.lightToDark = Run-ShellSmoke 'theme-change' -ResultName 'theme-change-light' `
             -ExpectedTheme System -ExpectedThemeStatus 'System (Light)' -SwitchToTheme Dark

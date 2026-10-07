@@ -18,7 +18,7 @@ param(
         'html-theme-open', 'html-theme-light', 'html-theme-switch',
         'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed',
         'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry',
-        'theme-segmented', 'theme-change', 'theme-restored', 'theme-error', 'theme-error-retry',
+        'theme-selector', 'theme-change', 'theme-restored', 'theme-error', 'theme-error-retry',
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry')]
     [string] $Mode,
@@ -4068,6 +4068,15 @@ try {
         [void](Wait-Status 'Settings ready.')
         [void](Wait-HiddenById 'ShellStatus')
         Assert-HeadingLevel 'SettingsHeading' 1
+        Assert-HeadingLevel 'SettingsAppearanceHeading' 2
+        Assert-HeadingLevel 'SettingsLibraryHeading' 2
+        Assert-HeadingLevel 'SettingsGameDataHeading' 2
+        Assert-Below 'AppThemeSettingsCard' 'SettingsAppearanceHeading'
+        Assert-Below 'WindowMaterialSettingsCard' 'AppThemeSettingsCard'
+        Assert-Below 'SettingsLibraryHeading' 'WindowMaterialSettingsCard'
+        Assert-Below 'LibraryStorageSettingsCard' 'SettingsLibraryHeading'
+        Assert-Below 'SettingsGameDataHeading' 'LibraryStorageSettingsCard'
+        Assert-Below 'ProviderSettingsExpander' 'SettingsGameDataHeading'
         Resize-ShellWindow $narrowWidth $windowHeight
         Assert-InsideWindow 'SettingsHeading'
         Assert-InsideWindow 'LibraryStorageSettingsCard'
@@ -4087,22 +4096,15 @@ try {
     elseif ($Mode -like 'theme-*') {
         $themeIds = [ordered]@{ System = 'ThemeSystem'; Light = 'ThemeLight'; Dark = 'ThemeDark' }
 
-        function Test-ThemeSelected([string] $id) {
-            $item = Find-ById $id
-            if (-not $item -or $item.Current.IsOffscreen) { return $false }
-            return $item.GetCurrentPattern(
-                [System.Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected
-        }
-
-        # The shown theme is the only selected item.
+        # The drop-down's one selected item is the shown theme.
         function Wait-ThemeShown([string] $label, [string] $step) {
             $deadline = (Get-Date).AddSeconds(10)
             do {
-                $selected = @($themeIds.Keys | Where-Object { Test-ThemeSelected $themeIds[$_] })
-                if ($selected.Count -eq 1 -and $selected[0] -eq $label) { return }
+                $shown = Get-ComboSelection 'AppThemeSelector'
+                if ($shown -eq $label) { return }
                 Start-Sleep -Milliseconds 100
             } while ((Get-Date) -lt $deadline)
-            throw "$step expected '$label' as the only selected theme; found '$($selected -join ',')'."
+            throw "$step expected '$label' in the theme drop-down; found '$shown'."
         }
 
         function Send-ThemeKeys([string] $keys) {
@@ -4130,19 +4132,21 @@ try {
         # The theme the window, title bar and choice report now.
         function Assert-ThemeShown([string] $label, [string] $status, [string] $step) {
             Wait-ThemeShown $label $step
-            Wait-ItemStatus 'AppThemeChoice' $status $step
+            Wait-ItemStatus 'AppThemeSelector' $status $step
             $titleBar = if ($label -eq 'System') { 'UseDefaultAppMode' } else { $label }
             Wait-ItemStatus 'AppTitleBar' $titleBar $step
         }
 
-        # Keyboard only: focus the shown item, then arrow to the target.
+        # Keyboard only: open the drop-down, arrow to the target, commit.
         function Select-ThemeByKeys([string] $from, [string] $to) {
             $order = @('System', 'Light', 'Dark')
             $steps = $order.IndexOf($to) - $order.IndexOf($from)
-            (Wait-VisibleById $themeIds[$from]).SetFocus()
-            Wait-FocusedId $themeIds[$from]
-            $key = if ($steps -gt 0) { '{RIGHT}' } else { '{LEFT}' }
+            Focus-And-Verify 'AppThemeSelector'
+            Send-ThemeKeys '%{DOWN}'
+            Start-Sleep -Milliseconds 300
+            $key = if ($steps -gt 0) { '{DOWN}' } else { '{UP}' }
             for ($i = 0; $i -lt [Math]::Abs($steps); $i++) { Send-ThemeKeys $key }
+            Send-ThemeKeys '{ENTER}'
         }
 
         $windowsTheme = if ($WindowsTheme) { $WindowsTheme }
@@ -4153,56 +4157,47 @@ try {
         function Open-ThemeSettings {
             Select-Element 'Settings'
             [void](Wait-Name 'AppThemeSettingsCard' 'App theme. Choose light or dark, or follow Windows.')
-            [void](Wait-EnabledById 'AppThemeChoice')
+            [void](Wait-EnabledById 'AppThemeSelector')
         }
 
         Resize-ShellWindow 1500 720
         Open-ThemeSettings
 
-        if ($Mode -eq 'theme-segmented') {
-            # The UIA gate: three list items with their names, a readable
-            # selected state, and selection that follows the arrow keys.
-            $choice = Wait-VisibleById 'AppThemeChoice'
-            if ($choice.Current.Name -ne 'App theme') {
-                throw "The theme choice is named '$($choice.Current.Name)'."
+        if ($Mode -eq 'theme-selector') {
+            # TR14.2 with the drop-down: named, three named items with their
+            # ids, keyboard selection, whole at the CI launch size.
+            $selector = Wait-VisibleById 'AppThemeSelector'
+            if ($selector.Current.Name -ne 'App theme') {
+                throw "The theme drop-down is named '$($selector.Current.Name)'."
             }
+            Wait-ThemeShown 'System' 'A new library'
+            $expand = $selector.GetCurrentPattern(
+                [System.Windows.Automation.ExpandCollapsePattern]::Pattern)
+            $expand.Expand()
+            Start-Sleep -Milliseconds 300
             $report.themeItems = [ordered]@{}
-            foreach ($label in $themeIds.Keys) {
-                $item = Wait-VisibleById $themeIds[$label]
-                $report.themeItems[$label] = [ordered]@{
-                    name = $item.Current.Name
-                    controlType = $item.Current.ControlType.ProgrammaticName
-                    patterns = @($item.GetSupportedPatterns() | ForEach-Object { $_.ProgrammaticName })
-                }
-            }
             foreach ($label in $themeIds.Keys) {
                 $item = Wait-VisibleById $themeIds[$label]
                 if ($item.Current.ControlType -ne [System.Windows.Automation.ControlType]::ListItem -or
                     $item.Current.Name -ne $label) {
                     throw "$($themeIds[$label]) is a $($item.Current.ControlType.ProgrammaticName) named '$($item.Current.Name)'."
                 }
+                $report.themeItems[$label] = $item.Current.Name
             }
-            Wait-ThemeShown 'System' 'A new library'
-            (Wait-VisibleById 'ThemeSystem').SetFocus()
-            Wait-FocusedId 'ThemeSystem'
-            Send-ThemeKeys '{RIGHT}'
-            Wait-ThemeShown 'Light' 'Right'
-            Wait-FocusedId 'ThemeLight'
-            Send-ThemeKeys '{LEFT}'
-            Wait-ThemeShown 'System' 'Left'
-            Wait-FocusedId 'ThemeSystem'
-            # The CI launch size: the three items stay whole on the card.
+            $expand.Collapse()
+            Select-ThemeByKeys 'System' 'Light'
+            Wait-ThemeShown 'Light' 'Alt+Down, Down, Enter'
+            [void](Wait-Status 'App theme set to Light.')
+            Select-ThemeByKeys 'Light' 'System'
+            Wait-ThemeShown 'System' 'Alt+Down, Up, Enter'
+            [void](Wait-Status 'App theme set to System.')
+            # The CI launch size: the drop-down stays whole on its card.
             Resize-ShellWindow 768 519
             Start-Sleep -Milliseconds 400
-            foreach ($id in $themeIds.Values) {
-                $bounds = (Wait-VisibleById $id).Current.BoundingRectangle
-                if ($bounds.Width -lt 24 -or $bounds.Height -lt 24) {
-                    throw "At 768x519 $id is $bounds."
-                }
-            }
-            $report.themeNarrowScreenshot = Save-WindowScreenshot 'theme-segmented-narrow'
+            Assert-InsideWindow 'AppThemeSelector'
+            $report.themeNarrowScreenshot = Save-WindowScreenshot 'theme-selector-narrow'
             Resize-ShellWindow 1500 720
-            $report.phases += 'theme-segmented'
+            $report.phases += 'theme-selector'
         }
         elseif ($Mode -in @('theme-change', 'theme-restored')) {
             # TR14.2: the stored theme is applied at launch, and a keyboard
@@ -4277,10 +4272,10 @@ try {
             $report.themeErrorScreenshot = Save-WindowScreenshot 'theme-error'
             # Putting the choice back moves focus to it. Leaving and tabbing
             # back in lands on it again and changes nothing.
-            Wait-FocusedId $themeIds[$ExpectedTheme]
+            Wait-FocusedId 'AppThemeSelector'
             Send-ThemeKeys '+{TAB}'
             Send-ThemeKeys '{TAB}'
-            Wait-FocusedId $themeIds[$ExpectedTheme]
+            Wait-FocusedId 'AppThemeSelector'
             Start-Sleep -Milliseconds 1000
             $report.themeErrorTabInFocus = [System.Windows.Automation.AutomationElement]::FocusedElement.Current.AutomationId
             Assert-ThemeShown $ExpectedTheme $ExpectedThemeStatus 'Tabbing back into the choice'
@@ -5733,6 +5728,9 @@ try {
         [void](Wait-Name 'ProviderSettingsExpander' 'Game data providers. IGDB credentials saved.')
         $report.settingsScreenshot = Save-WindowScreenshot 'provider-settings-saved'
         $report.phases += 'credentials-saved'
+        # T14.4: a routine provider message closes by itself (ruling 12).
+        [void](Wait-HiddenById 'ProviderSettingsStatus')
+        $report.phases += 'saved-status-closes'
         Go-Back
         [void](Wait-Status 'Library ready.')
     }
