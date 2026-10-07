@@ -86,7 +86,7 @@ internal sealed class HtmlReaderSession : IReaderSession
 
     public WebView2 View { get; }
     public GuideFormat Format => GuideFormat.Html;
-    public ReaderCapabilities Capabilities => ReaderCapabilities.Scroll;
+    public ReaderCapabilities Capabilities => ReaderCapabilities.Scroll | ReaderCapabilities.TextSize;
 
     // Capabilities don't change during an HTML session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
@@ -322,8 +322,14 @@ internal sealed class HtmlReaderSession : IReaderSession
             : defaultPageColor;
     }
 
-    public Task ExecuteAsync(ReaderAction action, CancellationToken token) =>
-        throw new NotSupportedException("HTML guides have no reader commands yet.");
+    // A text size keeps the current theme; the style's zoom applies it.
+    public Task ExecuteAsync(ReaderAction action, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        return action is TextSizeAction size
+            ? ApplyAppearanceAsync(appearance with { TextScale = size.Scale }, token)
+            : throw new NotSupportedException($"HTML guides don't support {action.Command}.");
+    }
 
     // Runs a fixed host script in the entry document only. Any failure,
     // including a page that navigated away or a renderer that died, is null.
@@ -458,6 +464,9 @@ internal sealed class HtmlReaderSession : IReaderSession
             HtmlRestoreStep step = point.Quote is null ? HtmlRestoreStep.Fraction : HtmlRestoreStep.Exact;
             await ScrollToTargetAsync(new HtmlRestoreTarget(step, point.Offset, point.Fraction));
         }
+        // With no point yet, no baseline either: the next tick takes the
+        // first capture, as it would have without the resize.
+        if (current is null) return;
         HtmlScroll? scroll = HtmlLocationRules.ParseScroll(await RunScriptAsync(HtmlPositionScripts.ReadScroll));
         if (scroll is not null && started == generation && !disposed) lastScroll = scroll;
     }

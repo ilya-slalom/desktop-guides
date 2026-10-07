@@ -19,6 +19,7 @@ param(
     [switch] $ProgressOnly,
     [switch] $CompletionOnly,
     [switch] $ThemeOnly,
+    [switch] $TextSizeOnly,
     [switch] $ImportOnly,
     [switch] $GameActionsOnly,
     [switch] $ProviderOnly,
@@ -55,6 +56,7 @@ $scenarioGroups = [ordered]@{
     'progress' = $ProgressOnly.IsPresent
     'completion' = $CompletionOnly.IsPresent
     'theme' = $ThemeOnly.IsPresent
+    'text-size' = $TextSizeOnly.IsPresent
     'import' = $ImportOnly.IsPresent
     'game-actions' = $GameActionsOnly.IsPresent
     'provider' = $ProviderOnly.IsPresent
@@ -786,7 +788,7 @@ function Run-ShellSmoke(
         -Principal $principal -Force | Out-Null
     Start-ScheduledTask -TaskName $smokeTask
     $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*' -or $mode -like 'completion-*') { 240 }
-        elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*' -or $mode -like 'theme-*') { 120 }
+        elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*' -or $mode -like 'theme-*' -or $mode -like 'text-size-*') { 120 }
         else { 60 }
     $deadline = (Get-Date).AddSeconds($timeoutSeconds)
     do {
@@ -1845,6 +1847,93 @@ function Run-ThemeScenarios {
     }
 }
 
+function Assert-StoredTextScales($ids, $expected, [string] $step) {
+    $keys = @($expected.Keys)
+    $json = Invoke-ShellSeed (@('describe-text-scales', $dataRoot) + @($keys | ForEach-Object { $ids.$_ }))
+    $stored = $json | ConvertFrom-Json
+    $result = [ordered]@{}
+    foreach ($key in $keys) {
+        $actual = $stored.($ids.$key)
+        $want = $expected[$key]
+        $ok = if ($null -eq $want) { $null -eq $actual }
+            else { $null -ne $actual -and [math]::Abs([double] $actual - $want) -lt 0.0001 }
+        if (-not $ok) { throw "After $step the stored text scale of $key is '$actual', not '$want'." }
+        $result[$key] = $actual
+    }
+    return $result
+}
+
+function Invoke-TextSizeLaunch([scriptblock] $passes) {
+    # One launch with the TXT and HTML diagnostics gates open.
+    Start-InstalledShell
+    $processId = $report.launchedProcessId
+    $gates = @(
+        foreach ($name in @('TextDiagnostics', 'HtmlDiagnostics')) {
+            [System.Threading.EventWaitHandle]::new(
+                $false, [System.Threading.EventResetMode]::ManualReset,
+                "Local\DesktopGuides.Preview.$name.$processId")
+        })
+    try {
+        & $passes
+        Close-InstalledShell
+    }
+    finally {
+        foreach ($gate in $gates) { $gate.Dispose() }
+    }
+}
+
+function Run-TextSizeScenarios {
+    # TR14.1: fixed text size steps for TXT and HTML, saved per guide,
+    # restored after a relaunch, fixed-width TXT columns, PDF untouched,
+    # and a failed save put back.
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    $cacheRoot = Get-HtmlCacheRoot
+    Remove-Item -LiteralPath (Join-Path $cacheRoot 'diagnostics') -Recurse -Force -ErrorAction SilentlyContinue
+    $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
+    if (-not (Test-Path -LiteralPath (Join-Path $fixtureRoot 'p0\generated\pdf-long.pdf'))) {
+        throw 'pdf-long.pdf is missing; run tools/p0/make_fixtures.py first.'
+    }
+    $ids = Invoke-ShellSeed @('seed-text-size', $dataRoot, $fixtureRoot) | ConvertFrom-Json
+    $report.textSize = [ordered]@{}
+    function Run-TextSizePass([string] $mode) {
+        $report.textSize[$mode] = Run-ShellSmoke $mode -ResultName $mode `
+            -AppDataRoot $dataRoot -AppCacheRoot $cacheRoot
+    }
+
+    Invoke-TextSizeLaunch {
+        Run-TextSizePass 'text-size-steps'
+        Run-TextSizePass 'text-size-whitespace'
+        Run-TextSizePass 'text-size-restart'
+    }
+    $report.textSize.storedBeforeRelaunch = Assert-StoredTextScales $ids `
+        ([ordered]@{ ascii = 1.25; web = 0.9; utf8 = $null }) 'the first launch'
+
+    Invoke-TextSizeLaunch {
+        Run-TextSizePass 'text-size-restart-after'
+        Run-TextSizePass 'text-size-pdf'
+    }
+    $report.textSize.storedAfterPdf = Assert-StoredTextScales $ids `
+        ([ordered]@{ ascii = 1.25; web = 0.9; utf8 = $null; pdf = $null }) 'the PDF zoom'
+
+    Invoke-TextSizeLaunch {
+        Run-TextSizePass 'text-size-error-prepare'
+        # A held write lock makes the app's save time out after 30 s.
+        $ready = Join-Path $ResultDirectory "text-size-lock-ready-$runId"
+        $release = Join-Path $ResultDirectory "text-size-lock-release-$runId"
+        $lock = Start-ShellDatabaseLock 'hold-write-lock' $ready $release -HoldSeconds 120
+        try {
+            Run-TextSizePass 'text-size-error'
+        }
+        finally {
+            Release-ShellDatabaseLock $lock $release
+        }
+        [void](Assert-StoredTextScales $ids ([ordered]@{ ascii = 1.25 }) 'the failed save')
+        Run-TextSizePass 'text-size-error-retry'
+    }
+    $report.textSize.storedAfterRetry = Assert-StoredTextScales $ids `
+        ([ordered]@{ ascii = 1.5; web = 0.9 }) 'the retry'
+}
+
 function Run-ImportScenarios {
     Invoke-ShellSeed @('seed-import', $dataRoot) | Out-Null
     $originalTheme = Get-AppThemePreference
@@ -2425,6 +2514,7 @@ try {
     if (Enter-ScenarioGroup 'progress') { Run-ProgressScenarios }
     if (Enter-ScenarioGroup 'completion') { Run-CompletionScenarios }
     if (Enter-ScenarioGroup 'theme') { Run-ThemeScenarios }
+    if (Enter-ScenarioGroup 'text-size') { Run-TextSizeScenarios }
 
     if (Enter-ScenarioGroup 'import') {
         Run-ImportScenarios

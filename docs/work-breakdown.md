@@ -448,6 +448,7 @@ and shared Settings components without breaking TXT whitespace, HTML offline
 behavior, or high-contrast system colors.
 
 - **T14.1** Add per-guide TXT/HTML font-size controls and saved preferences.
+  Implemented; see [p1/t14-1-text-size-design.md](p1/t14-1-text-size-design.md).
 - **T14.2** Add global theme setting with a Windows theme default. Present the
   bounded `System` / `Light` / `Dark` choice with Toolkit `Segmented`, bound to data
   so each item exposes its selected state, with a custom automation peer as

@@ -1,0 +1,17 @@
+﻿{
+    "mode":  "text-size-pdf",
+    "invocationId":  "1361946a549942faba1bbb72f241b33b",
+    "observedAt":  "2026-10-07T02:29:13.7219106Z",
+    "processId":  4624,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "text-size-pdf"
+               ],
+    "textSizePdf":  {
+                        "before":  "Page 1 of 200 · Fit width",
+                        "after":  "Page 1 of 200 · 75%"
+                    }
+}

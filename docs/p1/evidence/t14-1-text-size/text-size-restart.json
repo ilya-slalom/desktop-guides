@@ -1,0 +1,15 @@
+﻿{
+    "mode":  "text-size-restart",
+    "invocationId":  "a602d7ae77614060978b2dfbf234f704",
+    "observedAt":  "2026-10-07T02:28:56.7687205Z",
+    "processId":  6356,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "text-size-restart"
+               ],
+    "htmlPageFocusKeys":  "ran",
+    "textSizeHtmlScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\text-size-restart.text-size-html-90.png"
+}

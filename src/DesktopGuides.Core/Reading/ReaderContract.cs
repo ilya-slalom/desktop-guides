@@ -49,8 +49,16 @@ public sealed record FitWidthAction()
     : ReaderAction(ReaderCommand.FitWidth);
 public sealed record ZoomAction(double Factor)
     : ReaderAction(ReaderCommand.Zoom);
-public sealed record TextSizeAction(double Factor)
-    : ReaderAction(ReaderCommand.TextSize);
+// The target scale, not a factor: the shell steps, the sessions apply.
+public sealed record TextSizeAction(double Scale)
+    : ReaderAction(ReaderCommand.TextSize)
+{
+    public double Scale { get; } =
+        double.IsFinite(Scale) && Scale >= TextSizeSteps.Min && Scale <= TextSizeSteps.Max
+            ? Scale
+            : throw new ArgumentOutOfRangeException(
+                nameof(Scale), Scale, "A text size must be between 75% and 200%.");
+}
 public sealed record FindAction(string Query)
     : ReaderAction(ReaderCommand.Find);
 

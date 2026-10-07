@@ -886,7 +886,7 @@ restart. Theme/font changes preserve or visibly approximate the location.
 | T12.3 | T12.2 | Per-format bounded estimate, content-hash comparison, and approximate status. Restart, changed-byte, invalid-value, and unread tests preserve completion and display truthful percentages. | TR12.3, TR05.2 |
 | T13.2 | T03.2, T12.2 | Transactional completion timestamp service, independent of locator and estimate. Repeat/toggle/restart tests prove 100% reading never implies complete. | TR13.1, TR13.2 |
 | T13.1 | T05.1, T11.3, T13.2 | Guide and Reader completion actions bound to one service and presented as a two-item Toolkit `Segmented` choice when its selected-state UIA passes, with native radio buttons as fallback. UIA and keyboard checks show immediate committed state and announce changes; final-page reading leaves state unchanged. | TR13.1, TR13.2 |
-| T14.1 | T03.2, T08.2, T09.1, T11.3 | Bounded per-guide TXT/HTML text-size controls and persisted preferences. Two-guide restart test preserves separate sizes and TXT fixed-width layout. | TR14.1 |
+| T14.1 | T03.2, T08.2, T09.1, T11.3 | Bounded per-guide TXT/HTML text-size controls and persisted preferences. Two-guide restart test preserves separate sizes and TXT fixed-width layout. Implemented with fixed steps 75–200%, a label and a reset; see [the design](t14-1-text-size-design.md). | TR14.1 |
 | T14.3 | T08.3, T09.3, T10.3, T14.1, T14.2 | Pre-change capture and post-layout restore across text/theme changes. TXT returns within one line, HTML to matching context where present, PDF to page/fraction; fallback is announced. | TR14.1, TR14.2 |
 | T14.4 | T05.4, T08.3, T09.2, T10.2, T11.3, T14.2 | Shared design language applied to production Reader and Settings commands, Toolkit `SettingsCard`/`SettingsExpander` groups, the T14.2 `Segmented` choice, and teaching/status surfaces. Installed TXT/HTML/PDF/Settings screenshots and keyboard, theme, high-contrast, text-scale, display-scale, and narrow-width checks pass; every Toolkit dependency is centrally locked. | TR11.3, TR14.3 |
 
@@ -920,6 +920,15 @@ An HTML guide gets one fixed local style through DevTools: Light keeps the
 page's colors, Dark forces a dark palette, and high contrast is left to
 Windows. It follows a theme or Windows change without a reload, and the
 guide's stored text scale applies at open. The style makes no request.
+
+T14.1 is implemented; see the
+[design and implementation notes](t14-1-text-size-design.md).
+TXT and HTML guides show *Smaller text*, the current size and *Larger
+text*, with *Reset text size* in the overflow and the Ctrl+Minus,
+Ctrl+Plus and Ctrl+0 keys. The size moves through fixed steps from 75%
+to 200%, applies at once, is saved per guide and survives a relaunch,
+and a failed save puts the stored size back. TXT keeps its fixed-width
+columns; PDF keeps its own zoom.
 
 ## M5 — errors, accessibility, and portable backup
 

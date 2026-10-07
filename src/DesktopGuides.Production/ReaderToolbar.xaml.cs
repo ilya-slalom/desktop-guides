@@ -38,6 +38,8 @@ public sealed partial class ReaderToolbar : UserControl
     ];
 
     private bool promptOpen;
+    // The open guide's text size; the shell sets it at open (Ruling 3).
+    private double textScale = TextSizeSteps.Default;
 
     public ReaderToolbar()
     {
@@ -64,6 +66,10 @@ public sealed partial class ReaderToolbar : UserControl
 
     public event Action<string>? CommandFailed;
 
+    // Raised by a text size step before its action runs, so the shell's
+    // scale is current for a theme refresh during the write (Ruling 3).
+    public event Action<IReaderSession, double>? TextSizeChanged;
+
     internal WindowMaterial DialogMaterial { get; set; } = WindowMaterial.Mica;
     internal ElementTheme DialogTheme { get; set; } = ElementTheme.Default;
 
@@ -86,6 +92,7 @@ public sealed partial class ReaderToolbar : UserControl
         KeysEnabled = false;
         ZoomIn.IsEnabled = true;
         ZoomOut.IsEnabled = true;
+        ShowTextSize(TextSizeSteps.Default, announce: false);
         if (session is not null)
         {
             session.CapabilitiesChanged += CapabilitiesChanged;
@@ -133,6 +140,8 @@ public sealed partial class ReaderToolbar : UserControl
         PageEnd.Visibility = Show(edges);
         SmallerText.Visibility = Show(textSize);
         LargerText.Visibility = Show(textSize);
+        TextSizeContainer.Visibility = Show(textSize);
+        ResetTextSize.Visibility = Show(textSize);
         ZoomOut.Visibility = Show(zoom);
         ZoomIn.Visibility = Show(zoom);
         GoToPage.Visibility = Show(pageJump);
@@ -150,7 +159,9 @@ public sealed partial class ReaderToolbar : UserControl
         VirtualKey key, VirtualKeyModifiers modifiers, bool fromContent = false)
     {
         AppBarButton? command = CommandFor(key, modifiers);
-        if (command is null || !KeysEnabled || promptOpen || session is null ||
+        // Ruling 1: the text size keys run before T16.1 turns the other keys on.
+        bool textKey = command == SmallerText || command == LargerText || command == ResetTextSize;
+        if (command is null || !(KeysEnabled || textKey) || promptOpen || session is null ||
             XamlRoot is null || Commands.Visibility != Visibility.Visible ||
             command.Visibility != Visibility.Visible || !command.IsEnabled ||
             DialogOpen())
@@ -183,12 +194,17 @@ public sealed partial class ReaderToolbar : UserControl
             (VirtualKey.Home, Ctrl) => PageStart,
             (VirtualKey.End, Ctrl) => PageEnd,
             (VirtualKey.G, Ctrl) => GoToPage,
-            (VirtualKey.Add or EqualsKey, Ctrl) => ZoomIn,
-            (EqualsKey, Ctrl | VirtualKeyModifiers.Shift) => ZoomIn,
-            (VirtualKey.Subtract or MinusKey, Ctrl) => ZoomOut,
-            (VirtualKey.Number0 or VirtualKey.NumberPad0, Ctrl) => FitToWidth,
+            (VirtualKey.Add or EqualsKey, Ctrl) => ZoomOr(ZoomIn, LargerText),
+            (EqualsKey, Ctrl | VirtualKeyModifiers.Shift) => ZoomOr(ZoomIn, LargerText),
+            (VirtualKey.Subtract or MinusKey, Ctrl) => ZoomOr(ZoomOut, SmallerText),
+            (VirtualKey.Number0 or VirtualKey.NumberPad0, Ctrl) => ZoomOr(FitToWidth, ResetTextSize),
             _ => null
         };
+
+    // Ruling 2: a session shows zoom or text size, not both. The zoom
+    // commands win while visible, even disabled.
+    private static AppBarButton ZoomOr(AppBarButton zoom, AppBarButton text) =>
+        zoom.Visibility == Visibility.Visible ? zoom : text;
 
     // One place maps a keyed command to its action, for clicks and keys.
     private Task RunAsync(AppBarButton command, bool fromKeyboard = false)
@@ -201,6 +217,9 @@ public sealed partial class ReaderToolbar : UserControl
         if (command == ZoomOut) return ExecuteAsync(new ZoomAction(0.9), "zoom out");
         if (command == ZoomIn) return ExecuteAsync(new ZoomAction(1.1), "zoom in");
         if (command == FitToWidth) return ExecuteAsync(new FitWidthAction(), "fit to width");
+        if (command == SmallerText) return StepTextAsync(TextSizeSteps.Smaller(textScale), "make the text smaller");
+        if (command == LargerText) return StepTextAsync(TextSizeSteps.Larger(textScale), "make the text larger");
+        if (command == ResetTextSize) return StepTextAsync(TextSizeSteps.Default, "reset the text size");
         throw new ArgumentException("This command has no key.", nameof(command));
     }
 
@@ -217,6 +236,49 @@ public sealed partial class ReaderToolbar : UserControl
         }
         ZoomIn.IsEnabled = canZoomIn;
         ZoomOut.IsEnabled = canZoomOut;
+    }
+
+    // The shell shows the open guide's size, at open and after a failed save.
+    public void SetTextSize(double scale) => ShowTextSize(scale, announce: false);
+
+    private void ShowTextSize(double scale, bool announce)
+    {
+        textScale = scale;
+        string label = TextSizeSteps.Label(scale);
+        TextSizeValue.Text = label;
+        AutomationProperties.SetName(TextSizeValue, $"Text size {label}");
+        bool larger = TextSizeSteps.CanLarger(scale);
+        bool smaller = TextSizeSteps.CanSmaller(scale);
+        // P5. Disabling the focused command would move focus, so it moves to the other one first.
+        if (!larger && smaller && LargerText.FocusState != FocusState.Unfocused)
+        {
+            SmallerText.Focus(LargerText.FocusState);
+        }
+        else if (!smaller && larger && SmallerText.FocusState != FocusState.Unfocused)
+        {
+            LargerText.Focus(SmallerText.FocusState);
+        }
+        LargerText.IsEnabled = larger;
+        SmallerText.IsEnabled = smaller;
+        ResetTextSize.IsEnabled = scale != TextSizeSteps.Default;
+        if (announce)
+        {
+            FrameworkElementAutomationPeer.CreatePeerForElement(TextSizeValue)
+                ?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+        }
+    }
+
+    // The toolbar steps (Ruling 3); the session only applies the target.
+    private Task StepTextAsync(double target, string description)
+    {
+        IReaderSession? current = session;
+        if (current is null || target == textScale)
+        {
+            return Task.CompletedTask;
+        }
+        ShowTextSize(target, announce: true);
+        TextSizeChanged?.Invoke(current, target);
+        return ExecuteAsync(new TextSizeAction(target), description);
     }
 
     private async Task ExecuteAsync(ReaderAction action, string description)
@@ -347,7 +409,7 @@ public sealed partial class ReaderToolbar : UserControl
             foreach (Control command in new Control[]
             {
                 PageStart, PreviousPage, NextPage, PageEnd, SmallerText, LargerText,
-                ZoomOut, ZoomIn, GoToPage, FitToWidth, FindInGuide
+                ZoomOut, ZoomIn, GoToPage, FitToWidth, ResetTextSize, FindInGuide
             })
             {
                 if (command.Visibility == Visibility.Visible &&
@@ -372,10 +434,13 @@ public sealed partial class ReaderToolbar : UserControl
         await RunAsync(PageEnd);
 
     private async void SmallerTextClicked(object sender, RoutedEventArgs args) =>
-        await ExecuteAsync(new TextSizeAction(0.9), "make the text smaller");
+        await RunAsync(SmallerText);
 
     private async void LargerTextClicked(object sender, RoutedEventArgs args) =>
-        await ExecuteAsync(new TextSizeAction(1.1), "make the text larger");
+        await RunAsync(LargerText);
+
+    private async void ResetTextSizeClicked(object sender, RoutedEventArgs args) =>
+        await RunAsync(ResetTextSize);
 
     private async void ZoomOutClicked(object sender, RoutedEventArgs args) =>
         await RunAsync(ZoomOut);

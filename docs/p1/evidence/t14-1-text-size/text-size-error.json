@@ -1,0 +1,14 @@
+﻿{
+    "mode":  "text-size-error",
+    "invocationId":  "f2e55ca8ffd04f2389dd9f7c9ac02748",
+    "observedAt":  "2026-10-07T02:29:23.6303729Z",
+    "processId":  9956,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "text-size-error"
+               ],
+    "textSizeErrorScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\text-size-error.text-size-error.png"
+}

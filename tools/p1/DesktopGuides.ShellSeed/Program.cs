@@ -713,6 +713,66 @@ if (args.Length == 3 && args[0] == "seed-progress")
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "seed-text-size")
+{
+    // T14.1: two TXT guides, an HTML guide and a PDF guide in one game.
+    ManagedPathResolver sizePaths = new(args[1]);
+    await using SqliteLibraryRepository sizeRepository = new(sizePaths);
+    await sizeRepository.InitializeAsync();
+    if ((await sizeRepository.ListGamesAsync()).Count != 0)
+    {
+        throw new InvalidOperationException("The text size seed needs an empty library.");
+    }
+    string fixtures = Path.GetFullPath(args[2]);
+    Game sizeGame = await sizeRepository.AddGameAsync("Text Size Game", null, null);
+    GuideImportValidator sizeValidator = new();
+    GuideImportPublisher sizePublisher = new(sizeRepository, sizePaths);
+    async Task<Guid> PublishAsync(string relative, string title)
+    {
+        ImportInspection inspection = await sizeValidator.InspectAsync(
+            Path.Combine(fixtures, relative), CancellationToken.None);
+        if (inspection is not ImportReady ready)
+        {
+            throw new InvalidOperationException($"The {relative} fixture failed the import preview: {inspection}.");
+        }
+        return await sizePublisher.PublishAsync(
+            ready.Manifest, sizeGame.Id, title, false, null, CancellationToken.None);
+    }
+    long sizeNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    Guid ascii = Guid.NewGuid();
+    await InsertTextGuideAsync(sizePaths, sizeGame.Id, ascii, "ASCII Map Guide", sizeNow,
+        File.ReadAllBytes(Path.Combine(fixtures, "p0", "txt-ascii.txt")));
+    Guid utf8 = Guid.NewGuid();
+    await InsertTextGuideAsync(sizePaths, sizeGame.Id, utf8, "UTF-8 Guide", sizeNow,
+        File.ReadAllBytes(Path.Combine(fixtures, "p0", "txt-utf8.txt")));
+    Guid web = await PublishAsync(Path.Combine("p0", "html-static", "guide.html"), "Static Web Guide");
+    Guid pdf = await PublishAsync(Path.Combine("p0", "generated", "pdf-long.pdf"), "Long PDF Guide");
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        ascii = ascii.ToString("N"),
+        utf8 = utf8.ToString("N"),
+        web = web.ToString("N"),
+        pdf = pdf.ToString("N")
+    }));
+    return 0;
+}
+
+if (args.Length >= 3 && args[0] == "describe-text-scales")
+{
+    // Each guide's stored TextScale, or null when it has none.
+    ManagedPathResolver scalePaths = new(args[1]);
+    await using SqliteLibraryRepository scaleRepository = new(scalePaths);
+    await scaleRepository.InitializeAsync();
+    Dictionary<string, double?> scales = [];
+    foreach (string id in args.Skip(2))
+    {
+        ReaderPreferences? preferences = await scaleRepository.GetReaderPreferencesAsync(Guid.Parse(id));
+        scales[id] = preferences?.TextScale;
+    }
+    Console.WriteLine(JsonSerializer.Serialize(scales));
+    return 0;
+}
+
 if (args.Length == 2 && args[0] == "clear-reading-locations")
 {
     // Puts every guide back at its start between passes that share a data folder.

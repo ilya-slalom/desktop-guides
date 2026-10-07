@@ -1,0 +1,13 @@
+﻿{
+    "mode":  "text-size-restart-after",
+    "invocationId":  "271a7186958048c98b9678ef4a38737e",
+    "observedAt":  "2026-10-07T02:29:08.1823576Z",
+    "processId":  4624,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "text-size-restart-after"
+               ]
+}

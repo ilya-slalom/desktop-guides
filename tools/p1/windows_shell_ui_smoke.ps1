@@ -18,7 +18,9 @@ param(
         'html-theme-open', 'html-theme-light', 'html-theme-switch',
         'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed',
         'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry',
-        'theme-segmented', 'theme-change', 'theme-restored', 'theme-error', 'theme-error-retry')]
+        'theme-segmented', 'theme-change', 'theme-restored', 'theme-error', 'theme-error-retry',
+        'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
+        'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -1229,12 +1231,15 @@ try {
         'html-position',
         'html-theme-open', 'html-theme-light', 'html-theme-switch',
         'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed',
-        'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry')) {
+        'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry',
+        'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
+        'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
             elseif ($Mode -like 'html-theme-*') { 'Web Theme Game' }
             elseif ($Mode -like 'pdf-*') { 'PDF Reader Game' }
             elseif ($Mode -like 'progress-*' -or $Mode -like 'completion-*') { 'Progress Game' }
+            elseif ($Mode -like 'text-size-*') { 'Text Size Game' }
             else { 'Text Reader Game' }
         $missingMessage = "This guide's file is missing from the library."
         $listItem = New-Object System.Windows.Automation.PropertyCondition(
@@ -1291,6 +1296,15 @@ try {
             }
         }
 
+        # T14.1: a loaded HTML guide shows only the text-size commands.
+        function Assert-OnlyTextSizeCommands([string] $guide) {
+            foreach ($name in @('Smaller text', 'Larger text')) {
+                if (-not (Wait-ReaderCommand $name)) { throw "$guide has no visible '$name'." }
+            }
+            foreach ($name in @('Next page', 'Zoom in', 'Go to page')) {
+                if (Find-VisibleName $name) { throw "$guide exposed '$name'." }
+            }
+        }
         # The smoke window shows only a few guide rows, so scroll a lower
         # guide into view before selecting it.
         function Show-TextGuide([string] $guide) {
@@ -1956,7 +1970,7 @@ try {
             Open-TextGuide 'Canary Guide A'
             [void](Wait-Status 'Guide ready.')
             [void](Wait-PageName 'Canary guide A loaded')
-            Assert-NoReaderCommands 'Canary Guide A'
+            Assert-OnlyTextSizeCommands 'Canary Guide A'
             Assert-Absent 'ReaderLoadError'
             Assert-Absent 'ReaderPlaceholder'
             # The meta refresh fires after one second. It isn't
@@ -2003,6 +2017,17 @@ try {
             Wait-HiddenById 'ReaderExternalLinkBar'
 
             Mark-CanaryLines 'after-blank-link'
+            # The text-size toolbar shortens the page, which can put the
+            # link below the fold. The 3000 px spacer keeps the section
+            # off-screen until the fragment link moves it.
+            $jump = Wait-PageName 'Jump to details'
+            if ($jump.Current.IsOffscreen) {
+                $jump.GetCurrentPattern(
+                    [System.Windows.Automation.ScrollItemPattern]::Pattern).ScrollIntoView()
+            }
+            if (-not (Wait-PageName 'Canary details').Current.IsOffscreen) {
+                throw 'The details section was on-screen before the fragment link.'
+            }
             Click-Element (Wait-PageVisible 'Jump to details')
             $details = Wait-PageName 'Canary details'
             $deadline = (Get-Date).AddSeconds(5)
@@ -2022,7 +2047,7 @@ try {
             Open-TextGuide 'Canary Guide B'
             [void](Wait-Status 'Guide ready.')
             [void](Wait-PageName 'Canary guide B loaded')
-            Assert-NoReaderCommands 'Canary Guide B'
+            Assert-OnlyTextSizeCommands 'Canary Guide B'
             Assert-Absent 'ReaderLoadError'
             Assert-NoExternalLinkBar 'opening Canary Guide B'
             $report.phases += 'html-canary-b'
@@ -3184,6 +3209,282 @@ try {
                 [void](Wait-Status "$numbered marked complete.")
                 Wait-CompletionShown $true 'The retry'
                 $report.phases += 'completion-error-retry'
+            }
+        }
+        elseif ($Mode -like 'text-size-*') {
+            $ascii = 'ASCII Map Guide'
+            $utf8 = 'UTF-8 Guide'
+            $web = 'Static Web Guide'
+            $columns = 'Columns:   one     two'
+
+            function Send-Keys([string] $keys) {
+                [System.Windows.Forms.SendKeys]::SendWait($keys)
+            }
+
+            function Get-TextSizeName {
+                $value = Find-ById 'TextSizeValue'
+                if (-not $value -or $value.Current.IsOffscreen) { return $null }
+                return $value.Current.Name
+            }
+
+            function Wait-TextSize([string] $label) {
+                $deadline = (Get-Date).AddSeconds(10)
+                do {
+                    if ((Invoke-UiaRetry { Get-TextSizeName }) -ceq "Text size $label") { return }
+                    Start-Sleep -Milliseconds 100
+                } while ((Get-Date) -lt $deadline)
+                throw "Expected the text size label 'Text size $label'; saw '$(Get-TextSizeName)'."
+            }
+
+            function Step-TextSize([string] $keys, [string] $label) {
+                Send-Keys $keys
+                Wait-TextSize $label
+                [void](Wait-Status "Text size $label.")
+            }
+
+            function Assert-TextCommand([string] $name, [bool] $enabled) {
+                $command = Find-VisibleName $name
+                if (-not $command) { throw "The Reader toolbar has no visible '$name'." }
+                if ($command.Current.IsEnabled -ne $enabled) {
+                    throw "'$name' is enabled=$($command.Current.IsEnabled); expected $enabled."
+                }
+            }
+
+            # Reset lives in the overflow: open it, read the state, close it.
+            function Assert-ResetEnabled([bool] $enabled) {
+                $more = $null
+                foreach ($candidate in @('More', 'More options', 'More commands', 'Show more', 'See more')) {
+                    $more = Find-VisibleName $candidate
+                    if ($more) { break }
+                }
+                if (-not $more) { throw 'The Reader toolbar has no visible overflow button.' }
+                Invoke-Element $more
+                $deadline = (Get-Date).AddSeconds(5)
+                do {
+                    $reset = Find-VisibleName 'Reset text size'
+                    if ($reset) { break }
+                    Start-Sleep -Milliseconds 100
+                } while ((Get-Date) -lt $deadline)
+                if (-not $reset) { throw "The Reader toolbar overflow has no visible 'Reset text size'." }
+                $actual = $reset.Current.IsEnabled
+                Send-Keys '{ESC}'
+                if ($actual -ne $enabled) { throw "'Reset text size' is enabled=$actual; expected $enabled." }
+            }
+
+            function Read-TextDiagnostics {
+                $path = Join-Path $AppCacheRoot "diagnostics\txt-text-size-$ProcessId.json"
+                if (-not (Test-Path -LiteralPath $path)) { return $null }
+                try { return Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json }
+                catch { return $null }
+            }
+
+            function Wait-TextDiagnostics([double] $scale, [string] $what) {
+                $deadline = (Get-Date).AddSeconds(10)
+                do {
+                    $file = Read-TextDiagnostics
+                    if ($file -and [math]::Abs([double] $file.scale - $scale) -lt 0.001) { return $file }
+                    Start-Sleep -Milliseconds 200
+                } while ((Get-Date) -lt $deadline)
+                throw "After $what the TXT view reported $(Read-TextDiagnostics | ConvertTo-Json -Compress); expected scale $scale."
+            }
+
+            function Wait-HtmlScale([double] $scale, [string] $what) {
+                $deadline = (Get-Date).AddSeconds(15)
+                do {
+                    $file = Read-HtmlAppearance
+                    if ($file -and [double] $file.opacity -eq 1 -and
+                        [math]::Abs([double] $file.session.appearance.scale - $scale) -lt 0.001) { return $file }
+                    Start-Sleep -Milliseconds 250
+                } while ((Get-Date) -lt $deadline)
+                throw "After $what the HTML view reported $(Read-HtmlAppearance | ConvertTo-Json -Compress -Depth 5); expected scale $scale."
+            }
+
+            function Open-TextSizeGame {
+                [void](Wait-Name 'LibraryHeading' 'Library')
+                [void](Wait-Status 'Library ready.')
+                Select-Element $textGame
+                [void](Wait-Name 'GameHeading' $textGame)
+                [void](Wait-Status 'Game ready.')
+            }
+
+            function Open-SizedGuide([string] $guide, [string] $label) {
+                Open-TextGuide $guide
+                [void](Wait-Status 'Guide ready.' -Seconds 60)
+                Wait-TextSize $label
+            }
+
+            if ($Mode -eq 'text-size-steps') {
+                # Keyboard only, on A. Every Larger binding gets a turn.
+                Open-TextSizeGame
+                Open-SizedGuide $ascii '100%'
+                [void](Wait-TextDiagnostics 1.0 'the open')
+                Assert-ResetEnabled $false
+                [void](Wait-FirstTextRow)
+                # The ListView itself isn't a focus target; its rows are.
+                (Find-ById 'ReaderTextLines').FindFirst($scope, $listItem).SetFocus()
+                Wait-FocusWithin 'ReaderTextLines'
+                Step-TextSize '^=' '110%'
+                Step-TextSize '^{ADD}' '125%'
+                Step-TextSize '^+=' '150%'
+                Step-TextSize '^=' '175%'
+                # A focused Larger text that becomes disabled hands focus to Smaller text.
+                (Find-VisibleName 'Larger text').SetFocus()
+                Wait-FocusedName 'Larger text'
+                Step-TextSize '^=' '200%'
+                Assert-TextCommand 'Larger text' $false
+                Wait-FocusedName 'Smaller text'
+                $report.textSize200Screenshot = Save-WindowScreenshot 'text-size-200'
+                Step-TextSize '^0' '100%'
+                Assert-ResetEnabled $false
+                Assert-TextCommand 'Larger text' $true
+                Step-TextSize '^-' '90%'
+                Assert-ResetEnabled $true
+                # The overflow check leaves focus on its button; the hand-off
+                # needs a focused Smaller text, as Larger text was above.
+                (Find-VisibleName 'Smaller text').SetFocus()
+                Wait-FocusedName 'Smaller text'
+                Step-TextSize '^{SUBTRACT}' '75%'
+                Assert-TextCommand 'Smaller text' $false
+                Wait-FocusedName 'Larger text'
+                [void](Wait-TextDiagnostics 0.75 'the last step')
+                $report.textSize75Screenshot = Save-WindowScreenshot 'text-size-75'
+                $report.phases += 'text-size-steps'
+            }
+            elseif ($Mode -eq 'text-size-whitespace') {
+                # Continues on A at 75%. The rows grow with the size and keep
+                # their columns; the top line stays.
+                Step-TextSize '^0' '100%'
+                $at100 = Wait-TextDiagnostics 1.0 'the reset'
+                $top = Get-TopRowName
+                foreach ($label in @('110%', '125%', '150%')) {
+                    Invoke-Element (Find-VisibleName 'Larger text')
+                    Wait-TextSize $label
+                    [void](Wait-Status "Text size $label.")
+                }
+                $at150 = Wait-TextDiagnostics 1.5 'three steps up'
+                # The text stack rounds a glyph advance to 1/64 px, so across a
+                # long row 1.5 times the 100% width can be off by more than a
+                # cell. The app's part: the cell scales and the row keeps its columns.
+                $expectedCell = 1.5 * [double] $at100.cellWidth
+                if ([math]::Abs([double] $at150.cellWidth - $expectedCell) -gt 0.01 * $expectedCell) {
+                    throw "At 150% a cell is $($at150.cellWidth) px wide; expected $expectedCell within 1%."
+                }
+                $columns100 = [double] $at100.rowWidth / [double] $at100.cellWidth
+                $columns150 = [double] $at150.rowWidth / [double] $at150.cellWidth
+                if ([math]::Abs($columns150 - $columns100) -ge 1) {
+                    throw "The row spans $columns150 cells at 150% and $columns100 at 100%."
+                }
+                Assert-RowNames $ascii $asciiNames
+                if ($asciiNames[5] -cne $columns) { throw "txt-ascii line 6 is '$($asciiNames[5])', not '$columns'." }
+                $after = Get-TopRowName
+                if ($after -cne $top) { throw "The top line moved from '$top' to '$after' at 150%." }
+                $report.textSizeWhitespace = [ordered]@{
+                    at100 = $at100; at150 = $at150; topLine = $top
+                }
+                $report.textSize150Screenshot = Save-WindowScreenshot 'text-size-150'
+                $report.phases += 'text-size-whitespace'
+            }
+            elseif ($Mode -eq 'text-size-restart') {
+                # Continues on A at 150%. Two quick presses save only where they end.
+                Step-TextSize '^0' '100%'
+                Send-Keys '^='
+                Send-Keys '^='
+                Wait-TextSize '125%'
+                [void](Wait-Status 'Text size 125%.')
+                [void](Wait-TextDiagnostics 1.25 'two quick presses')
+                Back-ToTextGame
+
+                Open-SizedGuide $web '100%'
+                [void](Wait-HtmlScale 1.0 'the HTML open')
+                # Ruling 10: try the key with focus in the page first.
+                $page = @(Get-PageRoots)[0]
+                $report.htmlPageFocusKeys = 'not-delivered'
+                if ($page) {
+                    try { $page.SetFocus() } catch { }
+                    Send-Keys '^-'
+                    $deadline = (Get-Date).AddSeconds(5)
+                    do {
+                        if ((Get-TextSizeName) -ceq 'Text size 90%') { $report.htmlPageFocusKeys = 'ran'; break }
+                        Start-Sleep -Milliseconds 100
+                    } while ((Get-Date) -lt $deadline)
+                }
+                if ($report.htmlPageFocusKeys -ne 'ran') {
+                    Invoke-Element (Find-VisibleName 'Smaller text')
+                }
+                Wait-TextSize '90%'
+                [void](Wait-Status 'Text size 90%.')
+                [void](Wait-HtmlScale 0.9 'Smaller text')
+                Assert-OnlyTextSizeCommands $web
+                $report.textSizeHtmlScreenshot = Save-WindowScreenshot 'text-size-html-90'
+                Back-ToTextGame
+
+                Open-SizedGuide $utf8 '100%'
+                Back-ToTextGame
+                $report.phases += 'text-size-restart'
+            }
+            elseif ($Mode -eq 'text-size-restart-after') {
+                Open-TextSizeGame
+                Open-SizedGuide $ascii '125%'
+                [void](Wait-TextDiagnostics 1.25 'reopening A')
+                Back-ToTextGame
+                Open-SizedGuide $web '90%'
+                [void](Wait-HtmlScale 0.9 'reopening the HTML guide')
+                Back-ToTextGame
+                Open-SizedGuide $utf8 '100%'
+                Back-ToTextGame
+                $report.phases += 'text-size-restart-after'
+            }
+            elseif ($Mode -eq 'text-size-pdf') {
+                # Continues on the Game page. PDF keeps its zoom and has no text size.
+                Open-TextGuide 'Long PDF Guide'
+                [void](Wait-Status 'Guide ready.' -Seconds 60)
+                [void](Wait-PdfPage 1 200 'page 1 of 200')
+                foreach ($name in @('Zoom in', 'Zoom out')) {
+                    if (-not (Wait-ReaderCommand $name)) { throw "The PDF guide has no visible '$name'." }
+                }
+                foreach ($name in @('Larger text', 'Smaller text')) {
+                    if (Find-VisibleName $name) { throw "The PDF guide exposed '$name'." }
+                }
+                if (Get-TextSizeName) { throw 'The PDF guide showed a text size label.' }
+                (Find-ById 'PdfPreviewScroller').SetFocus()
+                [void](Wait-FocusedId 'PdfPreviewScroller')
+                $before = (Find-ById 'PdfPageStatus').Current.Name
+                Send-Keys '^='
+                $deadline = (Get-Date).AddSeconds(10)
+                do {
+                    $after = (Find-ById 'PdfPageStatus').Current.Name
+                    if ($after -cne $before) { break }
+                    Start-Sleep -Milliseconds 100
+                } while ((Get-Date) -lt $deadline)
+                if ($after -ceq $before) { throw "Ctrl+= didn't zoom the PDF guide: the status still reads '$before'." }
+                $report.textSizePdf = [ordered]@{ before = $before; after = $after }
+                Back-ToTextGame
+                $report.phases += 'text-size-pdf'
+            }
+            elseif ($Mode -eq 'text-size-error-prepare') {
+                # The installer takes the write lock after this mode.
+                Open-TextSizeGame
+                Open-SizedGuide $ascii '125%'
+                [void](Wait-TextDiagnostics 1.25 'the open before the lock')
+                $report.phases += 'text-size-error-prepare'
+            }
+            elseif ($Mode -eq 'text-size-error') {
+                # The size applies at once; the timed-out save puts the stored one back.
+                Invoke-Element (Find-VisibleName 'Larger text')
+                Wait-TextSize '150%'
+                [void](Wait-TextDiagnostics 1.5 'the pending save')
+                [void](Wait-Status 'Could not save the text size: ' -Prefix -Seconds 60)
+                Wait-TextSize '125%'
+                [void](Wait-TextDiagnostics 1.25 'the failed save')
+                $report.textSizeErrorScreenshot = Save-WindowScreenshot 'text-size-error'
+                $report.phases += 'text-size-error'
+            }
+            else {
+                # text-size-error-retry: the lock is gone and the retry saves.
+                Invoke-Element (Find-VisibleName 'Larger text')
+                Wait-TextSize '150%'
+                [void](Wait-Status 'Text size 150%.')
+                $report.phases += 'text-size-error-retry'
             }
         }
         else {

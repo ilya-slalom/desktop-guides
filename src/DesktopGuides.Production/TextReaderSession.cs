@@ -11,18 +11,30 @@ internal sealed class TextReaderSession : IReaderSession
     private readonly TextGuideDocument document;
     private bool disposed;
 
-    public TextReaderSession(TextGuideDocument document, int maxColumns)
+    // The initial text scale applies before the first measure (Ruling 5);
+    // with a diagnostics folder the view reports each measure there.
+    public TextReaderSession(
+        TextGuideDocument document, int maxColumns, double textScale, string? diagnosticsFolder)
     {
         ArgumentNullException.ThrowIfNull(document);
         this.document = document;
-        View = new TextReaderView(new TextLineList(document), maxColumns);
+        string? diagnosticsPath = diagnosticsFolder is null
+            ? null
+            : Path.Combine(diagnosticsFolder, $"txt-text-size-{Environment.ProcessId}.json");
+        View = new TextReaderView(new TextLineList(document), maxColumns, textScale, diagnosticsPath);
         View.TopLineChanged += OnTopLineChanged;
     }
+
+    // Installed tests open the gate to read the view's applied size.
+    public static string? DiagnosticsFolderForTest(string cacheRoot) =>
+        TestGate.IsOpen($@"Local\DesktopGuides.Preview.TextDiagnostics.{Environment.ProcessId}")
+            ? Path.Combine(cacheRoot, "diagnostics")
+            : null;
 
     public TextReaderView View { get; }
     public GuideFormat Format => GuideFormat.Txt;
     public ReaderCapabilities Capabilities =>
-        ReaderCapabilities.Scroll | ReaderCapabilities.PageNavigation;
+        ReaderCapabilities.Scroll | ReaderCapabilities.PageNavigation | ReaderCapabilities.TextSize;
 
     // Capabilities don't change during a TXT session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
@@ -65,6 +77,9 @@ internal sealed class TextReaderSession : IReaderSession
                 break;
             case PageEdgeAction edge:
                 View.ScrollToEdge(edge.Edge);
+                break;
+            case TextSizeAction size:
+                View.TextScale = size.Scale;
                 break;
             default:
                 throw new NotSupportedException($"TXT guides don't support {action.Command}.");

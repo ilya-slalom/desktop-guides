@@ -1,0 +1,13 @@
+﻿{
+    "mode":  "text-size-error-retry",
+    "invocationId":  "b5f49300c29f4ecaadebc5bab6cef882",
+    "observedAt":  "2026-10-07T02:29:56.1204316Z",
+    "processId":  9956,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "text-size-error-retry"
+               ]
+}

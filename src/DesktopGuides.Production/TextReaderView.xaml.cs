@@ -1,3 +1,4 @@
+using System.Globalization;
 using DesktopGuides.Core.Reading;
 using DesktopGuides.Core.Text;
 using Microsoft.UI.Dispatching;
@@ -21,7 +22,12 @@ public sealed partial class TextReaderView : UserControl
     private double rowWidth;
     private double rowHeight;
     private double baseFontSize;
-    private double fontScale = 1;
+    private readonly string? diagnosticsPath;
+    private double cellWidth;
+    // The font size is the base size times the test hook's multiplier
+    // (Ruling 4) times the guide's text size.
+    private double testScale = 1;
+    private double textScale;
     // The line to keep at the top through layout changes; it follows the
     // reader's scrolling except while the view applies its own scroll.
     private int anchorLine;
@@ -32,12 +38,14 @@ public sealed partial class TextReaderView : UserControl
     private RegisteredWaitHandle? remeasureWait;
     private EventWaitHandle? remeasureSignal;
 
-    public TextReaderView(TextLineList lines, int maxColumns)
+    public TextReaderView(TextLineList lines, int maxColumns, double textScale, string? diagnosticsPath)
     {
         ArgumentNullException.ThrowIfNull(lines);
         ArgumentOutOfRangeException.ThrowIfNegative(maxColumns);
         this.lines = lines;
         this.maxColumns = maxColumns;
+        this.textScale = textScale;
+        this.diagnosticsPath = diagnosticsPath;
         InitializeComponent();
         Loaded += OnLoaded;
         SizeChanged += OnSizeChanged;
@@ -46,6 +54,22 @@ public sealed partial class TextReaderView : UserControl
     public event EventHandler? TopLineChanged;
 
     public int LineCount => lines.Count;
+
+    // T14.1: the guide's text size. Rows re-measure at the new size, keep
+    // Consolas, their measured width and no wrapping, and the top line stays.
+    // Before the first layout the value is only kept.
+    public double TextScale
+    {
+        get => textScale;
+        set
+        {
+            if (value == textScale) return;
+            textScale = value;
+            Remeasure();
+        }
+    }
+
+    private double CellFontSize => baseFontSize * testScale * textScale;
 
     // Shows the line at the top; before the first layout it is kept and
     // applied once rows exist.
@@ -128,10 +152,31 @@ public sealed partial class TextReaderView : UserControl
 
     private void Measure()
     {
-        CellProbe.FontSize = baseFontSize * fontScale;
+        CellProbe.FontSize = CellFontSize;
         CellProbe.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        rowWidth = Math.Ceiling(CellProbe.DesiredSize.Width / ProbeColumns * maxColumns);
+        cellWidth = CellProbe.DesiredSize.Width / ProbeColumns;
+        rowWidth = Math.Ceiling(cellWidth * maxColumns);
         rowHeight = Math.Ceiling(CellProbe.DesiredSize.Height);
+        WriteDiagnostics();
+    }
+
+    // Installed tests read the applied size and row measure (Ruling 7).
+    private void WriteDiagnostics()
+    {
+        if (diagnosticsPath is null) return;
+        string json = string.Create(CultureInfo.InvariantCulture,
+            $"{{\"scale\":{textScale:R},\"rowWidth\":{rowWidth:R},\"cellWidth\":{cellWidth:R},\"rowHeight\":{rowHeight:R}}}");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(diagnosticsPath)!);
+            string temporary = diagnosticsPath + ".tmp";
+            File.WriteAllText(temporary, json);
+            File.Move(temporary, diagnosticsPath, overwrite: true);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // Test diagnostics must not affect reading.
+        }
     }
 
     // Issue #29: the text size changed, so rows measured at the old size
@@ -163,7 +208,7 @@ public sealed partial class TextReaderView : UserControl
 
     private void ApplyRowSize(TextBlock text)
     {
-        text.FontSize = baseFontSize * fontScale;
+        text.FontSize = CellFontSize;
         // A minimum, so a fallback glyph wider than a Consolas cell isn't clipped.
         text.MinWidth = rowWidth;
         text.Height = rowHeight;
@@ -197,8 +242,8 @@ public sealed partial class TextReaderView : UserControl
                 // change it; the view must notice on its own.
                 dispatcher?.TryEnqueue(() =>
                 {
-                    fontScale = TestFontScale;
-                    CellProbe.FontSize = baseFontSize * fontScale;
+                    testScale = TestFontScale;
+                    CellProbe.FontSize = CellFontSize;
                 }), null, Timeout.Infinite, executeOnlyOnce: false);
         }
         catch (UnauthorizedAccessException)

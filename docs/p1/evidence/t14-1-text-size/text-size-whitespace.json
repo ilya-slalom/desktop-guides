@@ -1,0 +1,29 @@
+﻿{
+    "mode":  "text-size-whitespace",
+    "invocationId":  "da32b7bb33814e66b7a2d3df146e8795",
+    "observedAt":  "2026-10-07T02:28:53.8074634Z",
+    "processId":  6356,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "text-size-whitespace"
+               ],
+    "textSizeWhitespace":  {
+                               "at100":  {
+                                             "scale":  1,
+                                             "rowWidth":  15900,
+                                             "cellWidth":  7.703125,
+                                             "rowHeight":  17
+                                         },
+                               "at150":  {
+                                             "scale":  1.5,
+                                             "rowWidth":  23833,
+                                             "cellWidth":  11.546875,
+                                             "rowHeight":  25
+                                         },
+                               "topLine":  "MAP"
+                           },
+    "textSize150Screenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\text-size-whitespace.text-size-150.png"
+}
