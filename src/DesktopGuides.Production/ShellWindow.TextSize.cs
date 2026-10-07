@@ -1,5 +1,6 @@
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Reading;
+using Microsoft.UI.Xaml.Controls;
 
 namespace DesktopGuides.Production;
 
@@ -13,6 +14,9 @@ public sealed partial class ShellWindow
     private double readerTextScale = TextSizeSteps.Default;
     private double committedTextScale = TextSizeSteps.Default;
     private Guid textSizeGuideId;
+    // T14.3: the size whose restore came back only by fraction. The save
+    // and the restore can finish in either order; both show the notice.
+    private double? shiftedTextScale;
 
     // A failed read gives the default: the size never blocks reading.
     private async Task<double> ReadTextScaleAsync(Guid guideId)
@@ -47,6 +51,7 @@ public sealed partial class ShellWindow
         }
         Guid guideId = textSizeGuideId;
         readerTextScale = scale;
+        shiftedTextScale = null;
         await textSizeSaveGate.WaitAsync();
         try
         {
@@ -61,7 +66,9 @@ public sealed partial class ShellWindow
                 committedTextScale = scale;
                 if (scale == readerTextScale)
                 {
-                    ShowTransientStatus(TextSizeSteps.Status(scale));
+                    ShowTransientStatus(shiftedTextScale == scale
+                        ? TextSizeSteps.ShiftedStatus(scale)
+                        : TextSizeSteps.Status(scale));
                 }
             }
         }
@@ -79,6 +86,27 @@ public sealed partial class ShellWindow
             textSizeSaveGate.Release();
         }
     }
+
+    // T14.3: an HTML page that came back only by fraction says so. The
+    // notice never covers a warning or an error, such as a failed save.
+    private void OnAppearanceRestored(object? sender, AppearanceRestoredEventArgs args)
+    {
+        if (!ReferenceEquals(sender, readerSession)) return;
+        if (args.Outcome.Kind == RestoreKind.Exact)
+        {
+            shiftedTextScale = null;
+            return;
+        }
+        shiftedTextScale = readerTextScale;
+        if (!StatusShowsProblem())
+        {
+            ShowTransientStatus(TextSizeSteps.ShiftedStatus(readerTextScale));
+        }
+    }
+
+    private bool StatusShowsProblem() =>
+        ShellStatusInfoBar.IsOpen &&
+        ShellStatusInfoBar.Severity is InfoBarSeverity.Warning or InfoBarSeverity.Error;
 
     private async Task RevertTextSizeAsync(IReaderSession session)
     {

@@ -49,6 +49,7 @@ public sealed partial class ShellWindow
         session.ExternalLinkRequested += OnExternalLinkRequested;
         session.UnavailableLinkRequested += OnUnavailableLinkRequested;
         session.Failed += OnReaderSessionFailed;
+        session.AppearanceRestored += OnAppearanceRestored;
         ShowReaderSurface(placeholder: false, view: session.View);
         try
         {
