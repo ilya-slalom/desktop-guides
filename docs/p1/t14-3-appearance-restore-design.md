@@ -1,6 +1,7 @@
 # T14.3 appearance restore design
 
-Status: implemented; CI run 37583360621.
+Status: implemented; CI runs 37583360621 and, after the final review,
+37590262774.
 Prerequisites: T08.3 (TXT locator), T09.3 (HTML locator), T10.3 (PDF
 locator), T14.1 (text size, PR #51) and T14.2 (theme setting) are merged.
 
@@ -272,6 +273,25 @@ Other notes:
   request reaching the handler; its second attempt, on the same commit,
   opened it. Not reproduced since.
 
+Final review fixes:
+
+- **Pinned text is never the place.** The capture and the scroll back
+  skip text inside a `position: fixed` or `sticky` element, as they skip
+  hidden text. Before, a long fixed side menu or header first in the
+  body could be the capture when the place was early in the guide, where
+  the capture's offset search reaches the pinned text; each size step
+  then scrolled to the top and still reported `Exact`. The same hole was
+  in T09.3's open-time restore. If wrong, a guide whose real content
+  sits in a sticky element loses that text as a place and falls back to
+  the next unpinned line or the fraction.
+- **A restyle during a restore's capture re-scrolls.** The open-time
+  restore records the generation before its last scroll; if a text-size
+  write moved it by the time the capture returns, the restore scrolls to
+  its target again instead of adopting the drifted capture. No installed
+  step can hit that window on demand, so this is verified by reading and
+  the green restore phases. If wrong, a page whose generation keeps
+  changing repeats the scroll, one resize settle per pass.
+
 ## Verification
 
 - Core tests went from 888 to 899: `HtmlLocationRulesTests`
@@ -295,6 +315,14 @@ Other notes:
     [dark](evidence/t14-3-appearance-restore/html-position-dark.html-place-shifted.png),
     [light report](evidence/t14-3-appearance-restore/html-position-light.json),
     [dark report](evidence/t14-3-appearance-restore/html-position-dark.json)).
+  - `position-fixed-header` (added after the final review, run
+    37590256423 and the full run 37590262774): Fixed Header Web Guide
+    (`tests/fixtures/p1/html-fixed-header`: a fixed header, a 400-link
+    fixed side menu and a sticky bar before a `<pre>` of 800 marked
+    lines), jumped to MARK-0020; the capture is MARK-0020, and 110% and
+    back to 100% keep it on top with `Exact` at the same offset. Red
+    first in run 37589479265: the capture was offset 2, inside the
+    header.
   - The other position phases (fragment, resize, the restores and the
     unimported link) still pass.
 - TXT, PDF and theme changes are carried by existing checks in the same
