@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('empty', 'game-editor', 'game-editor-persisted',
-        'normal', 'design-language', 'stale', 'long-list', 'switch-game',
+        'normal', 'design-language', 'design-readers', 'stale', 'long-list', 'switch-game',
         'switch-game-prepare', 'switch-game-loading', 'queue-guide',
         'queue-guide-write', 'prepare-game-editor-close',
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
@@ -4095,6 +4095,64 @@ try {
         $report.settingsWideScreenshot =
             Save-WindowScreenshot 'settings-wide'
         $report.phases += 'settings-wide'
+    }
+    elseif ($Mode -eq 'design-readers') {
+        # T14.4: each reader at wide and narrow widths, and the open
+        # overflow menu, for screenshot review. Rendering isn't asserted.
+        $sizeGame = 'Text Size Game'
+        Resize-ShellWindow 1500 720
+        Select-Element $sizeGame
+        [void](Wait-Name 'GameHeading' $sizeGame)
+        [void](Wait-Status 'Game ready.')
+        foreach ($reader in @(
+            @{ guide = 'ASCII Map Guide'; format = 'TXT'; name = 'txt' },
+            @{ guide = 'Static Web Guide'; format = 'HTML'; name = 'html' },
+            @{ guide = 'Long PDF Guide'; format = 'PDF'; name = 'pdf' })) {
+            Open-GuideFromGame $reader.guide
+            [void](Wait-Name 'ReaderHeading' $reader.guide)
+            [void](Wait-Name 'ReaderFormat' $reader.format)
+            [void](Wait-Status 'Guide ready.' -Seconds 60)
+            [void](Wait-VisibleById 'ReaderCommands')
+            Assert-Absent 'ShellStatus'
+            Start-Sleep -Milliseconds 400
+            $report["$($reader.name)WideScreenshot"] =
+                Save-WindowScreenshot "reader-$($reader.name)-wide"
+            Resize-ShellWindow 600 720
+            Start-Sleep -Milliseconds 400
+            Assert-InsideWindow 'ReaderHeading'
+            Assert-InsideWindow 'ReaderCommands'
+            Assert-Below 'CompletionChoice' 'ReaderFormat'
+            $report["$($reader.name)NarrowScreenshot"] =
+                Save-WindowScreenshot "reader-$($reader.name)-narrow"
+            Resize-ShellWindow 1500 720
+            Go-Back
+            [void](Wait-Name 'GameHeading' $sizeGame)
+            [void](Wait-Status 'Game ready.')
+        }
+
+        # The open menu is a popup outside the shell root; the shot shows
+        # its theme (T14.2 left it unchecked).
+        Open-GuideFromGame 'Long PDF Guide'
+        [void](Wait-Status 'Guide ready.' -Seconds 60)
+        $more = $null
+        foreach ($candidate in @('More', 'More options', 'More commands', 'Show more', 'See more')) {
+            $more = Find-VisibleName $candidate
+            if ($more) { break }
+        }
+        if (-not $more) { throw 'The PDF Reader toolbar has no More button.' }
+        Invoke-Element $more
+        $deadline = (Get-Date).AddSeconds(5)
+        while (-not (Find-VisibleName 'Fit to width') -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Milliseconds 100
+        }
+        if (-not (Find-VisibleName 'Fit to width')) { throw 'The overflow menu did not open.' }
+        Start-Sleep -Milliseconds 400
+        Assert-ShellForeground
+        $report.overflowScreenshot = Save-WindowScreenshot 'reader-pdf-overflow'
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+        Go-Back
+        [void](Wait-Name 'GameHeading' $sizeGame)
+        $report.phases += 'design-readers'
     }
     elseif ($Mode -like 'theme-*') {
         $themeIds = [ordered]@{ System = 'ThemeSystem'; Light = 'ThemeLight'; Dark = 'ThemeDark' }
