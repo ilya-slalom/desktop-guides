@@ -4,6 +4,7 @@ using DesktopGuides.Production.Providers;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using DispatcherQueueTimer = Microsoft.UI.Dispatching.DispatcherQueueTimer;
 
 namespace DesktopGuides.Production;
 
@@ -165,12 +166,27 @@ public sealed partial class ProviderSettingsCard : UserControl
         AutomationProperties.SetName(ProviderSettingsExpander, $"Game data providers. {description}");
     }
 
+    // T14.4: routine results close after 3 s; errors stay until closed (TR11.3).
+    private DispatcherQueueTimer? statusTimer;
+
     private void Show(InfoBarSeverity severity, string message)
     {
         ProviderSettingsStatus.Severity = severity;
         ProviderSettingsStatus.Message = message;
         AutomationProperties.SetName(ProviderSettingsStatus, message);
         ProviderSettingsStatus.IsOpen = true;
+        if (statusTimer is null)
+        {
+            statusTimer = DispatcherQueue.CreateTimer();
+            statusTimer.Interval = TimeSpan.FromSeconds(3);
+            statusTimer.IsRepeating = false;
+            statusTimer.Tick += (_, _) => ProviderSettingsStatus.IsOpen = false;
+        }
+        statusTimer.Stop();
+        if (severity is InfoBarSeverity.Success or InfoBarSeverity.Informational)
+        {
+            statusTimer.Start();
+        }
     }
 
     private void SetBusy(bool busy)

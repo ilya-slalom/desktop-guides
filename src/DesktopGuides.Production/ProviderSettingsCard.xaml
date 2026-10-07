@@ -16,20 +16,20 @@
             <toolkit:SettingsCard Header="IGDB client ID"
                                   Description="From your Twitch developer application.">
                 <PasswordBox x:Name="IgdbClientIdInput"
-                             MinWidth="260" MaxLength="64"
+                             MinWidth="{StaticResource DesktopGuidesCredentialInputMinWidth}" MaxLength="64"
                              AutomationProperties.AutomationId="IgdbClientIdInput"
                              AutomationProperties.Name="IGDB client ID" />
             </toolkit:SettingsCard>
             <toolkit:SettingsCard Header="IGDB client secret">
                 <PasswordBox x:Name="IgdbClientSecretInput"
-                             MinWidth="260" MaxLength="128"
+                             MinWidth="{StaticResource DesktopGuidesCredentialInputMinWidth}" MaxLength="128"
                              AutomationProperties.AutomationId="IgdbClientSecretInput"
                              AutomationProperties.Name="IGDB client secret" />
             </toolkit:SettingsCard>
             <toolkit:SettingsCard Header="SteamGridDB API key"
                                   Description="Optional. Used for cover art.">
                 <PasswordBox x:Name="SteamGridDbKeyInput"
-                             MinWidth="260" MaxLength="128"
+                             MinWidth="{StaticResource DesktopGuidesCredentialInputMinWidth}" MaxLength="128"
                              AutomationProperties.AutomationId="SteamGridDbKeyInput"
                              AutomationProperties.Name="SteamGridDB API key" />
             </toolkit:SettingsCard>
@@ -42,19 +42,22 @@
                     <StackPanel Orientation="Horizontal" Spacing="{StaticResource DesktopGuidesSpacing8}">
                         <Button x:Name="TestConnectionButton"
                                 Content="Test connection"
+                                Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
                                 Click="TestClicked"
                                 AutomationProperties.AutomationId="ProviderTestButton" />
                         <Button x:Name="SaveButton"
                                 Content="Save"
-                                Style="{StaticResource AccentButtonStyle}"
+                                Style="{StaticResource DesktopGuidesPrimaryActionButtonStyle}"
                                 Click="SaveClicked"
                                 AutomationProperties.AutomationId="ProviderSaveButton" />
                         <Button x:Name="RemoveButton"
                                 Content="Remove"
+                                Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
                                 Click="RemoveClicked"
                                 AutomationProperties.AutomationId="ProviderRemoveButton" />
                         <ProgressRing x:Name="ProviderBusy"
-                                      Width="20" Height="20"
+                                      Width="{StaticResource DesktopGuidesInlineProgressSize}"
+                                      Height="{StaticResource DesktopGuidesInlineProgressSize}"
                                       IsActive="False"
                                       AutomationProperties.AutomationId="ProviderBusy" />
                     </StackPanel>

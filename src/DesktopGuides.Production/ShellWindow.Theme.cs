@@ -4,6 +4,7 @@ using Microsoft.UI.System;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Controls;
 
 namespace DesktopGuides.Production;
 
@@ -20,12 +21,13 @@ public sealed partial class ShellWindow
 
     private void InitializeThemeChoice()
     {
-        AppThemeChoice.SetOptions(
-            ThemePresentation.Options
-                .Select(option => new BoundedChoiceOption(option.Label, option.AutomationId))
-                .ToList());
-        // System follows Windows, so its status follows the resolved theme.
-        AppThemeChoice.ChoiceChanged += AppThemeChoiceChanged;
+        // T14.4: a drop-down, like Window background; each item keeps its id.
+        foreach (ThemeOption option in ThemePresentation.Options)
+        {
+            ComboBoxItem item = new() { Content = option.Label };
+            AutomationProperties.SetAutomationId(item, option.AutomationId);
+            AppThemeSelector.Items.Add(item);
+        }
         ShellRoot.ActualThemeChanged += (_, _) =>
         {
             UpdateThemeStatus();
@@ -59,7 +61,7 @@ public sealed partial class ShellWindow
         AppWindow.TitleBar.PreferredTheme = titleBar;
         AutomationProperties.SetItemStatus(AppTitleBar, titleBar.ToString());
         applyingThemeSelection = true;
-        AppThemeChoice.SelectedIndex = ThemePresentation.IndexOf(requested);
+        AppThemeSelector.SelectedIndex = ThemePresentation.IndexOf(requested);
         applyingThemeSelection = false;
         UpdateThemeStatus();
         RefreshReaderAppearance();
@@ -93,16 +95,16 @@ public sealed partial class ShellWindow
 
     private void UpdateThemeStatus() =>
         AutomationProperties.SetItemStatus(
-            AppThemeChoice,
+            AppThemeSelector,
             ThemePresentation.Status(requestedTheme, appliedTheme, ShellRoot.ActualTheme.ToString()));
 
-    private async void AppThemeChoiceChanged(object? sender, EventArgs e)
+    private async void AppThemeSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (applyingThemeSelection || repository is null || AppThemeChoice.SelectedIndex < 0)
+        if (applyingThemeSelection || repository is null || AppThemeSelector.SelectedIndex < 0)
         {
             return;
         }
-        ThemePreference requested = ThemePresentation.Options[AppThemeChoice.SelectedIndex].Preference;
+        ThemePreference requested = ThemePresentation.Options[AppThemeSelector.SelectedIndex].Preference;
         if (requested == requestedTheme)
         {
             return;

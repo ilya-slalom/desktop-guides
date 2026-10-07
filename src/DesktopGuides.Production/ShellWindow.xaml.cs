@@ -393,7 +393,7 @@ public sealed partial class ShellWindow : Window
             ApplyTheme(storedTheme);
             ApplyWindowMaterial(requestedMaterial);
             WindowMaterialSelector.IsEnabled = true;
-            AppThemeChoice.IsEnabled = true;
+            AppThemeSelector.IsEnabled = true;
             ready = true;
             // Queued like every other render, so a quick first click can't be overwritten.
             await RunNavigationAsync(() => RenderCurrentAsync());

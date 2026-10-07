@@ -615,6 +615,54 @@
                               VerticalScrollBarVisibility="Auto"
                               VerticalContentAlignment="Top">
                     <StackPanel Spacing="{StaticResource DesktopGuidesSpacing4}">
+                        <TextBlock x:Name="SettingsAppearanceHeading"
+                                   Text="Appearance"
+                                   Style="{StaticResource DesktopGuidesSettingsSectionStyle}"
+                                   AutomationProperties.AutomationId="SettingsAppearanceHeading" />
+                        <toolkit:SettingsCard
+                            x:Name="AppThemeSettingsCard"
+                            Header="App theme"
+                            Description="Choose light or dark, or follow Windows."
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="AppThemeSettingsCard"
+                            AutomationProperties.Name="App theme. Choose light or dark, or follow Windows.">
+                            <toolkit:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE771;"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                            </toolkit:SettingsCard.HeaderIcon>
+                            <ComboBox x:Name="AppThemeSelector"
+                                      MinWidth="{StaticResource DesktopGuidesSettingsChoiceMinWidth}"
+                                      IsEnabled="False"
+                                      SelectionChanged="AppThemeSelectionChanged"
+                                      AutomationProperties.AutomationId="AppThemeSelector"
+                                      AutomationProperties.Name="App theme" />
+                        </toolkit:SettingsCard>
+                        <toolkit:SettingsCard
+                            x:Name="WindowMaterialSettingsCard"
+                            Header="Window background"
+                            Description="Choose how much of your desktop shows behind the app."
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="WindowMaterialSettingsCard"
+                            AutomationProperties.Name="Window background. Choose how much of your desktop shows behind the app.">
+                            <toolkit:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE790;"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                            </toolkit:SettingsCard.HeaderIcon>
+                            <ComboBox x:Name="WindowMaterialSelector"
+                                      MinWidth="{StaticResource DesktopGuidesSettingsChoiceMinWidth}"
+                                      IsEnabled="False"
+                                      SelectionChanged="WindowMaterialSelectionChanged"
+                                      AutomationProperties.AutomationId="WindowMaterialSelector"
+                                      AutomationProperties.Name="Window background">
+                                <ComboBoxItem Content="Mica" Tag="Mica" />
+                                <ComboBoxItem Content="Acrylic" Tag="Acrylic" />
+                                <ComboBoxItem Content="Solid" Tag="Solid" />
+                            </ComboBox>
+                        </toolkit:SettingsCard>
+                        <TextBlock x:Name="SettingsLibraryHeading"
+                                   Text="Library"
+                                   Style="{StaticResource DesktopGuidesSettingsSectionStyle}"
+                                   AutomationProperties.AutomationId="SettingsLibraryHeading" />
                         <toolkit:SettingsCard
                             x:Name="LibraryStorageSettingsCard"
                             Header="Library storage"
@@ -629,44 +677,10 @@
                                           AutomationProperties.AccessibilityView="Raw" />
                             </toolkit:SettingsCard.HeaderIcon>
                         </toolkit:SettingsCard>
-                        <toolkit:SettingsCard
-                            x:Name="AppThemeSettingsCard"
-                            Header="App theme"
-                            Description="Choose light or dark, or follow Windows."
-                            HorizontalAlignment="Stretch"
-                            AutomationProperties.AutomationId="AppThemeSettingsCard"
-                            AutomationProperties.Name="App theme. Choose light or dark, or follow Windows.">
-                            <toolkit:SettingsCard.HeaderIcon>
-                                <FontIcon Glyph="&#xE771;"
-                                          AutomationProperties.AccessibilityView="Raw" />
-                            </toolkit:SettingsCard.HeaderIcon>
-                            <local:BoundedChoice x:Name="AppThemeChoice"
-                                                 IsEnabled="False"
-                                                 AutomationProperties.AutomationId="AppThemeChoice"
-                                                 AutomationProperties.Name="App theme" />
-                        </toolkit:SettingsCard>
-                        <toolkit:SettingsCard
-                            x:Name="WindowMaterialSettingsCard"
-                            Header="Window background"
-                            Description="Choose how much of your desktop shows behind the app."
-                            HorizontalAlignment="Stretch"
-                            AutomationProperties.AutomationId="WindowMaterialSettingsCard"
-                            AutomationProperties.Name="Window background. Choose how much of your desktop shows behind the app.">
-                            <toolkit:SettingsCard.HeaderIcon>
-                                <FontIcon Glyph="&#xE790;"
-                                          AutomationProperties.AccessibilityView="Raw" />
-                            </toolkit:SettingsCard.HeaderIcon>
-                            <ComboBox x:Name="WindowMaterialSelector"
-                                      MinWidth="160"
-                                      IsEnabled="False"
-                                      SelectionChanged="WindowMaterialSelectionChanged"
-                                      AutomationProperties.AutomationId="WindowMaterialSelector"
-                                      AutomationProperties.Name="Window background">
-                                <ComboBoxItem Content="Mica" Tag="Mica" />
-                                <ComboBoxItem Content="Acrylic" Tag="Acrylic" />
-                                <ComboBoxItem Content="Solid" Tag="Solid" />
-                            </ComboBox>
-                        </toolkit:SettingsCard>
+                        <TextBlock x:Name="SettingsGameDataHeading"
+                                   Text="Game data"
+                                   Style="{StaticResource DesktopGuidesSettingsSectionStyle}"
+                                   AutomationProperties.AutomationId="SettingsGameDataHeading" />
                         <local:ProviderSettingsCard x:Name="ProviderSettings" />
                     </StackPanel>
                 </ScrollViewer>
