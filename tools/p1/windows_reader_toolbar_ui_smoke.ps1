@@ -438,6 +438,13 @@ try {
     if (-not $more -or $zoom) {
         throw 'Narrow CommandBar did not move Zoom in to overflow.'
     }
+    # T14.4: page movement leaves the bar last (DynamicOverflowOrder).
+    if (-not (Find-VisibleByName 'Previous page') -or -not (Find-VisibleByName 'Next page')) {
+        throw 'Narrow CommandBar moved Previous or Next page to overflow.'
+    }
+    if (Find-VisibleByName 'Go to start') {
+        throw 'Narrow CommandBar kept Go to start while Zoom in overflowed.'
+    }
     Open-Overflow
     Invoke-Command 'Zoom in' 'Zoom 1.1'
     $report.phases += 'narrow-primary-command-overflow'
