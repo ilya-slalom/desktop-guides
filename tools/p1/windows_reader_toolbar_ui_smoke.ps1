@@ -438,16 +438,33 @@ try {
     if (-not $more -or $zoom) {
         throw 'Narrow CommandBar did not move Zoom in to overflow.'
     }
-    # T14.4: page movement leaves the bar last (DynamicOverflowOrder).
-    if (-not (Find-VisibleByName 'Previous page') -or -not (Find-VisibleByName 'Next page')) {
-        throw 'Narrow CommandBar moved Previous or Next page to overflow.'
-    }
+    # T14.4: Go to start leaves before size and zoom (DynamicOverflowOrder).
     if (Find-VisibleByName 'Go to start') {
         throw 'Narrow CommandBar kept Go to start while Zoom in overflowed.'
     }
     Open-Overflow
     Invoke-Command 'Zoom in' 'Zoom 1.1'
     $report.phases += 'narrow-primary-command-overflow'
+
+    # T14.4: where the Previous and Next group fits, page movement is what
+    # stays; at 180 px even that group overflows.
+    Invoke-Id 'MediumToolbar'
+    $deadline = (Get-Date).AddSeconds(15)
+    do {
+        $previous = Find-VisibleByName 'Previous page'
+        $next = Find-VisibleByName 'Next page'
+        $start = Find-VisibleByName 'Go to start'
+        $zoom = Find-VisibleByName 'Zoom in'
+        if ($previous -and $next -and -not $start -and -not $zoom) { break }
+        Start-Sleep -Milliseconds 200
+    } while ((Get-Date) -lt $deadline)
+    if (-not $previous -or -not $next) {
+        throw 'A medium CommandBar moved Previous or Next page to overflow.'
+    }
+    if ($start -or $zoom) {
+        throw 'A medium CommandBar kept Go to start or Zoom in while page movement fit.'
+    }
+    $report.phases += 'medium-toolbar-keeps-page-movement'
 
     Invoke-Id 'NoControls'
     Wait-ToolbarVisibility $false
