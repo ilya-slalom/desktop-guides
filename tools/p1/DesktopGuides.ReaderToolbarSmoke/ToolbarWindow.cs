@@ -152,7 +152,7 @@ public sealed class ToolbarWindow : Window
         PageJumpAction page => $"Page jump {page.PageNumber}",
         FitWidthAction => "Fit to width",
         ZoomAction zoom => $"Zoom {zoom.Factor:G}",
-        TextSizeAction text => $"Text size {text.Factor:G}",
+        TextSizeAction text => $"Text size {text.Scale:G}",
         FindAction find => $"Find {find.Query}",
         _ => action.Command.ToString()
     };

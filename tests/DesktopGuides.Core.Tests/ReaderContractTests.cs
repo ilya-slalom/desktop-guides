@@ -77,6 +77,21 @@ public sealed class ReaderContractTests
         Assert.Same(end, paged.LastAction);
     }
 
+    [Theory]
+    [InlineData(0.75)]
+    [InlineData(1.3)]
+    [InlineData(2.0)]
+    public void TextSizeActionCarriesTheScale(double scale) =>
+        Assert.Equal(scale, new TextSizeAction(scale).Scale);
+
+    [Theory]
+    [InlineData(0.7)]
+    [InlineData(2.1)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void TextSizeActionRejectsAScaleOutOfRange(double scale) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TextSizeAction(scale));
+
     private sealed class FakeReader(GuideFormat format, ReaderCapabilities capabilities)
         : IReaderSession, IDisposable
     {
