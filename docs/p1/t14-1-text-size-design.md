@@ -1,6 +1,6 @@
 # T14.1 text size design
 
-Status: designed.
+Status: implemented; CI run 37561318073.
 Prerequisites: T03.2 (versioned migrations, PR #4), T08.2 (TXT view),
 T09.1 (HTML adapter) and T11.3 (the capability toolbar) are merged. T09.2
 (PR #49) already applies a guide's stored HTML text scale at open.
@@ -158,7 +158,7 @@ Its guides are `txt-ascii` (A), `txt-utf8` (B) and `html-static`.
 | Mode | Checks |
 | --- | --- |
 | `text-size-steps` | Keyboard only, on A: the label reads `100%`. Ctrl+Plus steps through `110%`, `125%`, `150%`, `175%` and `200%`; *Larger text* is then disabled and focus is on *Smaller text*. Ctrl+0 returns to `100%`. Ctrl+Minus steps to `90%` and `75%`; *Smaller text* is disabled. Each status reads `Text size <label>.` |
-| `text-size-whitespace` | On A at 150%: line 6's automation name is still `Columns:   one     two`, the diagnostics report scale 1.5 and a row width 1.5 times the 100% width (within one cell), and the first visible line hasn't changed. |
+| `text-size-whitespace` | On A at 150%: line 6's automation name is still `Columns:   one     two`, the diagnostics report scale 1.5, a cell width 1.5 times the 100% cell (within 1%) and a row that spans the same number of columns (within one), and the first visible line hasn't changed. |
 | `text-size-restart` | A is set to 125% and `html-static` to 90%; B is opened and left alone. After a relaunch, A's label reads `125%`, `html-static` reads `90%` and its appearance diagnostics report scale 0.9, and B reads `100%`. The stored `TextScale` values are 1.25, 0.9 and null. |
 | `text-size-pdf` | A PDF guide shows *Zoom in* and *Zoom out* and no text-size commands. After Ctrl+Plus zooms, its stored `TextScale` is still null. |
 | `text-size-error` | With the write lock held, *Larger text* on A shows the save-failure text, and the label and diagnostics return to the stored size. After the lock is released, a retry saves. |
@@ -184,6 +184,108 @@ In the implementing branch:
   [work-breakdown.md](../work-breakdown.md);
 - the S14 T14.1 entry in [p1-technical-design.md](../p1-technical-design.md),
   with the fixed steps.
+
+## Implementation notes
+
+- **The text-size keys don't need `KeysEnabled`.** The shell turns keys on
+  for PDF only, and T16.1 owns the other TXT and HTML keys. Ctrl+Plus,
+  Ctrl+Minus and Ctrl+0 reach the text-size commands whatever
+  `KeysEnabled` says; every other key still needs it.
+- **Zoom wins by visibility.** Zoom and *Fit to width* take the keys while
+  they're visible, even when disabled, so Ctrl+= with *Zoom in* disabled
+  still does nothing. Otherwise the keys go to the text-size commands.
+- **The toolbar steps.** The toolbar holds the current scale (the shell
+  sets it with `SetTextSize`), computes the target with `TextSizeSteps`,
+  updates the label and command states, raises `TextSizeChanged` and then
+  runs `TextSizeAction(target)`. The event comes first, so the shell's
+  scale is current if a theme refresh lands during an HTML write. A failed
+  save sets and applies the stored size again.
+- **The TXT test hook keeps its own multiplier.** The font size is the base
+  size times the test hook's scale times the text size; the remeasure hook
+  never changes the guide's size.
+- **The TXT size applies before the first measure.** `TextReaderSession`
+  takes it as a constructor parameter.
+- **One shell scale.** `readerTextScale` serves TXT and HTML. It's read once
+  at open with `TextSizeSteps.Normalize` and is what a theme refresh sends.
+  T09.2's `htmlTextScale` is gone.
+- **TXT diagnostics.** With the gate
+  `Local\DesktopGuides.Preview.TextDiagnostics.<pid>` open when the session
+  starts, the view writes `diagnostics\txt-text-size-<pid>.json` after each
+  measure (`scale`, `rowWidth`, `cellWidth`, `rowHeight`), through a
+  temporary file.
+- **Saves.** One gate serializes them. A queued save that is no longer the
+  latest for the open guide is skipped. A save for a guide that has closed
+  still runs but leaves the screen alone. A failure reverts only while its
+  guide is open and no newer change is pending.
+- **TXT keys from the list.** No key routing was needed: Ctrl+= with focus
+  on a TXT row reaches the toolbar's accelerators.
+- **HTML keys with page focus.** `text-size-restart` focuses the page and
+  sends Ctrl+Minus; `htmlPageFocusKeys` is `ran`. The keys reach the
+  toolbar from inside the page.
+- **The label's automation name.** `TextSizeValue` shows `110%`; its
+  automation name, set in code, is `Text size 110%`, so the live region
+  announces the context.
+- **HTML canaries.** HTML guides now show the text-size commands, so the
+  `html` group checks Canary Guides A and B with
+  `Assert-OnlyTextSizeCommands`. The load-error and stopped cases still
+  show no commands.
+- **The whitespace check measures the cell.** The text stack rounds the
+  Consolas advance to 1/64 px, so a 2064-column row at 150% is 23833 px,
+  not 1.5 × 15900. The check is that the cell scales 1.5 times within 1%
+  and the row spans the same columns within one.
+- **HTML pages are shorter.** The toolbar now shows for HTML guides, so the
+  page view is shorter. The canary smoke scrolls *Jump to details* into
+  view before clicking it, and checks the target section is still
+  off-screen.
+- **The first HTML capture survives an early resize.** The toolbar appears
+  just after an HTML guide opens, and the WebView resizes. The resize used
+  to set the scroll baseline before any point was captured, so the first
+  capture never came. With no point yet, the resize now keeps no baseline.
+- **Smoke focus.** `text-size-steps` focuses a TXT row (a `ListView` can't
+  take UI Automation focus), and focuses *Smaller text* before the last
+  step down, since the overflow check leaves focus on *More*.
+
+## Verification
+
+- Core tests went from 839 to 888: `TextSizeStepsTests` (fixed steps,
+  default, `Normalize` for in-range, between-step, out-of-range, NaN and
+  null values, `Larger` and `Smaller` including between steps and at the
+  ends, a culture-invariant label, status and save-failure text) and
+  `ReaderContractTests` (`TextSizeActionCarriesTheScale`,
+  `TextSizeActionRejectsAScaleOutOfRange`). Infrastructure stays at 540.
+- Full CI run 37561318073, artifact `production-shell-ui-core`:
+  - `text-size-steps`: keyboard only, 100% → 200% and 200% → 75%, with
+    each status and the disabled ends
+    ([200%](evidence/t14-1-text-size/text-size-steps.text-size-200.png),
+    [75%](evidence/t14-1-text-size/text-size-steps.text-size-75.png),
+    [report](evidence/t14-1-text-size/text-size-steps.json)).
+  - `text-size-whitespace`: line 6 is unchanged at 150%; the cell goes
+    from 7.703125 to 11.546875 px, the row from 15900 to 23833 px, and the
+    top line is still `MAP`
+    ([150%](evidence/t14-1-text-size/text-size-whitespace.text-size-150.png),
+    [report](evidence/t14-1-text-size/text-size-whitespace.json)).
+  - `text-size-restart`: after a relaunch A reads 125%, `html-static` 90%
+    (applied scale 0.9) and B 100%; stored values 1.25, 0.9 and null;
+    `htmlPageFocusKeys` is `ran`
+    ([HTML 90%](evidence/t14-1-text-size/text-size-restart.text-size-html-90.png),
+    [before](evidence/t14-1-text-size/text-size-restart.json),
+    [after](evidence/t14-1-text-size/text-size-restart-after.json)).
+  - `text-size-pdf`: the PDF zooms from *Fit width* to 75% and its stored
+    `TextScale` stays null ([report](evidence/t14-1-text-size/text-size-pdf.json)).
+  - `text-size-error`: with the write lock held, *Larger text* shows the
+    save failure and returns to the stored size; after release a retry
+    stores 1.5
+    ([failure](evidence/t14-1-text-size/text-size-error.text-size-error.png),
+    [report](evidence/t14-1-text-size/text-size-error.json),
+    [retry](evidence/t14-1-text-size/text-size-error-retry.json)).
+- Every job of run 37561318073 passes. The `pdf` shard passed on a rerun:
+  its first attempt had three failed progress saves in `progress-changed`,
+  a mode this change doesn't touch. The same day `core-tests` once failed
+  `ProgressCoordinatorSavesEachGuidesLocatorAcrossReopen` (5 s against a
+  usual 130 ms). Both look like progress saves timing out on a slow
+  runner.
+- `txt` group (run 37559450447) and `html` group (run 37560666536) pass;
+  the HTML canaries show only the text-size commands.
 
 ## Risks
 

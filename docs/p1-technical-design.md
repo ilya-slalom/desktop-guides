@@ -824,7 +824,7 @@ project uses a provisional package identity until T17.1 sets the public one.
 - **T14.1** Store per-Guide TXT/HTML text scale (initially 0.75–2.0 of the
   16-unit default, equivalent to 12–32 WinUI font units) in
   ReaderPreferences. Show Smaller/Larger and a current value with bounded
-  steps; PDF uses its separate zoom value and is not written into text
+  steps; the steps are 75, 90, 100, 110, 125, 150, 175 and 200%, with a reset to 100%; PDF uses its separate zoom value and is not written into text
   preferences. Test that changing one guide leaves another unchanged after
   restart and never collapses TXT whitespace.
 - **T14.2** Store global `System`, `Light`, or `Dark` in Settings; System is

@@ -1,0 +1,15 @@
+﻿{
+    "mode":  "text-size-steps",
+    "invocationId":  "fdae6b7e714a455d8c2fb96d55d790f1",
+    "observedAt":  "2026-10-07T02:28:49.2791211Z",
+    "processId":  6356,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "text-size-steps"
+               ],
+    "textSize200Screenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\text-size-steps.text-size-200.png",
+    "textSize75Screenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\text-size-steps.text-size-75.png"
+}

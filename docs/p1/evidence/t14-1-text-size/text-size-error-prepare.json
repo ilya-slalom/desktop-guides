@@ -1,0 +1,13 @@
+﻿{
+    "mode":  "text-size-error-prepare",
+    "invocationId":  "84376dfcde3f48e6929ece3f0580cd7b",
+    "observedAt":  "2026-10-07T02:29:20.4341309Z",
+    "processId":  9956,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "text-size-error-prepare"
+               ]
+}
