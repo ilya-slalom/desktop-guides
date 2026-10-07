@@ -2266,19 +2266,21 @@ try {
             $report.phases += 'position-text-size-fallback'
 
             # position-fixed-header: text that stays on screen (a fixed site
-            # header, a sticky bar) is never the place, so the capture is
-            # the line under them and a size step keeps it on top.
+            # header, a long fixed side menu, a sticky bar) is never the
+            # place, so the capture is the line under them and a size step
+            # keeps it on top. The place is early in the guide, where the
+            # capture's search reaches the pinned text.
             Open-TextGuide 'Fixed Header Web Guide'
             $report.sessionsOpened++
             [void](Wait-Status 'Guide ready.')
-            Click-Element (Wait-PageVisible 'Jump to MARK-0420')
-            $fixedTarget = Wait-HtmlPosition { param($p) $p.quote -like 'MARK-0420 *' } 'the MARK-0420 line under a fixed header'
-            [void](Wait-TopMark 420 'a jump under a fixed header')
+            Click-Element (Wait-PageVisible 'Jump to MARK-0020')
+            $fixedTarget = Wait-HtmlPosition { param($p) $p.quote -like 'MARK-0020 *' } 'the MARK-0020 line under a fixed header'
+            [void](Wait-TopMark 20 'a jump under a fixed header')
             foreach ($step in @(
                 @{ command = 'Larger text'; scale = 1.1; label = '110%' },
                 @{ command = 'Smaller text'; scale = 1.0; label = '100%' })) {
                 $after = Step-HtmlTextSize $step.command 1 $step.scale "Text size $($step.label)."
-                [void](Wait-TopMark 420 "a size step to $($step.label) under a fixed header")
+                [void](Wait-TopMark 20 "a size step to $($step.label) under a fixed header")
                 if ($after.appearanceKind -ne 'Exact' -or $after.offset -ne $fixedTarget.offset) {
                     throw "A size step to $($step.label) under a fixed header restored '$($after.appearanceKind)' at offset $($after.offset); expected Exact at $($fixedTarget.offset)."
                 }
