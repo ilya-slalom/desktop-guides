@@ -593,24 +593,30 @@ internal sealed class HtmlReaderSession : IReaderSession
                     await RunScriptAsync(HtmlPositionScripts.Find(HtmlLocationRules.FindArgs(position))));
             }
             HtmlRestoreTarget? target = HtmlLocationRules.Resolve(plan, find);
-            if (target is not null)
+            int started = generation;
+            if (target is not null) target = await ScrollToTargetAsync(target);
+            HtmlScroll? scroll;
+            HtmlCapture? capture;
+            while (true)
             {
-                int started = generation;
-                target = await ScrollToTargetAsync(target);
                 while (target is not null && started != generation && !disposed)
                 {
-                    // The window was resized during the restore.
+                    // The window was resized, or a restyle wrote, during the
+                    // restore.
                     started = generation;
                     await Task.Delay(ResizeSettle);
                     target = await ScrollToTargetAsync(target) ?? target;
                 }
+                if (disposed) return HtmlLocationRules.Outcome(plan, target);
+                scroll = HtmlLocationRules.ParseScroll(await RunScriptAsync(HtmlPositionScripts.ReadScroll));
+                capture = await CaptureAsync();
+                if (disposed) return HtmlLocationRules.Outcome(plan, target);
+                // A reflow that landed after the last scroll would make this
+                // capture a drifted place: scroll to the target again.
+                if (target is null || started == generation) break;
             }
             RestoreOutcome outcome = HtmlLocationRules.Outcome(plan, target);
-            if (disposed) return outcome;
-            HtmlScroll? scroll = HtmlLocationRules.ParseScroll(await RunScriptAsync(HtmlPositionScripts.ReadScroll));
             if (scroll is not null) lastScroll = scroll;
-            HtmlCapture? capture = await CaptureAsync();
-            if (disposed) return outcome;
             diagnostics?.RecordRestore(outcome.Kind);
             lastOutcome = outcome;
             lastStep = outcome.Kind == RestoreKind.Unavailable ? null : target?.Step;
