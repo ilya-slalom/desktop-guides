@@ -3351,9 +3351,17 @@ try {
                     [void](Wait-Status "Text size $label.")
                 }
                 $at150 = Wait-TextDiagnostics 1.5 'three steps up'
-                $expected = 1.5 * [double] $at100.rowWidth
-                if ([math]::Abs([double] $at150.rowWidth - $expected) -gt [double] $at150.cellWidth) {
-                    throw "At 150% the row is $($at150.rowWidth) px wide; expected $expected within one cell ($($at150.cellWidth) px)."
+                # The text stack rounds a glyph advance to 1/64 px, so across a
+                # long row 1.5 times the 100% width can be off by more than a
+                # cell. The app's part: the cell scales and the row keeps its columns.
+                $expectedCell = 1.5 * [double] $at100.cellWidth
+                if ([math]::Abs([double] $at150.cellWidth - $expectedCell) -gt 0.01 * $expectedCell) {
+                    throw "At 150% a cell is $($at150.cellWidth) px wide; expected $expectedCell within 1%."
+                }
+                $columns100 = [double] $at100.rowWidth / [double] $at100.cellWidth
+                $columns150 = [double] $at150.rowWidth / [double] $at150.cellWidth
+                if ([math]::Abs($columns150 - $columns100) -ge 1) {
+                    throw "The row spans $columns150 cells at 150% and $columns100 at 100%."
                 }
                 Assert-RowNames $ascii $asciiNames
                 if ($asciiNames[5] -cne $columns) { throw "txt-ascii line 6 is '$($asciiNames[5])', not '$columns'." }
