@@ -1,0 +1,12 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- T14.4: the Reader's commands sit on the page, from the left. -->
+    <Style x:Key="DesktopGuidesReaderCommandBarStyle" TargetType="CommandBar">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="IsDynamicOverflowEnabled" Value="True" />
+    </Style>
+
+    <x:Double x:Key="DesktopGuidesTextSizeValueMinWidth">44</x:Double>
+</ResourceDictionary>

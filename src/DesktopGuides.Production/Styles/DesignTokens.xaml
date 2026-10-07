@@ -107,4 +107,13 @@
     <CornerRadius x:Key="DesktopGuidesControlCornerRadius">4</CornerRadius>
     <CornerRadius x:Key="DesktopGuidesSurfaceCornerRadius">8</CornerRadius>
     <CornerRadius x:Key="DesktopGuidesHeroCornerRadius">12</CornerRadius>
+
+    <!-- T14.4: sizes the Reader and Settings used as literals. -->
+    <x:Double x:Key="DesktopGuidesSettingsChoiceMinWidth">160</x:Double>
+    <x:Double x:Key="DesktopGuidesCredentialInputMinWidth">260</x:Double>
+    <x:Double x:Key="DesktopGuidesInlineProgressSize">20</x:Double>
+    <x:Double x:Key="DesktopGuidesPdfSplitBreakpoint">720</x:Double>
+    <x:Double x:Key="DesktopGuidesPdfUnlockMaxWidth">360</x:Double>
+    <Thickness x:Key="DesktopGuidesSettingsSectionMargin">0,24,0,8</Thickness>
+    <Thickness x:Key="DesktopGuidesTextLinePadding">12,0</Thickness>
 </ResourceDictionary>
