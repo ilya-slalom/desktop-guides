@@ -231,16 +231,42 @@ try {
         throw "The shell status '$($status.Current.Name)' did not close."
     }
 
+    # T14.4: these messages never open the shell bar. The probe and a UI
+    # Automation notification carry them; the page itself shows the state.
+    $quietStatusPatterns = @(
+        '^(Library|Game|Guide|Settings) ready\.$',
+        ('^(Opening guide|Loading library|Loading game|Loading guide)' + [char]0x2026 + '$'),
+        '^Text size \d+%\.( Your place may have shifted\.)?$',
+        ' marked (complete|in progress)\.$',
+        '^App theme set to (System|Light|Dark)\.$',
+        '^Window background set to (Mica|Acrylic|Solid)\.$',
+        '^(No games match\.|\d+ of \d+ games match\.)$',
+        '^Opened near your last place\. The guide changed since you were here\.$')
+
+    function Test-QuietStatus([string] $message) {
+        foreach ($pattern in $quietStatusPatterns) {
+            if ($message -cmatch $pattern) { return $true }
+        }
+        return $false
+    }
+
+    # Watches the bar briefly: a quiet message must never be on it.
+    function Assert-QuietStatus([string] $message) {
+        $deadline = (Get-Date).AddMilliseconds(400)
+        do {
+            $bar = Find-ById 'ShellStatus'
+            if ($bar -and -not $bar.Current.IsOffscreen -and $bar.Current.Name -ceq $message) {
+                throw "The quiet status '$message' opened the shell status bar."
+            }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+    }
+
     function Wait-Status(
         [string[]] $expected,
         [switch] $AllowHidden,
         [switch] $Prefix,
         [int] $Seconds = 15) {
-        $transient = @($expected | Where-Object { $_ -in @(
-            'Library ready.',
-            'Game ready.',
-            'Guide ready.',
-            'Settings ready.') }).Count -gt 0
         $lastObserved = 'status probe was not found'
         $deadline = (Get-Date).AddSeconds($Seconds)
         do {
@@ -263,7 +289,12 @@ try {
             if ($matched -and
                 $sequence -gt $script:lastStatusSequence) {
                 if ($message -eq 'Library ready.') { Assert-Absent 'LibraryLoading' }
-                if ($transient -or $AllowHidden) {
+                if (Test-QuietStatus $message) {
+                    Assert-QuietStatus $message
+                    $script:lastStatusSequence = $sequence
+                    return $probe
+                }
+                if ($AllowHidden) {
                     $script:lastStatusSequence = $sequence
                     return $probe
                 }
@@ -879,6 +910,20 @@ try {
             $a.Top -lt $b.Bottom -and $a.Bottom -gt $b.Top
         if ($overlap) {
             throw "'$firstId' overlaps '$secondId': $a and $b."
+        }
+    }
+
+    # T14.4: a quiet confirmation opens no bar above the Reader, so the
+    # Reader's toolbar stays where it was. The block runs with &, so it
+    # sees the caller's variables through dynamic scoping.
+    function Assert-ReaderCommandsStay([scriptblock] $action, [string] $what) {
+        [void](Wait-HiddenById 'ShellStatus')
+        $before = (Wait-VisibleById 'ReaderCommands').Current.BoundingRectangle.Top
+        & $action
+        Start-Sleep -Milliseconds 300
+        $after = (Wait-VisibleById 'ReaderCommands').Current.BoundingRectangle.Top
+        if ([Math]::Abs($after - $before) -gt 1) {
+            throw "$what moved the Reader toolbar from $before to $after."
         }
     }
 
@@ -1955,6 +2000,11 @@ try {
             [void](Wait-Name 'GameHeading' $textGame)
             [void](Wait-Status 'Game ready.')
             Open-TextGuide 'ASCII Map Guide'
+            # T14.4: the held load shows in the card and the progress line,
+            # not in the shell bar.
+            [void](Wait-VisibleById 'ReaderLoading')
+            [void](Wait-VisibleById 'RouteProgress')
+            Assert-Absent 'ShellStatus'
             $report.phases += 'txt-load-paused'
         }
         elseif ($Mode -eq 'txt-back-during-load') {
@@ -2009,7 +2059,7 @@ try {
             [void](Wait-PageName 'Canary guide A loaded')
             Assert-OnlyTextSizeCommands 'Canary Guide A'
             Assert-Absent 'ReaderLoadError'
-            Assert-Absent 'ReaderPlaceholder'
+            Assert-Absent 'ReaderLoading'
             # The meta refresh fires after one second. It isn't
             # user-initiated, so it is cancelled without the bar (R9).
             Mark-CanaryLines 'loaded-a'
@@ -2248,6 +2298,7 @@ try {
                 @{ command = 'Smaller text'; scale = 1.0; label = '100%' })) {
                 $after = Step-HtmlTextSize $step.command 1 $step.scale `
                     "Text size $($step.label). Your place may have shifted."
+                [void](Wait-Name 'ReaderNotice' 'Your place may have shifted.')
                 if ($after.appearanceKind -ne 'Approximate' -or $after.appearanceStep -ne 'Fraction') {
                     throw "A size step to $($step.label) restored '$($after.appearanceKind)/$($after.appearanceStep)'; expected Approximate/Fraction."
                 }
@@ -2499,7 +2550,7 @@ try {
             if ($textStatus) { throw "Expected no text status for tagged text; saw '$textStatus'." }
             $previewStatus = Get-PdfStatus 'PdfPreviewStatus'
             if ($previewStatus) { throw "Expected no preview status; saw '$previewStatus'." }
-            Assert-Absent 'ReaderPlaceholder'
+            Assert-Absent 'ReaderLoading'
             Assert-Absent 'ReaderLoadError'
             $report.pdfReaderScreenshot = Save-WindowScreenshot 'pdf-reader'
 
@@ -3027,12 +3078,14 @@ try {
                 $approximate = 'Opened near your last place. The guide changed since you were here.'
                 Open-TextGuide 'Numbered Lines Guide'
                 [void](Wait-Status $approximate)
+                [void](Wait-Name 'ReaderNotice' $approximate)
                 Wait-FirstTextRow
                 Wait-TopLine $ExpectedTopLine 'Reopening a changed TXT guide'
                 $report.progressChangedTxtScreenshot = Save-WindowScreenshot 'progress-changed-txt'
                 Back-ToTextGame
                 Open-TextGuide 'Long PDF Guide'
                 [void](Wait-Status $approximate)
+                [void](Wait-Name 'ReaderNotice' $approximate)
                 [void](Wait-PdfPage 121 200 'page 121 of 200')
                 $report.progressPdfFraction = Wait-PdfFraction 0.3 'Reopening a changed PDF guide'
                 $report.progressChangedPdfScreenshot = Save-WindowScreenshot 'progress-changed-pdf'
@@ -3253,8 +3306,10 @@ try {
                     Wait-CompletionShown $false 'Marking in progress in the Reader'
                     Wait-FocusedId 'CompletionInProgress'
                 }
-                Send-Keys '{RIGHT}'
-                [void](Wait-Status "$web marked complete.")
+                Assert-ReaderCommandsStay {
+                    Send-Keys '{RIGHT}'
+                    [void](Wait-Status "$web marked complete.")
+                } 'Marking complete in the Reader'
                 Wait-CompletionShown $true 'Marking complete in the Reader'
                 Wait-FocusedId 'CompletionComplete'
                 $report.completionReaderStartedComplete = $startedComplete
@@ -3341,9 +3396,11 @@ try {
             }
 
             function Step-TextSize([string] $keys, [string] $label) {
-                Send-Keys $keys
-                Wait-TextSize $label
-                [void](Wait-Status "Text size $label.")
+                Assert-ReaderCommandsStay {
+                    Send-Keys $keys
+                    Wait-TextSize $label
+                    [void](Wait-Status "Text size $label.")
+                } "A text-size step to $label"
             }
 
             function Assert-TextCommand([string] $name, [bool] $enabled) {
@@ -3612,7 +3669,7 @@ try {
             if (-not $scroll.Current.HorizontallyScrollable) {
                 throw 'The long txt-ascii line did not make the reader scroll sideways.'
             }
-            Assert-Absent 'ReaderPlaceholder'
+            Assert-Absent 'ReaderLoading'
             Assert-Absent 'ReaderLoadError'
             foreach ($name in 'Go to start', 'Previous page', 'Next page', 'Go to end') {
                 $button = Find-ByName $name
@@ -3697,7 +3754,7 @@ try {
             [void](Wait-Status $missingMessage)
             [void](Wait-Name 'ReaderLoadError' $missingMessage)
             Assert-Absent 'ReaderTextLines'
-            Assert-Absent 'ReaderPlaceholder'
+            Assert-Absent 'ReaderLoading'
             Assert-NoReaderCommands 'Missing File Guide'
             $report.phases += 'txt-missing'
 
@@ -3708,7 +3765,7 @@ try {
             [void](Wait-Status 'Re-import this guide to read it.')
             [void](Wait-Name 'ReaderLoadError' 'Re-import this guide to read it.')
             Assert-Absent 'ReaderTextLines'
-            Assert-Absent 'ReaderPlaceholder'
+            Assert-Absent 'ReaderLoading'
             Assert-NoReaderCommands 'Web Page Guide'
             $report.phases += 'html-no-manifest'
 
@@ -5798,7 +5855,7 @@ try {
         if (-not $firstLine -or $firstLine.Current.Name -ne 'Test guide.') {
             throw 'The TXT reader did not show the seeded guide text.'
         }
-        Assert-Absent 'ReaderPlaceholder'
+        Assert-Absent 'ReaderLoading'
         foreach ($name in 'Go to start', 'Previous page', 'Next page', 'Go to end') {
             $button = Find-ByName $name
             if (-not $button -or $button.Current.IsOffscreen) {
