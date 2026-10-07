@@ -1767,7 +1767,9 @@ public sealed partial class ShellWindow : Window
                     {
                         return false;
                     }
-                    TextReaderSession session = new(document, maxColumns);
+                    TextReaderSession session = new(
+                        document, maxColumns, TextSizeSteps.Default,
+                        TextReaderSession.DiagnosticsFolderForTest(cacheRoot!));
                     readerSession = session;
                     ShowReaderSurface(placeholder: false, view: session.View);
                     ReaderActions.SetSession(session);
