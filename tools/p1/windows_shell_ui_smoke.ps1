@@ -2017,6 +2017,17 @@ try {
             Wait-HiddenById 'ReaderExternalLinkBar'
 
             Mark-CanaryLines 'after-blank-link'
+            # The text-size toolbar shortens the page, which can put the
+            # link below the fold. The 3000 px spacer keeps the section
+            # off-screen until the fragment link moves it.
+            $jump = Wait-PageName 'Jump to details'
+            if ($jump.Current.IsOffscreen) {
+                $jump.GetCurrentPattern(
+                    [System.Windows.Automation.ScrollItemPattern]::Pattern).ScrollIntoView()
+            }
+            if (-not (Wait-PageName 'Canary details').Current.IsOffscreen) {
+                throw 'The details section was on-screen before the fragment link.'
+            }
             Click-Element (Wait-PageVisible 'Jump to details')
             $details = Wait-PageName 'Canary details'
             $deadline = (Get-Date).AddSeconds(5)
