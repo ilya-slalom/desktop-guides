@@ -2591,7 +2591,7 @@ try {
             Open-TextGuide 'Scanned PDF Guide'
             [void](Wait-Status 'Guide ready.')
             [void](Wait-Name 'PdfPageStatus' ('Page 1 of 1' + $pdfDot + 'Fit width'))
-            [void](Wait-Name 'PdfTextStatus' 'Image-only page; OCR is unavailable')
+            [void](Wait-Name 'PdfTextStatus' 'Image-only page; OCR is unavailable.')
             $scanText = Get-PdfText
             if ($scanText) { throw "Expected no text for an image-only page; read '$scanText'." }
             $report.phases += 'pdf-scan'
