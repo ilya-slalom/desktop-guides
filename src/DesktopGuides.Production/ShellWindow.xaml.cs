@@ -235,8 +235,11 @@ public sealed partial class ShellWindow : Window
             "DesktopGuidesStatus");
     }
 
+    // A route load replaces the previous route's bar, as the busy
+    // message did; quiet changes within a page leave the bar alone.
     private void ShowRouteProgress(string message)
     {
+        HideStatus();
         RouteProgress.Visibility = Visibility.Visible;
         AnnounceStatus(message);
     }
@@ -331,7 +334,6 @@ public sealed partial class ShellWindow : Window
             ShowBusyStatus("Waiting for previous window…");
             libraryLease = await LibrarySessionLease.AcquireAsync(
                 dataRoot, leaseWait.Token);
-            HideStatus();
             ShowRouteProgress("Loading library…");
             ManagedPathResolver paths = new(dataRoot);
             repository = new SqliteLibraryRepository(paths);
