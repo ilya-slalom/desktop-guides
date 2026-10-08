@@ -432,8 +432,22 @@ Found while running the checks:
   file holding a credential value; the package, the temporary certificate and
   the task were removed. The blocked-network pass wasn't run (no firewall rule).
   Result: [provider-settings-host.json](evidence/t14-4-reader-settings/provider-settings-host.json).
-- **Not run here:** listening with Narrator, which waits for the user. High
-  contrast, text scale and 200% display scale are T16.2's.
+- **Narrator pass** on VEGA, 8 October 2026, at the user's request. A small
+  UI Automation client recorded the notification events Narrator speaks,
+  while the installed `html` and `text-size` groups ran
+  ([uia-notifications-host.tsv](evidence/t14-4-reader-settings/uia-notifications-host.tsv)).
+  The app raised 283 announcements, all `ImportantMostRecent`. They
+  included every quiet message: the ready messages; the loading and
+  opening messages; "Text size N%." (49); "Text size N%. Your place may have
+  shifted." (8); and the approximate-restore message. Warnings and errors
+  were announced by the shell `InfoBar` itself. The card notices are
+  announced twice: once by the `InfoBar` opening and once by
+  `ShowReaderNotice`. That is a deferred minor. A first run with Narrator on
+  stopped at the first guide open: Narrator Home takes focus at start and
+  Narrator intercepts the keys the harness sends. So the scenarios ran with
+  the listener only, and nobody listened to the audio; T16.2's Narrator pass
+  covers listening. High contrast, text scale and 200% display scale are
+  T16.2's.
 
 ## Risks
 
