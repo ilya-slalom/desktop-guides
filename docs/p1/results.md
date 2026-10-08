@@ -1,8 +1,8 @@
 # P1 implementation results
 
 Status: P1 work is merged into `main` through
-[PR #54](https://github.com/ilya-slalom/desktop-guides/pull/54) (T14.4, merge
-commit `3ba3d72`) on 8 October 2026. The [merged PR summary](#merged-pr-summary)
+[PR #57](https://github.com/ilya-slalom/desktop-guides/pull/57) (a T14.4 harness fix,
+merge commit `0f10a1c`) on 8 October 2026. The [merged PR summary](#merged-pr-summary)
 lists every PR since M0 with its CI run and test counts. The P1 first usable
 release remains in progress: the [dependency plan](implementation-plan.md)
 defines all task exit gates, and this file records only checks actually run.
@@ -24,7 +24,7 @@ PR #16. T14.4 merged in PR #54.
 
 ## Merged PR summary
 
-One row per PR merged into `main` after M0, through PR #54. The *Record* column
+One row per PR merged into `main` after M0, through PR #57. The *Record* column
 links the task's own verification section, which has the full evidence.
 
 - *Final CI run* is the run the PR cites as decisive. Where no CI run is
@@ -36,7 +36,7 @@ links the task's own verification section, which has the full evidence.
 - PRs record `shell-scope` only from #38 onward, when the input was added.
   From #47 a full run splits `production-shell-ui` into four shards.
 - Tasks for #33 (a T08.3 harness follow-up) and #37 are inferred from the PR
-  titles. #15, #21, #38, #43, #47 and #53 aren't task PRs.
+  titles. #15, #21, #38, #43, #47, #53, #55 and #56 aren't task PRs.
 
 | PR | Merged | Commit | Task | Final CI run | Core | Infra | Record | Caveats |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -77,6 +77,9 @@ links the task's own verification section, which has the full evidence.
 | [#52](https://github.com/ilya-slalom/desktop-guides/pull/52) | 2026-10-07 | `a350d7e` | T14.3 | [37590262774](https://github.com/ilya-slalom/desktop-guides/actions/runs/37590262774) | 899 | 540 | [t14-3-appearance-restore-design](t14-3-appearance-restore-design.md#verification) | Run after the final-review fixes; [37583360621](https://github.com/ilya-slalom/desktop-guides/actions/runs/37583360621) passed before them. The fix for a restyle landing during a restore's capture has no failing-first test. |
 | [#53](https://github.com/ilya-slalom/desktop-guides/pull/53) | 2026-10-07 | `5795a24` | Docs | — | — | — | — | Docs only: status pages brought up to PR #52. No CI run started: #47's docs-only skip held. |
 | [#54](https://github.com/ilya-slalom/desktop-guides/pull/54) | 2026-10-08 | `3ba3d72` | T14.4 | [37710298596](https://github.com/ilya-slalom/desktop-guides/actions/runs/37710298596) | 906 | 540 | [t14-4-reader-settings-design](t14-4-reader-settings-design.md#verification) | The `html` shard passed on attempt 2 after a one-off WebView2 open hang before the first offline session. The host `-ProviderOnly` pass and a UI Automation notification record (the Narrator pass) ran on VEGA; nobody listened to the audio, and high contrast, text scale and 200% display scale are T16.2's. |
+| [#55](https://github.com/ilya-slalom/desktop-guides/pull/55) | 2026-10-08 | `f7c22e3` | Docs | — | — | — | — | Docs only: records the T14.4 merge (PR #54). No CI run started: #47's docs-only skip held. |
+| [#56](https://github.com/ilya-slalom/desktop-guides/pull/56) | 2026-10-08 | `aef9d81` | Portable build | [37736088360](https://github.com/ilya-slalom/desktop-guides/actions/runs/37736088360) | 906 | 540 | [host check](#portable-single-file-release--host-check-8-october-2026) | The `core` shard passed on attempt 2 after `text-size-steps` lost a race with the closing overflow, fixed in #57. The earlier head `bb74c70` passed every job in [37730052864](https://github.com/ilya-slalom/desktop-guides/actions/runs/37730052864). It also plans T17.4 from the [size spike](#portable-size-spike--8-october-2026). |
+| [#57](https://github.com/ilya-slalom/desktop-guides/pull/57) | 2026-10-08 | `0f10a1c` | T14.4 (harness) | [37738588719](https://github.com/ilya-slalom/desktop-guides/actions/runs/37738588719) | 906 | 540 | — | Harness only: `Assert-ResetEnabled` now waits for the overflow to close, and `text-size-steps` recorded closes of 42, 38 and 51 ms. |
 
 ## M2 T04.1 game editor — implementation check, 27 September 2026
 
@@ -1342,7 +1345,8 @@ The portable release is now one `DesktopGuides.Production.exe` in a zip,
 not a 544-file folder. The publish is single-file with full self-extraction,
 symbols are embedded, and `tools/p1/package_portable_release.ps1` builds the
 zip, its `.zip.sha256` file and a JSON manifest; see
-[Portable build](e2e-testing.md#portable-build).
+[Portable build](e2e-testing.md#portable-build). It merged through
+[PR #56](https://github.com/ilya-slalom/desktop-guides/pull/56), merge commit `aef9d81`.
 
 On the Windows 11 x64 host (build `10.0.26200.0`, .NET SDK `10.0.401`), from
 a zip staging of `80d2647`, the locked MSIX, ShellSeed and portable restores

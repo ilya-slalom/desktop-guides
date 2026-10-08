@@ -607,7 +607,8 @@ blocked-network controller removal record.
 
 T04.4 was merged through PR #14, merge commit
 `3e490de93a2733978c9000d754a8d618f0208563`, and the portable build through
-PR #15, merge commit `a4bb44c8ef06053cf1b2e5b154641fb95cf5fa1a`. The
+PR #15, merge commit `a4bb44c8ef06053cf1b2e5b154641fb95cf5fa1a`; PR #56
+(merge commit `aef9d81`) made its release a single exe. The
 [T05.4 catalog components design](t05-4-catalog-components-design.md) and
 [plan](t05-4-catalog-components-plan.md) extract the artwork row, cover frame,
 facts, empty-state, busy-row and status `InfoBar` patterns into
