@@ -1,8 +1,8 @@
 # P1 implementation plan and exit gates
 
-Status: 42 of the 54 tasks are merged, 7 October 2026. M0 and M3 are
-complete; M1 still needs T17.1, M2 the optional T11.5, and M4 T14.4. M5–M6
-are planned.
+Status: 43 of the 54 tasks are merged, 8 October 2026. M0, M3 and M4 are
+complete; M1 still needs T17.1 and M2 the optional T11.5. M5–M6 are
+planned.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
 This plan orders all **16 P1 stories and 54 tasks** in the
@@ -890,7 +890,7 @@ restart. Theme/font changes preserve or visibly approximate the location.
 | T13.1 | T05.1, T11.3, T13.2 | Guide and Reader completion actions bound to one service and presented as a two-item Toolkit `Segmented` choice when its selected-state UIA passes, with native radio buttons as fallback. UIA and keyboard checks show immediate committed state and announce changes; final-page reading leaves state unchanged. | TR13.1, TR13.2 |
 | T14.1 | T03.2, T08.2, T09.1, T11.3 | Bounded per-guide TXT/HTML text-size controls and persisted preferences. Two-guide restart test preserves separate sizes and TXT fixed-width layout. Implemented with fixed steps 75–200%, a label and a reset; see [the design](t14-1-text-size-design.md). | TR14.1 |
 | T14.3 | T08.3, T09.3, T10.3, T14.1, T14.2 | Pre-change capture and post-layout restore across text/theme changes. TXT returns within one line, HTML to matching context where present, PDF to page/fraction; fallback is announced. Implemented in the HTML session: a restyle captures first, pauses tracking and scrolls back after the write; TXT and PDF already keep their place; see [the design](t14-3-appearance-restore-design.md). | TR14.1, TR14.2 |
-| T14.4 | T05.4, T08.3, T09.2, T10.2, T11.3, T14.2 | Shared design language applied to production Reader and Settings commands, Toolkit `SettingsCard`/`SettingsExpander` groups, the App theme drop-down, and teaching/status surfaces. Installed TXT/HTML/PDF/Settings screenshots and keyboard, theme, and narrow-width checks pass; every Toolkit dependency is centrally locked. High contrast, Windows text scale and 200% display scale are checked in T16.2. Implemented; see [the design](t14-4-reader-settings-design.md). | TR11.3, TR14.3 |
+| T14.4 | T05.4, T08.3, T09.2, T10.2, T11.3, T14.2 | Shared design language applied to production Reader and Settings commands, Toolkit `SettingsCard`/`SettingsExpander` groups, the App theme drop-down, and teaching/status surfaces. Installed TXT/HTML/PDF/Settings screenshots and keyboard, theme, and narrow-width checks pass; every Toolkit dependency is centrally locked. High contrast, Windows text scale and 200% display scale are checked in T16.2. Merged through PR #54; see [the design](t14-4-reader-settings-design.md). | TR11.3, TR14.3 |
 
 T13.2 was merged through PR #42 on 5 October 2026 (merge commit
 `0807d5a`; CI run 37286991639); see the
@@ -948,7 +948,8 @@ that can only come back by fraction says `Your place may have shifted.`
 TXT keeps its top line and PDF its page as before, and a theme change
 doesn't move the place in any reader.
 
-T14.4 is implemented on `feat/p1-t14-4-reader-settings-design`; see the
+T14.4 was merged through PR #54 on 8 October 2026 (merge commit
+`3ba3d72`; CI run 37710298596); see the
 [design and implementation notes](t14-4-reader-settings-design.md). The
 shell bar only shows what the page doesn't: route loads show a progress line
 and, in the Reader, a loading state in the reading card; ready messages and

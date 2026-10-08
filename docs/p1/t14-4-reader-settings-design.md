@@ -1,7 +1,7 @@
 # T14.4 Reader and Settings design language design
 
-Status: implemented on `feat/p1-t14-4-reader-settings-design`; full CI run
-37710298596 (see [Verification](#verification)).
+Status: merged through PR #54 on 8 October 2026 (merge commit `3ba3d72`);
+full CI run 37710298596 (see [Verification](#verification)).
 Prerequisites: T05.4 (catalog components, PR #16), T08.3 (TXT position,
 PR #31), T09.2 (HTML theme style, PR #49), T10.2 (PDF controls, PR #46),
 T11.3 (reader shell, PR #7) and T14.2 (theme setting, PR #48) are merged.

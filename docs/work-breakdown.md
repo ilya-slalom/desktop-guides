@@ -3,7 +3,7 @@
 Status: P0 merged in [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1)
 on 25 September 2026. The clean-VM prerequisite gate and Windows 10 check
 remain deferred. P1 is designed in the [technical design](p1-technical-design.md)
-and [implementation plan](p1/implementation-plan.md); on 7 October 2026, 42 of
+and [implementation plan](p1/implementation-plan.md); on 8 October 2026, 43 of
 its 54 tasks are merged, and the plan records each one. Source:
 [initial requirements and high-level design](initial-design.md). The backlog
 defines the acceptance gates; [Windows results](p0/results.md) record
@@ -467,7 +467,7 @@ behavior, or high-contrast system colors.
   settings, teaching, and status patterns. Use Toolkit `SettingsCard` and
   `SettingsExpander` for settings rows/groups and the App theme drop-down;
   justify and centrally lock each Toolkit package before use.
-  Implemented; see [the design](p1/t14-4-reader-settings-design.md).
+  Implemented in PR #54; see [the design](p1/t14-4-reader-settings-design.md).
 - **TR14.1** Reader preferences are keyed by guide ID and have a bounded,
   accessible size range.
 - **TR14.2** Theme CSS or assets do not require a remote resource.
