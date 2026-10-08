@@ -148,6 +148,9 @@ jobs:
       - name: Check test-owned scheduled task cleanup
         shell: pwsh
         run: ./tools/p1/test_windows_shell_task_cleanup.ps1
+      - name: Check portable release packaging
+        shell: pwsh
+        run: ./tools/p1/test_package_portable_release.ps1
       - name: Check loopback canary
         shell: pwsh
         run: python -m unittest discover -s tools/p0 -p "test_*.py" -v

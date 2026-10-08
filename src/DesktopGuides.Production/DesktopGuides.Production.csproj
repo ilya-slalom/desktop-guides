@@ -13,12 +13,19 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PublishProfile>Properties\PublishProfiles\win10-$(Platform).pubxml</PublishProfile>
+    <!-- The portable release is one file. Analyze both builds so they restore
+         the same packages and share packages.lock.json. -->
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
   </PropertyGroup>
-  <!-- Portable release: no package identity, Windows App SDK and .NET bundled. -->
+  <!-- Portable release: one exe with no package identity, Windows App SDK and
+       .NET bundled. The Windows App SDK's DLL redirection needs every bundled
+       file on disk, so each version extracts once to %TEMP%\.net. -->
   <PropertyGroup Condition="'$(Portable)' == 'true'">
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" />

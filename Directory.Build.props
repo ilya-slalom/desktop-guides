@@ -5,5 +5,7 @@
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)artifacts\portable\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
     <BaseOutputPath>$(MSBuildThisFileDirectory)artifacts\portable\bin\$(MSBuildProjectName)\</BaseOutputPath>
     <DefaultItemExcludes>$(DefaultItemExcludes);bin\**;obj\**</DefaultItemExcludes>
+    <!-- Symbols go inside each assembly, so the single-file publish has no .pdb. -->
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 </Project>
