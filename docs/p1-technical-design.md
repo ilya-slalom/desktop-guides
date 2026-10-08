@@ -1,6 +1,6 @@
 # P1 technical design: local library and first usable reader
 
-Status: design for S03–S17 and S20, updated 28 September 2026. 43 of the 54
+Status: design for S03–S17 and S20, updated 28 September 2026. 43 of the 55
 tasks, through M4, are implemented as of 8 October 2026; see
 [P1 results](p1/results.md).
 The [high-level design](initial-design.md) defines R1–R9;
@@ -960,7 +960,7 @@ project uses a provisional package identity until T17.1 sets the public one.
 
 Every P1 task closes with a code or documentation artifact, a named test or
 manual trace, and a reviewable result. The [implementation plan](p1/implementation-plan.md)
-lists dependencies and specific exits for all 54 tasks. Core/Infrastructure
+lists dependencies and specific exits for all 55 tasks. Core/Infrastructure
 tests run on the locked Windows CI toolchain; critical file-boundary and
 symlink tests also run on Windows NTFS. UI Automation, Narrator, high
 contrast, DPI, installed-package, and offline checks run on target Windows

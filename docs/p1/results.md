@@ -1392,3 +1392,65 @@ later launches; 0.47 s for the multi-file build.
 the P0 `P0-WebView` cache and a library created at 12:27 that day, before the
 move, and nothing in it changed. The extraction folders the runs created under
 `%TEMP%\.net` were removed. No scheduled task or app process was left behind.
+
+## Portable size spike — 8 October 2026
+
+A throwaway spike on the Windows 11 x64 host measured how far the portable
+build can shrink. It built size variants from `80d2647` in scratch copies of
+the staging and kept no code. The size work is scheduled as T17.4, a final
+pass before the T17.3 candidate runs.
+
+| Variant | Exe | First-launch extraction | Cold / warm launch | Result |
+| --- | --- | --- | --- | --- |
+| `80d2647` | 244.0 MB | 551 files, 233.3 MB | 2.2 s / 0.5 s | passes |
+| V1: unused Windows App SDK components excluded | 181.8 MB | 485 files, 171.2 MB | 1.5 s / 0.5 s | passes |
+| V2: V1 with `PublishTrimmed`, `TrimMode=partial` | 94.3 MB | 355 files, 84.0 MB | 2.9 s / 0.64 s | crashes |
+| V2c: V2 with `EnableCompressionInSingleFile` | 41.7 MB | 355 files, 84.0 MB | 3.0 s / 0.65 s | crashes |
+| V2f: V1 with `TrimMode=full` | 89.3 MB | — | — | not run |
+
+- **What V1 removes.** The app uses only Foundation (file pickers, app
+  lifecycle), WinUI and WebView2. The `Microsoft.WindowsAppSDK` 2.5.1
+  metapackage also brings AI, ML (`onnxruntime.dll` 21.7 MB, `DirectML.dll`
+  18.7 MB), Search, Widgets and DWrite. The Community Toolkit packages depend
+  on the metapackage, so V1 keeps it and adds direct references to those
+  components and `Microsoft.Windows.AI.MachineLearning` with
+  `ExcludeAssets="all"`. A reference to only the components the app uses made
+  NuGet resolve the Toolkit's metapackage at 1.6, whose build files collide
+  with the 2.x components.
+- **V1 build checks.** It published with 0 warnings. The MSIX still built and
+  declared `Microsoft.WindowsAppRuntime.2` 2.5.1.0, and the MSIX restore
+  accepted the updated lock file. Both builds load only the system
+  `DWrite.dll`, never `DWriteCore.dll`, so text rendering doesn't change.
+- **V1 scenario runs.** These groups passed on the V1 exe: core, txt,
+  text-size, game-actions, design, catalog, pdf (all but the host-only
+  `pdf-keys`), progress, theme, completion and import. `html-position` failed
+  in both html runs at different points: once "Larger text" wasn't visible,
+  and once the 110% restore never reported. The `80d2647` build also fails
+  `html-position` in 3 of 4 runs on this host, so these runs neither show nor
+  rule out a V1 effect. `provider` wasn't run, because it needs credentials.
+- **Trimmed builds crash.** V2 and V2c crash with a stowed exception
+  (`0xc000027b`) in `Microsoft.UI.Xaml.dll`: in core at game-editor
+  "edit-by-id-and-clear-optional-fields", and early in the design, pdf,
+  progress and html groups. Compression isn't the cause, because V2 fails the
+  same way.
+- **Trim warnings to fix.** A publish with `-p:CsWinRTAotWarningLevel=2
+  -p:TrimmerSingleWarn=false` lists 20 warnings:
+  - CsWinRT1028 (4): `GameSearchItem`, `GuideRowItem`, `LibraryGameItem` and
+    `ProviderServices` need `partial`;
+  - CsWinRT1030 (9): generic WinRT interfaces, for example `Catalog`,
+    `List<MetadataItem>` and `byte[]`, need `AllowUnsafeBlocks` for generated
+    code;
+  - IL2026 (7): reflection-based `System.Text.Json` calls in
+    `HtmlPositionScripts.cs`, `ExternalLinkLaunchers.cs`,
+    `HtmlReaderSession.cs` and `ShellWindow.Progress.cs`.
+
+  The default build also reports IL2104 for AngleSharp, the Windows SDK
+  projection and `WinRT.Runtime`. Trimming drops the framework's ReadyToRun
+  code, which probably explains the slower start.
+- **Compression** shrinks the exe, not the extraction, so it pays off only
+  together with trimming.
+
+`%LOCALAPPDATA%\DesktopGuides` was renamed aside for the runs and renamed
+back; its 291 files matched the pre-run list by path, size and write time.
+The runs switched the Windows app theme and restored it (dark). The
+extraction folder and the spike copies were removed afterwards.
