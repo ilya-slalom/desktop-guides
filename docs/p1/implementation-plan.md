@@ -968,6 +968,9 @@ Exit: interrupted operations recover without damaging unrelated content;
 Settings can export outside app data and restore a validated library; complete
 flows work by keyboard and with the recorded accessibility checks.
 
+T20.1 is implemented on `feat/p1-t20-1-library-export`; see the
+[design](t20-1-library-export-design.md#t201-verification-record).
+
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
 | T15.1 | T03.2, T06.3, T09.1, T10.1 | Stable service errors and actionable UI for corrupt DB, missing guide, invalid content, and missing runtime. An unaffected guide still opens; a corrupt DB is never replaced by an empty one. | TR15.1 |

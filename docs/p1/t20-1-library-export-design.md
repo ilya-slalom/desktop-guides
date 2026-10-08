@@ -1,6 +1,6 @@
 # T20.1 library export archive design
 
-Status: design agreed in brainstorming on 8 October 2026; not implemented.
+Status: implemented on `feat/p1-t20-1-library-export`; see the verification record.
 Prerequisites T03.2 (PR #4), T04.4 (PR #14), T06.3 (PR #19) and T15.2
 (PR #5) are merged.
 
@@ -420,3 +420,77 @@ When T20.1 is implemented, update these:
 - **Mid-session reconciliation.** It runs reconciler code outside its usual
   startup context. The recovery tests cover both a leftover row and a
   conflicting one.
+
+## T20.1 verification record
+
+- **Unit tests.** On `pcsx2-win` (Windows 11 build 26200, .NET SDK
+  10.0.401): Core 931/931 (906 plus 25) and Infrastructure 590/590 (540 plus
+  50). The new test classes are:
+  - `LibraryArchiveManifestTests` (25): round trip, deterministic sorted
+    output, counts, non-ASCII paths, and each rejection: format, version, a
+    missing field, counts, a negative size, a malformed ID, five unsafe
+    content paths, four wrong path shapes, an uppercase hash, a duplicate
+    path, no database entry, non-JSON, an oversized manifest, and limits on
+    `Write`;
+  - `LibraryExportRepositoryTests` (6): the write gate is held, an open
+    connection and the token are passed, a cancelled gate wait, a validated
+    `BackupTo` copy, deletion on failed validation, and refusal of an
+    existing file;
+  - `LibraryArchiveVerifierTests` (8): a matching archive; a truncated
+    archive; an entry missing from the manifest or from the archive; the
+    manifest not first; changed bytes; wrong order; cancellation;
+  - `LibraryArchivePlanTests` (12): every referenced file with its recorded
+    size and hash; stray files left out; a missing file; a wrong size; HTML
+    rows that disagree with the guide; missing artwork; several damaged
+    guides; a shared relative path archived once; `LibraryTooLarge`; and,
+    on Windows, a junctioned guide folder, a linked guide file and a linked
+    artwork file;
+  - `LibraryExporterTests` (23):
+    - the archive's entries and verification;
+    - the snapshot's rows: reading state, a preference, a setting and
+      provider metadata;
+    - exclusions (TR20.2): credentials, recovery copies, the lock file,
+      staging, trash, artwork staging, the cache and stray files;
+    - an edit during export waits and is absent from the snapshot;
+    - a leftover `Prepared` import is reconciled first, and an unrecoverable
+      row fails with `RecoveryIncomplete`;
+    - a guide changed in place and mismatched artwork are damaged;
+    - destination rules by whole path segment, a non-zip or missing folder,
+      and an existing destination with and without `overwrite`;
+    - cancellation at each of the six checkpoints and while waiting for the
+      gate leaves nothing and releases the gate;
+    - a corrupted temporary archive fails verification;
+    - two exports with the same clock are byte-identical;
+    - a stale `.tmp` from another export is left alone;
+    - an empty library;
+    - progress through each phase.
+  - `LibraryExportMeasurement` (1): skipped unless `DG_EXPORT_MEASURE` is
+    set.
+- **Measurement.** [measurement.json](evidence/t20-1-library-export/measurement.json):
+  - the library had 2 games and 32 guides (20 TXT, 5 HTML with 52 files
+    each, PDFs of 20, 20, 20 and 100 MB, plus the fixture's 3), 175.0 MB in
+    all;
+  - the archive was 170.1 MB with 291 entries;
+  - the write gate was held 0.48 s, and the whole export took 0.77 s.
+
+  The PDFs and images are random bytes, stored uncompressed, so the archive
+  is only a little smaller than the library. A gate this short doesn't
+  justify hard-link pinning.
+- **Production build.** The x64 Release build succeeded with no warnings.
+  Production doesn't call the exporter yet.
+- **Rulings:**
+  - Host test staging adds the gitignored `tests/fixtures/p0/generated`
+    fixtures, which the PDF tests read.
+  - `ExportFixture.AddHtmlGuideAsync` iterates named tuple elements, because
+    a lone `_` inside the `(journal, _)` lambda is a parameter, not a
+    discard.
+  - `LibraryExportMeasurement` gained `using DesktopGuides.Core.Backup;`.
+  - Only the live layout and section 9 of `p1-technical-design.md` were
+    corrected, as this design's Documentation section lists.
+- **Follow-up.** Section 2 of `p1-technical-design.md` still describes the
+  T04.4-era `GameMetadataLinks` table, an `AddGameMetadata` journal and
+  `games/<game-id>` roots. The code stores provider metadata in `Games`
+  columns and artwork under `library/artwork/`. Correct that text before
+  T20.2's restore design relies on it.
+- **Not run:** an installed smoke, because T20.1 has no UI.
+
