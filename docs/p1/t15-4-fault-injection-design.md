@@ -324,4 +324,8 @@ When T15.4 is implemented, update these:
     includes `BeforeArtworkDelete`, because that game has artwork.
   - **The reserved-name defect was fixed in T15.4 instead of tracked.** The
     fix touches one file and changes no protocol step or journal format.
+  - **The `MovedToContent` checkpoint is also a cancellation point.** An
+    import can now be cancelled after the content move and before the
+    staging folder is deleted. It rolls back fully, the same as a cancel at
+    `Renamed`, as the cancel column requires.
 - **Not run.** No installed smoke, because T15.4 has no UI.
