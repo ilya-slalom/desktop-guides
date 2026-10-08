@@ -120,7 +120,7 @@ public sealed class ManagedPathResolver : ILibraryPaths
         return root;
     }
 
-    private static void RejectFilesystemLinks(string path)
+    internal static void RejectFilesystemLinks(string path)
     {
         string fullPath = Path.GetFullPath(path);
         string root = Path.GetPathRoot(fullPath)!;
