@@ -2581,30 +2581,6 @@ catch {
     catch {
         $report.processesAtFailureError = $_ | Out-String
     }
-    try {
-        $report.applicationEvents = @(
-            Get-WinEvent -FilterHashtable @{
-                LogName = 'Application'
-                StartTime = [datetime]$report.observedAt
-            } -ErrorAction Stop |
-            Where-Object {
-                $_.Message -match 'DesktopGuides\.Production' -and
-                $_.ProviderName -in @('.NET Runtime', 'Application Error',
-                    'Windows Error Reporting')
-            } |
-            Select-Object -First 8 |
-            ForEach-Object {
-                [ordered]@{
-                    observedAt = $_.TimeCreated.ToUniversalTime().ToString('o')
-                    provider = $_.ProviderName
-                    eventId = $_.Id
-                    message = $_.Message
-                }
-            })
-    }
-    catch {
-        $report.applicationEventsError = $_ | Out-String
-    }
 }
 finally {
     if ($dataRoot) {
@@ -2715,6 +2691,35 @@ finally {
                 'Temporary package or certificate remains.'
             }
         }
+    }
+    # Crash events are kept on passing runs too: an app that crashes as it
+    # closes still passes its checks, and only the event log shows it.
+    try {
+        $events = @(
+            Get-WinEvent -FilterHashtable @{
+                LogName = 'Application'
+                StartTime = [datetime]$report.observedAt
+            } -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Message -match 'DesktopGuides\.Production' -and
+                $_.ProviderName -in @('.NET Runtime', 'Application Error',
+                    'Windows Error Reporting')
+            })
+        $report.applicationEventCount = $events.Count
+        $report.applicationEvents = @(
+            $events |
+            Select-Object -First 8 |
+            ForEach-Object {
+                [ordered]@{
+                    observedAt = $_.TimeCreated.ToUniversalTime().ToString('o')
+                    provider = $_.ProviderName
+                    eventId = $_.Id
+                    message = $_.Message
+                }
+            })
+    }
+    catch {
+        $report.applicationEventsError = $_ | Out-String
     }
     if ($cleanupErrors.Count -gt 0) {
         $report.success = $false

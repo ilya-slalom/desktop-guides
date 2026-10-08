@@ -2345,9 +2345,17 @@ try {
             Open-TextGuide 'Picture Web Guide'
             $report.sessionsOpened++
             [void](Wait-Status 'Guide ready.')
+            $savesBeforeJump = [int] (Read-ProgressCounts).saves
             Click-Element (Wait-PageVisible 'Jump to the middle')
             $middle = Wait-HtmlPosition { param($p) $p.locator -and -not $p.quote } 'a capture with no text'
-            Start-Sleep -Seconds 2
+            # The jump's own save can land late; take the baseline once it
+            # has, or after 10 s if the place was already saved.
+            $deadline = (Get-Date).AddSeconds(10)
+            while ([int] (Read-ProgressCounts).saves -le $savesBeforeJump -and
+                (Get-Date) -lt $deadline) {
+                Start-Sleep -Milliseconds 250
+            }
+            Start-Sleep -Seconds 1
             $savesBefore = [int] (Read-ProgressCounts).saves
             foreach ($step in @(
                 @{ command = 'Larger text'; scale = 1.1; label = '110%' },
@@ -5046,7 +5054,9 @@ try {
                     $uia::ClassNameProperty, '#32770'),
                 [System.Windows.Automation.PropertyCondition]::new(
                     $uia::ProcessIdProperty, $process.Id))
-            $deadline = (Get-Date).AddSeconds(15)
+            # The first picker after a fresh install can take well over 15 s
+            # to load the shell's file dialog components.
+            $deadline = (Get-Date).AddSeconds(30)
             do {
                 $picker = $uia::RootElement.FindFirst(
                     [System.Windows.Automation.TreeScope]::Children, $condition)
@@ -5057,7 +5067,14 @@ try {
                 if ($picker) { return $picker }
                 Start-Sleep -Milliseconds 200
             } while ((Get-Date) -lt $deadline)
-            throw 'The system Open dialog did not appear.'
+            $windows = $uia::RootElement.FindAll(
+                [System.Windows.Automation.TreeScope]::Children,
+                [System.Windows.Automation.PropertyCondition]::new(
+                    $uia::ProcessIdProperty, $process.Id))
+            $seen = @($windows | ForEach-Object {
+                    "'$($_.Current.Name)' [$($_.Current.ClassName)]" })
+            throw ('The system Open dialog did not appear. Top-level windows ' +
+                "of the app: $(if ($seen) { $seen -join ', ' } else { 'none' }).")
         }
 
         # Managed UIA sees the dialog's Win32 controls as panes without
