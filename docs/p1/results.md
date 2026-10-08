@@ -1,8 +1,8 @@
 # P1 implementation results
 
 Status: P1 work is merged into `main` through
-[PR #52](https://github.com/ilya-slalom/desktop-guides/pull/52) (T14.3, merge
-commit `a350d7e`) on 7 October 2026. The [merged PR summary](#merged-pr-summary)
+[PR #54](https://github.com/ilya-slalom/desktop-guides/pull/54) (T14.4, merge
+commit `3ba3d72`) on 8 October 2026. The [merged PR summary](#merged-pr-summary)
 lists every PR since M0 with its CI run and test counts. The P1 first usable
 release remains in progress: the [dependency plan](implementation-plan.md)
 defines all task exit gates, and this file records only checks actually run.
@@ -20,11 +20,11 @@ On 28 September 2026, requirements review added T04.4 (provider-backed,
 search-first game addition with a cached offline snapshot, and T04.1 as the
 manual fallback) and UI planning added T11.4, T05.4, and T14.4. T11.4 merged
 in PR #13 and T04.4, using IGDB and SteamGridDB, in PR #14; T05.4 merged in
-PR #16. T14.4 isn't implemented yet.
+PR #16. T14.4 merged in PR #54.
 
 ## Merged PR summary
 
-One row per PR merged into `main` after M0, through PR #52. The *Record* column
+One row per PR merged into `main` after M0, through PR #54. The *Record* column
 links the task's own verification section, which has the full evidence.
 
 - *Final CI run* is the run the PR cites as decisive. Where no CI run is
@@ -36,7 +36,7 @@ links the task's own verification section, which has the full evidence.
 - PRs record `shell-scope` only from #38 onward, when the input was added.
   From #47 a full run splits `production-shell-ui` into four shards.
 - Tasks for #33 (a T08.3 harness follow-up) and #37 are inferred from the PR
-  titles. #15, #21, #38, #43 and #47 aren't task PRs.
+  titles. #15, #21, #38, #43, #47 and #53 aren't task PRs.
 
 | PR | Merged | Commit | Task | Final CI run | Core | Infra | Record | Caveats |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -75,6 +75,8 @@ links the task's own verification section, which has the full evidence.
 | [#49](https://github.com/ilya-slalom/desktop-guides/pull/49) | 2026-10-06 | `a330d39` | T09.2 | [37484041874](https://github.com/ilya-slalom/desktop-guides/actions/runs/37484041874) | 839 (host) | 540 (host) | [t09-2-html-theme-style-design](t09-2-html-theme-style-design.md#verification) | The review fix `368a223` came later: [37486250072](https://github.com/ilya-slalom/desktop-guides/actions/runs/37486250072) checked it with `shell-scope=html` and `dev-fast`, and the PR run [37486234386](https://github.com/ilya-slalom/desktop-guides/actions/runs/37486234386) passed every job. Dark changing image and inline SVG colors is deferred to [#50](https://github.com/ilya-slalom/desktop-guides/issues/50). |
 | [#51](https://github.com/ilya-slalom/desktop-guides/pull/51) | 2026-10-07 | `6567c81` | T14.1 | [37561318073](https://github.com/ilya-slalom/desktop-guides/actions/runs/37561318073) | 888 | 540 | [t14-1-text-size-design](t14-1-text-size-design.md#verification) | The `pdf` shard passed on a rerun after three failed progress saves in `progress-changed`, which looks like a slow-runner flake. The uncited PR-head run [37564016374](https://github.com/ilya-slalom/desktop-guides/actions/runs/37564016374), on a docs-only commit, failed `native-arm64-ui`. |
 | [#52](https://github.com/ilya-slalom/desktop-guides/pull/52) | 2026-10-07 | `a350d7e` | T14.3 | [37590262774](https://github.com/ilya-slalom/desktop-guides/actions/runs/37590262774) | 899 | 540 | [t14-3-appearance-restore-design](t14-3-appearance-restore-design.md#verification) | Run after the final-review fixes; [37583360621](https://github.com/ilya-slalom/desktop-guides/actions/runs/37583360621) passed before them. The fix for a restyle landing during a restore's capture has no failing-first test. |
+| [#53](https://github.com/ilya-slalom/desktop-guides/pull/53) | 2026-10-07 | `5795a24` | Docs | — | — | — | — | Docs only: status pages brought up to PR #52. No CI run started: #47's docs-only skip held. |
+| [#54](https://github.com/ilya-slalom/desktop-guides/pull/54) | 2026-10-08 | `3ba3d72` | T14.4 | [37710298596](https://github.com/ilya-slalom/desktop-guides/actions/runs/37710298596) | 906 | 540 | [t14-4-reader-settings-design](t14-4-reader-settings-design.md#verification) | The `html` shard passed on attempt 2 after a one-off WebView2 open hang before the first offline session. The host `-ProviderOnly` pass and a UI Automation notification record (the Narrator pass) ran on VEGA; nobody listened to the audio, and high contrast, text scale and 200% display scale are T16.2's. |
 
 ## M2 T04.1 game editor — implementation check, 27 September 2026
 
