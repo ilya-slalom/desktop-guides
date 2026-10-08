@@ -67,14 +67,29 @@ flowchart LR
 
 ### Live layout and path rule
 
-For the packaged app, use
-`ApplicationData.Current.LocalFolder.Path/DesktopGuides/` as an app-data
-parent. Its live `library/` child contains `library.sqlite`,
-`games/<game-id>/`, `content/<guide-id>/`, `.staging/<operation-id>/`, and
-`.trash/<operation-id>/`. Sibling `.restore/`, `.recovery/`, and
-`restore-state.json` support whole-library replacement without renaming a
-directory into itself. Put transient WebView2 profiles under
-`LocalCacheFolder`, outside backup scope. Tests inject a temporary parent.
+The data root is `ApplicationData.Current.LocalFolder.Path` for the packaged
+app and `%LOCALAPPDATA%\DesktopGuides` for the portable build. It holds:
+
+- `library/`;
+- `.recovery/`, the pre-migration database copies;
+- `library.session.lock`;
+- the DPAPI-protected `providers.bin`.
+
+The live `library/` child contains:
+
+- `library.sqlite`;
+- `content/<guide-id>/`;
+- `artwork/<game-id>/<sha256>.<ext>`, the content-addressed provider artwork
+  referenced by `Games.ArtworkRelativePath`;
+- `.staging/<operation-id>/`, `.trash/<operation-id>/` and
+  `.artwork-staging/`.
+
+Provider metadata lives in `Games` columns. T20.2 adds the restore marker and
+the staging it needs to replace the whole library without renaming a
+directory into itself. Transient WebView2 profiles and diagnostics go under
+the cache root, outside backup scope: `LocalCacheFolder`, or
+`%LOCALAPPDATA%\DesktopGuides\Cache` for the portable build. Tests inject a
+temporary parent.
 Only a generated `Guid` in `"N"` form names a guide directory. Database paths
 are forward-slash relative paths within that directory; no original absolute
 path is stored. Keep a sanitized basename only as an optional source label.
@@ -895,20 +910,27 @@ project uses a provisional package identity until T17.1 sets the public one.
 
 ### S20 — Export and restore a local backup
 
-- **T20.1** Define a versioned ZIP manifest with archive version,
-  application/schema version, export time, IDs, each relative managed path,
-  byte length, and SHA-256. Hold the library write gate and reconcile all
-  known FileOperations before taking a `BackupDatabase` snapshot and copying
-  immutable managed files. If recovery is incomplete, fail export. The
-  database and content must describe one state. Do not include original source
-  paths, passwords, diagnostic logs, temp directories, or WebView2 profile
-  data. Stream the archive into a temporary sibling of the user-selected
-  destination and rename only after full checksum verification; cancellation
-  removes that temporary output.
+- **T20.1** Export a versioned ZIP. It holds:
+  - `manifest.json`, with the format and schema versions, the export ID and
+    time, and each entry's relative path, byte length and SHA-256;
+  - a `BackupDatabase` snapshot;
+  - every guide and artwork file the snapshot references.
+
+  Hold the library write gate from recovery to the last entry:
+  - run the file-operation reconciler, and fail if any operation remains;
+  - write the snapshot to `%TEMP%`;
+  - fail, naming each guide or game, if a referenced file is missing, is a
+    link, or doesn't match its recorded size or hash.
+
+  Exclude credentials, `.recovery/`, staging and trash, the database
+  sidecars, the cache root and every unreferenced file. Write a temporary
+  sibling of the destination, verify it against its manifest, then rename it.
+  Cancellation or failure removes it. See the
+  [T20.1 design](p1/t20-1-library-export-design.md).
 - **T20.2** Validate archive version, supported schema version, entry count,
   expanded size, duplicate and escaping names, hashes, database integrity,
   foreign keys, all managed-guide references, and every
-  `GameMetadataLinks` artwork reference and manifest entry in a staging root
+  `Games.ArtworkRelativePath` artwork reference and manifest entry in a staging root
   before touching the live library. Canonical export destinations must be
   outside the package's app-data parent;
   the Settings flow and first-import reminder explain why. P1 choices are

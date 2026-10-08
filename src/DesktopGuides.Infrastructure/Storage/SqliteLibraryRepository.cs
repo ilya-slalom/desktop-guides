@@ -769,7 +769,19 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
     {
         string path = Path.Combine(paths.RecoveryRoot,
             $"library-v{version}-{clock.GetUtcNow():yyyyMMddHHmmss}-{Guid.NewGuid():N}.sqlite");
-        // Reserve the generated name without opening an existing file or link.
+        BackupTo(connection, path, version);
+        return path;
+    }
+
+    /// <summary>
+    /// Writes a consistent copy of the open database to a new file and checks
+    /// it as a library of <paramref name="version"/>. A plain file copy of a
+    /// live WAL database is not consistent. The file must not exist; it and
+    /// its sidecars are deleted again if anything fails.
+    /// </summary>
+    internal static void BackupTo(SqliteConnection source, string path, int version)
+    {
+        // Reserve the name without opening an existing file or link.
         using (FileStream created = new(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
         }
@@ -782,14 +794,21 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                 Pooling = false
             }.ToString());
             backup.Open();
-            connection.BackupDatabase(backup);
+            source.BackupDatabase(backup);
             ValidateDatabase(backup, null, version);
-            return path;
         }
         catch
         {
-            File.Delete(path);
+            DeleteDatabaseFiles(path);
             throw;
+        }
+    }
+
+    internal static void DeleteDatabaseFiles(string path)
+    {
+        foreach (string suffix in new[] { "", "-wal", "-shm", "-journal" })
+        {
+            File.Delete(path + suffix);
         }
     }
 
@@ -901,6 +920,30 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         try
         {
             return await Task.Run(() => work(new ImportJournal(this), token), token);
+        }
+        finally
+        {
+            writeGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Runs an export under the write gate for its whole duration, with a
+    /// connection to the live database, so no write can land between the
+    /// snapshot and the last file copied. The token cancels the wait and is
+    /// passed to the work.
+    /// </summary>
+    internal async Task<T> RunExportAsync<T>(
+        Func<SqliteConnection, CancellationToken, Task<T>> work, CancellationToken token)
+    {
+        await writeGate.WaitAsync(token);
+        try
+        {
+            return await Task.Run(async () =>
+            {
+                using SqliteConnection connection = OpenConnection();
+                return await work(connection, token);
+            }, token);
         }
         finally
         {
