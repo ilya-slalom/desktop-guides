@@ -23,12 +23,14 @@ public sealed partial class ShellWindow
         ProgressCoordinator coordinator = new(store, TimeProvider.System);
         coordinator.SaveFailed += (_, _) =>
             DispatcherQueue.TryEnqueue(() => ShowWarningStatus(SaveFailedMessage));
-        coordinator.CountsChanged += (_, _) => WriteProgressCountsForTest(coordinator.Counts);
+        coordinator.CountsChanged += (_, _) =>
+            WriteProgressCountsForTest(coordinator.Counts, coordinator.LastFailure);
         progress = coordinator;
     }
 
-    // Test gate only: counts, never locator text.
-    private void WriteProgressCountsForTest(ProgressCounts counts)
+    // Test gate only: counts and the latest failure's stage and type, never
+    // locator text or exception messages.
+    private void WriteProgressCountsForTest(ProgressCounts counts, ProgressFailure? lastFailure)
     {
         if (cacheRoot is null ||
             !TestGate.IsOpen($@"Local\DesktopGuides.Preview.ProgressDiagnostics.{Environment.ProcessId}"))
@@ -49,6 +51,13 @@ public sealed partial class ShellWindow
                     skippedUnchanged = counts.SkippedUnchanged,
                     failures = counts.Failures,
                     opens = counts.Opens,
+                    openFailures = counts.OpenFailures,
+                    lastFailure = lastFailure is null ? null : new
+                    {
+                        stage = lastFailure.Stage,
+                        type = lastFailure.ErrorType,
+                        hresult = lastFailure.HResult,
+                    },
                 }));
                 File.Move(temp, path, true);
             }

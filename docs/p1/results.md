@@ -1460,3 +1460,35 @@ pass before the T17.3 candidate runs.
 back; its 291 files matched the pre-run list by path, size and write time.
 The runs switched the Windows app theme and restored it (dark). The
 extraction folder and the spike copies were removed afterwards.
+
+## Intermittent CI failures — triage, 9 October 2026
+
+A read-only pass over about 200 `windows-ci.yml` runs (5–8 October) found
+these recurring signatures. Every one passed on rerun. None was reproduced
+on demand, so the causes are hypotheses until the new diagnostics catch one.
+
+- **"<step> had N failed saves"** (PDF shard; 3 runs: 37561318073,
+  37740199516, 37787308392 attempt 1). The count was cumulative for the
+  process, and included open times whose write missed the 2 s budget. In
+  `progress-changed`, no place is saved at all, and two opens gave exactly
+  two failures. Likely cause: a slow runner disk, with the open write
+  queued behind the settings write. The fix counts open-record failures as
+  `openFailures`, keeps `failures` for saves, and writes the latest
+  failure's stage, type and HResult to the test-gated diagnostics file so
+  the smoke can say where a save failed.
+- **HTML open stuck on "Loading guide…"** (about 7 runs, for example
+  37604152077 and 37791324169). WebView2 stalls before it requests the
+  entry page, probably a cold start on a fresh profile. The app reports
+  that as "This guide's files have changed. Re-import it", which is wrong
+  for a guide whose copy is intact. That is a user-facing defect.
+- **"The system Open dialog did not appear"** (1 run, 37740199516): the file
+  picker took more than 15 s on the shard's first pass.
+- **native-arm64-ui "Probe status is unavailable."** (3 runs): the P0 smoke
+  looks up `StatusText` once, without retrying.
+- **"Size steps on the picture guide saved the reading place"** (1 run,
+  37791324169): the jump's quiet save landed after the smoke's fixed 2 s
+  sleep and was counted against the size steps.
+- **Crash at process exit** (`0xc000000d` with a .NET unhandled exception,
+  PDF passes in 4 runs) after the pass had succeeded. Its frequency is
+  unknown, because events are collected only for failed passes and exit
+  codes are not checked.
