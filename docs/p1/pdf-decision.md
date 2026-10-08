@@ -60,6 +60,8 @@ explicit render-cache bound.
   preview and accessible text aligned. Keep the password only for an open
   session, clear each attempt, and never persist it.
 
-The experimental modes and repeatable scripts live under
-`src/DesktopGuides.App/Probes/` and `tools/p1/`. They remain separate from
-the production `IReaderAdapter` that T10.1 will implement.
+The experimental modes and repeatable scripts lived under
+`src/DesktopGuides.App/Probes/` and `tools/p1/`, separate from the production
+`IReaderAdapter` that T10.1 implemented. They were removed once the
+production PDF reader shipped; the committed evidence above stays, and the
+scripts can be recovered from git at commit `70516da`.
