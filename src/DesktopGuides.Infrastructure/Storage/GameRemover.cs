@@ -19,6 +19,8 @@ public sealed class GameRemover
     private readonly ILibraryPaths paths;
     private readonly IArtworkStore artwork;
     private readonly Action<RemovalCheckpoint> checkpoint;
+    private readonly Action<IDeletionJournal, Guid> rollBack;
+    private readonly Action<IDeletionJournal, Guid> finish;
 
     public GameRemover(SqliteLibraryRepository repository, ILibraryPaths paths, IArtworkStore artwork)
         : this(repository, paths, artwork, _ => { })
@@ -27,12 +29,15 @@ public sealed class GameRemover
 
     internal GameRemover(
         SqliteLibraryRepository repository, ILibraryPaths paths, IArtworkStore artwork,
-        Action<RemovalCheckpoint> checkpoint)
+        Action<RemovalCheckpoint> checkpoint,
+        Action<IDeletionJournal, Guid>? rollBack = null, Action<IDeletionJournal, Guid>? finish = null)
     {
         this.repository = repository ?? throw new ArgumentNullException(nameof(repository));
         this.paths = paths ?? throw new ArgumentNullException(nameof(paths));
         this.artwork = artwork ?? throw new ArgumentNullException(nameof(artwork));
         this.checkpoint = checkpoint ?? throw new ArgumentNullException(nameof(checkpoint));
+        this.rollBack = rollBack ?? ((journal, operationId) => journal.RollBack(operationId));
+        this.finish = finish ?? ((journal, operationId) => journal.Finish(operationId));
     }
 
     /// <summary>The game with its guide and file counts, or null when it's already gone.</summary>
@@ -108,6 +113,7 @@ public sealed class GameRemover
         try
         {
             checkpoint(RemovalCheckpoint.Prepared);
+            bool trashCreated = false;
             for (int index = 0; index < game.GuideIds.Count; index++)
             {
                 if (!trees[index].Exists)
@@ -117,6 +123,11 @@ public sealed class GameRemover
                 Guid guideId = game.GuideIds[index];
                 string trashPath = paths.GetTrashedGuideRoot(operationId, guideId);
                 Directory.CreateDirectory(Path.GetDirectoryName(trashPath)!);
+                if (!trashCreated)
+                {
+                    trashCreated = true;
+                    checkpoint(RemovalCheckpoint.TrashCreated);
+                }
                 Directory.Move(paths.GetGuideRoot(guideId), trashPath);
                 checkpoint(RemovalCheckpoint.MovedGuide);
             }
@@ -127,7 +138,7 @@ public sealed class GameRemover
         {
             try
             {
-                journal.RollBack(operationId);
+                rollBack(journal, operationId);
             }
             catch (Exception rollBackError)
             {
@@ -141,7 +152,7 @@ public sealed class GameRemover
         try
         {
             checkpoint(RemovalCheckpoint.Committed);
-            journal.Finish(operationId);
+            finish(journal, operationId);
         }
         catch (Exception)
         {
@@ -158,6 +169,7 @@ public sealed class GameRemover
         {
             return;
         }
+        checkpoint(RemovalCheckpoint.BeforeArtworkDelete);
         try
         {
             artwork.Delete(relativePath);
@@ -178,7 +190,20 @@ public sealed class GameRemover
         new(gameId, title, trees.Count, trees.Sum(tree => tree.FileCount));
 
     private List<OwnedGuideTree> CaptureAll(IReadOnlyList<Guid> guideIds) =>
-        guideIds.Select(id => Capture(paths.GetGuideRoot(id))).ToList();
+        guideIds.Select(id => Capture(GuideRoot(id))).ToList();
+
+    /// <summary>The guide's content root; a link there is unsafe, not a crash.</summary>
+    private string GuideRoot(Guid guideId)
+    {
+        try
+        {
+            return paths.GetGuideRoot(guideId);
+        }
+        catch (InvalidDataException error)
+        {
+            throw new GameRemovalException(GameRemovalIssue.Unsafe, error);
+        }
+    }
 
     private static OwnedGuideTree Capture(string root)
     {

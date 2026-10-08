@@ -37,7 +37,7 @@ internal sealed class OwnedGuideTree
         }
 
         List<string> files = [];
-        List<string> directories = [root];
+        List<string> directories = [Unnormalized(root)];
         for (int index = 0; index < directories.Count; index++)
         {
             foreach (string child in Directory.EnumerateFileSystemEntries(directories[index]))
@@ -58,6 +58,20 @@ internal sealed class OwnedGuideTree
             }
         }
         return new OwnedGuideTree(files, directories);
+    }
+
+    /// <summary>
+    /// The root as a <c>\\?\</c> path on Windows, so a child named <c>CON</c> or
+    /// <c>x.</c> is read and deleted as itself instead of as a device or <c>x</c>.
+    /// </summary>
+    private static string Unnormalized(string root)
+    {
+        if (!OperatingSystem.IsWindows() || root.StartsWith(@"\\?\", StringComparison.Ordinal))
+        {
+            return root;
+        }
+        string full = Path.GetFullPath(root);
+        return full.StartsWith(@"\\", StringComparison.Ordinal) ? @"\\?\UNC\" + full[2..] : @"\\?\" + full;
     }
 
     public void Delete()

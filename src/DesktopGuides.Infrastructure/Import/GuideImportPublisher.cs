@@ -9,7 +9,7 @@ using Microsoft.Data.Sqlite;
 
 namespace DesktopGuides.Infrastructure.Import;
 
-internal enum ImportCheckpoint { Prepared, Copied, Verified, Renamed, InCommit }
+internal enum ImportCheckpoint { Prepared, Copied, Verified, MovedToContent, Renamed, InCommit, Published }
 
 /// <summary>
 /// Copies a previewed guide into managed storage and publishes it. The whole
@@ -113,6 +113,7 @@ public sealed class GuideImportPublisher
             await VerifyAsync(manifest, plan, staged, token);
             Pass(ImportCheckpoint.Verified, token);
             Directory.Move(staged, paths.GetGuideRoot(guideId));
+            Pass(ImportCheckpoint.MovedToContent, token);
             // The operation folder held only this guide; rollback and startup accept it missing.
             Directory.Delete(Path.GetDirectoryName(staged)!);
             Pass(ImportCheckpoint.Renamed, token);
@@ -125,7 +126,6 @@ public sealed class GuideImportPublisher
                     (manifest as TxtImportManifest)?.CodePage,
                     plan.Html?.Manifest.Assets.Select(ToGuideAsset).ToArray() ?? []),
                 () => checkpoint(ImportCheckpoint.InCommit));
-            return guideId;
         }
         catch (Exception error)
         {
@@ -143,6 +143,9 @@ public sealed class GuideImportPublisher
             }
             throw new GuideImportException(ImportIssue.SaveFailed, SaveFailedMessage);
         }
+        // After the commit: a fault here must never reach the rollback above.
+        checkpoint(ImportCheckpoint.Published);
+        return guideId;
     }
 
     private void Pass(ImportCheckpoint point, CancellationToken token)

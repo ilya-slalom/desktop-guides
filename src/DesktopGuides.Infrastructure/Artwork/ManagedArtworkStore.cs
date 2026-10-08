@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using DesktopGuides.Core.Paths;
 using DesktopGuides.Core.Providers;
+using DesktopGuides.Infrastructure.Storage;
 
 namespace DesktopGuides.Infrastructure.Artwork;
 
@@ -54,6 +55,9 @@ public sealed partial class ManagedArtworkStore(ILibraryPaths paths) : IArtworkS
         if (ResolvePath(relativePath) is not { } file) return;
         try
         {
+            // A linked artwork folder may point outside the library; leave it
+            // for the startup sweep to count for review.
+            ManagedPathResolver.RejectFilesystemLinks(file);
             File.Delete(file);
             string folder = Path.GetDirectoryName(file)!;
             if (Directory.Exists(folder) && !Directory.EnumerateFileSystemEntries(folder).Any())
@@ -61,6 +65,7 @@ public sealed partial class ManagedArtworkStore(ILibraryPaths paths) : IArtworkS
                 Directory.Delete(folder);
             }
         }
+        catch (InvalidDataException) { }
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
     }
