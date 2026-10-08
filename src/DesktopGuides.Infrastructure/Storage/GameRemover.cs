@@ -190,7 +190,20 @@ public sealed class GameRemover
         new(gameId, title, trees.Count, trees.Sum(tree => tree.FileCount));
 
     private List<OwnedGuideTree> CaptureAll(IReadOnlyList<Guid> guideIds) =>
-        guideIds.Select(id => Capture(paths.GetGuideRoot(id))).ToList();
+        guideIds.Select(id => Capture(GuideRoot(id))).ToList();
+
+    /// <summary>The guide's content root; a link there is unsafe, not a crash.</summary>
+    private string GuideRoot(Guid guideId)
+    {
+        try
+        {
+            return paths.GetGuideRoot(guideId);
+        }
+        catch (InvalidDataException error)
+        {
+            throw new GameRemovalException(GameRemovalIssue.Unsafe, error);
+        }
+    }
 
     private static OwnedGuideTree Capture(string root)
     {

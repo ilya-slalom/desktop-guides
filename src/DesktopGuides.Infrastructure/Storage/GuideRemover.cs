@@ -44,7 +44,7 @@ public sealed class GuideRemover
         {
             return null;
         }
-        OwnedGuideTree content = await Task.Run(() => Capture(paths.GetGuideRoot(guide.Id)), token);
+        OwnedGuideTree content = await Task.Run(() => Capture(GuideRoot(guide.Id)), token);
         return new GuideRemovalPreview(guide.Id, guide.GameId, guide.Title, content.FileCount);
     }
 
@@ -67,7 +67,7 @@ public sealed class GuideRemover
             // would then refuse to open the library.
             throw new GuideRemovalException(GuideRemovalIssue.RestoreFailed);
         }
-        string contentPath = paths.GetGuideRoot(guideId);
+        string contentPath = GuideRoot(guideId);
         OwnedGuideTree content = Capture(contentPath);
         Guid operationId = Guid.NewGuid();
         try
@@ -116,6 +116,19 @@ public sealed class GuideRemover
         {
             // The Committed row stays, so the next startup deletes the trash.
             return new GuideRemovalResult(GuideRemovalOutcome.Removed, true);
+        }
+    }
+
+    /// <summary>The guide's content root; a link there is unsafe, not a crash.</summary>
+    private string GuideRoot(Guid guideId)
+    {
+        try
+        {
+            return paths.GetGuideRoot(guideId);
+        }
+        catch (InvalidDataException error)
+        {
+            throw new GuideRemovalException(GuideRemovalIssue.Unsafe, error);
         }
     }
 
