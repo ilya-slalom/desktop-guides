@@ -1053,8 +1053,39 @@ try {
         Expand-ProviderSettings
     }
 
+    # T14.4: the section headings make Settings taller than the CI launch
+    # window, so a card can start below the fold; scroll it into view.
+    function Show-SettingsCard([string] $id) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $element = Find-ById $id
+            if ($element -and -not $element.Current.IsOffscreen) { return $element }
+            if ($element) {
+                $item = $null
+                if ($element.TryGetCurrentPattern(
+                        [System.Windows.Automation.ScrollItemPattern]::Pattern, [ref]$item)) {
+                    $item.ScrollIntoView()
+                }
+                else {
+                    $scrollable = [System.Windows.Automation.PropertyCondition]::new(
+                        [System.Windows.Automation.AutomationElement]::IsScrollPatternAvailableProperty, $true)
+                    foreach ($viewer in $root.FindAll($scope, $scrollable)) {
+                        $pattern = $viewer.GetCurrentPattern(
+                            [System.Windows.Automation.ScrollPattern]::Pattern)
+                        if ($pattern.Current.VerticallyScrollable) {
+                            $pattern.SetScrollPercent(
+                                [System.Windows.Automation.ScrollPattern]::NoScroll, 100)
+                        }
+                    }
+                }
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected visible '$id'."
+    }
+
     function Expand-ProviderSettings {
-        $expander = Wait-VisibleById 'ProviderSettingsExpander'
+        $expander = Show-SettingsCard 'ProviderSettingsExpander'
         $pattern = $null
         if ($expander.TryGetCurrentPattern(
             [System.Windows.Automation.ExpandCollapsePattern]::Pattern,

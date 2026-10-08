@@ -898,6 +898,10 @@ public sealed partial class ShellWindow : Window
         navigator.OpenSettings();
         await RenderCurrentAsync();
         ProviderSettings.Expand();
+        // T14.4: the section headings can push the card below the fold. The
+        // notice sent the user here, so bring it into view once laid out.
+        DispatcherQueue.TryEnqueue(() => ProviderSettings.StartBringIntoView(
+            new BringIntoViewOptions { VerticalAlignmentRatio = 0 }));
     }
 
     private async void EditGameClicked(object sender, RoutedEventArgs args)

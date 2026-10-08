@@ -1,7 +1,7 @@
 # T14.4 Reader and Settings design language design
 
-Status: design approved in brainstorming on 7 October 2026; not yet
-implemented.
+Status: implemented on `feat/p1-t14-4-reader-settings-design`; full CI run
+37706441424 (see [Verification](#verification)).
 Prerequisites: T05.4 (catalog components, PR #16), T08.3 (TXT position,
 PR #31), T09.2 (HTML theme style, PR #49), T10.2 (PDF controls, PR #46),
 T11.3 (reader shell, PR #7) and T14.2 (theme setting, PR #48) are merged.
@@ -325,6 +325,62 @@ scale, and listening to the new announcements with Narrator.
   choice only, and the approximate-restore notice is in the reading card.
 - [results.md](results.md) and [progress.md](../progress.md): the PR's
   row.
+
+## Implementation notes
+
+Rulings from the [plan](t14-4-reader-settings-plan.md), one line each:
+
+1. **Copy count.** 14 strings changed (3 Core, 11 Production); the P0
+   diagnostic app keeps its own text.
+2. **A card notice also updates the probe**, so `Wait-Status` sees it.
+3. **`StatusShowsProblem` is gone**: the notice no longer shares the bar.
+4. **Startup** begins with the bar closed and `RouteProgress` visible;
+   `Waiting for previous window…` keeps the bar.
+5. **`ShowReaderSurface(loading:)`** shows `ReaderLoading`; the three
+   format starts pass `true`.
+6. **A failed render stops loading** in the card and the progress line.
+7. **`RouteProgress` hides** in `RenderCurrentAsync`'s `finally` and in
+   `ShowErrorStatus` / `ShowWarningStatus`.
+8. **The completion row moves by code**; the header's row spacing is 0
+   wide and 12 narrow.
+9. **Alt+Left** lives on `ShellRoot`; it may not fire while focus is in
+   the WebView2 page (T16.1).
+10. **Drop-down keys**: Alt+Down, arrows, Enter.
+11. **`theme-segmented` became `theme-selector`.**
+12. **Provider `Success` and `Informational` messages close after 3 s.**
+13. **`design-readers`** runs in the `design` group from `seed-text-size`.
+14. **The shifted notice** shows in the card; the announcement names the
+    size and the shift.
+15. **`ShowsGroupSeparator` takes `IReadOnlyCollection<ReaderCommand>`.**
+16. **Narrator** isn't observable from the harness; see Verification.
+17. **The metadata line keeps the body size** of the approved mockup.
+18. **No label strip**: `DefaultLabelPosition="Collapsed"` centers the
+    size label on the icons.
+
+Found while running the checks:
+
+- **A route load clears the previous route's bar.** The old busy message
+  replaced any bar on navigation; with quiet ready messages a warning about
+  the last guide stayed on the next page. `ShowRouteProgress` now calls
+  `HideStatus()`; quiet announcements still never touch the bar.
+- **The PDF place passes scroll to 0.2, not 0.3.** Without the Back row the
+  PDF viewport is taller, so at 1500×720 page 121 scrolls only 0.262 of its
+  height. `pdf-resize`, `pdf-zoom` and `progress-flush` share `$pdfPoint`.
+- **`progress-flush` waits for the scroll before Back**, polling under the
+  1 s quiet delay; once in two runs Back had flushed the page top.
+- **The burst bound follows T12.2's ceiling of 2.** A 4 s deadline can fire
+  just after the last press while its page turn is still arriving; the
+  bound is `min(2, floor((seconds + 1) / 4) + 1)`.
+- **Overflow order at 180 px.** Equal `DynamicOverflowOrder` values move as
+  a group, and Previous and Next don't fit beside More at 180 px, so every
+  primary command overflows there. The toolbar smoke checks the order at
+  180 px (Go to start leaves first) and page movement at a new 320 px
+  step. At 180 px the open menu is taller than the test window and clips
+  its last rows (no UI Automation scroll moved it), so the narrow step
+  invokes the moved Zoom in through its Invoke pattern. A stretched-bar
+  experiment showed the alignment wasn't the cause, so the bar stays left.
+- **`E9A6` is FitPage**, and the other glyphs match the Segoe Fluent Icons
+  reference.
 
 ## Risks
 
