@@ -728,7 +728,7 @@ extracted from proven feature content rather than created speculatively.
 | T11.4 foundation | T11.1, T11.3 | Design-language note plus semantic XAML resources for type, spacing, surfaces, state, icons, and copy. Pin Toolkit `SettingsControls` and use `SettingsCard` for the local-storage row. Add native `TitleBar`, a seamless window backdrop with a Mica, Acrylic, or Solid setting and matching dialogs, full-width routes, and transient `InfoBar` status treatment. Representative Library/Game/Reader/Settings layouts pass wide/narrow, keyboard-focus, theme, window-material, long-text, title-bar navigation, status-timeout, and Settings-card UIA checks at the host's 100% scale; the PR includes installed screenshots. The deferred 200% scale check moves to T16.2. High contrast moves to T16.2. |
 | T04.4 provider flow | T11.4 and provider decision | Use reviewed explicit search, progress, validation/status, result-row, artwork-fallback, and dialog patterns. Add Toolkit `MetadataControl` for compact edition/provider facts. Cancellation and manual fallback stay visible and keyboard accessible. |
 | T05.4 catalog/workflow components | T04.4 | Extract only the proven reusable patterns for Library, Game, and import, including `MetadataControl` templates and T06.1 `HeaderedContentControl` groups. Virtualization and offline rendering checks prevent a visual component from adding provider calls or an item-permanent control tree. |
-| T14.4 reader/Settings adoption | T05.4, production readers, T14.2 | Apply the same language to reader commands, Toolkit `SettingsCard`/`SettingsExpander` groups, and the `Segmented` appearance choice without crowding guide content. Theme and focus checks cover TXT, HTML, PDF, and Settings. |
+| T14.4 reader/Settings adoption | T05.4, production readers, T14.2 | Apply the same language to reader commands, Toolkit `SettingsCard`/`SettingsExpander` groups, and the App theme drop-down without crowding guide content. Theme and focus checks cover TXT, HTML, PDF, and Settings. |
 | T11.5 colorful icons | T14.4 | Optional Fluent UI System Icons `*_color` set behind a Settings toggle. Runs before T16.2 so the audit sees the final icons. |
 | T16.2 final audit | Completed production UI, T11.5 | Review the complete Add → Import → Read → Complete → Export flow for hierarchy, copy, keyboard, UIA, touch, overflow/localization, themes, high contrast, DPI, and screenshot consistency. Run the high-contrast pass deferred from T11.4. Before enabling high contrast, save the active `.theme` path and wallpaper, and restore them exactly afterward. Alternatively, run in a disposable Windows profile or VM. |
 
@@ -760,7 +760,7 @@ observed again in the actual adapter, beyond the T10.0 prototype.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
-| T14.2 | T03.2, T11.1 | Persisted System/Light/Dark setting and local theme styles presented through Toolkit `Segmented`, bound to data, with a custom selection automation peer as the fallback. Restart and disconnected-session checks pass; high contrast keeps system colors. | TR14.2 |
+| T14.2 | T03.2, T11.1 | Persisted System/Light/Dark setting and local theme styles presented through Toolkit `Segmented`, bound to data, with a custom selection automation peer as the fallback. Restart and disconnected-session checks pass; high contrast keeps system colors. T14.4 moved the choice to a drop-down that matches Window background, at the user's request. | TR14.2 |
 | T07.3 | T06.3, T07.2, T11.2 | Per-guide WebView2 manifest responder, navigation/popup/resource deny rules, and explicit external-link action. Fresh-profile online/offline canary tests record zero guide-originated network requests and block cross-guide loads. | TR07.1–TR07.3 |
 | T08.1 | T06.3, T11.2 | Managed TXT decoding and stored encoding choice. BOM, strict UTF-8, CP437, Windows-1252, newline, and truncation tests pass with untouched originals. | TR08.1 |
 | T08.2 | T08.1 | Virtualized monospace no-wrap TXT view. ASCII diagrams survive; 10 MiB response and realized-item measures meet the P0 reference checks without a persistent control per line. | TR08.1, TR08.2 |
@@ -861,7 +861,7 @@ guide now reopens where it was left, after leaving the Reader or
 restarting the app. A changed position is saved 1 s after the last
 movement, and continuous movement saves at most once every 4 s. Leaving the
 Reader, the window losing focus and the window closing save an unsaved
-position at once. A restore that isn't exact says so in the status bar,
+position at once. A restore that isn't exact says so in the reading card (T14.4),
 and a lost place opens at the start and keeps the stored place until the
 reader moves. T12.2 wrote only the locator; T12.3 adds estimates and the
 open time.
@@ -890,7 +890,7 @@ restart. Theme/font changes preserve or visibly approximate the location.
 | T13.1 | T05.1, T11.3, T13.2 | Guide and Reader completion actions bound to one service and presented as a two-item Toolkit `Segmented` choice when its selected-state UIA passes, with native radio buttons as fallback. UIA and keyboard checks show immediate committed state and announce changes; final-page reading leaves state unchanged. | TR13.1, TR13.2 |
 | T14.1 | T03.2, T08.2, T09.1, T11.3 | Bounded per-guide TXT/HTML text-size controls and persisted preferences. Two-guide restart test preserves separate sizes and TXT fixed-width layout. Implemented with fixed steps 75–200%, a label and a reset; see [the design](t14-1-text-size-design.md). | TR14.1 |
 | T14.3 | T08.3, T09.3, T10.3, T14.1, T14.2 | Pre-change capture and post-layout restore across text/theme changes. TXT returns within one line, HTML to matching context where present, PDF to page/fraction; fallback is announced. Implemented in the HTML session: a restyle captures first, pauses tracking and scrolls back after the write; TXT and PDF already keep their place; see [the design](t14-3-appearance-restore-design.md). | TR14.1, TR14.2 |
-| T14.4 | T05.4, T08.3, T09.2, T10.2, T11.3, T14.2 | Shared design language applied to production Reader and Settings commands, Toolkit `SettingsCard`/`SettingsExpander` groups, the T14.2 `Segmented` choice, and teaching/status surfaces. Installed TXT/HTML/PDF/Settings screenshots and keyboard, theme, high-contrast, text-scale, display-scale, and narrow-width checks pass; every Toolkit dependency is centrally locked. | TR11.3, TR14.3 |
+| T14.4 | T05.4, T08.3, T09.2, T10.2, T11.3, T14.2 | Shared design language applied to production Reader and Settings commands, Toolkit `SettingsCard`/`SettingsExpander` groups, the App theme drop-down, and teaching/status surfaces. Installed TXT/HTML/PDF/Settings screenshots and keyboard, theme, and narrow-width checks pass; every Toolkit dependency is centrally locked. High contrast, Windows text scale and 200% display scale are checked in T16.2. Implemented; see [the design](t14-4-reader-settings-design.md). | TR11.3, TR14.3 |
 
 T13.2 was merged through PR #42 on 5 October 2026 (merge commit
 `0807d5a`; CI run 37286991639); see the
@@ -947,6 +947,18 @@ never saves a place that moved only because the size changed. A page
 that can only come back by fraction says `Your place may have shifted.`
 TXT keeps its top line and PDF its page as before, and a theme change
 doesn't move the place in any reader.
+
+T14.4 is implemented on `feat/p1-t14-4-reader-settings-design`; see the
+[design and implementation notes](t14-4-reader-settings-design.md). The
+shell bar only shows what the page doesn't: route loads show a progress line
+and, in the Reader, a loading state in the reading card; ready messages and
+changes the page already shows are announced; an approximate place is said in
+the reading card. The Reader has one Back (the title bar's, plus Alt+Left), a
+"Game · TXT" metadata line, grouped left-aligned commands with end-bar and
+font-size glyphs (#32), and one reading frame for HTML. Settings groups its
+cards under Appearance, Library and Game data, with App theme and Window
+background as drop-downs. `CommunityToolkit.WinUI.Extensions` is pinned.
+High contrast, text scale and 200% display scale move to T16.2.
 
 ## M5 — errors, accessibility, and portable backup
 

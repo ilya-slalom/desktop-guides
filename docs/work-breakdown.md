@@ -458,14 +458,16 @@ behavior, or high-contrast system colors.
   the fallback.
   Implemented in PR #48; see
   [p1/t14-2-theme-setting-design.md](p1/t14-2-theme-setting-design.md).
+  T14.4 moved it to a drop-down that matches Window background, at the
+  user's request; `Segmented` stays for the completion choice.
 - **T14.3** Recheck location restoration after changing appearance.
   Implemented in PR #52; see [the design](p1/t14-3-appearance-restore-design.md).
 - **T14.4** Apply the shared design language to reader and Settings surfaces
   after their functional controls exist. Adopt suitable Gallery command,
   settings, teaching, and status patterns. Use Toolkit `SettingsCard` and
-  `SettingsExpander` for settings rows/groups and the T14.2 `Segmented`
-  appearance choice; justify and centrally lock each Toolkit package before
-  use.
+  `SettingsExpander` for settings rows/groups and the App theme drop-down;
+  justify and centrally lock each Toolkit package before use.
+  Implemented; see [the design](p1/t14-4-reader-settings-design.md).
 - **TR14.1** Reader preferences are keyed by guide ID and have a bounded,
   accessible size range.
 - **TR14.2** Theme CSS or assets do not require a remote resource.

@@ -109,12 +109,24 @@ gradients or repeated cards.
 
 ### Copy
 
-Use sentence case and concrete actions: `Add game`, `Edit game`, `Back to
-game`, and `Open selected guide`. Empty states explain the next action.
+Use sentence case and concrete actions: `Add game`, `Edit game`, `Open in
+browser`, and `Open selected guide`. Empty states explain the next action.
 Status text reports state without fixture terminology. Error text names the
-failed operation and offers one recovery action when one exists. Loading uses
-a top `InfoBar`; routine ready messages close after three seconds, while
-warnings and errors remain dismissible.
+failed operation and offers one recovery action when one exists. Route loads
+show a progress line over the content and, in the Reader, in the reading card.
+Ready messages and changes the page already shows are announced, not shown. An
+approximate reading place is said in the reading card until dismissed. Other
+confirmations close after three seconds; warnings and errors stay until
+dismissed. A route load clears the previous route's bar (T14.4).
+
+### Icons
+
+Segoe Fluent monochrome icons, from the `Symbol` enum where one names the
+action. In the Reader, Go to start and Go to end use the end-bar glyphs
+(`Previous`, `Next`) beside the ← / → page arrows; text size uses
+`FontDecrease` / `FontIncrease`, distinct from PDF's magnifier zoom; overflow
+commands carry icons too, so a menu never mixes rows with and without them
+(T14.4, #32).
 
 ## Implementation sequence and exits
 
