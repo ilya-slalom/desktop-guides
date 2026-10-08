@@ -33,7 +33,7 @@ internal sealed class HtmlReaderSession : IReaderSession
     private CoreWebView2? core;
     private string? contentSha256;
     private bool entryNavigated;
-    private bool entryServed;
+    private HtmlEntryState entry;
     private bool disposed;
     private TaskCompletionSource<bool>? pendingNavigation;
     private bool failed;
@@ -231,7 +231,8 @@ internal sealed class HtmlReaderSession : IReaderSession
         catch (Exception error) when (error is not OperationCanceledException and not HtmlGuideLoadException)
         {
             // A timeout or a COM failure leaves the guide unreadable, not the app.
-            throw new HtmlGuideLoadException(HtmlGuideLoadError.Changed);
+            // A stall before the entry request says nothing about the guide's files.
+            throw new HtmlGuideLoadException(HtmlGuideLoadMessages.ForFailedOpen(entry, failed));
         }
         finally
         {
@@ -239,11 +240,11 @@ internal sealed class HtmlReaderSession : IReaderSession
             // A closed or crashed view raises nothing more, and touching it could throw.
             if (!disposed && !failed) core.NavigationCompleted -= Completed;
         }
-        if (!success || !entryServed)
+        if (!success || entry != HtmlEntryState.Served)
         {
             // A dying renderer can fail the navigation before ProcessFailed
             // reaches the completion source.
-            throw new HtmlGuideLoadException(failed ? HtmlGuideLoadError.Crashed : HtmlGuideLoadError.Changed);
+            throw new HtmlGuideLoadException(HtmlGuideLoadMessages.ForFailedOpen(entry, failed));
         }
     }
 
@@ -672,11 +673,15 @@ internal sealed class HtmlReaderSession : IReaderSession
                 {
                     await Task.Delay(TimeSpan.FromSeconds(1));
                 }
+                bool isEntry = serve.Asset.Kind == GuideAssetKind.EntryHtml;
+                // An entry read that throws is treated as changed.
+                if (isEntry) entry = HtmlEntryState.Changed;
                 HtmlAssetRead read = await Task.Run(() => reader.Read(serve.Asset));
+                if (isEntry && read.Status == HtmlAssetReadStatus.Missing) entry = HtmlEntryState.Missing;
                 if (read.Status == HtmlAssetReadStatus.Served && !disposed && environment is not null)
                 {
                     diagnostics?.RecordServed(serve.Asset.RequestPath);
-                    if (serve.Asset.Kind == GuideAssetKind.EntryHtml) entryServed = true;
+                    if (isEntry) entry = HtmlEntryState.Served;
                     args.Response = environment.CreateWebResourceResponse(
                         new MemoryStream(read.Bytes!).AsRandomAccessStream(), 200, "OK",
                         HtmlRequestPolicy.ServedHeaders(serve.ContentType));

@@ -26,6 +26,18 @@ public sealed class HtmlGuideLoadMessagesTests
     public void EachErrorHasOneAction(HtmlGuideLoadError error, HtmlGuideLoadAction action) =>
         Assert.Equal(action, HtmlGuideLoadMessages.ActionFor(error));
 
+    // A stalled or failed first navigation is only "changed" when the entry
+    // page itself failed its hash check.
+    [Theory]
+    [InlineData(HtmlEntryState.NotRequested, false, HtmlGuideLoadError.RuntimeFailed)]
+    [InlineData(HtmlEntryState.Served, false, HtmlGuideLoadError.Crashed)]
+    [InlineData(HtmlEntryState.Changed, false, HtmlGuideLoadError.Changed)]
+    [InlineData(HtmlEntryState.Missing, false, HtmlGuideLoadError.Missing)]
+    [InlineData(HtmlEntryState.NotRequested, true, HtmlGuideLoadError.Crashed)]
+    [InlineData(HtmlEntryState.Changed, true, HtmlGuideLoadError.Crashed)]
+    public void AFailedOpenNamesWhatFailed(HtmlEntryState entry, bool crashed, HtmlGuideLoadError error) =>
+        Assert.Equal(error, HtmlGuideLoadMessages.ForFailedOpen(entry, crashed));
+
     [Theory]
     [InlineData(HtmlGuideLoadAction.GetRuntime, "Get WebView2 Runtime")]
     [InlineData(HtmlGuideLoadAction.Reopen, "Reopen")]
