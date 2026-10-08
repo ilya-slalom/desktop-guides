@@ -1,8 +1,8 @@
 # P1 implementation results
 
 Status: P1 work is merged into `main` through
-[PR #57](https://github.com/ilya-slalom/desktop-guides/pull/57) (a T14.4 harness fix,
-merge commit `0f10a1c`) on 8 October 2026. The [merged PR summary](#merged-pr-summary)
+[PR #59](https://github.com/ilya-slalom/desktop-guides/pull/59) (T20.1, merge commit
+`47ccf3a`) on 8 October 2026. The [merged PR summary](#merged-pr-summary)
 lists every PR since M0 with its CI run and test counts. The P1 first usable
 release remains in progress: the [dependency plan](implementation-plan.md)
 defines all task exit gates, and this file records only checks actually run.
@@ -24,7 +24,7 @@ PR #16. T14.4 merged in PR #54.
 
 ## Merged PR summary
 
-One row per PR merged into `main` after M0, through PR #57. The *Record* column
+One row per PR merged into `main` after M0, through PR #59. The *Record* column
 links the task's own verification section, which has the full evidence.
 
 - *Final CI run* is the run the PR cites as decisive. Where no CI run is
@@ -36,7 +36,7 @@ links the task's own verification section, which has the full evidence.
 - PRs record `shell-scope` only from #38 onward, when the input was added.
   From #47 a full run splits `production-shell-ui` into four shards.
 - Tasks for #33 (a T08.3 harness follow-up) and #37 are inferred from the PR
-  titles. #15, #21, #38, #43, #47, #53, #55 and #56 aren't task PRs.
+  titles. #15, #21, #38, #43, #47, #53, #55, #56 and #58 aren't task PRs.
 
 | PR | Merged | Commit | Task | Final CI run | Core | Infra | Record | Caveats |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -80,6 +80,8 @@ links the task's own verification section, which has the full evidence.
 | [#55](https://github.com/ilya-slalom/desktop-guides/pull/55) | 2026-10-08 | `f7c22e3` | Docs | — | — | — | — | Docs only: records the T14.4 merge (PR #54). No CI run started: #47's docs-only skip held. |
 | [#56](https://github.com/ilya-slalom/desktop-guides/pull/56) | 2026-10-08 | `aef9d81` | Portable build | [37736088360](https://github.com/ilya-slalom/desktop-guides/actions/runs/37736088360) | 906 | 540 | [host check](#portable-single-file-release--host-check-8-october-2026) | The `core` shard passed on attempt 2 after `text-size-steps` lost a race with the closing overflow, fixed in #57. The earlier head `bb74c70` passed every job in [37730052864](https://github.com/ilya-slalom/desktop-guides/actions/runs/37730052864). It also plans T17.4 from the [size spike](#portable-size-spike--8-october-2026). |
 | [#57](https://github.com/ilya-slalom/desktop-guides/pull/57) | 2026-10-08 | `0f10a1c` | T14.4 (harness) | [37738588719](https://github.com/ilya-slalom/desktop-guides/actions/runs/37738588719) | 906 | 540 | — | Harness only: `Assert-ResetEnabled` now waits for the overflow to close, and `text-size-steps` recorded closes of 42, 38 and 51 ms. |
+| [#58](https://github.com/ilya-slalom/desktop-guides/pull/58) | 2026-10-08 | `b225803` | Docs | — | — | — | — | Docs only: records the #55–#57 merges. No CI run started: #47's docs-only skip held. |
+| [#59](https://github.com/ilya-slalom/desktop-guides/pull/59) | 2026-10-08 | `47ccf3a` | T20.1 | [37765505021](https://github.com/ilya-slalom/desktop-guides/actions/runs/37765505021) | 932 | 593 | [t20-1-library-export-design](t20-1-library-export-design.md#t201-verification-record) | Every job passed on the first attempt. Headless only: no installed smoke, because T20.1 has no UI. The final review's four fixes landed in `e0a4486`. |
 
 ## M2 T04.1 game editor — implementation check, 27 September 2026
 
