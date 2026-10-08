@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO.Compression;
 using DesktopGuides.Core.Backup;
 using DesktopGuides.Core.Library;
@@ -359,5 +360,90 @@ public sealed class LibraryExporterTests : IAsyncLifetime
         LibraryExportProgress written = recorder.Reports.Last(report => report.Phase == LibraryExportPhase.Writing);
         Assert.True(written.BytesTotal > 0);
         Assert.Equal(written.BytesTotal, written.BytesDone);
+    }
+
+    private sealed class CallerContext : SynchronizationContext
+    {
+        public override void Post(SendOrPostCallback callback, object? state) =>
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                SynchronizationContext? previous = Current;
+                SetSynchronizationContext(this);
+                try { callback(state); }
+                finally { SetSynchronizationContext(previous); }
+            });
+    }
+
+    [Fact]
+    public async Task VerificationAndRenameDoNotRunOnTheCallersContext()
+    {
+        CallerContext caller = new();
+        bool onCaller = true;
+        LibraryExporter exporter = Exporter(point =>
+        {
+            if (point == ExportCheckpoint.BeforeRename) onCaller = SynchronizationContext.Current == caller;
+        });
+        TaskCompletionSource<LibraryExportResult> done = new();
+        caller.Post(async _ =>
+        {
+            try { done.SetResult(await Export(exporter)); }
+            catch (Exception error) { done.SetException(error); }
+        }, null);
+
+        await done.Task;
+
+        Assert.False(onCaller);
+    }
+
+    [Fact]
+    public async Task AHardLinkedLiveDatabaseFailsAsDatabaseInvalid()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string link = Path.Combine(fixture.Library.Root, "linked.sqlite");
+        using (Process mklink = Process.Start(new ProcessStartInfo(
+            "cmd.exe", $"/c mklink /H \"{link}\" \"{fixture.Library.Paths.DatabasePath}\"")
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        })!)
+        {
+            mklink.WaitForExit();
+            Assert.Equal(0, mklink.ExitCode);
+        }
+        try
+        {
+            await Fails(LibraryExportIssue.DatabaseInvalid);
+            AssertNothingLeft();
+        }
+        finally
+        {
+            File.Delete(link);
+        }
+    }
+
+    [Fact]
+    public async Task AReaderHoldingTheTemporaryArchiveDoesNotFailVerification()
+    {
+        FileStream? scanner = null;
+        LibraryExporter exporter = Exporter(point =>
+        {
+            if (point == ExportCheckpoint.Written)
+            {
+                scanner = new FileStream(Directory.EnumerateFiles(output, "*.tmp").Single(),
+                    FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            }
+            if (point == ExportCheckpoint.BeforeRename) scanner?.Dispose();
+        });
+
+        try
+        {
+            Assert.True(File.Exists((await Export(exporter)).Path));
+        }
+        finally
+        {
+            scanner?.Dispose();
+        }
     }
 }

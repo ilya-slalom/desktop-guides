@@ -135,6 +135,11 @@ public sealed partial record LibraryArchiveManifest(
         {
             throw new InvalidDataException("The manifest has a malformed value.", error);
         }
+        catch (OverflowException error)
+        {
+            // Sizes whose total doesn't fit in a long.
+            throw new InvalidDataException("The manifest has a malformed value.", error);
+        }
     }
 
     /// <summary>Throws unless the path is the database, a content file or an artwork file.</summary>

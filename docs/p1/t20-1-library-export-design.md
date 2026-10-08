@@ -424,14 +424,14 @@ When T20.1 is implemented, update these:
 ## T20.1 verification record
 
 - **Unit tests.** On `pcsx2-win` (Windows 11 build 26200, .NET SDK
-  10.0.401): Core 931/931 (906 plus 25) and Infrastructure 590/590 (540 plus
-  50). The new test classes are:
-  - `LibraryArchiveManifestTests` (25): round trip, deterministic sorted
+  10.0.401): Core 932/932 (906 plus 26) and Infrastructure 593/593 (540 plus
+  53), after the final-review fixes below. The new test classes are:
+  - `LibraryArchiveManifestTests` (26): round trip, deterministic sorted
     output, counts, non-ASCII paths, and each rejection: format, version, a
     missing field, counts, a negative size, a malformed ID, five unsafe
     content paths, four wrong path shapes, an uppercase hash, a duplicate
-    path, no database entry, non-JSON, an oversized manifest, and limits on
-    `Write`;
+    path, no database entry, non-JSON, an oversized manifest, sizes that
+    overflow the total, and limits on `Write`;
   - `LibraryExportRepositoryTests` (6): the write gate is held, an open
     connection and the token are passed, a cancelled gate wait, a validated
     `BackupTo` copy, deletion on failed validation, and refusal of an
@@ -445,7 +445,7 @@ When T20.1 is implemented, update these:
     guides; a shared relative path archived once; `LibraryTooLarge`; and,
     on Windows, a junctioned guide folder, a linked guide file and a linked
     artwork file;
-  - `LibraryExporterTests` (23):
+  - `LibraryExporterTests` (26):
     - the archive's entries and verification;
     - the snapshot's rows: reading state, a preference, a setting and
       provider metadata;
@@ -463,7 +463,11 @@ When T20.1 is implemented, update these:
     - two exports with the same clock are byte-identical;
     - a stale `.tmp` from another export is left alone;
     - an empty library;
-    - progress through each phase.
+    - progress through each phase;
+    - verification and the rename don't run on the caller's context;
+    - a hard-linked live database fails as `DatabaseInvalid`;
+    - another reader holding the temporary archive doesn't fail
+      verification.
   - `LibraryExportMeasurement` (1): skipped unless `DG_EXPORT_MEASURE` is
     set.
 - **Measurement.** [measurement.json](evidence/t20-1-library-export/measurement.json):
@@ -478,6 +482,33 @@ When T20.1 is implemented, update these:
   justify hard-link pinning.
 - **Production build.** The x64 Release build succeeded with no warnings.
   Production doesn't call the exporter yet.
+- **Final review.** A fresh reviewer found no Critical issues. These four
+  were fixed, each with a test that failed first:
+  - `ExportAsync` now runs the destination check, verification and rename
+    off the caller's context, so T20.2's UI won't freeze;
+  - errors opening or reading the live library map to `DatabaseInvalid` or
+    `WriteFailed`, never a raw exception;
+  - verification shares reads, so an antivirus or indexer handle on the new
+    file doesn't fail it;
+  - `Parse` maps an overflowing size total to `InvalidDataException`.
+
+  Deferred minors (by effect):
+  - snapshot I/O errors read as `DatabaseInvalid`;
+  - bad options surface late as `LibraryTooLarge`;
+  - freelist pages can keep deleted rows in the archived database;
+  - progress cadence;
+  - case and Unicode-normalization duplicates pass `Parse` (T20.2 staging
+    must catch them);
+  - `Parse` accepts unknown JSON properties;
+  - a crash leaves the `%TEMP%` snapshot behind;
+  - ancestor links of the destination aren't resolved;
+  - test gaps around the stale `.tmp` with `overwrite`, several write-stage
+    mismatches, and a junctioned destination;
+  - ZIP times have 2-second resolution.
+
+  MSIX AppData write virtualization is handed to T20.2: a destination under
+  `%LOCALAPPDATA%` or `%APPDATA%` outside `Packages` would be redirected into
+  the package store and lost on uninstall.
 - **Rulings:**
   - Host test staging adds the gitignored `tests/fixtures/p0/generated`
     fixtures, which the PDF tests read.

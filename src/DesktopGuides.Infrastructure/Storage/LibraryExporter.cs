@@ -56,7 +56,11 @@ public sealed class LibraryExporter
     public async Task<LibraryExportResult> ExportAsync(
         string destination, bool overwrite, IProgress<LibraryExportProgress>? progress, CancellationToken token)
     {
-        string target = CheckDestination(destination, overwrite);
+        // Everything below blocks on disk I/O, so none of it runs on the caller's
+        // (UI) context: the destination check runs on the pool, and every await
+        // below resumes there.
+        string target = await Task.Run(() => CheckDestination(destination, overwrite), token)
+            .ConfigureAwait(false);
         Guid exportId = newId();
         DateTimeOffset created = DateTimeOffset.FromUnixTimeSeconds(clock.GetUtcNow().ToUnixTimeSeconds());
         string temp = $"{target}.{exportId:N}.tmp";
@@ -64,10 +68,23 @@ public sealed class LibraryExporter
         progress?.Report(new LibraryExportProgress(LibraryExportPhase.Preparing, 0, 0));
         try
         {
-            LibraryArchiveManifest manifest = await repository.RunExportAsync(
-                (connection, work) => Task.FromResult(
-                    WriteUnderGate(connection, exportId, created, snapshot, temp, progress, work)),
-                token);
+            LibraryArchiveManifest manifest;
+            try
+            {
+                manifest = await repository.RunExportAsync(
+                    (connection, work) => Task.FromResult(
+                        WriteUnderGate(connection, exportId, created, snapshot, temp, progress, work)),
+                    token).ConfigureAwait(false);
+            }
+            catch (Exception error) when (error is InvalidDataException or SqliteException or FormatException)
+            {
+                // Opening or reading the live library failed, for example a linked database file.
+                throw new LibraryExportException(LibraryExportIssue.DatabaseInvalid, inner: error);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                throw new LibraryExportException(LibraryExportIssue.WriteFailed, inner: error);
+            }
             string sha256 = Verify(temp, manifest, progress, token);
             checkpoint(ExportCheckpoint.BeforeRename);
             token.ThrowIfCancellationRequested();
@@ -243,7 +260,8 @@ public sealed class LibraryExporter
         progress?.Report(new LibraryExportProgress(LibraryExportPhase.Verifying, 0, manifest.TotalBytes));
         try
         {
-            using FileStream stream = new(temp, FileMode.Open, FileAccess.Read, FileShare.None);
+            // Share reads: an antivirus scan or indexer may already hold the new file open.
+            using FileStream stream = new(temp, FileMode.Open, FileAccess.Read, FileShare.Read);
             if (LibraryArchiveVerifier.Verify(stream, token).ExportId != manifest.ExportId)
             {
                 throw new InvalidDataException("The archive's manifest isn't the one this export wrote.");

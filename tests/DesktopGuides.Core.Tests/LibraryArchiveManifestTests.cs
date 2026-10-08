@@ -172,4 +172,14 @@ public sealed class LibraryArchiveManifestTests
         Assert.Equal(new[] { guide }, error.GuideIds);
         Assert.Empty(error.GameIds);
     }
+
+    [Fact]
+    public void ParseRejectsSizesThatOverflowTheTotal()
+    {
+        string json = Json(Sample())
+            .Replace("\"bytes\": 4096", "\"bytes\": 9223372036854775807")
+            .Replace("\"bytes\": 12345", "\"bytes\": 9223372036854775807");
+
+        Assert.Contains("malformed value", Rejects(json).Message);
+    }
 }
