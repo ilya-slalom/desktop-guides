@@ -3,7 +3,7 @@
 Status: P0 merged in [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1)
 on 25 September 2026. The clean-VM prerequisite gate and Windows 10 check
 remain deferred. P1 is designed in the [technical design](p1-technical-design.md)
-and [implementation plan](p1/implementation-plan.md); on 8 October 2026, 43 of
+and [implementation plan](p1/implementation-plan.md); on 8 October 2026, 44 of
 its 55 tasks are merged, and the plan records each one. Source:
 [initial requirements and high-level design](initial-design.md). The backlog
 defines the acceptance gates; [Windows results](p0/results.md) record
@@ -571,7 +571,8 @@ After the first import, the app explains that uninstall removes its live
 library and points to Export in Settings.
 
 - **T20.1** Define a versioned manifest and archive of a consistent SQLite
-  snapshot and managed guide files.
+  snapshot and managed guide files. Implemented in PR #59; see
+  [the design](p1/t20-1-library-export-design.md).
 - **T20.2** Build export, validation, and restore flows with cancel/replace
   conflict handling. Place Export and Restore actions in Toolkit
   `SettingsCard` rows and group advanced restore details in

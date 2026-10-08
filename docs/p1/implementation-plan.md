@@ -1,8 +1,8 @@
 # P1 implementation plan and exit gates
 
-Status: 43 of the 55 tasks are merged, 8 October 2026. M0, M3 and M4 are
-complete; M1 still needs T17.1 and M2 the optional T11.5. M5–M6 are
-planned.
+Status: 44 of the 55 tasks are merged, 8 October 2026. M0, M3 and M4 are
+complete; M1 still needs T17.1 and M2 the optional T11.5. M5 has started
+with T20.1, and M6 is planned.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
 This plan orders all **16 P1 stories and 55 tasks** in the
@@ -968,7 +968,8 @@ Exit: interrupted operations recover without damaging unrelated content;
 Settings can export outside app data and restore a validated library; complete
 flows work by keyboard and with the recorded accessibility checks.
 
-T20.1 is implemented on `feat/p1-t20-1-library-export`; see the
+T20.1 was merged through PR #59 on 8 October 2026 (merge commit `47ccf3a`;
+CI run 37765505021); see the
 [design](t20-1-library-export-design.md#t201-verification-record).
 
 | Task | Prerequisites | Output and verifiable exit | TR |

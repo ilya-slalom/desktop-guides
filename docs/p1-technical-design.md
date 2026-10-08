@@ -1,7 +1,7 @@
 # P1 technical design: local library and first usable reader
 
-Status: design for S03–S17 and S20, updated 28 September 2026. 43 of the 55
-tasks, through M4, are implemented as of 8 October 2026; see
+Status: design for S03–S17 and S20, updated 28 September 2026. 44 of the 55
+tasks, through M4 plus T20.1, are implemented as of 8 October 2026; see
 [P1 results](p1/results.md).
 The [high-level design](initial-design.md) defines R1–R9;
 the [work breakdown](work-breakdown.md) owns story, task, and TR IDs; the

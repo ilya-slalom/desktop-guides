@@ -1,6 +1,7 @@
 # T20.1 library export archive design
 
-Status: implemented on `feat/p1-t20-1-library-export`; see the verification record.
+Status: merged through PR #59 on 8 October 2026, merge commit `47ccf3a`;
+verified by CI run 37765505021. See the verification record.
 Prerequisites T03.2 (PR #4), T04.4 (PR #14), T06.3 (PR #19) and T15.2
 (PR #5) are merged.
 
