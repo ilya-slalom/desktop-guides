@@ -117,7 +117,7 @@ public sealed class ProgressCoordinatorTests
     }
 
     [Fact]
-    public async Task FailedOpenCountsAFailureAndRaisesNothing()
+    public async Task FailedOpenCountsAnOpenFailureAndRaisesNothing()
     {
         ProgressCoordinator coordinator = new(store, clock);
         int failed = 0;
@@ -134,7 +134,26 @@ public sealed class ProgressCoordinatorTests
         Assert.Empty(store.Opens);
         Assert.Single(store.Writes);
         Assert.Equal(0, failed);
-        Assert.Equal(new ProgressCounts(1, 0, 1, 0), coordinator.Counts);
+        Assert.Equal(new ProgressCounts(1, 0, 0, 0, OpenFailures: 1), coordinator.Counts);
+        Assert.Equal(new ProgressFailure("open", nameof(IOException), new IOException().HResult),
+            coordinator.LastFailure);
+    }
+
+    [Fact]
+    public async Task SlowOpenPastTheTimeoutIsAnOpenFailureNotASaveFailure()
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        int failed = 0;
+        coordinator.SaveFailed += (_, _) => failed++;
+        store.OpenHold = new TaskCompletionSource();
+        IProgressTracking tracking = Track(coordinator, GuideA, new FakeSession(), null);
+
+        clock.Advance(ProgressCoordinator.FlushTimeout);
+        await tracking.DisposeAsync();
+
+        Assert.Equal(0, failed);
+        Assert.Equal(new ProgressCounts(0, 0, 0, 0, OpenFailures: 1), coordinator.Counts);
+        Assert.Equal("open", coordinator.LastFailure?.Stage);
     }
 
     [Fact]
@@ -321,6 +340,8 @@ public sealed class ProgressCoordinatorTests
         Assert.Equal(3, store.Attempts);
         Assert.Equal(GuideA, Assert.Single(failed).GuideId);
         Assert.Equal(new ProgressCounts(1, 0, 2, 1), coordinator.Counts);
+        Assert.Equal(new ProgressFailure("write", nameof(IOException), new IOException().HResult),
+            coordinator.LastFailure);
     }
 
     [Fact]
@@ -359,6 +380,7 @@ public sealed class ProgressCoordinatorTests
         await dispose.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Empty(store.Writes);
         Assert.Equal(1, failed);
+        Assert.Equal("capture", coordinator.LastFailure?.Stage);
         Assert.Equal(0, session.Subscribers);
     }
 

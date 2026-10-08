@@ -3016,8 +3016,18 @@ try {
             $saveFailed = "Couldn't save your place in this guide."
 
             function Assert-NoSaveFailure([string] $step) {
+                # An open time that wasn't recorded is not a failed save; it
+                # is reported below with the latest failure's stage and type.
                 $counts = Read-ProgressCounts
-                if ($counts.failures -ne 0) { throw "$step had $($counts.failures) failed saves." }
+                if ($counts.failures -ne 0) {
+                    $last = $counts.lastFailure
+                    throw ("$step had $($counts.failures) failed saves; the last failed at " +
+                        "$($last.stage) with $($last.type) (0x$('{0:X8}' -f [int] $last.hresult)).")
+                }
+                if ([int] $counts.openFailures -ne 0) {
+                    $report.progressOpenFailures = [ordered]@{
+                        step = $step; count = [int] $counts.openFailures; last = $counts.lastFailure }
+                }
                 # The status probe holds the latest message as 'sequence|message'.
                 $probe = Find-RawById 'ShellContent'
                 if ($probe -and $probe.Current.ItemStatus -like "*|$saveFailed") {

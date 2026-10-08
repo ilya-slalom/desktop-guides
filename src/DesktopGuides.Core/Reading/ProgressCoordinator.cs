@@ -2,7 +2,13 @@ using DesktopGuides.Core.Library;
 
 namespace DesktopGuides.Core.Reading;
 
-public sealed record ProgressCounts(int Saves, int SkippedUnchanged, int Failures, int Opens);
+// Failures counts failed saves; OpenFailures counts open times that weren't recorded.
+public sealed record ProgressCounts(
+    int Saves, int SkippedUnchanged, int Failures, int Opens, int OpenFailures = 0);
+
+// Where the latest failure happened (open, turn, capture or write) and its
+// exception type and HResult. Never the message, which may hold a path.
+public sealed record ProgressFailure(string Stage, string ErrorType, int HResult);
 
 public sealed class ProgressSaveFailedEventArgs(Guid guideId, Exception error) : EventArgs
 {
@@ -37,6 +43,8 @@ public sealed class ProgressCoordinator
     private int skippedUnchanged;
     private int failures;
     private int opens;
+    private int openFailures;
+    private ProgressFailure? lastFailure;
 
     public ProgressCoordinator(IReadingLocationStore store, TimeProvider clock)
     {
@@ -53,7 +61,15 @@ public sealed class ProgressCoordinator
     {
         get
         {
-            lock (countsGate) return new(saves, skippedUnchanged, failures, opens);
+            lock (countsGate) return new(saves, skippedUnchanged, failures, opens, openFailures);
+        }
+    }
+
+    public ProgressFailure? LastFailure
+    {
+        get
+        {
+            lock (countsGate) return lastFailure;
         }
     }
 
@@ -69,14 +85,24 @@ public sealed class ProgressCoordinator
         return tracking;
     }
 
-    private void Record(int saved, int skipped, int failed, int opened = 0)
+    private void Record(int saved, int skipped, int opened = 0)
     {
         lock (countsGate)
         {
             saves += saved;
             skippedUnchanged += skipped;
-            failures += failed;
             opens += opened;
+        }
+        CountsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void RecordFailure(string stage, Exception error)
+    {
+        lock (countsGate)
+        {
+            if (stage == "open") openFailures++;
+            else failures++;
+            lastFailure = new(stage, error.GetType().Name, error.HResult);
         }
         CountsChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -171,8 +197,8 @@ public sealed class ProgressCoordinator
             else context.Post(_ => _ = SaveFromTimerAsync(), null);
         }
 
-        // Never throws. A failure is counted but not reported: the guide did open,
-        // and the next open records it again.
+        // Never throws. A failure is counted as an open failure but not reported:
+        // the guide did open, and the next open records it again.
         internal async Task RecordOpenAsync(DateTimeOffset openedUtc)
         {
             using CancellationTokenSource timeout = new(FlushTimeout, owner.clock);
@@ -192,15 +218,15 @@ public sealed class ProgressCoordinator
                 }
                 await owner.store.RecordGuideOpenedAsync(guideId, openedUtc, timeout.Token)
                     .WaitAsync(timeout.Token).ConfigureAwait(false);
-                owner.Record(0, 0, 0, 1);
+                owner.Record(0, 0, 1);
             }
             catch (ReadingStateMissingException)
             {
                 // The guide was removed.
             }
-            catch (Exception)
+            catch (Exception error)
             {
-                owner.Record(0, 0, 1);
+                owner.RecordFailure("open", error);
             }
             finally
             {
@@ -228,9 +254,10 @@ public sealed class ProgressCoordinator
                 {
                     if (!dirty) return;
                 }
-                Failed(error);
+                Failed("turn", error);
                 return;
             }
+            string stage = "capture";
             try
             {
                 lock (gate)
@@ -249,13 +276,14 @@ public sealed class ProgressCoordinator
                 }
                 if (json == lastJson)
                 {
-                    owner.Record(0, 1, 0);
+                    owner.Record(0, 1);
                     return;
                 }
+                stage = "write";
                 await owner.store.SaveReadingLocationAsync(guideId, json, estimate, token)
                     .WaitAsync(token).ConfigureAwait(false);
                 lastJson = json;
-                owner.Record(1, 0, 0);
+                owner.Record(1, 0);
             }
             catch (ReadingStateMissingException)
             {
@@ -263,7 +291,7 @@ public sealed class ProgressCoordinator
             }
             catch (Exception error)
             {
-                Failed(error);
+                Failed(stage, error);
             }
             finally
             {
@@ -271,7 +299,7 @@ public sealed class ProgressCoordinator
             }
         }
 
-        private void Failed(Exception error)
+        private void Failed(string stage, Exception error)
         {
             bool report;
             lock (gate)
@@ -282,7 +310,7 @@ public sealed class ProgressCoordinator
                 report = !failureReported;
                 failureReported = true;
             }
-            owner.Record(0, 0, 1);
+            owner.RecordFailure(stage, error);
             if (report) owner.SaveFailed?.Invoke(owner, new ProgressSaveFailedEventArgs(guideId, error));
         }
 
