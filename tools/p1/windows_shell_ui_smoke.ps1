@@ -1515,11 +1515,13 @@ try {
 
         # The app's own view of the position, written only while the
         # HtmlPosition gate is open. The locator is the T12.1 codec JSON.
+        # A read can race the app's replace of the file and return $null;
+        # a check that needs a value goes through Wait-HtmlPosition.
         function Read-HtmlPosition {
             $path = Join-Path $AppCacheRoot "diagnostics\html-position-$ProcessId.json"
             if (-not (Test-Path -LiteralPath $path)) { return $null }
             try {
-                $file = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+                $file = Get-Content -LiteralPath $path -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json
             }
             catch {
                 return $null
@@ -1571,7 +1573,7 @@ try {
         # T14.3: one burst of quick toolbar clicks, then the restore the
         # session made after the burst's last write.
         function Step-HtmlTextSize([string] $command, [int] $clicks, [double] $scale, [string] $status) {
-            $before = [int] (Read-HtmlPosition).appearanceRestores
+            $before = [int] (Wait-HtmlPosition { param($p) $p.locator } 'a position before the size step').appearanceRestores
             for ($index = 0; $index -lt $clicks; $index++) {
                 $button = Find-VisibleName $command
                 if (-not $button) { throw "The Reader toolbar has no visible '$command'." }
@@ -2300,8 +2302,8 @@ try {
                 # Past the 300 ms settle, the re-apply and two polls.
                 Start-Sleep -Milliseconds 1500
                 $report.htmlResizeMarks += Wait-TopMark 420 "a resize to $width px"
-                $after = Read-HtmlPosition
-                if (-not $after -or $after.offset -ne $target.offset) {
+                $after = Wait-HtmlPosition { param($p) $p.locator } "a position after a resize to $width px"
+                if ($after.offset -ne $target.offset) {
                     throw "After a resize to $width px the position offset was $($after.offset); expected $($target.offset)."
                 }
             }
@@ -2323,7 +2325,7 @@ try {
                 if ($after.appearanceKind -ne 'Exact') {
                     throw "A size step to $($burst.label) restored '$($after.appearanceKind)'; expected Exact."
                 }
-                $after = Read-HtmlPosition
+                $after = Wait-HtmlPosition { param($p) $p.locator } "a position after a size step to $($burst.label)"
                 if ($after.offset -ne $target.offset) {
                     throw "After a size step to $($burst.label) the position offset was $($after.offset); expected $($target.offset)."
                 }
@@ -2336,7 +2338,7 @@ try {
             }
             $report.phases += 'position-text-size'
 
-            $saved = (Read-HtmlPosition).locator
+            $saved = (Wait-HtmlPosition { param($p) $p.locator } 'the place after the size steps').locator
             Back-ToTextGame
 
             # position-text-size-fallback: with no text box on screen the
@@ -2496,7 +2498,7 @@ try {
             # point. One second covers the 300 ms settle and a 500 ms poll.
             Start-Sleep -Seconds 1
             [void](Wait-TopMark 420 'an unimported link')
-            $after = Read-HtmlPosition
+            $after = Wait-HtmlPosition { param($p) $p.locator } 'a position after an unimported link'
             if ($after.offset -ne $here.offset) {
                 throw "An unimported link moved the point from offset $($here.offset) to $($after.offset)."
             }
@@ -2569,8 +2571,7 @@ try {
             $before = Wait-HtmlAppearance 1 'the open'
             $report.htmlAppearanceBefore = Assert-HtmlAppearance $before 'Light' 1 `
                 'rgb(255, 255, 255)' 'rgb(34, 34, 34)' '1' 'a System open with Windows light'
-            [void](Wait-HtmlPosition { param($p) $p.locator } 'a first capture')
-            $placeBefore = (Read-HtmlPosition).locator
+            $placeBefore = (Wait-HtmlPosition { param($p) $p.locator } 'a first capture').locator
             $report.htmlThemeLightScreenshot = Save-WindowScreenshot 'html-theme-system-light'
 
             # The install side restores the user's value in its finally.
@@ -2590,7 +2591,7 @@ try {
             }
             # Two polls past the switch, the reading place is the same.
             Start-Sleep -Milliseconds 1200
-            $placeAfter = (Read-HtmlPosition).locator
+            $placeAfter = (Wait-HtmlPosition { param($p) $p.locator } 'the place after the switch').locator
             if ($placeAfter -cne $placeBefore) {
                 throw "The switch moved the reading place from $placeBefore to $placeAfter."
             }
