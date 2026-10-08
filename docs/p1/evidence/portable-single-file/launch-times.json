@@ -1,0 +1,27 @@
+[
+    {
+        "label":  "single-file cold (extracts)",
+        "windowMs":  1634
+    },
+    {
+        "label":  "extraction",
+        "files":  551,
+        "bytes":  233305709
+    },
+    {
+        "label":  "single-file warm 1",
+        "windowMs":  482
+    },
+    {
+        "label":  "single-file warm 2",
+        "windowMs":  476
+    },
+    {
+        "label":  "multi-file folder 1",
+        "windowMs":  474
+    },
+    {
+        "label":  "multi-file folder 2",
+        "windowMs":  472
+    }
+]

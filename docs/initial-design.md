@@ -119,9 +119,10 @@ navigate the reader. All actions must also be reachable in the UI.
   1809 and later. The test matrix should include Windows 11, Windows 10 22H2,
   x64, and ARM64 before promising those combinations publicly.
 - **Delivery:** Release the same WinUI 3 app in two forms for each tested CPU
-  target: a signed MSIX, and a portable, self-contained build — a folder that
-  bundles .NET and the Windows App SDK and runs from its executable without
-  installation. The MSIX keeps its data in the package's local folder; the
+  target: a signed MSIX, and a portable, self-contained build — a single
+  executable that bundles .NET and the Windows App SDK and runs without
+  installation. On first launch it unpacks its bundled files to a per-user
+  temporary folder. The MSIX keeps its data in the package's local folder; the
   portable build has no package identity and keeps its data in
   `%LOCALAPPDATA%\DesktopGuides`, so the two builds keep separate libraries
   and run as separate single instances. Choose the signing approach before

@@ -1335,3 +1335,122 @@ Selected evidence includes
 [search results](evidence/t04-provider-search/provider-live.search-results.png),
 [linked live game](evidence/t04-provider-search/provider-live.linked-game-live.png), and
 [offline search](evidence/t04-provider-search/provider-offline-blocked.search-offline.png).
+
+## Portable single-file release — host check, 8 October 2026
+
+The portable release is now one `DesktopGuides.Production.exe` in a zip,
+not a 544-file folder. The publish is single-file with full self-extraction,
+symbols are embedded, and `tools/p1/package_portable_release.ps1` builds the
+zip, its `.zip.sha256` file and a JSON manifest; see
+[Portable build](e2e-testing.md#portable-build).
+
+On the Windows 11 x64 host (build `10.0.26200.0`, .NET SDK `10.0.401`), from
+a zip staging of `80d2647`, the locked MSIX, ShellSeed and portable restores
+passed, publish gave 0 warnings, and the packaging test passed. The
+[release manifest](evidence/portable-single-file/release-manifest.json)
+records a 92,034,870-byte zip (SHA-256 `F9FABCAF…E14C`) holding a
+244,004,113-byte exe (SHA-256 `1016FDC1…086E`). The multi-file release from
+`f7c22e3` was 544 files in a 97,082,441-byte zip.
+
+Every run below used the exe unpacked from that zip, with the same SHA-256,
+in an interactive scheduled task without elevation:
+
+- `core` passed ([report](evidence/portable-single-file/core-html-run.json)).
+  The same run then failed `html-position`, as described below.
+- `html` passed in full, both `html-position` passes included
+  ([report](evidence/portable-single-file/html-run.json)).
+- `pdf`: `pdf-reader`, `pdf-zoom`, `pdf-jump` and `pdf-locked` passed in light
+  and dark ([report](evidence/portable-single-file/pdf-run.json)).
+  `pdf-keys` failed.
+
+Two checks fail on this host for the `f7c22e3` multi-file portable build as
+well, so the single-file change doesn't cause them. Hosted CI runners pass
+both.
+
+- `pdf-keys`: after Ctrl+G, `Expected keyboard focus on 'ReaderCommandInput',
+  found 'PdfPreviewScroller'`. It failed twice on the single exe and once on
+  the multi-file build.
+- `position-fixed-header`: after the size step back to 100%, the top line was
+  MARK-0023 instead of MARK-0020 (page top 552). It failed twice on the single
+  exe and once on the multi-file build, and passed in the `html` run above.
+
+The first run's `html` failure came from staging. Windows `tar` read the UTF-8
+names in the tar stream with the OEM code page, so the Guide B fixture no
+longer matched its companion folder. Staging from a zip fixed it. The `html`
+run above used a staging copy of `windows_shell_ui_smoke.ps1` with an
+environment-variable guard meant to skip `position-fixed-header`. The smoke
+runs as its own scheduled task and never saw the variable, so the guard never
+applied and the phase ran unchanged. The staging copy was restored afterwards.
+
+[Launch times](evidence/portable-single-file/launch-times.json), from start to
+a visible main window: 1.63 s for the first launch, which unpacks 551 files
+(233,305,709 bytes) to `%TEMP%\.net\DesktopGuides.Production`; 0.48 s for
+later launches; 0.47 s for the multi-file build.
+
+`%LOCALAPPDATA%\DesktopGuides` already existed. It was renamed to
+`DesktopGuides.bak-20261008` for the runs and renamed back afterwards. It held
+the P0 `P0-WebView` cache and a library created at 12:27 that day, before the
+move, and nothing in it changed. The extraction folders the runs created under
+`%TEMP%\.net` were removed. No scheduled task or app process was left behind.
+
+## Portable size spike — 8 October 2026
+
+A throwaway spike on the Windows 11 x64 host measured how far the portable
+build can shrink. It built size variants from `80d2647` in scratch copies of
+the staging and kept no code. The size work is scheduled as T17.4, a final
+pass before the T17.3 candidate runs.
+
+| Variant | Exe | First-launch extraction | Cold / warm launch | Result |
+| --- | --- | --- | --- | --- |
+| `80d2647` | 244.0 MB | 551 files, 233.3 MB | 2.2 s / 0.5 s | passes |
+| V1: unused Windows App SDK components excluded | 181.8 MB | 485 files, 171.2 MB | 1.5 s / 0.5 s | passes |
+| V2: V1 with `PublishTrimmed`, `TrimMode=partial` | 94.3 MB | 355 files, 84.0 MB | 2.9 s / 0.64 s | crashes |
+| V2c: V2 with `EnableCompressionInSingleFile` | 41.7 MB | 355 files, 84.0 MB | 3.0 s / 0.65 s | crashes |
+| V2f: V1 with `TrimMode=full` | 89.3 MB | — | — | not run |
+
+- **What V1 removes.** The app uses only Foundation (file pickers, app
+  lifecycle), WinUI and WebView2. The `Microsoft.WindowsAppSDK` 2.5.1
+  metapackage also brings AI, ML (`onnxruntime.dll` 21.7 MB, `DirectML.dll`
+  18.7 MB), Search, Widgets and DWrite. The Community Toolkit packages depend
+  on the metapackage, so V1 keeps it and adds direct references to those
+  components and `Microsoft.Windows.AI.MachineLearning` with
+  `ExcludeAssets="all"`. A reference to only the components the app uses made
+  NuGet resolve the Toolkit's metapackage at 1.6, whose build files collide
+  with the 2.x components.
+- **V1 build checks.** It published with 0 warnings. The MSIX still built and
+  declared `Microsoft.WindowsAppRuntime.2` 2.5.1.0, and the MSIX restore
+  accepted the updated lock file. Both builds load only the system
+  `DWrite.dll`, never `DWriteCore.dll`, so text rendering doesn't change.
+- **V1 scenario runs.** These groups passed on the V1 exe: core, txt,
+  text-size, game-actions, design, catalog, pdf (all but the host-only
+  `pdf-keys`), progress, theme, completion and import. `html-position` failed
+  in both html runs at different points: once "Larger text" wasn't visible,
+  and once the 110% restore never reported. The `80d2647` build also fails
+  `html-position` in 3 of 4 runs on this host, so these runs neither show nor
+  rule out a V1 effect. `provider` wasn't run, because it needs credentials.
+- **Trimmed builds crash.** V2 and V2c crash with a stowed exception
+  (`0xc000027b`) in `Microsoft.UI.Xaml.dll`: in core at game-editor
+  "edit-by-id-and-clear-optional-fields", and early in the design, pdf,
+  progress and html groups. Compression isn't the cause, because V2 fails the
+  same way.
+- **Trim warnings to fix.** A publish with `-p:CsWinRTAotWarningLevel=2
+  -p:TrimmerSingleWarn=false` lists 20 warnings:
+  - CsWinRT1028 (4): `GameSearchItem`, `GuideRowItem`, `LibraryGameItem` and
+    `ProviderServices` need `partial`;
+  - CsWinRT1030 (9): generic WinRT interfaces, for example `Catalog`,
+    `List<MetadataItem>` and `byte[]`, need `AllowUnsafeBlocks` for generated
+    code;
+  - IL2026 (7): reflection-based `System.Text.Json` calls in
+    `HtmlPositionScripts.cs`, `ExternalLinkLaunchers.cs`,
+    `HtmlReaderSession.cs` and `ShellWindow.Progress.cs`.
+
+  The default build also reports IL2104 for AngleSharp, the Windows SDK
+  projection and `WinRT.Runtime`. Trimming drops the framework's ReadyToRun
+  code, which probably explains the slower start.
+- **Compression** shrinks the exe, not the extraction, so it pays off only
+  together with trimming.
+
+`%LOCALAPPDATA%\DesktopGuides` was renamed aside for the runs and renamed
+back; its 291 files matched the pre-run list by path, size and write time.
+The runs switched the Windows app theme and restored it (dark). The
+extraction folder and the spike copies were removed afterwards.

@@ -1,0 +1,1120 @@
+{
+    "runId":  "a0148d53312a4ac99d35995ddeb1934d",
+    "observedAt":  "2026-10-08T04:45:31.2351416Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "AMD64",
+    "mode":  "portable",
+    "scenarioScope":  "html",
+    "scenarioGroupsRun":  [
+                              "html"
+                          ],
+    "success":  true,
+    "windowsAppRuntime":  [
+                              "2.2.0.0",
+                              "2.3.1.0",
+                              "2.4.0.0",
+                              "2.5.1.0"
+                          ],
+    "dotnetSdk":  "10.0.401",
+    "portableExecutable":  "E:\\work\\desktop-guides\\portable-80d2647\\verify\\DesktopGuides.Production.exe",
+    "portableExecutableSha256":  "1016FDC1BF52360A44A276F21776AE6132B549358A60AF42AD35A234FFDE086E",
+    "htmlReader":  {
+                       "guideA":  "6e2f3850b62e4462ab46d15084c34ac3",
+                       "guideB":  "3d3cb30b235849849e9af28f09e4f36e",
+                       "html-reader-online":  {
+                                                  "mode":  "html-reader",
+                                                  "invocationId":  "86dd83b9f94846938ed53f913230dd99",
+                                                  "observedAt":  "2026-10-08T04:45:36.5163701Z",
+                                                  "processId":  67220,
+                                                  "sessionId":  1,
+                                                  "exitDelayMilliseconds":  0,
+                                                  "expectedScalePercent":  0,
+                                                  "success":  true,
+                                                  "phases":  [
+                                                                 "html-canary-a",
+                                                                 "html-external-links",
+                                                                 "html-canary-b",
+                                                                 "html-crash"
+                                                             ],
+                                                  "canaryLines":  [
+                                                                      "before-a=1",
+                                                                      "loaded-a=1",
+                                                                      "after-refresh=1",
+                                                                      "after-cross-guide-link=1",
+                                                                      "after-external-link=1",
+                                                                      "after-blank-link=1",
+                                                                      "after-links=1",
+                                                                      "before-crash=1",
+                                                                      "opened-b=1",
+                                                                      "closed-b=1"
+                                                                  ],
+                                                  "webView2Runtime":  "154.0.4258.62",
+                                                  "webView2ProxyArguments":  true,
+                                                  "htmlExternalLinkScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-reader-online.html-external-link.png",
+                                                  "htmlCrashScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-reader-online.html-crash.png"
+                                              },
+                       "profileSweep":  "removed",
+                       "online":  {
+                                      "sessions":  [
+                                                       {
+                                                           "guideId":  "6e2f3850b62e4462ab46d15084c34ac3",
+                                                           "served":  [
+                                                                          "guide.html",
+                                                                          "images/a.png",
+                                                                          "style.css"
+                                                                      ],
+                                                           "denied":  [
+                                                                          {
+                                                                              "reason":  "CrossGuide",
+                                                                              "context":  "Document",
+                                                                              "count":  1
+                                                                          },
+                                                                          {
+                                                                              "reason":  "External",
+                                                                              "context":  "Document",
+                                                                              "count":  2
+                                                                          }
+                                                                      ],
+                                                           "rejectedCaptures":  0,
+                                                           "restores":  {
+
+                                                                        },
+                                                           "entryNavigations":  1,
+                                                           "appearance":  {
+                                                                              "theme":  "Light",
+                                                                              "scale":  1,
+                                                                              "applications":  1,
+                                                                              "failures":  0,
+                                                                              "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                              "bodyColor":  "rgb(0, 0, 0)",
+                                                                              "rootZoom":  "1"
+                                                                          }
+                                                       },
+                                                       {
+                                                           "guideId":  "3d3cb30b235849849e9af28f09e4f36e",
+                                                           "served":  [
+                                                                          "Canary Guide B (PS1) - Walkthrough\u0027s 100% Café – v2_files/b.png",
+                                                                          "Canary Guide B (PS1) - Walkthrough\u0027s 100% Café – v2_files/style.css",
+                                                                          "guide.html"
+                                                                      ],
+                                                           "denied":  [
+
+                                                                      ],
+                                                           "rejectedCaptures":  0,
+                                                           "restores":  {
+
+                                                                        },
+                                                           "entryNavigations":  1,
+                                                           "appearance":  {
+                                                                              "theme":  "Light",
+                                                                              "scale":  1,
+                                                                              "applications":  1,
+                                                                              "failures":  0,
+                                                                              "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                              "bodyColor":  "rgb(0, 0, 0)",
+                                                                              "rootZoom":  "1"
+                                                                          }
+                                                       },
+                                                       {
+                                                           "guideId":  "3d3cb30b235849849e9af28f09e4f36e",
+                                                           "served":  [
+                                                                          "Canary Guide B (PS1) - Walkthrough\u0027s 100% Café – v2_files/b.png",
+                                                                          "Canary Guide B (PS1) - Walkthrough\u0027s 100% Café – v2_files/style.css",
+                                                                          "guide.html"
+                                                                      ],
+                                                           "denied":  [
+
+                                                                      ],
+                                                           "rejectedCaptures":  0,
+                                                           "restores":  {
+
+                                                                        },
+                                                           "entryNavigations":  1,
+                                                           "appearance":  {
+                                                                              "theme":  "Light",
+                                                                              "scale":  1,
+                                                                              "applications":  1,
+                                                                              "failures":  0,
+                                                                              "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                              "bodyColor":  "rgb(0, 0, 0)",
+                                                                              "rootZoom":  "1"
+                                                                          }
+                                                       }
+                                                   ],
+                                      "externalLaunches":  [
+                                                               "https://example.com/desktop-guides-canary"
+                                                           ],
+                                      "canaryLinesBefore":  1
+                                  },
+                       "html-reader-offline":  {
+                                                   "mode":  "html-reader",
+                                                   "invocationId":  "76e94f70a97242f3b065f831e5ce2c8a",
+                                                   "observedAt":  "2026-10-08T04:45:55.3908926Z",
+                                                   "processId":  59888,
+                                                   "sessionId":  1,
+                                                   "exitDelayMilliseconds":  0,
+                                                   "expectedScalePercent":  0,
+                                                   "success":  true,
+                                                   "phases":  [
+                                                                  "html-canary-a",
+                                                                  "html-external-links",
+                                                                  "html-canary-b",
+                                                                  "html-crash"
+                                                              ],
+                                                   "canaryLines":  [
+                                                                       "before-a=1",
+                                                                       "loaded-a=1",
+                                                                       "after-refresh=1",
+                                                                       "after-cross-guide-link=1",
+                                                                       "after-external-link=1",
+                                                                       "after-blank-link=1",
+                                                                       "after-links=1",
+                                                                       "before-crash=1",
+                                                                       "opened-b=1",
+                                                                       "closed-b=1"
+                                                                   ],
+                                                   "webView2Runtime":  "154.0.4258.62",
+                                                   "webView2ProxyArguments":  true,
+                                                   "htmlExternalLinkScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-reader-offline.html-external-link.png",
+                                                   "htmlCrashScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-reader-offline.html-crash.png"
+                                               },
+                       "offline":  {
+                                       "sessions":  [
+                                                        {
+                                                            "guideId":  "6e2f3850b62e4462ab46d15084c34ac3",
+                                                            "served":  [
+                                                                           "guide.html",
+                                                                           "images/a.png",
+                                                                           "style.css"
+                                                                       ],
+                                                            "denied":  [
+                                                                           {
+                                                                               "reason":  "CrossGuide",
+                                                                               "context":  "Document",
+                                                                               "count":  1
+                                                                           },
+                                                                           {
+                                                                               "reason":  "External",
+                                                                               "context":  "Document",
+                                                                               "count":  2
+                                                                           }
+                                                                       ],
+                                                            "rejectedCaptures":  0,
+                                                            "restores":  {
+
+                                                                         },
+                                                            "entryNavigations":  1,
+                                                            "appearance":  {
+                                                                               "theme":  "Dark",
+                                                                               "scale":  1,
+                                                                               "applications":  1,
+                                                                               "failures":  0,
+                                                                               "bodyBackground":  "rgb(30, 30, 30)",
+                                                                               "bodyColor":  "rgb(230, 230, 230)",
+                                                                               "rootZoom":  "1"
+                                                                           }
+                                                        },
+                                                        {
+                                                            "guideId":  "3d3cb30b235849849e9af28f09e4f36e",
+                                                            "served":  [
+                                                                           "Canary Guide B (PS1) - Walkthrough\u0027s 100% Café – v2_files/b.png",
+                                                                           "Canary Guide B (PS1) - Walkthrough\u0027s 100% Café – v2_files/style.css",
+                                                                           "guide.html"
+                                                                       ],
+                                                            "denied":  [
+
+                                                                       ],
+                                                            "rejectedCaptures":  0,
+                                                            "restores":  {
+
+                                                                         },
+                                                            "entryNavigations":  1,
+                                                            "appearance":  {
+                                                                               "theme":  "Dark",
+                                                                               "scale":  1,
+                                                                               "applications":  1,
+                                                                               "failures":  0,
+                                                                               "bodyBackground":  "rgb(30, 30, 30)",
+                                                                               "bodyColor":  "rgb(230, 230, 230)",
+                                                                               "rootZoom":  "1"
+                                                                           }
+                                                        },
+                                                        {
+                                                            "guideId":  "3d3cb30b235849849e9af28f09e4f36e",
+                                                            "served":  [
+                                                                           "Canary Guide B (PS1) - Walkthrough\u0027s 100% Café – v2_files/b.png",
+                                                                           "Canary Guide B (PS1) - Walkthrough\u0027s 100% Café – v2_files/style.css",
+                                                                           "guide.html"
+                                                                       ],
+                                                            "denied":  [
+
+                                                                       ],
+                                                            "rejectedCaptures":  0,
+                                                            "restores":  {
+
+                                                                         },
+                                                            "entryNavigations":  1,
+                                                            "appearance":  {
+                                                                               "theme":  "Dark",
+                                                                               "scale":  1,
+                                                                               "applications":  1,
+                                                                               "failures":  0,
+                                                                               "bodyBackground":  "rgb(30, 30, 30)",
+                                                                               "bodyColor":  "rgb(230, 230, 230)",
+                                                                               "rootZoom":  "1"
+                                                                           }
+                                                        }
+                                                    ],
+                                       "externalLaunches":  [
+                                                                "https://example.com/desktop-guides-canary"
+                                                            ],
+                                       "canaryLinesBefore":  1
+                                   },
+                       "html-runtime-missing":  {
+                                                    "mode":  "html-runtime-missing",
+                                                    "invocationId":  "2d092c43caaa4478af1403b40de093f2",
+                                                    "observedAt":  "2026-10-08T04:46:12.1870194Z",
+                                                    "processId":  67840,
+                                                    "sessionId":  1,
+                                                    "exitDelayMilliseconds":  0,
+                                                    "expectedScalePercent":  0,
+                                                    "success":  true,
+                                                    "phases":  [
+                                                                   "html-runtime-missing",
+                                                                   "html-missing-entry",
+                                                                   "html-runtime-missing-txt"
+                                                               ],
+                                                    "htmlRuntimeMissingScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-runtime-missing.html-runtime-missing.png"
+                                                },
+                       "runtimeMissing":  {
+                                              "sessions":  [
+                                                               {
+                                                                   "guideId":  "6e2f3850b62e4462ab46d15084c34ac3",
+                                                                   "served":  [
+
+                                                                              ],
+                                                                   "denied":  [
+
+                                                                              ],
+                                                                   "rejectedCaptures":  0,
+                                                                   "restores":  {
+
+                                                                                },
+                                                                   "entryNavigations":  0,
+                                                                   "appearance":  {
+                                                                                      "theme":  null,
+                                                                                      "scale":  null,
+                                                                                      "applications":  0,
+                                                                                      "failures":  0,
+                                                                                      "bodyBackground":  null,
+                                                                                      "bodyColor":  null,
+                                                                                      "rootZoom":  null
+                                                                                  }
+                                                               }
+                                                           ],
+                                              "externalLaunches":  [
+                                                                       "https://developer.microsoft.com/microsoft-edge/webview2/"
+                                                                   ],
+                                              "canaryLinesBefore":  2
+                                          }
+                   },
+    "launchedProcessId":  60664,
+    "launchedSessionId":  1,
+    "closedGracefully":  true,
+    "htmlPosition":  {
+                         "guideLong":  "3559119da41f4e5c9d943449565596ba",
+                         "guideChanged":  "eabaa771db694686917d93d28271be7a",
+                         "guidePictures":  "0fa5056333424383ad64d4c8c21748fe",
+                         "guideFixedHeader":  "cffae6948aa9498b8ab4bdb79231ce8d",
+                         "html-position-light":  {
+                                                     "mode":  "html-position",
+                                                     "invocationId":  "42ede4a14fb84f50bf45e9dbcba7a3eb",
+                                                     "observedAt":  "2026-10-08T04:46:20.9380547Z",
+                                                     "processId":  67088,
+                                                     "sessionId":  1,
+                                                     "exitDelayMilliseconds":  0,
+                                                     "expectedScalePercent":  0,
+                                                     "success":  true,
+                                                     "phases":  [
+                                                                    "position-fragment",
+                                                                    "position-resize",
+                                                                    "position-text-size",
+                                                                    "position-text-size-fallback",
+                                                                    "position-fixed-header",
+                                                                    "position-restore-exact",
+                                                                    "position-restore-late-images",
+                                                                    "position-restore-changed",
+                                                                    "position-restore-invalid",
+                                                                    "position-unimported-link"
+                                                                ],
+                                                     "sessionsOpened":  9,
+                                                     "unimportedClicks":  2,
+                                                     "restoreKinds":  [
+                                                                          "Exact",
+                                                                          "Exact",
+                                                                          "Approximate",
+                                                                          "Exact",
+                                                                          "Exact"
+                                                                      ],
+                                                     "htmlPositionOffset":  29056,
+                                                     "htmlResizeMarks":  [
+                                                                             420,
+                                                                             420,
+                                                                             420
+                                                                         ],
+                                                     "htmlTextSizeMarks":  [
+                                                                               420,
+                                                                               420,
+                                                                               420,
+                                                                               420
+                                                                           ],
+                                                     "htmlTextSizeSaves":  0,
+                                                     "htmlShiftedScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-position-light.html-place-shifted.png",
+                                                     "htmlRestoreScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-position-light.html-restore.png",
+                                                     "progressApproximateScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-position-light.progress-approximate.png",
+                                                     "progressUnavailableHtmlScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-position-light.progress-unavailable-html.png",
+                                                     "htmlUnavailableLinkScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-position-light.html-unavailable-link.png"
+                                                 },
+                         "html-position-light-sessions":  [
+                                                              {
+                                                                  "guideId":  "3559119da41f4e5c9d943449565596ba",
+                                                                  "served":  [
+                                                                                 "guide.html",
+                                                                                 "images/map.png",
+                                                                                 "images/route.png"
+                                                                             ],
+                                                                  "denied":  [
+                                                                                 {
+                                                                                     "reason":  "NotInManifest",
+                                                                                     "context":  "Other",
+                                                                                     "count":  2
+                                                                                 }
+                                                                             ],
+                                                                  "rejectedCaptures":  0,
+                                                                  "restores":  {
+
+                                                                               },
+                                                                  "entryNavigations":  1,
+                                                                  "appearance":  {
+                                                                                     "theme":  "Light",
+                                                                                     "scale":  1,
+                                                                                     "applications":  9,
+                                                                                     "failures":  0,
+                                                                                     "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                                     "bodyColor":  "rgb(0, 0, 0)",
+                                                                                     "rootZoom":  "1"
+                                                                                 }
+                                                              },
+                                                              {
+                                                                  "guideId":  "0fa5056333424383ad64d4c8c21748fe",
+                                                                  "served":  [
+                                                                                 "guide.html",
+                                                                                 "images/tile.png"
+                                                                             ],
+                                                                  "denied":  [
+                                                                                 {
+                                                                                     "reason":  "NotInManifest",
+                                                                                     "context":  "Other",
+                                                                                     "count":  2
+                                                                                 }
+                                                                             ],
+                                                                  "rejectedCaptures":  0,
+                                                                  "restores":  {
+
+                                                                               },
+                                                                  "entryNavigations":  1,
+                                                                  "appearance":  {
+                                                                                     "theme":  "Light",
+                                                                                     "scale":  1,
+                                                                                     "applications":  3,
+                                                                                     "failures":  0,
+                                                                                     "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                                     "bodyColor":  "rgb(0, 0, 0)",
+                                                                                     "rootZoom":  "1"
+                                                                                 }
+                                                              },
+                                                              {
+                                                                  "guideId":  "cffae6948aa9498b8ab4bdb79231ce8d",
+                                                                  "served":  [
+                                                                                 "guide.html"
+                                                                             ],
+                                                                  "denied":  [
+                                                                                 {
+                                                                                     "reason":  "NotInManifest",
+                                                                                     "context":  "Other",
+                                                                                     "count":  2
+                                                                                 }
+                                                                             ],
+                                                                  "rejectedCaptures":  0,
+                                                                  "restores":  {
+
+                                                                               },
+                                                                  "entryNavigations":  1,
+                                                                  "appearance":  {
+                                                                                     "theme":  "Light",
+                                                                                     "scale":  1,
+                                                                                     "applications":  3,
+                                                                                     "failures":  0,
+                                                                                     "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                                     "bodyColor":  "rgb(0, 0, 0)",
+                                                                                     "rootZoom":  "1"
+                                                                                 }
+                                                              },
+                                                              {
+                                                                  "guideId":  "3559119da41f4e5c9d943449565596ba",
+                                                                  "served":  [
+                                                                                 "guide.html",
+                                                                                 "images/map.png",
+                                                                                 "images/route.png"
+                                                                             ],
+                                                                  "denied":  [
+                                                                                 {
+                                                                                     "reason":  "NotInManifest",
+                                                                                     "context":  "Other",
+                                                                                     "count":  1
+                                                                                 }
+                                                                             ],
+                                                                  "rejectedCaptures":  0,
+                                                                  "restores":  {
+                                                                                   "Exact":  1
+                                                                               },
+                                                                  "entryNavigations":  1,
+                                                                  "appearance":  {
+                                                                                     "theme":  "Light",
+                                                                                     "scale":  1,
+                                                                                     "applications":  1,
+                                                                                     "failures":  0,
+                                                                                     "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                                     "bodyColor":  "rgb(0, 0, 0)",
+                                                                                     "rootZoom":  "1"
+                                                                                 }
+                                                              },
+                                                              {
+                                                                  "guideId":  "3559119da41f4e5c9d943449565596ba",
+                                                                  "served":  [
+                                                                                 "guide.html",
+                                                                                 "images/map.png",
+                                                                                 "images/route.png"
+                                                                             ],
+                                                                  "denied":  [
+                                                                                 {
+                                                                                     "reason":  "NotInManifest",
+                                                                                     "context":  "Other",
+                                                                                     "count":  1
+                                                                                 }
+                                                                             ],
+                                                                  "rejectedCaptures":  0,
+                                                                  "restores":  {
+                                                                                   "Exact":  1
+                                                                               },
+                                                                  "entryNavigations":  1,
+                                                                  "appearance":  {
+                                                                                     "theme":  "Light",
+                                                                                     "scale":  1,
+                                                                                     "applications":  1,
+                                                                                     "failures":  0,
+                                                                                     "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                                     "bodyColor":  "rgb(0, 0, 0)",
+                                                                                     "rootZoom":  "1"
+                                                                                 }
+                                                              },
+                                                              {
+                                                                  "guideId":  "eabaa771db694686917d93d28271be7a",
+                                                                  "served":  [
+                                                                                 "guide.html",
+                                                                                 "images/map.png",
+                                                                                 "images/route.png"
+                                                                             ],
+                                                                  "denied":  [
+                                                                                 {
+                                                                                     "reason":  "NotInManifest",
+                                                                                     "context":  "Other",
+                                                                                     "count":  1
+                                                                                 }
+                                                                             ],
+                                                                  "rejectedCaptures":  0,
+                                                                  "restores":  {
+                                                                                   "Approximate":  1
+                                                                               },
+                                                                  "entryNavigations":  1,
+                                                                  "appearance":  {
+                                                                                     "theme":  "Light",
+                                                                                     "scale":  1,
+                                                                                     "applications":  1,
+                                                                                     "failures":  0,
+                                                                                     "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                                     "bodyColor":  "rgb(0, 0, 0)",
+                                                                                     "rootZoom":  "1"
+                                                                                 }
+                                                              },
+                                                              {
+                                                                  "guideId":  "3559119da41f4e5c9d943449565596ba",
+                                                                  "served":  [
+                                                                                 "guide.html",
+                                                                                 "images/map.png",
+                                                                                 "images/route.png"
+                                                                             ],
+                                                                  "denied":  [
+                                                                                 {
+                                                                                     "reason":  "NotInManifest",
+                                                                                     "context":  "Other",
+                                                                                     "count":  1
+                                                                                 }
+                                                                             ],
+                                                                  "rejectedCaptures":  0,
+                                                                  "restores":  {
+
+                                                                               },
+                                                                  "entryNavigations":  1,
+                                                                  "appearance":  {
+                                                                                     "theme":  "Light",
+                                                                                     "scale":  1,
+                                                                                     "applications":  1,
+                                                                                     "failures":  0,
+                                                                                     "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                                     "bodyColor":  "rgb(0, 0, 0)",
+                                                                                     "rootZoom":  "1"
+                                                                                 }
+                                                              },
+                                                              {
+                                                                  "guideId":  "3559119da41f4e5c9d943449565596ba",
+                                                                  "served":  [
+                                                                                 "guide.html",
+                                                                                 "images/map.png",
+                                                                                 "images/route.png"
+                                                                             ],
+                                                                  "denied":  [
+                                                                                 {
+                                                                                     "reason":  "External",
+                                                                                     "context":  "Document",
+                                                                                     "count":  1
+                                                                                 },
+                                                                                 {
+                                                                                     "reason":  "NotInManifest",
+                                                                                     "context":  "Document",
+                                                                                     "count":  2
+                                                                                 },
+                                                                                 {
+                                                                                     "reason":  "NotInManifest",
+                                                                                     "context":  "Other",
+                                                                                     "count":  1
+                                                                                 },
+                                                                                 {
+                                                                                     "reason":  "UnimportedPage",
+                                                                                     "context":  "Navigation",
+                                                                                     "count":  2
+                                                                                 }
+                                                                             ],
+                                                                  "rejectedCaptures":  0,
+                                                                  "restores":  {
+                                                                                   "Exact":  1
+                                                                               },
+                                                                  "entryNavigations":  1,
+                                                                  "appearance":  {
+                                                                                     "theme":  "Light",
+                                                                                     "scale":  1,
+                                                                                     "applications":  1,
+                                                                                     "failures":  0,
+                                                                                     "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                                     "bodyColor":  "rgb(0, 0, 0)",
+                                                                                     "rootZoom":  "1"
+                                                                                 }
+                                                              },
+                                                              {
+                                                                  "guideId":  "3559119da41f4e5c9d943449565596ba",
+                                                                  "served":  [
+                                                                                 "guide.html",
+                                                                                 "images/map.png",
+                                                                                 "images/route.png"
+                                                                             ],
+                                                                  "denied":  [
+                                                                                 {
+                                                                                     "reason":  "NotInManifest",
+                                                                                     "context":  "Other",
+                                                                                     "count":  1
+                                                                                 }
+                                                                             ],
+                                                                  "rejectedCaptures":  0,
+                                                                  "restores":  {
+                                                                                   "Exact":  1
+                                                                               },
+                                                                  "entryNavigations":  1,
+                                                                  "appearance":  {
+                                                                                     "theme":  "Light",
+                                                                                     "scale":  1,
+                                                                                     "applications":  1,
+                                                                                     "failures":  0,
+                                                                                     "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                                     "bodyColor":  "rgb(0, 0, 0)",
+                                                                                     "rootZoom":  "1"
+                                                                                 }
+                                                              }
+                                                          ],
+                         "html-position-dark":  {
+                                                    "mode":  "html-position",
+                                                    "invocationId":  "8f3109c86eb6436d80903f6afe861e79",
+                                                    "observedAt":  "2026-10-08T04:47:24.6044397Z",
+                                                    "processId":  67024,
+                                                    "sessionId":  1,
+                                                    "exitDelayMilliseconds":  0,
+                                                    "expectedScalePercent":  0,
+                                                    "success":  true,
+                                                    "phases":  [
+                                                                   "position-fragment",
+                                                                   "position-resize",
+                                                                   "position-text-size",
+                                                                   "position-text-size-fallback",
+                                                                   "position-fixed-header",
+                                                                   "position-restore-exact",
+                                                                   "position-restore-late-images",
+                                                                   "position-restore-changed",
+                                                                   "position-restore-invalid",
+                                                                   "position-unimported-link"
+                                                               ],
+                                                    "sessionsOpened":  9,
+                                                    "unimportedClicks":  2,
+                                                    "restoreKinds":  [
+                                                                         "Exact",
+                                                                         "Exact",
+                                                                         "Approximate",
+                                                                         "Exact",
+                                                                         "Exact"
+                                                                     ],
+                                                    "htmlPositionOffset":  29056,
+                                                    "htmlResizeMarks":  [
+                                                                            420,
+                                                                            420,
+                                                                            420
+                                                                        ],
+                                                    "htmlTextSizeMarks":  [
+                                                                              420,
+                                                                              420,
+                                                                              420,
+                                                                              420
+                                                                          ],
+                                                    "htmlTextSizeSaves":  0,
+                                                    "htmlShiftedScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-position-dark.html-place-shifted.png",
+                                                    "htmlRestoreScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-position-dark.html-restore.png",
+                                                    "progressApproximateScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-position-dark.progress-approximate.png",
+                                                    "progressUnavailableHtmlScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-position-dark.progress-unavailable-html.png",
+                                                    "htmlUnavailableLinkScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-position-dark.html-unavailable-link.png"
+                                                },
+                         "html-position-dark-sessions":  [
+                                                             {
+                                                                 "guideId":  "3559119da41f4e5c9d943449565596ba",
+                                                                 "served":  [
+                                                                                "guide.html",
+                                                                                "images/map.png",
+                                                                                "images/route.png"
+                                                                            ],
+                                                                 "denied":  [
+                                                                                {
+                                                                                    "reason":  "NotInManifest",
+                                                                                    "context":  "Other",
+                                                                                    "count":  2
+                                                                                }
+                                                                            ],
+                                                                 "rejectedCaptures":  0,
+                                                                 "restores":  {
+
+                                                                              },
+                                                                 "entryNavigations":  1,
+                                                                 "appearance":  {
+                                                                                    "theme":  "Dark",
+                                                                                    "scale":  1,
+                                                                                    "applications":  9,
+                                                                                    "failures":  0,
+                                                                                    "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                                    "bodyColor":  "rgb(230, 230, 230)",
+                                                                                    "rootZoom":  "1"
+                                                                                }
+                                                             },
+                                                             {
+                                                                 "guideId":  "0fa5056333424383ad64d4c8c21748fe",
+                                                                 "served":  [
+                                                                                "guide.html",
+                                                                                "images/tile.png"
+                                                                            ],
+                                                                 "denied":  [
+                                                                                {
+                                                                                    "reason":  "NotInManifest",
+                                                                                    "context":  "Other",
+                                                                                    "count":  2
+                                                                                }
+                                                                            ],
+                                                                 "rejectedCaptures":  0,
+                                                                 "restores":  {
+
+                                                                              },
+                                                                 "entryNavigations":  1,
+                                                                 "appearance":  {
+                                                                                    "theme":  "Dark",
+                                                                                    "scale":  1,
+                                                                                    "applications":  3,
+                                                                                    "failures":  0,
+                                                                                    "bodyBackground":  "rgb(30, 30, 30)",
+                                                                                    "bodyColor":  "rgb(230, 230, 230)",
+                                                                                    "rootZoom":  "1"
+                                                                                }
+                                                             },
+                                                             {
+                                                                 "guideId":  "cffae6948aa9498b8ab4bdb79231ce8d",
+                                                                 "served":  [
+                                                                                "guide.html"
+                                                                            ],
+                                                                 "denied":  [
+                                                                                {
+                                                                                    "reason":  "NotInManifest",
+                                                                                    "context":  "Other",
+                                                                                    "count":  2
+                                                                                }
+                                                                            ],
+                                                                 "rejectedCaptures":  0,
+                                                                 "restores":  {
+
+                                                                              },
+                                                                 "entryNavigations":  1,
+                                                                 "appearance":  {
+                                                                                    "theme":  "Dark",
+                                                                                    "scale":  1,
+                                                                                    "applications":  3,
+                                                                                    "failures":  0,
+                                                                                    "bodyBackground":  "rgb(30, 30, 30)",
+                                                                                    "bodyColor":  "rgb(230, 230, 230)",
+                                                                                    "rootZoom":  "1"
+                                                                                }
+                                                             },
+                                                             {
+                                                                 "guideId":  "3559119da41f4e5c9d943449565596ba",
+                                                                 "served":  [
+                                                                                "guide.html",
+                                                                                "images/map.png",
+                                                                                "images/route.png"
+                                                                            ],
+                                                                 "denied":  [
+                                                                                {
+                                                                                    "reason":  "NotInManifest",
+                                                                                    "context":  "Other",
+                                                                                    "count":  1
+                                                                                }
+                                                                            ],
+                                                                 "rejectedCaptures":  0,
+                                                                 "restores":  {
+                                                                                  "Exact":  1
+                                                                              },
+                                                                 "entryNavigations":  1,
+                                                                 "appearance":  {
+                                                                                    "theme":  "Dark",
+                                                                                    "scale":  1,
+                                                                                    "applications":  1,
+                                                                                    "failures":  0,
+                                                                                    "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                                    "bodyColor":  "rgb(230, 230, 230)",
+                                                                                    "rootZoom":  "1"
+                                                                                }
+                                                             },
+                                                             {
+                                                                 "guideId":  "3559119da41f4e5c9d943449565596ba",
+                                                                 "served":  [
+                                                                                "guide.html",
+                                                                                "images/map.png",
+                                                                                "images/route.png"
+                                                                            ],
+                                                                 "denied":  [
+                                                                                {
+                                                                                    "reason":  "NotInManifest",
+                                                                                    "context":  "Other",
+                                                                                    "count":  1
+                                                                                }
+                                                                            ],
+                                                                 "rejectedCaptures":  0,
+                                                                 "restores":  {
+                                                                                  "Exact":  1
+                                                                              },
+                                                                 "entryNavigations":  1,
+                                                                 "appearance":  {
+                                                                                    "theme":  "Dark",
+                                                                                    "scale":  1,
+                                                                                    "applications":  1,
+                                                                                    "failures":  0,
+                                                                                    "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                                    "bodyColor":  "rgb(230, 230, 230)",
+                                                                                    "rootZoom":  "1"
+                                                                                }
+                                                             },
+                                                             {
+                                                                 "guideId":  "eabaa771db694686917d93d28271be7a",
+                                                                 "served":  [
+                                                                                "guide.html",
+                                                                                "images/map.png",
+                                                                                "images/route.png"
+                                                                            ],
+                                                                 "denied":  [
+                                                                                {
+                                                                                    "reason":  "NotInManifest",
+                                                                                    "context":  "Other",
+                                                                                    "count":  1
+                                                                                }
+                                                                            ],
+                                                                 "rejectedCaptures":  0,
+                                                                 "restores":  {
+                                                                                  "Approximate":  1
+                                                                              },
+                                                                 "entryNavigations":  1,
+                                                                 "appearance":  {
+                                                                                    "theme":  "Dark",
+                                                                                    "scale":  1,
+                                                                                    "applications":  1,
+                                                                                    "failures":  0,
+                                                                                    "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                                    "bodyColor":  "rgb(230, 230, 230)",
+                                                                                    "rootZoom":  "1"
+                                                                                }
+                                                             },
+                                                             {
+                                                                 "guideId":  "3559119da41f4e5c9d943449565596ba",
+                                                                 "served":  [
+                                                                                "guide.html",
+                                                                                "images/map.png",
+                                                                                "images/route.png"
+                                                                            ],
+                                                                 "denied":  [
+                                                                                {
+                                                                                    "reason":  "NotInManifest",
+                                                                                    "context":  "Other",
+                                                                                    "count":  1
+                                                                                }
+                                                                            ],
+                                                                 "rejectedCaptures":  0,
+                                                                 "restores":  {
+
+                                                                              },
+                                                                 "entryNavigations":  1,
+                                                                 "appearance":  {
+                                                                                    "theme":  "Dark",
+                                                                                    "scale":  1,
+                                                                                    "applications":  1,
+                                                                                    "failures":  0,
+                                                                                    "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                                    "bodyColor":  "rgb(230, 230, 230)",
+                                                                                    "rootZoom":  "1"
+                                                                                }
+                                                             },
+                                                             {
+                                                                 "guideId":  "3559119da41f4e5c9d943449565596ba",
+                                                                 "served":  [
+                                                                                "guide.html",
+                                                                                "images/map.png",
+                                                                                "images/route.png"
+                                                                            ],
+                                                                 "denied":  [
+                                                                                {
+                                                                                    "reason":  "External",
+                                                                                    "context":  "Document",
+                                                                                    "count":  1
+                                                                                },
+                                                                                {
+                                                                                    "reason":  "NotInManifest",
+                                                                                    "context":  "Document",
+                                                                                    "count":  2
+                                                                                },
+                                                                                {
+                                                                                    "reason":  "NotInManifest",
+                                                                                    "context":  "Other",
+                                                                                    "count":  1
+                                                                                },
+                                                                                {
+                                                                                    "reason":  "UnimportedPage",
+                                                                                    "context":  "Navigation",
+                                                                                    "count":  2
+                                                                                }
+                                                                            ],
+                                                                 "rejectedCaptures":  0,
+                                                                 "restores":  {
+                                                                                  "Exact":  1
+                                                                              },
+                                                                 "entryNavigations":  1,
+                                                                 "appearance":  {
+                                                                                    "theme":  "Dark",
+                                                                                    "scale":  1,
+                                                                                    "applications":  1,
+                                                                                    "failures":  0,
+                                                                                    "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                                    "bodyColor":  "rgb(230, 230, 230)",
+                                                                                    "rootZoom":  "1"
+                                                                                }
+                                                             },
+                                                             {
+                                                                 "guideId":  "3559119da41f4e5c9d943449565596ba",
+                                                                 "served":  [
+                                                                                "guide.html",
+                                                                                "images/map.png",
+                                                                                "images/route.png"
+                                                                            ],
+                                                                 "denied":  [
+                                                                                {
+                                                                                    "reason":  "NotInManifest",
+                                                                                    "context":  "Other",
+                                                                                    "count":  1
+                                                                                }
+                                                                            ],
+                                                                 "rejectedCaptures":  0,
+                                                                 "restores":  {
+                                                                                  "Exact":  1
+                                                                              },
+                                                                 "entryNavigations":  1,
+                                                                 "appearance":  {
+                                                                                    "theme":  "Dark",
+                                                                                    "scale":  1,
+                                                                                    "applications":  1,
+                                                                                    "failures":  0,
+                                                                                    "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                                    "bodyColor":  "rgb(230, 230, 230)",
+                                                                                    "rootZoom":  "1"
+                                                                                }
+                                                             }
+                                                         ]
+                     },
+    "htmlTheme":  {
+                      "guide":  "7bc153315ca94da8bb524566597abbfc",
+                      "html-theme-open":  {
+                                              "mode":  "html-theme-open",
+                                              "invocationId":  "79fdc8e687f44ba8a4baec7cebfdd5f7",
+                                              "observedAt":  "2026-10-08T04:48:27.9819013Z",
+                                              "processId":  56588,
+                                              "sessionId":  1,
+                                              "exitDelayMilliseconds":  0,
+                                              "expectedScalePercent":  0,
+                                              "success":  true,
+                                              "phases":  [
+                                                             "html-theme-open"
+                                                         ],
+                                              "htmlAppearance":  "theme=Dark applications=1 failures=0 background=rgb(30, 30, 30) color=rgb(230, 230, 230) zoom=1.5 opacity=1",
+                                              "htmlThemeScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-theme-open.html-theme-dark-1.5.png",
+                                              "remoteConnections":  0
+                                          },
+                      "html-theme-open-session":  {
+                                                      "guideId":  "7bc153315ca94da8bb524566597abbfc",
+                                                      "served":  [
+                                                                     "guide.html",
+                                                                     "images/route.png",
+                                                                     "style.css"
+                                                                 ],
+                                                      "denied":  [
+                                                                     {
+                                                                         "reason":  "NotInManifest",
+                                                                         "context":  "Other",
+                                                                         "count":  1
+                                                                     }
+                                                                 ],
+                                                      "rejectedCaptures":  0,
+                                                      "restores":  {
+
+                                                                   },
+                                                      "entryNavigations":  1,
+                                                      "appearance":  {
+                                                                         "theme":  "Dark",
+                                                                         "scale":  1.5,
+                                                                         "applications":  1,
+                                                                         "failures":  0,
+                                                                         "bodyBackground":  "rgb(30, 30, 30)",
+                                                                         "bodyColor":  "rgb(230, 230, 230)",
+                                                                         "rootZoom":  "1.5"
+                                                                     }
+                                                  },
+                      "html-theme-light":  {
+                                               "mode":  "html-theme-light",
+                                               "invocationId":  "0f5be7e45c684e24bb794a479e311a92",
+                                               "observedAt":  "2026-10-08T04:48:36.3968535Z",
+                                               "processId":  4856,
+                                               "sessionId":  1,
+                                               "exitDelayMilliseconds":  0,
+                                               "expectedScalePercent":  0,
+                                               "success":  true,
+                                               "phases":  [
+                                                              "html-theme-light"
+                                                          ],
+                                               "htmlAppearance":  "theme=Light applications=1 failures=0 background=rgb(255, 255, 255) color=rgb(34, 34, 34) zoom=1 opacity=1",
+                                               "htmlThemeScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-theme-light.html-theme-light.png",
+                                               "remoteConnections":  0
+                                           },
+                      "html-theme-light-session":  {
+                                                       "guideId":  "7bc153315ca94da8bb524566597abbfc",
+                                                       "served":  [
+                                                                      "guide.html",
+                                                                      "images/route.png",
+                                                                      "style.css"
+                                                                  ],
+                                                       "denied":  [
+                                                                      {
+                                                                          "reason":  "NotInManifest",
+                                                                          "context":  "Other",
+                                                                          "count":  1
+                                                                      }
+                                                                  ],
+                                                       "rejectedCaptures":  0,
+                                                       "restores":  {
+
+                                                                    },
+                                                       "entryNavigations":  1,
+                                                       "appearance":  {
+                                                                          "theme":  "Light",
+                                                                          "scale":  1,
+                                                                          "applications":  1,
+                                                                          "failures":  0,
+                                                                          "bodyBackground":  "rgb(255, 255, 255)",
+                                                                          "bodyColor":  "rgb(34, 34, 34)",
+                                                                          "rootZoom":  "1"
+                                                                      }
+                                                   },
+                      "html-theme-switch":  {
+                                                "mode":  "html-theme-switch",
+                                                "invocationId":  "3c42ef41eee1420ba95350a963472985",
+                                                "observedAt":  "2026-10-08T04:48:44.3247103Z",
+                                                "processId":  60664,
+                                                "sessionId":  1,
+                                                "exitDelayMilliseconds":  0,
+                                                "expectedScalePercent":  0,
+                                                "success":  true,
+                                                "phases":  [
+                                                               "html-theme-switch"
+                                                           ],
+                                                "htmlAppearanceBefore":  "theme=Light applications=1 failures=0 background=rgb(255, 255, 255) color=rgb(34, 34, 34) zoom=1 opacity=1",
+                                                "htmlThemeLightScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-theme-switch.html-theme-system-light.png",
+                                                "themeBroadcast":  true,
+                                                "htmlAppearanceAfter":  "theme=Dark applications=2 failures=0 background=rgb(30, 30, 30) color=rgb(230, 230, 230) zoom=1 opacity=1",
+                                                "htmlThemeDarkScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-html-rest\\html-theme-switch.html-theme-system-dark.png",
+                                                "remoteConnections":  0
+                                            },
+                      "html-theme-switch-session":  {
+                                                        "guideId":  "7bc153315ca94da8bb524566597abbfc",
+                                                        "served":  [
+                                                                       "guide.html",
+                                                                       "images/route.png",
+                                                                       "style.css"
+                                                                   ],
+                                                        "denied":  [
+                                                                       {
+                                                                           "reason":  "NotInManifest",
+                                                                           "context":  "Other",
+                                                                           "count":  1
+                                                                       }
+                                                                   ],
+                                                        "rejectedCaptures":  0,
+                                                        "restores":  {
+
+                                                                     },
+                                                        "entryNavigations":  1,
+                                                        "appearance":  {
+                                                                           "theme":  "Dark",
+                                                                           "scale":  1,
+                                                                           "applications":  2,
+                                                                           "failures":  0,
+                                                                           "bodyBackground":  "rgb(30, 30, 30)",
+                                                                           "bodyColor":  "rgb(230, 230, 230)",
+                                                                           "rootZoom":  "1"
+                                                                       }
+                                                    }
+                  },
+    "portableDataStillPresent":  false
+}

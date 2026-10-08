@@ -1,0 +1,242 @@
+{
+    "runId":  "320edca46db6433cb78b99b9e7f816ee",
+    "observedAt":  "2026-10-08T04:43:21.4128533Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "AMD64",
+    "mode":  "portable",
+    "scenarioScope":  "pdf",
+    "scenarioGroupsRun":  [
+                              "pdf"
+                          ],
+    "success":  true,
+    "windowsAppRuntime":  [
+                              "2.2.0.0",
+                              "2.3.1.0",
+                              "2.4.0.0",
+                              "2.5.1.0"
+                          ],
+    "dotnetSdk":  "10.0.401",
+    "portableExecutable":  "E:\\work\\desktop-guides\\portable-80d2647\\verify\\DesktopGuides.Production.exe",
+    "portableExecutableSha256":  "1016FDC1BF52360A44A276F21776AE6132B549358A60AF42AD35A234FFDE086E",
+    "pdfReader":  {
+                      "pdfLong":  "4939d2f00fcb486fbc7816c91a81adfc",
+                      "pdfLocked":  "a77bc9e73a1e4d57b0aab57d0e1c5027",
+                      "passFilter":  [
+                                         "pdf-reader*",
+                                         "pdf-zoom*",
+                                         "pdf-jump*",
+                                         "pdf-locked*"
+                                     ],
+                      "passesRun":  [
+                                        "pdf-reader-light",
+                                        "pdf-zoom-light",
+                                        "pdf-jump-light",
+                                        "pdf-locked-light",
+                                        "pdf-reader-dark",
+                                        "pdf-zoom-dark",
+                                        "pdf-jump-dark",
+                                        "pdf-locked-dark"
+                                    ],
+                      "pdf-reader-light":  {
+                                               "mode":  "pdf-reader",
+                                               "invocationId":  "8d679f4996f7410aa615fd6501132fd8",
+                                               "observedAt":  "2026-10-08T04:43:26.1114295Z",
+                                               "processId":  46852,
+                                               "sessionId":  1,
+                                               "exitDelayMilliseconds":  0,
+                                               "expectedScalePercent":  0,
+                                               "success":  true,
+                                               "phases":  [
+                                                              "pdf-access",
+                                                              "pdf-scan",
+                                                              "pdf-long",
+                                                              "pdf-resize",
+                                                              "pdf-damaged",
+                                                              "pdf-missing",
+                                                              "pdf-txt"
+                                                          ],
+                                               "pdfReaderScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-pdf-rest\\pdf-reader-light.pdf-reader.png",
+                                               "pdfReaderNarrowScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-pdf-rest\\pdf-reader-light.pdf-reader-narrow.png",
+                                               "pdfPosition":  {
+                                                                   "set":  0.20000000000000004,
+                                                                   "narrow":  0.19999999999999998,
+                                                                   "medium":  0.20000000000000004,
+                                                                   "wide":  0.20000000000000004,
+                                                                   "nextPage":  0
+                                                               },
+                                               "pdfResizeScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-pdf-rest\\pdf-reader-light.pdf-resize.png",
+                                               "pdfErrorScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-pdf-rest\\pdf-reader-light.pdf-error.png"
+                                           },
+                      "pdf-reader-light-diagnostics":  {
+                                                           "requests":  728,
+                                                           "loads":  238,
+                                                           "staleResults":  24,
+                                                           "peakCacheBytes":  100401664,
+                                                           "maxCacheBytes":  100663296,
+                                                           "cachedPagesAtClose":  49,
+                                                           "peakTextPages":  8,
+                                                           "peakTextCharacters":  280,
+                                                           "disposedCleanly":  true,
+                                                           "evictions":  177,
+                                                           "abandonedExtraction":  false
+                                                       },
+                      "pdf-zoom-light":  {
+                                             "mode":  "pdf-zoom",
+                                             "invocationId":  "d34ade5112ad4653b5a74b1c76de584b",
+                                             "observedAt":  "2026-10-08T04:43:52.3039089Z",
+                                             "processId":  9416,
+                                             "sessionId":  1,
+                                             "exitDelayMilliseconds":  0,
+                                             "expectedScalePercent":  0,
+                                             "success":  true,
+                                             "phases":  [
+                                                            "pdf-zoom"
+                                                        ],
+                                             "pdfZoom":  {
+                                                             "set":  0.20000000000000004,
+                                                             "100%":  0.19999999999999996,
+                                                             "125%":  0.20000000000000004,
+                                                             "fit":  0.20000000000000004,
+                                                             "horizontalViewSize":  {
+                                                                                        "page121":  39.7671568627451,
+                                                                                        "page122":  30.729166666666668
+                                                                                    }
+                                                         },
+                                             "pdfZoomScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-pdf-rest\\pdf-zoom-light.pdf-zoom.png"
+                                         },
+                      "pdf-jump-light":  {
+                                             "mode":  "pdf-jump",
+                                             "invocationId":  "402dc62e730d4ac0829463b273834f25",
+                                             "observedAt":  "2026-10-08T04:44:07.0550873Z",
+                                             "processId":  24052,
+                                             "sessionId":  1,
+                                             "exitDelayMilliseconds":  0,
+                                             "expectedScalePercent":  0,
+                                             "success":  true,
+                                             "phases":  [
+                                                            "pdf-jump"
+                                                        ],
+                                             "pdfJumpScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-pdf-rest\\pdf-jump-light.pdf-jump.png"
+                                         },
+                      "pdf-locked-light":  {
+                                               "mode":  "pdf-locked",
+                                               "invocationId":  "d266b0a3c2454bf084cc82fdeb63e1ad",
+                                               "observedAt":  "2026-10-08T04:44:15.0236268Z",
+                                               "processId":  23028,
+                                               "sessionId":  1,
+                                               "exitDelayMilliseconds":  0,
+                                               "expectedScalePercent":  0,
+                                               "success":  true,
+                                               "phases":  [
+                                                              "pdf-locked",
+                                                              "pdf-locked-reopen"
+                                                          ],
+                                               "pdfLockedScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-pdf-rest\\pdf-locked-light.pdf-locked.png",
+                                               "pdfLockedWrongScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-pdf-rest\\pdf-locked-light.pdf-locked-wrong.png"
+                                           },
+                      "pdf-reader-dark":  {
+                                              "mode":  "pdf-reader",
+                                              "invocationId":  "ca215178b5fe49be88e96be8ac9f40ed",
+                                              "observedAt":  "2026-10-08T04:44:23.3443729Z",
+                                              "processId":  13272,
+                                              "sessionId":  1,
+                                              "exitDelayMilliseconds":  0,
+                                              "expectedScalePercent":  0,
+                                              "success":  true,
+                                              "phases":  [
+                                                             "pdf-access",
+                                                             "pdf-scan",
+                                                             "pdf-long",
+                                                             "pdf-resize",
+                                                             "pdf-damaged",
+                                                             "pdf-missing",
+                                                             "pdf-txt"
+                                                         ],
+                                              "pdfReaderScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-pdf-rest\\pdf-reader-dark.pdf-reader.png",
+                                              "pdfReaderNarrowScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-pdf-rest\\pdf-reader-dark.pdf-reader-narrow.png",
+                                              "pdfPosition":  {
+                                                                  "set":  0.20000000000000004,
+                                                                  "narrow":  0.19999999999999998,
+                                                                  "medium":  0.20000000000000004,
+                                                                  "wide":  0.20000000000000004,
+                                                                  "nextPage":  0
+                                                              },
+                                              "pdfResizeScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-pdf-rest\\pdf-reader-dark.pdf-resize.png",
+                                              "pdfErrorScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-pdf-rest\\pdf-reader-dark.pdf-error.png"
+                                          },
+                      "pdf-reader-dark-diagnostics":  {
+                                                          "requests":  728,
+                                                          "loads":  237,
+                                                          "staleResults":  24,
+                                                          "peakCacheBytes":  100401664,
+                                                          "maxCacheBytes":  100663296,
+                                                          "cachedPagesAtClose":  49,
+                                                          "peakTextPages":  8,
+                                                          "peakTextCharacters":  280,
+                                                          "disposedCleanly":  true,
+                                                          "evictions":  177,
+                                                          "abandonedExtraction":  false
+                                                      },
+                      "pdf-zoom-dark":  {
+                                            "mode":  "pdf-zoom",
+                                            "invocationId":  "c6efd9abc1144776a67d63f863913407",
+                                            "observedAt":  "2026-10-08T04:44:49.2501000Z",
+                                            "processId":  53064,
+                                            "sessionId":  1,
+                                            "exitDelayMilliseconds":  0,
+                                            "expectedScalePercent":  0,
+                                            "success":  true,
+                                            "phases":  [
+                                                           "pdf-zoom"
+                                                       ],
+                                            "pdfZoom":  {
+                                                            "set":  0.20000000000000004,
+                                                            "100%":  0.19999999999999996,
+                                                            "125%":  0.20000000000000004,
+                                                            "fit":  0.20000000000000004,
+                                                            "horizontalViewSize":  {
+                                                                                       "page121":  39.7671568627451,
+                                                                                       "page122":  30.729166666666668
+                                                                                   }
+                                                        },
+                                            "pdfZoomScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-pdf-rest\\pdf-zoom-dark.pdf-zoom.png"
+                                        },
+                      "pdf-jump-dark":  {
+                                            "mode":  "pdf-jump",
+                                            "invocationId":  "f2027bae65074ff0a24f9d91f099d565",
+                                            "observedAt":  "2026-10-08T04:45:03.1203235Z",
+                                            "processId":  60984,
+                                            "sessionId":  1,
+                                            "exitDelayMilliseconds":  0,
+                                            "expectedScalePercent":  0,
+                                            "success":  true,
+                                            "phases":  [
+                                                           "pdf-jump"
+                                                       ],
+                                            "pdfJumpScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-pdf-rest\\pdf-jump-dark.pdf-jump.png"
+                                        },
+                      "pdf-locked-dark":  {
+                                              "mode":  "pdf-locked",
+                                              "invocationId":  "35aab5fd8c1648799c0b16612710b5ae",
+                                              "observedAt":  "2026-10-08T04:45:11.1849148Z",
+                                              "processId":  56880,
+                                              "sessionId":  1,
+                                              "exitDelayMilliseconds":  0,
+                                              "expectedScalePercent":  0,
+                                              "success":  true,
+                                              "phases":  [
+                                                             "pdf-locked",
+                                                             "pdf-locked-reopen"
+                                                         ],
+                                              "pdfLockedScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-pdf-rest\\pdf-locked-dark.pdf-locked.png",
+                                              "pdfLockedWrongScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-pdf-rest\\pdf-locked-dark.pdf-locked-wrong.png"
+                                          },
+                      "passwordScanUnreadable":  [
+
+                                                 ]
+                  },
+    "launchedProcessId":  56880,
+    "launchedSessionId":  1,
+    "closedGracefully":  true,
+    "portableDataStillPresent":  false
+}

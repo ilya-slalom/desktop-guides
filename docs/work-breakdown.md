@@ -4,7 +4,7 @@ Status: P0 merged in [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/
 on 25 September 2026. The clean-VM prerequisite gate and Windows 10 check
 remain deferred. P1 is designed in the [technical design](p1-technical-design.md)
 and [implementation plan](p1/implementation-plan.md); on 8 October 2026, 43 of
-its 54 tasks are merged, and the plan records each one. Source:
+its 55 tasks are merged, and the plan records each one. Source:
 [initial requirements and high-level design](initial-design.md). The backlog
 defines the acceptance gates; [Windows results](p0/results.md) record
 which checks have been performed. Windows 10 is deferred; native ARM64 CI
@@ -539,12 +539,23 @@ machine. Missing WebView2 Runtime produces an actionable setup message.
   tested matrix and PDF limitations. Follow the
   [installed E2E procedure](p1/e2e-testing.md). Signed-MSIX runs do not
   cover the portable build; its release gates (first run without
-  installation, data location, and replacing the folder with a newer build)
-  are defined separately later.
+  installation, data location, and replacing the executable with a newer
+  build) are defined separately later.
+- **T17.4** Run a distribution size pass on the final feature set, before the
+  T17.3 candidate runs. Exclude the Windows App SDK components the app doesn't
+  use (AI, ML, Search, Widgets, DWrite) from both builds. Make the portable
+  build trim-safe (C#/WinRT `partial` types and generic-interface code,
+  source-generated JSON), then publish it trimmed and compressed. A spike on
+  8 October 2026 measured the portable exe at 244 MB, 182 MB without the unused
+  components, and 94 MB trimmed (42 MB compressed); see
+  [P1 results](p1/results.md#portable-size-spike--8-october-2026).
 - **TR17.1** The final app needs no network access to display an imported TXT,
   HTML, or PDF guide after prerequisites are installed.
 - **TR17.2** No OS or architecture is advertised without a recorded install and
   reader smoke result.
+- **TR17.3** The size-reduced MSIX and portable builds pass the same scenario
+  groups as before the size pass, and CI fails on a new trim or C#/WinRT
+  warning in the portable build.
 
 ### S20 — Export and restore a local backup
 

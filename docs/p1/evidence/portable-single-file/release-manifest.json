@@ -1,0 +1,19 @@
+{
+    "name":  "DesktopGuides-portable-x64-80d2647.zip",
+    "commit":  "80d2647102d36a86144423136c4c83bce2e8e44b",
+    "architecture":  "x64",
+    "kind":  "portable single-file exe: Windows App SDK and .NET bundled, no package identity",
+    "executable":  "DesktopGuides.Production.exe",
+    "executableBytes":  244004113,
+    "executableSha256":  "1016FDC1BF52360A44A276F21776AE6132B549358A60AF42AD35A234FFDE086E",
+    "executableFileVersion":  "1.0.0.0",
+    "dataFolder":  "%LOCALAPPDATA%\\DesktopGuides",
+    "extractionFolder":  "%TEMP%\\.net\\DesktopGuides.Production",
+    "notBundled":  "WebView2 Runtime (HTML guides)",
+    "dotnetSdk":  "10.0.401",
+    "windowsAppSdk":  "2.5.1",
+    "zipBytes":  92034870,
+    "sha256":  "F9FABCAF46DD752CBC08CA3E2E1413452EC82D9EAF1002D2894A3D83AF55E14C",
+    "builtOn":  "VEGA",
+    "builtAt":  "2026-10-08T04:19:52.4232684Z"
+}
