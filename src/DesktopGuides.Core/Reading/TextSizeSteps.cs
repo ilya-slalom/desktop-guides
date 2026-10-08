@@ -61,10 +61,13 @@ public static class TextSizeSteps
 
     public static string Status(double scale) => $"Text size {Label(scale)}.";
 
+    // T14.4: the reading card's notice when a size step came back by fraction.
+    public const string ShiftedNotice = "Your place may have shifted.";
+
     // T14.3: an HTML page that came back only by fraction.
     public static string ShiftedStatus(double scale) =>
-        $"Text size {Label(scale)}. Your place may have shifted.";
+        $"Text size {Label(scale)}. {ShiftedNotice}";
 
     public static string SaveFailed(string message) =>
-        $"Could not save the text size: {message}";
+        $"Couldn't save the text size: {message}";
 }

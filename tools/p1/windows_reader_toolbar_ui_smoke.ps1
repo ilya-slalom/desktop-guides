@@ -201,6 +201,23 @@ try {
         Wait-Action $expectedAction
     }
 
+    # T14.4: at 180 px every primary command overflows, so the open menu is
+    # taller than the test window and clips its last rows. The moved command
+    # is still the menu's own: bring it into view when it can, then invoke it.
+    function Invoke-OverflowItem([string] $id, [string] $expectedAction) {
+        $item = Find-ById $id
+        if (-not $item) { throw "The overflow menu has no '$id'." }
+        $report.overflowItemClipped = $item.Current.IsOffscreen
+        $scrollItem = $null
+        if ($item.Current.IsOffscreen -and $item.TryGetCurrentPattern(
+                [System.Windows.Automation.ScrollItemPattern]::Pattern, [ref]$scrollItem)) {
+            $scrollItem.ScrollIntoView()
+            Start-Sleep -Milliseconds 200
+        }
+        $item.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+        Wait-Action $expectedAction
+    }
+
     function Find-More {
         foreach ($name in @('More', 'More options', 'More commands',
                 'Show more', 'See more')) {
@@ -438,9 +455,33 @@ try {
     if (-not $more -or $zoom) {
         throw 'Narrow CommandBar did not move Zoom in to overflow.'
     }
+    # T14.4: Go to start leaves before size and zoom (DynamicOverflowOrder).
+    if (Find-VisibleByName 'Go to start') {
+        throw 'Narrow CommandBar kept Go to start while Zoom in overflowed.'
+    }
     Open-Overflow
-    Invoke-Command 'Zoom in' 'Zoom 1.1'
+    Invoke-OverflowItem 'ZoomIn' 'Zoom 1.1'
     $report.phases += 'narrow-primary-command-overflow'
+
+    # T14.4: where the Previous and Next group fits, page movement is what
+    # stays; at 180 px even that group overflows.
+    Invoke-Id 'MediumToolbar'
+    $deadline = (Get-Date).AddSeconds(15)
+    do {
+        $previous = Find-VisibleByName 'Previous page'
+        $next = Find-VisibleByName 'Next page'
+        $start = Find-VisibleByName 'Go to start'
+        $zoom = Find-VisibleByName 'Zoom in'
+        if ($previous -and $next -and -not $start -and -not $zoom) { break }
+        Start-Sleep -Milliseconds 200
+    } while ((Get-Date) -lt $deadline)
+    if (-not $previous -or -not $next) {
+        throw 'A medium CommandBar moved Previous or Next page to overflow.'
+    }
+    if ($start -or $zoom) {
+        throw 'A medium CommandBar kept Go to start or Zoom in while page movement fit.'
+    }
+    $report.phases += 'medium-toolbar-keeps-page-movement'
 
     Invoke-Id 'NoControls'
     Wait-ToolbarVisibility $false

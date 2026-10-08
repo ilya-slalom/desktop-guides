@@ -14,11 +14,10 @@
         </Grid.RowDefinitions>
         <TextBlock x:Name="PageStatus"
                    Grid.ColumnSpan="2"
-                   Margin="0,0,0,12"
+                   Margin="{StaticResource DesktopGuidesReaderGapBelow}"
                    AutomationProperties.AutomationId="PdfPageStatus"
                    AutomationProperties.LiveSetting="Polite"
-                   Style="{StaticResource DesktopGuidesBodyStyle}"
-                   Foreground="{ThemeResource DesktopGuidesPrimaryTextBrush}" />
+                   Style="{StaticResource DesktopGuidesBodyStyle}" />
         <Grid x:Name="PreviewPane" Grid.Row="1">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -26,11 +25,10 @@
             </Grid.RowDefinitions>
             <TextBlock x:Name="PreviewStatus"
                        Visibility="Collapsed"
-                       Margin="0,0,0,12"
+                       Margin="{StaticResource DesktopGuidesReaderGapBelow}"
                        TextWrapping="Wrap"
                        AutomationProperties.AutomationId="PdfPreviewStatus"
-                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
-                       Foreground="{ThemeResource DesktopGuidesSecondaryTextBrush}" />
+                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}" />
             <ScrollViewer x:Name="PreviewScroller"
                           Grid.Row="1"
                           AutomationProperties.AutomationId="PdfPreviewScroller"
@@ -43,18 +41,17 @@
                        VerticalAlignment="Top" />
             </ScrollViewer>
         </Grid>
-        <Grid x:Name="TextPane" Grid.Row="1" Grid.Column="1" Margin="16,0,0,0">
+        <Grid x:Name="TextPane" Grid.Row="1" Grid.Column="1" Margin="{StaticResource DesktopGuidesPdfTextPaneMargin}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
             <TextBlock x:Name="TextStatus"
                        Visibility="Collapsed"
-                       Margin="0,0,0,12"
+                       Margin="{StaticResource DesktopGuidesReaderGapBelow}"
                        TextWrapping="Wrap"
                        AutomationProperties.AutomationId="PdfTextStatus"
-                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
-                       Foreground="{ThemeResource DesktopGuidesSecondaryTextBrush}" />
+                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}" />
             <TextBox x:Name="DocumentText"
                      Grid.Row="1"
                      IsReadOnly="True"

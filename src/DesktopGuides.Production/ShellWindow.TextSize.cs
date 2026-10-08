@@ -66,7 +66,7 @@ public sealed partial class ShellWindow
                 committedTextScale = scale;
                 if (scale == readerTextScale)
                 {
-                    ShowTransientStatus(shiftedTextScale == scale
+                    AnnounceStatus(shiftedTextScale == scale
                         ? TextSizeSteps.ShiftedStatus(scale)
                         : TextSizeSteps.Status(scale));
                 }
@@ -87,8 +87,8 @@ public sealed partial class ShellWindow
         }
     }
 
-    // T14.3: an HTML page that came back only by fraction says so. The
-    // notice never covers a warning or an error, such as a failed save.
+    // T14.3: an HTML page that came back only by fraction says so, in the
+    // reading card (T14.4).
     private void OnAppearanceRestored(object? sender, AppearanceRestoredEventArgs args)
     {
         if (!ReferenceEquals(sender, readerSession)) return;
@@ -98,15 +98,9 @@ public sealed partial class ShellWindow
             return;
         }
         shiftedTextScale = readerTextScale;
-        if (!StatusShowsProblem())
-        {
-            ShowTransientStatus(TextSizeSteps.ShiftedStatus(readerTextScale));
-        }
+        ShowReaderNotice(TextSizeSteps.ShiftedNotice);
+        AnnounceStatus(TextSizeSteps.ShiftedStatus(readerTextScale));
     }
-
-    private bool StatusShowsProblem() =>
-        ShellStatusInfoBar.IsOpen &&
-        ShellStatusInfoBar.Severity is InfoBarSeverity.Warning or InfoBarSeverity.Error;
 
     private async Task RevertTextSizeAsync(IReaderSession session)
     {

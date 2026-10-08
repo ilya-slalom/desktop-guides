@@ -134,7 +134,7 @@ internal static class Program
             Thread.Sleep(50);
         }
         throw new TimeoutException(
-            "Could not activate or take over the application window.");
+            "Couldn't activate or take over the application window.");
     }
 
     private static string ClosingSignalName(int processId) =>

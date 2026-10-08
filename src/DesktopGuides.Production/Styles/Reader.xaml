@@ -1,0 +1,20 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- T14.4: the Reader's commands sit on the page, from the left. -->
+    <Style x:Key="DesktopGuidesReaderCommandBarStyle" TargetType="CommandBar">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="IsDynamicOverflowEnabled" Value="True" />
+        <!-- No label strip under compact icons, so the size label centers on them. -->
+        <Setter Property="DefaultLabelPosition" Value="Collapsed" />
+    </Style>
+
+    <x:Double x:Key="DesktopGuidesTextSizeValueMinWidth">44</x:Double>
+
+    <!-- Collapsed elements take no margin, so a closed notice leaves no gap. -->
+    <Thickness x:Key="DesktopGuidesReaderNoticeMargin">0,0,0,12</Thickness>
+    <Thickness x:Key="DesktopGuidesReaderGapAbove">0,12,0,0</Thickness>
+    <Thickness x:Key="DesktopGuidesReaderGapBelow">0,0,0,12</Thickness>
+    <Thickness x:Key="DesktopGuidesPdfTextPaneMargin">16,0,0,0</Thickness>
+</ResourceDictionary>

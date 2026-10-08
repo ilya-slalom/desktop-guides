@@ -15,7 +15,7 @@ public sealed partial class ShellWindow
     // Returns false when a newer render took over, like the TXT path.
     private async Task<bool> OpenHtmlGuideAsync(Guide guide, int generation)
     {
-        ShowReaderSurface(placeholder: false);
+        ShowReaderSurface(loading: true);
         readerLoad = new CancellationTokenSource();
         CancellationToken token = readerLoad.Token;
         HtmlGuideLoad load;
@@ -50,7 +50,7 @@ public sealed partial class ShellWindow
         session.UnavailableLinkRequested += OnUnavailableLinkRequested;
         session.Failed += OnReaderSessionFailed;
         session.AppearanceRestored += OnAppearanceRestored;
-        ShowReaderSurface(placeholder: false, view: session.View);
+        ShowReaderSurface(loading: false, view: session.View);
         try
         {
             await session.OpenAsync(
@@ -68,7 +68,7 @@ public sealed partial class ShellWindow
                 return false;
             }
             readerSession = null;
-            ShowReaderSurface(placeholder: false);
+            ShowReaderSurface(loading: false);
             await session.DisposeAsync();
             ShowHtmlLoadError(error.Error);
             return true;
@@ -87,7 +87,7 @@ public sealed partial class ShellWindow
     private void ShowHtmlLoadError(HtmlGuideLoadError error)
     {
         string message = HtmlGuideLoadMessages.For(error);
-        ShowReaderSurface(placeholder: false, error: message, action: HtmlGuideLoadMessages.ActionFor(error));
+        ShowReaderSurface(loading: false, error: message, action: HtmlGuideLoadMessages.ActionFor(error));
         ShowWarningStatus(message);
     }
 
@@ -108,7 +108,7 @@ public sealed partial class ShellWindow
             ReaderActions.SetSession(null);
             HideExternalLinkBar();
             HideUnavailableLinkBar();
-            ShowReaderSurface(placeholder: false);
+            ShowReaderSurface(loading: false);
             await failed.DisposeAsync();
             ShowHtmlLoadError(error);
         });

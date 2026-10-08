@@ -15,7 +15,8 @@ public readonly record struct PdfPreviewLayout(double Offset, double ImageHeight
 // the page to scroll; a new page never moves keyboard focus.
 public sealed partial class PdfReaderView : UserControl
 {
-    private const double NarrowWidth = 720;
+    private static double NarrowWidth =>
+        (double)Application.Current.Resources["DesktopGuidesPdfSplitBreakpoint"];
     private bool? narrow;
 
     public PdfReaderView()
@@ -64,7 +65,7 @@ public sealed partial class PdfReaderView : UserControl
         SetStatus(TextStatus, text switch
         {
             null => "This page's text couldn't be read.",
-            { HasLetters: false } => "Image-only page; OCR is unavailable",
+            { HasLetters: false } => "Image-only page; OCR is unavailable.",
             { Truncated: true } => "Page text is shortened; it's too long to show in full.",
             _ => null,
         });
@@ -112,7 +113,8 @@ public sealed partial class PdfReaderView : UserControl
         narrow = isNarrow;
         Grid.SetRow(TextPane, isNarrow ? 2 : 1);
         Grid.SetColumn(TextPane, isNarrow ? 0 : 1);
-        TextPane.Margin = isNarrow ? new Thickness(0, 12, 0, 0) : new Thickness(16, 0, 0, 0);
+        TextPane.Margin = (Thickness)Application.Current.Resources[
+            isNarrow ? "DesktopGuidesReaderGapAbove" : "DesktopGuidesPdfTextPaneMargin"];
         TextColumn.Width = isNarrow ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
         TextRow.Height = isNarrow ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
     }

@@ -238,7 +238,7 @@ public sealed partial class AddGameDialog : ContentDialog
         }
         catch (Exception error)
         {
-            ShowStatus(InfoBarSeverity.Error, $"Could not add this game: {error.Message}", ProviderRecovery.Retry);
+            ShowStatus(InfoBarSeverity.Error, $"Couldn't add this game: {error.Message}", ProviderRecovery.Retry);
         }
         finally
         {

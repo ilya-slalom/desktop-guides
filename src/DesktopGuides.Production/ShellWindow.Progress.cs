@@ -187,7 +187,7 @@ public sealed partial class ShellWindow
     {
         if (kind == RestoreKind.Approximate)
         {
-            ShowStatus(ApproximateRestoreMessage, InfoBarSeverity.Informational, true, false);
+            ShowReaderNotice(ApproximateRestoreMessage);
         }
         else if (kind == RestoreKind.Unavailable)
         {
@@ -195,7 +195,7 @@ public sealed partial class ShellWindow
         }
         else
         {
-            ShowTransientStatus("Guide ready.");
+            AnnounceStatus("Guide ready.");
         }
     }
 

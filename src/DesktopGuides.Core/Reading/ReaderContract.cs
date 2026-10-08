@@ -82,6 +82,12 @@ public static class ReaderCommandPolicy
             .Select(entry => entry.Command)
             .ToArray();
 
+    // T14.4: the toolbar's separator sits between movement and size or
+    // zoom, so it shows only when a format has both.
+    public static bool ShowsGroupSeparator(IReadOnlyCollection<ReaderCommand> visible) =>
+        (visible.Contains(ReaderCommand.PageTurn) || visible.Contains(ReaderCommand.PageEdge)) &&
+        (visible.Contains(ReaderCommand.TextSize) || visible.Contains(ReaderCommand.Zoom));
+
     public static Task ExecuteAsync(
         IReaderSession session, ReaderAction action, CancellationToken token)
     {

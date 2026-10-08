@@ -72,4 +72,18 @@
         <Setter Property="TextTrimming" Value="Clip" />
         <Setter Property="IsTextSelectionEnabled" Value="False" />
     </Style>
+
+    <!-- T14.4: TXT keeps Consolas; T08.3's line metrics depend on it. -->
+    <FontFamily x:Key="DesktopGuidesReaderMonoFontFamily">Consolas</FontFamily>
+
+    <Style x:Key="DesktopGuidesSettingsSectionStyle"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource BodyStrongTextBlockStyle}">
+        <Setter Property="Foreground"
+                Value="{ThemeResource DesktopGuidesPrimaryTextBrush}" />
+        <Setter Property="Margin"
+                Value="{StaticResource DesktopGuidesSettingsSectionMargin}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="AutomationProperties.HeadingLevel" Value="Level2" />
+    </Style>
 </ResourceDictionary>

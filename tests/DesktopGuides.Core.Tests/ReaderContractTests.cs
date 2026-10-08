@@ -62,6 +62,21 @@ public sealed class ReaderContractTests
         Assert.Contains(ReaderCommand.PageEdge, ReaderCommandPolicy.VisibleCommands(paged));
     }
 
+    // T14.4: the separator sits between movement and size or zoom.
+    [Theory]
+    [InlineData(ReaderCapabilities.Scroll | ReaderCapabilities.PageNavigation | ReaderCapabilities.TextSize, true)]
+    [InlineData(ReaderCapabilities.Scroll | ReaderCapabilities.TextSize, false)]
+    [InlineData(ReaderCapabilities.PageNavigation | ReaderCapabilities.PageJump |
+        ReaderCapabilities.FitWidth | ReaderCapabilities.Zoom, true)]
+    [InlineData(ReaderCapabilities.PageNavigation, false)]
+    [InlineData(ReaderCapabilities.None, false)]
+    public void GroupSeparatorNeedsMovementAndSizeOrZoom(ReaderCapabilities capabilities, bool expected)
+    {
+        using FakeReader reader = new(GuideFormat.Txt, capabilities);
+        Assert.Equal(expected,
+            ReaderCommandPolicy.ShowsGroupSeparator(ReaderCommandPolicy.VisibleCommands(reader).ToList()));
+    }
+
     [Fact]
     public async Task PageEdgeDispatchesOnlyWithPageNavigation()
     {

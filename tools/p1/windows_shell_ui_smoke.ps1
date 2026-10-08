@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('empty', 'game-editor', 'game-editor-persisted',
-        'normal', 'design-language', 'stale', 'long-list', 'switch-game',
+        'normal', 'design-language', 'design-readers', 'stale', 'long-list', 'switch-game',
         'switch-game-prepare', 'switch-game-loading', 'queue-guide',
         'queue-guide-write', 'prepare-game-editor-close',
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
@@ -18,7 +18,7 @@ param(
         'html-theme-open', 'html-theme-light', 'html-theme-switch',
         'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed',
         'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry',
-        'theme-segmented', 'theme-change', 'theme-restored', 'theme-error', 'theme-error-retry',
+        'theme-selector', 'theme-change', 'theme-restored', 'theme-error', 'theme-error-retry',
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry')]
     [string] $Mode,
@@ -231,16 +231,42 @@ try {
         throw "The shell status '$($status.Current.Name)' did not close."
     }
 
+    # T14.4: these messages never open the shell bar. The probe and a UI
+    # Automation notification carry them; the page itself shows the state.
+    $quietStatusPatterns = @(
+        '^(Library|Game|Guide|Settings) ready\.$',
+        ('^(Opening guide|Loading library|Loading game|Loading guide)' + [char]0x2026 + '$'),
+        '^Text size \d+%\.( Your place may have shifted\.)?$',
+        ' marked (complete|in progress)\.$',
+        '^App theme set to (System|Light|Dark)\.$',
+        '^Window background set to (Mica|Acrylic|Solid)\.$',
+        '^(No games match\.|\d+ of \d+ games match\.)$',
+        '^Opened near your last place\. The guide changed since you were here\.$')
+
+    function Test-QuietStatus([string] $message) {
+        foreach ($pattern in $quietStatusPatterns) {
+            if ($message -cmatch $pattern) { return $true }
+        }
+        return $false
+    }
+
+    # Watches the bar briefly: a quiet message must never be on it.
+    function Assert-QuietStatus([string] $message) {
+        $deadline = (Get-Date).AddMilliseconds(400)
+        do {
+            $bar = Find-ById 'ShellStatus'
+            if ($bar -and -not $bar.Current.IsOffscreen -and $bar.Current.Name -ceq $message) {
+                throw "The quiet status '$message' opened the shell status bar."
+            }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+    }
+
     function Wait-Status(
         [string[]] $expected,
         [switch] $AllowHidden,
         [switch] $Prefix,
         [int] $Seconds = 15) {
-        $transient = @($expected | Where-Object { $_ -in @(
-            'Library ready.',
-            'Game ready.',
-            'Guide ready.',
-            'Settings ready.') }).Count -gt 0
         $lastObserved = 'status probe was not found'
         $deadline = (Get-Date).AddSeconds($Seconds)
         do {
@@ -263,7 +289,12 @@ try {
             if ($matched -and
                 $sequence -gt $script:lastStatusSequence) {
                 if ($message -eq 'Library ready.') { Assert-Absent 'LibraryLoading' }
-                if ($transient -or $AllowHidden) {
+                if (Test-QuietStatus $message) {
+                    Assert-QuietStatus $message
+                    $script:lastStatusSequence = $sequence
+                    return $probe
+                }
+                if ($AllowHidden) {
                     $script:lastStatusSequence = $sequence
                     return $probe
                 }
@@ -882,6 +913,41 @@ try {
         }
     }
 
+    # T14.4: a quiet confirmation opens no bar above the Reader, so the
+    # Reader's toolbar stays where it was. The block runs with &, so it
+    # sees the caller's variables through dynamic scoping.
+    function Assert-ReaderCommandsStay([scriptblock] $action, [string] $what) {
+        [void](Wait-HiddenById 'ShellStatus')
+        $before = (Wait-VisibleById 'ReaderCommands').Current.BoundingRectangle.Top
+        & $action
+        Start-Sleep -Milliseconds 300
+        $after = (Wait-VisibleById 'ReaderCommands').Current.BoundingRectangle.Top
+        if ([Math]::Abs($after - $before) -gt 1) {
+            throw "$what moved the Reader toolbar from $before to $after."
+        }
+    }
+
+    # T14.4: the keyboard's Back. Alt+Left is the shell's accelerator.
+    function Press-Back {
+        [System.Windows.Forms.SendKeys]::SendWait('%{LEFT}')
+    }
+
+    function Assert-SameLine([string] $firstId, [string] $secondId) {
+        $a = (Wait-VisibleById $firstId).Current.BoundingRectangle
+        $b = (Wait-VisibleById $secondId).Current.BoundingRectangle
+        if ([Math]::Abs($a.Top - $b.Top) -gt 2 -or $b.Left -lt $a.Right) {
+            throw "'$secondId' isn't after '$firstId' on its line: $a and $b."
+        }
+    }
+
+    function Assert-Below([string] $lowerId, [string] $upperId) {
+        $lower = (Wait-VisibleById $lowerId).Current.BoundingRectangle
+        $upper = (Wait-VisibleById $upperId).Current.BoundingRectangle
+        if ($lower.Top -lt $upper.Bottom) {
+            throw "'$lowerId' isn't below '$upperId': $lower and $upper."
+        }
+    }
+
     function Focus-And-Verify([string] $id) {
         $element = Wait-EnabledById $id
         $element.SetFocus()
@@ -987,8 +1053,39 @@ try {
         Expand-ProviderSettings
     }
 
+    # T14.4: the section headings make Settings taller than the CI launch
+    # window, so a card can start below the fold; scroll it into view.
+    function Show-SettingsCard([string] $id) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $element = Find-ById $id
+            if ($element -and -not $element.Current.IsOffscreen) { return $element }
+            if ($element) {
+                $item = $null
+                if ($element.TryGetCurrentPattern(
+                        [System.Windows.Automation.ScrollItemPattern]::Pattern, [ref]$item)) {
+                    $item.ScrollIntoView()
+                }
+                else {
+                    $scrollable = [System.Windows.Automation.PropertyCondition]::new(
+                        [System.Windows.Automation.AutomationElement]::IsScrollPatternAvailableProperty, $true)
+                    foreach ($viewer in $root.FindAll($scope, $scrollable)) {
+                        $pattern = $viewer.GetCurrentPattern(
+                            [System.Windows.Automation.ScrollPattern]::Pattern)
+                        if ($pattern.Current.VerticallyScrollable) {
+                            $pattern.SetScrollPercent(
+                                [System.Windows.Automation.ScrollPattern]::NoScroll, 100)
+                        }
+                    }
+                }
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected visible '$id'."
+    }
+
     function Expand-ProviderSettings {
-        $expander = Wait-VisibleById 'ProviderSettingsExpander'
+        $expander = Show-SettingsCard 'ProviderSettingsExpander'
         $pattern = $null
         if ($expander.TryGetCurrentPattern(
             [System.Windows.Automation.ExpandCollapsePattern]::Pattern,
@@ -1157,13 +1254,13 @@ try {
     }
 
     if ($Mode -eq 'waiting-handoff') {
-        [void](Wait-Status 'Waiting for previous window...')
+        [void](Wait-Status ('Waiting for previous window' + [char]0x2026))
         $report.phases += 'waiting-for-library-lease'
     }
     elseif ($Mode -eq 'queue-guide') {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         Open-GuideFromGame 'Blocked Write Guide'
-        [void](Wait-Status 'Opening guide...')
+        [void](Wait-Status ('Opening guide' + [char]0x2026))
         $report.phases += 'guide-action-started'
     }
     elseif ($Mode -eq 'queue-guide-write') {
@@ -1195,7 +1292,7 @@ try {
         [void](Wait-Status 'Game ready.')
         [void](Wait-SelectedGuide 'Route Test Guide')
         Invoke-Element (Wait-Name 'OpenSelectedGuide' 'Open Route Test Guide')
-        [void](Wait-Status 'Opening guide...')
+        [void](Wait-Status ('Opening guide' + [char]0x2026))
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         Select-Element 'Blocked Write Guide'
         [void](Wait-SelectedGuide 'Blocked Write Guide')
@@ -1204,7 +1301,7 @@ try {
     }
     elseif ($Mode -eq 'late-guide-after-close') {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
-        [void](Wait-Status 'Opening guide...' -AllowHidden)
+        [void](Wait-Status ('Opening guide' + [char]0x2026) -AllowHidden)
         [void](Wait-SelectedGuide 'Blocked Write Guide')
         Select-Element 'Route Test Guide'
         [void](Wait-SelectedGuide 'Route Test Guide')
@@ -1217,7 +1314,7 @@ try {
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Status 'Game ready.')
         Open-GuideFromGame 'Route Test Guide'
-        [void](Wait-Name 'ReaderBackToGame' 'Back to game')
+        [void](Wait-VisibleById 'ReaderLoading')
         [void](Wait-Status ('Loading guide' + [char]0x2026))
         $report.phases += 'reader-route-open-before-render-fault'
     }
@@ -1775,6 +1872,10 @@ try {
         }
 
         # The view can replace the scroller mid-lookup, so retry briefly.
+        # T14.4: the point the PDF place passes scroll to. It must sit inside
+        # page 121's scroll room at 1500x720, which the Reader header sets.
+        $pdfPoint = 0.2
+
         function Get-PdfScroll {
             $deadline = (Get-Date).AddSeconds(3)
             $scroller = Find-ById 'PdfPreviewScroller'
@@ -1955,6 +2056,11 @@ try {
             [void](Wait-Name 'GameHeading' $textGame)
             [void](Wait-Status 'Game ready.')
             Open-TextGuide 'ASCII Map Guide'
+            # T14.4: the held load shows in the card and the progress line,
+            # not in the shell bar.
+            [void](Wait-VisibleById 'ReaderLoading')
+            [void](Wait-VisibleById 'RouteProgress')
+            Assert-Absent 'ShellStatus'
             $report.phases += 'txt-load-paused'
         }
         elseif ($Mode -eq 'txt-back-during-load') {
@@ -2009,7 +2115,7 @@ try {
             [void](Wait-PageName 'Canary guide A loaded')
             Assert-OnlyTextSizeCommands 'Canary Guide A'
             Assert-Absent 'ReaderLoadError'
-            Assert-Absent 'ReaderPlaceholder'
+            Assert-Absent 'ReaderLoading'
             # The meta refresh fires after one second. It isn't
             # user-initiated, so it is cancelled without the bar (R9).
             Mark-CanaryLines 'loaded-a'
@@ -2248,6 +2354,7 @@ try {
                 @{ command = 'Smaller text'; scale = 1.0; label = '100%' })) {
                 $after = Step-HtmlTextSize $step.command 1 $step.scale `
                     "Text size $($step.label). Your place may have shifted."
+                [void](Wait-Name 'ReaderNotice' 'Your place may have shifted.')
                 if ($after.appearanceKind -ne 'Approximate' -or $after.appearanceStep -ne 'Fraction') {
                     throw "A size step to $($step.label) restored '$($after.appearanceKind)/$($after.appearanceStep)'; expected Approximate/Fraction."
                 }
@@ -2499,7 +2606,7 @@ try {
             if ($textStatus) { throw "Expected no text status for tagged text; saw '$textStatus'." }
             $previewStatus = Get-PdfStatus 'PdfPreviewStatus'
             if ($previewStatus) { throw "Expected no preview status; saw '$previewStatus'." }
-            Assert-Absent 'ReaderPlaceholder'
+            Assert-Absent 'ReaderLoading'
             Assert-Absent 'ReaderLoadError'
             $report.pdfReaderScreenshot = Save-WindowScreenshot 'pdf-reader'
 
@@ -2515,7 +2622,7 @@ try {
             Open-TextGuide 'Scanned PDF Guide'
             [void](Wait-Status 'Guide ready.')
             [void](Wait-Name 'PdfPageStatus' ('Page 1 of 1' + $pdfDot + 'Fit width'))
-            [void](Wait-Name 'PdfTextStatus' 'Image-only page; OCR is unavailable')
+            [void](Wait-Name 'PdfTextStatus' 'Image-only page; OCR is unavailable.')
             $scanText = Get-PdfText
             if ($scanText) { throw "Expected no text for an image-only page; read '$scanText'." }
             $report.phases += 'pdf-scan'
@@ -2547,7 +2654,7 @@ try {
             }
             $report.phases += 'pdf-long'
 
-            # pdf-resize (T10.3): a point 30% down portrait page 121 survives
+            # pdf-resize (T10.3): a point 20% down portrait page 121 survives
             # narrow, medium and wide windows; a page turn starts at the top.
             Invoke-ReaderCommand 'Go to start'
             [void](Wait-PdfPage 1 200 'page 1 of 200')
@@ -2555,22 +2662,22 @@ try {
             [void](Wait-PdfPage 121 200 'page 121 of 200' 60)
             $scroll = Get-PdfScroll
             $room = 1 - $scroll.Current.VerticalViewSize / 100
-            if (-not $scroll.Current.VerticallyScrollable -or $room -lt 0.3) {
-                throw "Page 121 scrolls only $([Math]::Round($room, 3)) of its height; pdf-resize needs 0.3."
+            if (-not $scroll.Current.VerticallyScrollable -or $room -lt $pdfPoint) {
+                throw "Page 121 scrolls only $([Math]::Round($room, 3)) of its height; pdf-resize needs $pdfPoint."
             }
             $scroll.SetScrollPercent(
-                [System.Windows.Automation.ScrollPattern]::NoScroll, 0.3 / $room * 100)
+                [System.Windows.Automation.ScrollPattern]::NoScroll, $pdfPoint / $room * 100)
             Start-Sleep -Milliseconds 300
             $set = Get-PdfFraction
-            if ([Math]::Abs($set - 0.3) -gt 0.02) {
-                throw "Scrolling page 121 reached fraction $([Math]::Round($set, 3)); expected 0.3."
+            if ([Math]::Abs($set - $pdfPoint) -gt 0.02) {
+                throw "Scrolling page 121 reached fraction $([Math]::Round($set, 3)); expected $pdfPoint."
             }
             $report.pdfPosition = [ordered]@{ set = $set }
-            # 1500 last: the page was scrolled there, so 0.3 itself must return
+            # 1500 last: the page was scrolled there, so the point itself must return
             # even if 1100 px clamped it.
             foreach ($size in @(@(600, 'narrow'), @(1100, 'medium'), @(1500, 'wide'))) {
                 Resize-ShellWindow $size[0] 720
-                $report.pdfPosition[$size[1]] = Wait-PdfFraction 0.3 "Resizing to $($size[0]) px"
+                $report.pdfPosition[$size[1]] = Wait-PdfFraction $pdfPoint "Resizing to $($size[0]) px"
                 [void](Wait-PdfPage 121 200 'page 121 of 200')
             }
             $report.pdfResizeScreenshot = Save-WindowScreenshot 'pdf-resize'
@@ -2663,34 +2770,34 @@ try {
             [void](Wait-PdfPage 121 200 'page 121 of 200' 60)
             $scroll = Get-PdfScroll
             $room = 1 - $scroll.Current.VerticalViewSize / 100
-            if (-not $scroll.Current.VerticallyScrollable -or $room -lt 0.3) {
-                throw "Page 121 scrolls only $([Math]::Round($room, 3)) of its height; pdf-zoom needs 0.3."
+            if (-not $scroll.Current.VerticallyScrollable -or $room -lt $pdfPoint) {
+                throw "Page 121 scrolls only $([Math]::Round($room, 3)) of its height; pdf-zoom needs $pdfPoint."
             }
             $scroll.SetScrollPercent(
-                [System.Windows.Automation.ScrollPattern]::NoScroll, 0.3 / $room * 100)
+                [System.Windows.Automation.ScrollPattern]::NoScroll, $pdfPoint / $room * 100)
             Start-Sleep -Milliseconds 300
             $report.pdfZoom = [ordered]@{ set = Get-PdfFraction }
 
             Invoke-ReaderCommand 'Zoom in'
             $first = Wait-PdfZoom '\d+%'
-            $report.pdfZoom[$first] = Wait-PdfFraction 0.3 "Zoom in to $first"
+            $report.pdfZoom[$first] = Wait-PdfFraction $pdfPoint "Zoom in to $first"
             [void](Wait-PdfPage 121 200 'page 121 of 200')
             Invoke-ReaderCommand 'Zoom in'
             $second = Wait-PdfZoom '\d+%' $first
             if ([int] $second.TrimEnd('%') -le [int] $first.TrimEnd('%')) {
                 throw "Zoom in went from $first to $second."
             }
-            $report.pdfZoom[$second] = Wait-PdfFraction 0.3 "Zoom in to $second"
+            $report.pdfZoom[$second] = Wait-PdfFraction $pdfPoint "Zoom in to $second"
             [void](Wait-PdfPage 121 200 'page 121 of 200')
             $report.pdfZoomScreenshot = Save-WindowScreenshot 'pdf-zoom'
             Invoke-ReaderCommand 'Zoom out'
             $back = Wait-PdfZoom '\d+%' $second
             if ($back -ne $first) { throw "Zoom out from $second went to $back; expected $first." }
-            [void](Wait-PdfFraction 0.3 "Zoom out to $back")
+            [void](Wait-PdfFraction $pdfPoint "Zoom out to $back")
             [void](Wait-PdfPage 121 200 'page 121 of 200')
             Invoke-OverflowCommand 'Fit to width'
             [void](Wait-PdfZoom 'Fit width')
-            $report.pdfZoom.fit = Wait-PdfFraction 0.3 'Fit to width'
+            $report.pdfZoom.fit = Wait-PdfFraction $pdfPoint 'Fit to width'
             [void](Wait-PdfPage 121 200 'page 121 of 200')
 
             # 200%: the page is wider than the viewport, so it scrolls sideways.
@@ -2961,16 +3068,24 @@ try {
                 [void](Wait-PdfPage 121 200 'page 121 of 200' 60)
                 $scroll = Get-PdfScroll
                 $room = 1 - $scroll.Current.VerticalViewSize / 100
-                if (-not $scroll.Current.VerticallyScrollable -or $room -lt 0.3) {
-                    throw "Page 121 scrolls only $([Math]::Round($room, 3)) of its height; progress-flush needs 0.3."
+                if (-not $scroll.Current.VerticallyScrollable -or $room -lt $pdfPoint) {
+                    throw "Page 121 scrolls only $([Math]::Round($room, 3)) of its height; progress-flush needs $pdfPoint."
                 }
                 $scroll.SetScrollPercent(
-                    [System.Windows.Automation.ScrollPattern]::NoScroll, 0.3 / $room * 100)
+                    [System.Windows.Automation.ScrollPattern]::NoScroll, $pdfPoint / $room * 100)
+                # T14.4: Back waits until the reader reports the point, so the
+                # flush has it to save; the short poll stays inside the 1 s
+                # quiet delay, so Back's flush is still what saves it.
+                $deadline = (Get-Date).AddSeconds(2)
+                while ([Math]::Abs((Get-PdfFraction) - $pdfPoint) -gt 0.02 -and
+                    (Get-Date) -lt $deadline) {
+                    Start-Sleep -Milliseconds 50
+                }
                 Back-ToTextGame
                 Open-TextGuide 'Long PDF Guide'
                 [void](Wait-Status 'Guide ready.')
                 [void](Wait-PdfPage 121 200 'page 121 of 200')
-                $report.progressPdfFraction = Wait-PdfFraction 0.3 'Reopening after Back'
+                $report.progressPdfFraction = Wait-PdfFraction $pdfPoint 'Reopening after Back'
                 Back-ToTextGame
                 $report.phases += 'progress-flush'
 
@@ -2991,7 +3106,10 @@ try {
                 }
                 $after = Read-ProgressCounts
                 $saves = $after.saves - $before.saves
-                $allowed = [Math]::Floor($elapsed / 4) + 1
+                # T14.4: a deadline can also fire just after the last press,
+                # while its page turn is still arriving, so the window counts
+                # the quiet second too. The T12.2 ceiling of 2 still holds.
+                $allowed = [Math]::Min(2, [Math]::Floor(($elapsed + 1) / 4) + 1)
                 if ($saves -lt 1 -or $saves -gt $allowed) {
                     throw "The burst made $saves saves in $([Math]::Round($elapsed, 1)) s; expected 1 to $allowed."
                 }
@@ -3027,12 +3145,14 @@ try {
                 $approximate = 'Opened near your last place. The guide changed since you were here.'
                 Open-TextGuide 'Numbered Lines Guide'
                 [void](Wait-Status $approximate)
+                [void](Wait-Name 'ReaderNotice' $approximate)
                 Wait-FirstTextRow
                 Wait-TopLine $ExpectedTopLine 'Reopening a changed TXT guide'
                 $report.progressChangedTxtScreenshot = Save-WindowScreenshot 'progress-changed-txt'
                 Back-ToTextGame
                 Open-TextGuide 'Long PDF Guide'
                 [void](Wait-Status $approximate)
+                [void](Wait-Name 'ReaderNotice' $approximate)
                 [void](Wait-PdfPage 121 200 'page 121 of 200')
                 $report.progressPdfFraction = Wait-PdfFraction 0.3 'Reopening a changed PDF guide'
                 $report.progressChangedPdfScreenshot = Save-WindowScreenshot 'progress-changed-pdf'
@@ -3253,8 +3373,10 @@ try {
                     Wait-CompletionShown $false 'Marking in progress in the Reader'
                     Wait-FocusedId 'CompletionInProgress'
                 }
-                Send-Keys '{RIGHT}'
-                [void](Wait-Status "$web marked complete.")
+                Assert-ReaderCommandsStay {
+                    Send-Keys '{RIGHT}'
+                    [void](Wait-Status "$web marked complete.")
+                } 'Marking complete in the Reader'
                 Wait-CompletionShown $true 'Marking complete in the Reader'
                 Wait-FocusedId 'CompletionComplete'
                 $report.completionReaderStartedComplete = $startedComplete
@@ -3300,7 +3422,7 @@ try {
                 Send-Keys '{LEFT}'
                 Start-Sleep -Seconds 1
                 Wait-CompletionShown $true 'Left while the write is pending'
-                [void](Wait-Status "Could not update completion for $numbered. Try again." -Seconds 60)
+                [void](Wait-Status "Couldn't update completion for $numbered. Try again." -Seconds 60)
                 Wait-CompletionShown $false 'After the failed write'
                 [void](Wait-RowHelp $numbered 'Text (TXT), *' -NotCompleted)
                 $report.completionErrorScreenshot = Save-WindowScreenshot 'completion-error'
@@ -3341,9 +3463,11 @@ try {
             }
 
             function Step-TextSize([string] $keys, [string] $label) {
-                Send-Keys $keys
-                Wait-TextSize $label
-                [void](Wait-Status "Text size $label.")
+                Assert-ReaderCommandsStay {
+                    Send-Keys $keys
+                    Wait-TextSize $label
+                    [void](Wait-Status "Text size $label.")
+                } "A text-size step to $label"
             }
 
             function Assert-TextCommand([string] $name, [bool] $enabled) {
@@ -3577,7 +3701,7 @@ try {
                 Invoke-Element (Find-VisibleName 'Larger text')
                 Wait-TextSize '150%'
                 [void](Wait-TextDiagnostics 1.5 'the pending save')
-                [void](Wait-Status 'Could not save the text size: ' -Prefix -Seconds 60)
+                [void](Wait-Status "Couldn't save the text size: " -Prefix -Seconds 60)
                 Wait-TextSize '125%'
                 [void](Wait-TextDiagnostics 1.25 'the failed save')
                 $report.textSizeErrorScreenshot = Save-WindowScreenshot 'text-size-error'
@@ -3612,7 +3736,7 @@ try {
             if (-not $scroll.Current.HorizontallyScrollable) {
                 throw 'The long txt-ascii line did not make the reader scroll sideways.'
             }
-            Assert-Absent 'ReaderPlaceholder'
+            Assert-Absent 'ReaderLoading'
             Assert-Absent 'ReaderLoadError'
             foreach ($name in 'Go to start', 'Previous page', 'Next page', 'Go to end') {
                 $button = Find-ByName $name
@@ -3697,7 +3821,8 @@ try {
             [void](Wait-Status $missingMessage)
             [void](Wait-Name 'ReaderLoadError' $missingMessage)
             Assert-Absent 'ReaderTextLines'
-            Assert-Absent 'ReaderPlaceholder'
+            Assert-Absent 'ReaderLoading'
+            Assert-Absent 'RouteProgress'
             Assert-NoReaderCommands 'Missing File Guide'
             $report.phases += 'txt-missing'
 
@@ -3708,7 +3833,8 @@ try {
             [void](Wait-Status 'Re-import this guide to read it.')
             [void](Wait-Name 'ReaderLoadError' 'Re-import this guide to read it.')
             Assert-Absent 'ReaderTextLines'
-            Assert-Absent 'ReaderPlaceholder'
+            Assert-Absent 'ReaderLoading'
+            Assert-Absent 'RouteProgress'
             Assert-NoReaderCommands 'Web Page Guide'
             $report.phases += 'html-no-manifest'
 
@@ -3959,17 +4085,21 @@ try {
         [void](Wait-HiddenById 'ShellStatus')
         Assert-HeadingLevel 'ReaderHeading' 1
         Assert-InsideWindow 'ReaderHeading'
-        Assert-InsideWindow 'ReaderBackToGame'
+        Assert-Absent 'ReaderBackToGame'
+        Assert-NoOverlap 'PART_BackButton' 'ReaderHeading'
+        Assert-SameLine 'ReaderGameName' 'ReaderFormat'
         $report.readerWideScreenshot = Save-WindowScreenshot 'reader-wide'
         $report.phases += 'reader-wide'
 
         Resize-ShellWindow $narrowWidth $windowHeight
         Assert-InsideWindow 'ReaderHeading'
-        Assert-InsideWindow 'ReaderBackToGame'
         Assert-InsideWindow 'ReaderFormat'
         Assert-InsideWindow 'ReaderTextLines'
-        Assert-NoOverlap 'PART_PaneToggleButton' 'ReaderBackToGame'
-        Assert-NoOverlap 'PART_BackButton' 'ReaderBackToGame'
+        Assert-InsideWindow 'CompletionChoice'
+        Assert-Below 'CompletionChoice' 'ReaderFormat'
+        Assert-NoOverlap 'CompletionChoice' 'ReaderHeading'
+        Assert-NoOverlap 'PART_PaneToggleButton' 'ReaderHeading'
+        Assert-NoOverlap 'PART_BackButton' 'ReaderHeading'
         $report.readerNarrowScreenshot =
             Save-WindowScreenshot 'reader-narrow'
         $report.phases += 'reader-narrow'
@@ -3982,6 +4112,15 @@ try {
         [void](Wait-Status 'Settings ready.')
         [void](Wait-HiddenById 'ShellStatus')
         Assert-HeadingLevel 'SettingsHeading' 1
+        Assert-HeadingLevel 'SettingsAppearanceHeading' 2
+        Assert-HeadingLevel 'SettingsLibraryHeading' 2
+        Assert-HeadingLevel 'SettingsGameDataHeading' 2
+        Assert-Below 'AppThemeSettingsCard' 'SettingsAppearanceHeading'
+        Assert-Below 'WindowMaterialSettingsCard' 'AppThemeSettingsCard'
+        Assert-Below 'SettingsLibraryHeading' 'WindowMaterialSettingsCard'
+        Assert-Below 'LibraryStorageSettingsCard' 'SettingsLibraryHeading'
+        Assert-Below 'SettingsGameDataHeading' 'LibraryStorageSettingsCard'
+        Assert-Below 'ProviderSettingsExpander' 'SettingsGameDataHeading'
         Resize-ShellWindow $narrowWidth $windowHeight
         Assert-InsideWindow 'SettingsHeading'
         Assert-InsideWindow 'LibraryStorageSettingsCard'
@@ -3998,25 +4137,77 @@ try {
             Save-WindowScreenshot 'settings-wide'
         $report.phases += 'settings-wide'
     }
+    elseif ($Mode -eq 'design-readers') {
+        # T14.4: each reader at wide and narrow widths, and the open
+        # overflow menu, for screenshot review. Rendering isn't asserted.
+        $sizeGame = 'Text Size Game'
+        Resize-ShellWindow 1500 720
+        Select-Element $sizeGame
+        [void](Wait-Name 'GameHeading' $sizeGame)
+        [void](Wait-Status 'Game ready.')
+        foreach ($reader in @(
+            @{ guide = 'ASCII Map Guide'; format = 'TXT'; name = 'txt' },
+            @{ guide = 'Static Web Guide'; format = 'HTML'; name = 'html' },
+            @{ guide = 'Long PDF Guide'; format = 'PDF'; name = 'pdf' })) {
+            Open-GuideFromGame $reader.guide
+            [void](Wait-Name 'ReaderHeading' $reader.guide)
+            [void](Wait-Name 'ReaderFormat' $reader.format)
+            [void](Wait-Status 'Guide ready.' -Seconds 60)
+            [void](Wait-VisibleById 'ReaderCommands')
+            Assert-Absent 'ShellStatus'
+            Assert-Absent 'RouteProgress'
+            Start-Sleep -Milliseconds 400
+            $report["$($reader.name)WideScreenshot"] =
+                Save-WindowScreenshot "reader-$($reader.name)-wide"
+            Resize-ShellWindow 600 720
+            Start-Sleep -Milliseconds 400
+            Assert-InsideWindow 'ReaderHeading'
+            Assert-InsideWindow 'ReaderCommands'
+            Assert-Below 'CompletionChoice' 'ReaderFormat'
+            $report["$($reader.name)NarrowScreenshot"] =
+                Save-WindowScreenshot "reader-$($reader.name)-narrow"
+            Resize-ShellWindow 1500 720
+            Go-Back
+            [void](Wait-Name 'GameHeading' $sizeGame)
+            [void](Wait-Status 'Game ready.')
+        }
+
+        # The open menu is a popup outside the shell root; the shot shows
+        # its theme (T14.2 left it unchecked).
+        Open-GuideFromGame 'Long PDF Guide'
+        [void](Wait-Status 'Guide ready.' -Seconds 60)
+        $more = $null
+        foreach ($candidate in @('More', 'More options', 'More commands', 'Show more', 'See more')) {
+            $more = Find-VisibleName $candidate
+            if ($more) { break }
+        }
+        if (-not $more) { throw 'The PDF Reader toolbar has no More button.' }
+        Invoke-Element $more
+        $deadline = (Get-Date).AddSeconds(5)
+        while (-not (Find-VisibleName 'Fit to width') -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Milliseconds 100
+        }
+        if (-not (Find-VisibleName 'Fit to width')) { throw 'The overflow menu did not open.' }
+        Start-Sleep -Milliseconds 400
+        Assert-ShellForeground
+        $report.overflowScreenshot = Save-WindowScreenshot 'reader-pdf-overflow'
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+        Go-Back
+        [void](Wait-Name 'GameHeading' $sizeGame)
+        $report.phases += 'design-readers'
+    }
     elseif ($Mode -like 'theme-*') {
         $themeIds = [ordered]@{ System = 'ThemeSystem'; Light = 'ThemeLight'; Dark = 'ThemeDark' }
 
-        function Test-ThemeSelected([string] $id) {
-            $item = Find-ById $id
-            if (-not $item -or $item.Current.IsOffscreen) { return $false }
-            return $item.GetCurrentPattern(
-                [System.Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected
-        }
-
-        # The shown theme is the only selected item.
+        # The drop-down's one selected item is the shown theme.
         function Wait-ThemeShown([string] $label, [string] $step) {
             $deadline = (Get-Date).AddSeconds(10)
             do {
-                $selected = @($themeIds.Keys | Where-Object { Test-ThemeSelected $themeIds[$_] })
-                if ($selected.Count -eq 1 -and $selected[0] -eq $label) { return }
+                $shown = Get-ComboSelection 'AppThemeSelector'
+                if ($shown -eq $label) { return }
                 Start-Sleep -Milliseconds 100
             } while ((Get-Date) -lt $deadline)
-            throw "$step expected '$label' as the only selected theme; found '$($selected -join ',')'."
+            throw "$step expected '$label' in the theme drop-down; found '$shown'."
         }
 
         function Send-ThemeKeys([string] $keys) {
@@ -4044,19 +4235,21 @@ try {
         # The theme the window, title bar and choice report now.
         function Assert-ThemeShown([string] $label, [string] $status, [string] $step) {
             Wait-ThemeShown $label $step
-            Wait-ItemStatus 'AppThemeChoice' $status $step
+            Wait-ItemStatus 'AppThemeSelector' $status $step
             $titleBar = if ($label -eq 'System') { 'UseDefaultAppMode' } else { $label }
             Wait-ItemStatus 'AppTitleBar' $titleBar $step
         }
 
-        # Keyboard only: focus the shown item, then arrow to the target.
+        # Keyboard only: open the drop-down, arrow to the target, commit.
         function Select-ThemeByKeys([string] $from, [string] $to) {
             $order = @('System', 'Light', 'Dark')
             $steps = $order.IndexOf($to) - $order.IndexOf($from)
-            (Wait-VisibleById $themeIds[$from]).SetFocus()
-            Wait-FocusedId $themeIds[$from]
-            $key = if ($steps -gt 0) { '{RIGHT}' } else { '{LEFT}' }
+            Focus-And-Verify 'AppThemeSelector'
+            Send-ThemeKeys '%{DOWN}'
+            Start-Sleep -Milliseconds 300
+            $key = if ($steps -gt 0) { '{DOWN}' } else { '{UP}' }
             for ($i = 0; $i -lt [Math]::Abs($steps); $i++) { Send-ThemeKeys $key }
+            Send-ThemeKeys '{ENTER}'
         }
 
         $windowsTheme = if ($WindowsTheme) { $WindowsTheme }
@@ -4067,56 +4260,47 @@ try {
         function Open-ThemeSettings {
             Select-Element 'Settings'
             [void](Wait-Name 'AppThemeSettingsCard' 'App theme. Choose light or dark, or follow Windows.')
-            [void](Wait-EnabledById 'AppThemeChoice')
+            [void](Wait-EnabledById 'AppThemeSelector')
         }
 
         Resize-ShellWindow 1500 720
         Open-ThemeSettings
 
-        if ($Mode -eq 'theme-segmented') {
-            # The UIA gate: three list items with their names, a readable
-            # selected state, and selection that follows the arrow keys.
-            $choice = Wait-VisibleById 'AppThemeChoice'
-            if ($choice.Current.Name -ne 'App theme') {
-                throw "The theme choice is named '$($choice.Current.Name)'."
+        if ($Mode -eq 'theme-selector') {
+            # TR14.2 with the drop-down: named, three named items with their
+            # ids, keyboard selection, whole at the CI launch size.
+            $selector = Wait-VisibleById 'AppThemeSelector'
+            if ($selector.Current.Name -ne 'App theme') {
+                throw "The theme drop-down is named '$($selector.Current.Name)'."
             }
+            Wait-ThemeShown 'System' 'A new library'
+            $expand = $selector.GetCurrentPattern(
+                [System.Windows.Automation.ExpandCollapsePattern]::Pattern)
+            $expand.Expand()
+            Start-Sleep -Milliseconds 300
             $report.themeItems = [ordered]@{}
-            foreach ($label in $themeIds.Keys) {
-                $item = Wait-VisibleById $themeIds[$label]
-                $report.themeItems[$label] = [ordered]@{
-                    name = $item.Current.Name
-                    controlType = $item.Current.ControlType.ProgrammaticName
-                    patterns = @($item.GetSupportedPatterns() | ForEach-Object { $_.ProgrammaticName })
-                }
-            }
             foreach ($label in $themeIds.Keys) {
                 $item = Wait-VisibleById $themeIds[$label]
                 if ($item.Current.ControlType -ne [System.Windows.Automation.ControlType]::ListItem -or
                     $item.Current.Name -ne $label) {
                     throw "$($themeIds[$label]) is a $($item.Current.ControlType.ProgrammaticName) named '$($item.Current.Name)'."
                 }
+                $report.themeItems[$label] = $item.Current.Name
             }
-            Wait-ThemeShown 'System' 'A new library'
-            (Wait-VisibleById 'ThemeSystem').SetFocus()
-            Wait-FocusedId 'ThemeSystem'
-            Send-ThemeKeys '{RIGHT}'
-            Wait-ThemeShown 'Light' 'Right'
-            Wait-FocusedId 'ThemeLight'
-            Send-ThemeKeys '{LEFT}'
-            Wait-ThemeShown 'System' 'Left'
-            Wait-FocusedId 'ThemeSystem'
-            # The CI launch size: the three items stay whole on the card.
+            $expand.Collapse()
+            Select-ThemeByKeys 'System' 'Light'
+            Wait-ThemeShown 'Light' 'Alt+Down, Down, Enter'
+            [void](Wait-Status 'App theme set to Light.')
+            Select-ThemeByKeys 'Light' 'System'
+            Wait-ThemeShown 'System' 'Alt+Down, Up, Enter'
+            [void](Wait-Status 'App theme set to System.')
+            # The CI launch size: the drop-down stays whole on its card.
             Resize-ShellWindow 768 519
             Start-Sleep -Milliseconds 400
-            foreach ($id in $themeIds.Values) {
-                $bounds = (Wait-VisibleById $id).Current.BoundingRectangle
-                if ($bounds.Width -lt 24 -or $bounds.Height -lt 24) {
-                    throw "At 768x519 $id is $bounds."
-                }
-            }
-            $report.themeNarrowScreenshot = Save-WindowScreenshot 'theme-segmented-narrow'
+            Assert-InsideWindow 'AppThemeSelector'
+            $report.themeNarrowScreenshot = Save-WindowScreenshot 'theme-selector-narrow'
             Resize-ShellWindow 1500 720
-            $report.phases += 'theme-segmented'
+            $report.phases += 'theme-selector'
         }
         elseif ($Mode -in @('theme-change', 'theme-restored')) {
             # TR14.2: the stored theme is applied at launch, and a keyboard
@@ -4185,16 +4369,16 @@ try {
             # The installer holds the write lock, so the save times out.
             Assert-ThemeShown $ExpectedTheme $ExpectedThemeStatus 'Before the failed save'
             Select-ThemeByKeys $ExpectedTheme $SwitchToTheme
-            [void](Wait-Status 'Could not save the app theme: ' -Prefix -Seconds 60)
+            [void](Wait-Status "Couldn't save the app theme: " -Prefix -Seconds 60)
             Assert-ThemeShown $ExpectedTheme $ExpectedThemeStatus 'After the failed save'
             Assert-ShellForeground
             $report.themeErrorScreenshot = Save-WindowScreenshot 'theme-error'
             # Putting the choice back moves focus to it. Leaving and tabbing
             # back in lands on it again and changes nothing.
-            Wait-FocusedId $themeIds[$ExpectedTheme]
+            Wait-FocusedId 'AppThemeSelector'
             Send-ThemeKeys '+{TAB}'
             Send-ThemeKeys '{TAB}'
-            Wait-FocusedId $themeIds[$ExpectedTheme]
+            Wait-FocusedId 'AppThemeSelector'
             Start-Sleep -Milliseconds 1000
             $report.themeErrorTabInFocus = [System.Windows.Automation.AutomationElement]::FocusedElement.Current.AutomationId
             Assert-ThemeShown $ExpectedTheme $ExpectedThemeStatus 'Tabbing back into the choice'
@@ -5126,7 +5310,7 @@ try {
         Open-GuideFromGame $title
         [void](Wait-Name 'ReaderHeading' $title)
         [void](Wait-Status 'Guide ready.')
-        Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
+        Go-Back
         [void](Wait-Name 'GameHeading' 'Import Test Game')
         [void](Wait-Status 'Game ready.')
         [void](Wait-SelectedGuide $title)
@@ -5142,6 +5326,19 @@ try {
         $report.phases += 'remove-confirm'
 
         if ($Mode -eq 'remove-guide-cancel') {
+            # T14.4: Alt+Left belongs to the dialog while it's open: it
+            # neither leaves the Game page behind it nor runs after it closes.
+            Press-Back
+            Start-Sleep -Milliseconds 500
+            [void](Wait-VisibleById 'RemoveGuideDialog')
+            Invoke-Element (Wait-EnabledById 'CloseButton')
+            [void](Wait-HiddenById 'RemoveGuideDialog')
+            Start-Sleep -Milliseconds 1000
+            [void](Wait-Name 'GameHeading' 'Import Test Game')
+            Assert-Absent 'LibraryHeading'
+            $report.phases += 'back-key-ignored-under-dialog'
+            Invoke-Element (Wait-EnabledById 'RemoveSelectedGuide')
+            [void](Wait-VisibleById 'RemoveGuideDialog')
             Invoke-Element (Wait-EnabledById 'CloseButton')
             [void](Wait-HiddenById 'RemoveGuideDialog')
             Wait-FocusedId 'RemoveSelectedGuide'
@@ -5248,7 +5445,7 @@ try {
             Open-GuideFromGame 'Beta Route Guide'
             [void](Wait-Name 'ReaderHeading' 'Beta Route Guide')
             [void](Wait-Status 'Guide ready.')
-            Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
+            Press-Back
             [void](Wait-Name 'GameHeading' $renameTitle)
             [void](Wait-Status 'Game ready.')
             [void](Wait-SelectedGuide 'Beta Route Guide')
@@ -5367,7 +5564,7 @@ try {
             [void](Wait-Status 'Guide ready.')
             $report.phases += 'persisted-resume'
 
-            Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
+            Press-Back
             [void](Wait-Name 'GameHeading' $renamed)
             [void](Wait-Status 'Game ready.')
             [void](Wait-SelectedGuide 'Beta Route Guide')
@@ -5410,7 +5607,7 @@ try {
         Invoke-Element (Wait-Name 'ResumeGuide' "Resume $target")
         [void](Wait-Name 'ReaderHeading' $target)
         [void](Wait-Status 'Guide ready.')
-        Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
+        Press-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Status 'Game ready.')
         [void](Wait-SelectedGuide $target)
@@ -5431,7 +5628,7 @@ try {
         $target = 'ZZZ Focus Target Guide'
         Invoke-Element (Wait-Name 'ResumeGuide' "Resume $target")
         [void](Wait-Name 'ReaderHeading' $target)
-        Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
+        Press-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Status 'Game ready.')
         [void](Wait-SelectedGuide $target)
@@ -5515,6 +5712,16 @@ try {
             throw 'A Reader opened after the later guide was removed.'
         }
         $report.phases += 'later-guide-failed-without-opening-reader'
+        # T14.4: opening Settings clears the previous route's bar, as every
+        # other route load does.
+        Select-Element 'Settings'
+        [void](Wait-Name 'SettingsHeading' 'Settings')
+        [void](Wait-Status 'Settings ready.')
+        [void](Wait-HiddenById 'ShellStatus')
+        Go-Back
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Status 'Game ready.')
+        $report.phases += 'settings-clears-previous-bar'
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
         [void](Wait-Status 'Library ready.')
@@ -5525,14 +5732,19 @@ try {
         $report.phases += 'superseded-guide-not-saved-as-resume'
     }
     elseif ($Mode -eq 'reader-render-error-observed') {
-        [void](Wait-Name 'ReaderBackToGame' 'Back to game')
         [void](Wait-Status `
-            'Could not load this view: Stored guide format is invalid.')
+            "Couldn't load this view: Stored guide format is invalid.")
+        # T14.4: the Reader route is still showing, and a failed render
+        # stops the card's loading state.
+        Assert-Absent 'GameHeading'
+        Assert-Absent 'LibraryHeading'
+        Assert-Absent 'ReaderLoading'
+        Assert-Absent 'RouteProgress'
         $report.phases += 'reader-render-read-failed-on-reader-route'
     }
     elseif ($Mode -eq 'reader-render-error-result') {
         [void](Wait-Status `
-            'Could not load this view: Stored guide format is invalid.')
+            "Couldn't load this view: Stored guide format is invalid.")
         Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Status 'Game ready.')
@@ -5643,6 +5855,9 @@ try {
         [void](Wait-Name 'ProviderSettingsExpander' 'Game data providers. IGDB credentials saved.')
         $report.settingsScreenshot = Save-WindowScreenshot 'provider-settings-saved'
         $report.phases += 'credentials-saved'
+        # T14.4: a routine provider message closes by itself (ruling 12).
+        [void](Wait-HiddenById 'ProviderSettingsStatus')
+        $report.phases += 'saved-status-closes'
         Go-Back
         [void](Wait-Status 'Library ready.')
     }
@@ -5798,7 +6013,7 @@ try {
         if (-not $firstLine -or $firstLine.Current.Name -ne 'Test guide.') {
             throw 'The TXT reader did not show the seeded guide text.'
         }
-        Assert-Absent 'ReaderPlaceholder'
+        Assert-Absent 'ReaderLoading'
         foreach ($name in 'Go to start', 'Previous page', 'Next page', 'Go to end') {
             $button = Find-ByName $name
             if (-not $button -or $button.Current.IsOffscreen) {
@@ -5817,8 +6032,7 @@ try {
         Wait-PaneState 'Navigation pane closed'
         $report.phases += 'reader-pane-toggle'
 
-        $readerBack = Wait-Name 'ReaderBackToGame' 'Back to game'
-        Invoke-Element $readerBack
+        Go-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Status 'Game ready.')
         [void](Wait-SelectedGuide $ExpectedResumeGuide)
@@ -5841,7 +6055,7 @@ try {
         [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
         [void](Wait-Status 'Guide ready.')
         $report.phases += 'pointer-reopen-selected-guide'
-        Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
+        Press-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Status 'Game ready.')
         [void](Wait-SelectedGuide $ExpectedResumeGuide)
@@ -5885,7 +6099,7 @@ try {
         Click-Element (Wait-GuideRow 'Route Test Guide')
         [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
         [void](Wait-Status 'Guide ready.')
-        Click-Element (Wait-Name 'ReaderBackToGame' 'Back to game')
+        Click-Element (Wait-VisibleById 'PART_BackButton')
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Status 'Game ready.')
         $report.phases += 'pointer-library-game-reader-game'
@@ -5899,7 +6113,7 @@ try {
         Press-Enter (Wait-GuideRow 'Route Test Guide')
         [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
         [void](Wait-Status 'Guide ready.')
-        Press-Enter (Wait-Name 'ReaderBackToGame' 'Back to game')
+        Press-Back
         [void](Wait-Name 'GameHeading' 'Route Test Game')
         [void](Wait-Status 'Game ready.')
         $report.phases += 'keyboard-library-game-reader-game'

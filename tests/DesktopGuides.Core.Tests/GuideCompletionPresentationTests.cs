@@ -39,7 +39,7 @@ public sealed class GuideCompletionPresentationTests
 
     [Fact]
     public void SaveFailedOffersARetry() =>
-        Assert.Equal("Could not update completion for Walkthrough. Try again.",
+        Assert.Equal("Couldn't update completion for Walkthrough. Try again.",
             GuideCompletionPresentation.SaveFailed("Walkthrough"));
 
     [Fact]
@@ -52,7 +52,7 @@ public sealed class GuideCompletionPresentationTests
         string title = "Ōkami 大神 <b>&amp;</b> " + new string('x', 300);
         Assert.Equal($"Completion for {title}", GuideCompletionPresentation.ChoiceName(title));
         Assert.Equal($"{title} marked complete.", GuideCompletionPresentation.Announcement(title, Finished));
-        Assert.Equal($"Could not update completion for {title}. Try again.",
+        Assert.Equal($"Couldn't update completion for {title}. Try again.",
             GuideCompletionPresentation.SaveFailed(title));
     }
 }

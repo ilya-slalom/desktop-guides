@@ -90,7 +90,7 @@ public sealed partial class GameEditorDialog : ContentDialog
         catch (Exception error)
         {
             args.Cancel = true;
-            SaveError.Message = $"Could not save this game: {error.Message}";
+            SaveError.Message = $"Couldn't save this game: {error.Message}";
             SaveError.IsOpen = true;
         }
         finally

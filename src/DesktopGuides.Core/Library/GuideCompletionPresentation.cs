@@ -17,5 +17,5 @@ public static class GuideCompletionPresentation
         IsComplete(completedUtc) ? $"{title} marked complete." : $"{title} marked in progress.";
 
     public static string SaveFailed(string title) =>
-        $"Could not update completion for {title}. Try again.";
+        $"Couldn't update completion for {title}. Try again.";
 }

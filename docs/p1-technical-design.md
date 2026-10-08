@@ -355,7 +355,7 @@ packages are added only with the task that first uses them:
 | T11.4, T14.4, T20.2 | `SettingsCard`, `SettingsExpander` | `CommunityToolkit.WinUI.Controls.SettingsControls` | Use cards for actionable or informative Settings rows and expanders for optional advanced groups. Do not turn catalog rows or reader content into settings cards. |
 | T04.4, T05.1, T05.4 | `MetadataControl` | `CommunityToolkit.WinUI.Controls.MetadataControl` | Flatten short platform, edition, provider, format, and reading-state facts into accessible text. Keep artwork, title, selection, and virtualization in the owning data template. |
 | T06.1 | `HeaderedContentControl` | `CommunityToolkit.WinUI.Controls.HeaderedControls` | Associate repeated import-preview groups with visible headings. Use native headings when only one group exists. |
-| T14.2, T19.2 | `Segmented` | `CommunityToolkit.WinUI.Controls.Segmented` | Present two to five bounded, mutually exclusive states. Verify selected-state UIA and retain native radio-button behavior as the fallback. T14.2 binds the items to data (BoundedChoice), which exposes SelectionItem; T13.1's completion choice uses it too. |
+| T13.1, T19.2 | `Segmented` | `CommunityToolkit.WinUI.Controls.Segmented` | Present two to five bounded, mutually exclusive states. Verify selected-state UIA and retain native radio-button behavior as the fallback. T14.2 binds the items to data (BoundedChoice), which exposes SelectionItem; the completion choice uses it. T14.4 moved App theme to a drop-down at the user's request. |
 | T18.2 | `GridSplitter` | `CommunityToolkit.WinUI.Controls.Sizers` | Make the optional table-of-contents pane resizable without changing its collapsed default. Do not place a splitter in the primary reading surface before the pane exists. |
 | T22.2 | `RichSuggestBox` candidate | `CommunityToolkit.WinUI.Controls.RichSuggestBox` | Use only when a selected source supports cancellable incremental suggestions within its rate and credential model. T04.4 provider search remains explicit-submit. |
 
@@ -382,7 +382,7 @@ The recorded UI tasks were reviewed as one set:
 | T11.1–T11.4 | Keep `NavigationView` and `CommandBar`; move shell Back and pane-toggle actions into native `TitleBar`, use Mica behind transparent route backgrounds, fill the available width, and auto-hide routine native `InfoBar` messages. |
 | T11.4 | Use `SettingsCard` for the local-storage row and retain semantic app resources around it. |
 | T13.1 | `Segmented` (`BoundedChoice`) for the two explicit completion states; it replaced T13.1's `RadioButtons` fallback in T14.2. |
-| T14.1–T14.4 | Use `Segmented` for System/Light/Dark and `SettingsCard`/`SettingsExpander` for Settings. Keep reader text-size commands native. |
+| T14.1–T14.4 | Use drop-downs for App theme and Window background (T14.4), and `SettingsCard`/`SettingsExpander` with section headings for Settings. Keep reader text-size commands native. |
 | T15.1, T15.3 | Keep actionable `InfoBar` and destructive `ContentDialog` behavior native. |
 | T16.1–T16.2 | Audit Toolkit controls together with native controls; keyboard accelerators and focus restoration stay app-owned. |
 | T20.2 | Put Export and Restore in `SettingsCard` rows, with optional details in `SettingsExpander` and native replacement confirmation. |

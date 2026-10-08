@@ -850,6 +850,30 @@ function Run-DesignLanguageScenarios {
     }
 }
 
+# T14.4: each reader at wide and narrow widths in light and dark.
+function Run-ReaderDesignScenarios {
+    $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    [void](Invoke-ShellSeed @('seed-text-size', $dataRoot, $fixtureRoot))
+    $originalTheme = Get-AppThemePreference
+    try {
+        Set-AppThemePreference $true
+        Start-InstalledShell
+        $report.designReadersLight = Run-ShellSmoke 'design-readers' `
+            -ResultName 'design-readers-light'
+        Close-InstalledShell
+
+        Set-AppThemePreference $false
+        Start-InstalledShell
+        $report.designReadersDark = Run-ShellSmoke 'design-readers' `
+            -ResultName 'design-readers-dark'
+        Close-InstalledShell
+    }
+    finally {
+        Restore-AppThemePreference $originalTheme
+    }
+}
+
 function Run-CatalogScenarios {
     Invoke-ShellSeed @('seed-catalog', $dataRoot) | Out-Null
     $originalTheme = Get-AppThemePreference
@@ -1802,11 +1826,11 @@ function Run-ThemeScenarios {
     try {
         Set-AppThemePreference $true
         Start-InstalledShell
-        $report.theme.segmented = Run-ShellSmoke 'theme-segmented'
+        $report.theme.selector = Run-ShellSmoke 'theme-selector'
         Close-InstalledShell
         [void](Assert-StoredTheme 'System' 'the gate')
 
-        # Windows light: System to Dark (two arrow presses, two saves).
+        # Windows light: System to Dark (one drop-down choice, one save).
         Start-InstalledShell
         $report.theme.lightToDark = Run-ShellSmoke 'theme-change' -ResultName 'theme-change-light' `
             -ExpectedTheme System -ExpectedThemeStatus 'System (Light)' -SwitchToTheme Dark
@@ -2499,6 +2523,7 @@ try {
         }
         Run-DesignLanguageScenarios
         Run-MaterialScenarios
+        Run-ReaderDesignScenarios
     }
 
     if (Enter-ScenarioGroup 'catalog') {

@@ -74,6 +74,13 @@ public sealed class ToolbarWindow : Window
                 toolbar.Width = 180;
                 return Task.CompletedTask;
             }));
+        // T14.4: wide enough for the Previous and Next group, not for zoom.
+        controls.Children.Add(ControlButton("Medium toolbar", "MediumToolbar",
+            () =>
+            {
+                toolbar.Width = 320;
+                return Task.CompletedTask;
+            }));
         controls.Children.Add(ControlButton("Wide toolbar", "WideToolbar",
             () =>
             {
