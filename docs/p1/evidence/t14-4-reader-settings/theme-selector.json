@@ -1,0 +1,20 @@
+﻿{
+    "mode":  "theme-selector",
+    "invocationId":  "e1b52794f68d4417bb92aeef12c309d0",
+    "observedAt":  "2026-10-08T01:07:21.9506723Z",
+    "processId":  1768,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "theme-selector"
+               ],
+    "themeItems":  {
+                       "System":  "System",
+                       "Light":  "Light",
+                       "Dark":  "Dark"
+                   },
+    "themeNarrowScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\theme-selector.theme-selector-narrow.png"
+}

@@ -1,0 +1,21 @@
+﻿{
+    "mode":  "design-readers",
+    "invocationId":  "1b6a50fc77314a06b8f7f0c9faa0de4c",
+    "observedAt":  "2026-10-08T01:03:18.9250567Z",
+    "processId":  8636,
+    "sessionId":  2,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "design-readers"
+               ],
+    "txtWideScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\design-readers-light.reader-txt-wide.png",
+    "txtNarrowScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\design-readers-light.reader-txt-narrow.png",
+    "htmlWideScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\design-readers-light.reader-html-wide.png",
+    "htmlNarrowScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\design-readers-light.reader-html-narrow.png",
+    "pdfWideScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\design-readers-light.reader-pdf-wide.png",
+    "pdfNarrowScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\design-readers-light.reader-pdf-narrow.png",
+    "overflowScreenshot":  "D:\\a\\desktop-guides\\desktop-guides\\artifacts\\production-shell\\installed\\design-readers-light.reader-pdf-overflow.png"
+}

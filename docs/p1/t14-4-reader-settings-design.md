@@ -1,7 +1,7 @@
 # T14.4 Reader and Settings design language design
 
 Status: implemented on `feat/p1-t14-4-reader-settings-design`; full CI run
-37706441424 (see [Verification](#verification)).
+37710298596 (see [Verification](#verification)).
 Prerequisites: T05.4 (catalog components, PR #16), T08.3 (TXT position,
 PR #31), T09.2 (HTML theme style, PR #49), T10.2 (PDF controls, PR #46),
 T11.3 (reader shell, PR #7) and T14.2 (theme setting, PR #48) are merged.
@@ -381,6 +381,53 @@ Found while running the checks:
   experiment showed the alignment wasn't the cause, so the bar stays left.
 - **`E9A6` is FitPage**, and the other glyphs match the Segoe Fluent Icons
   reference.
+
+## Verification
+
+- **Unit tests.** CI run 37710298596 `core-tests`: Core 906/906 (899 before;
+  five `ShowsGroupSeparator` rows and two `ShiftedNotice` facts) and
+  Infrastructure 540/540.
+- **Red, then green, per task** (dispatched CI runs):
+
+  | Task | Red | Green |
+  | --- | --- | --- |
+  | 3–4 status | 37694299304 (`The quiet status 'Game ready.' opened the shell status bar.`) | 37696710787 (core, html, design), 37705125647 and 37705133458 (progress), 37702111258 (pdf) |
+  | 5 header and Back | 37695137819 (`'ReaderBackToGame' was visible.`) | 37696710787 |
+  | 6 commands | 37696767891 (overflow order) | 37705118073 (`reader-toolbar-ui`, `medium-toolbar-keeps-page-movement`) |
+  | 7 surface | 37698490991 (the image-only period) | 37702111258 |
+  | 8 Settings | 37700375217 (`AppThemeSelector`), 37700386770 (section headings) | 37702186578 (theme), 37702197554 (design), 37708996963 (provider card in view) |
+  | Review: Settings clears the bar | 37709606391 (`Expected 'ShellStatus' to hide.`) | 37710298596 (core) |
+
+- **Full run** 37710298596 at `6f6b8c1`: `core-tests`, both package builds
+  for x64 and ARM64, native ARM64 Core and UI, `reader-toolbar-ui`, and the
+  `core`, `pdf` and `design` shards passed. The `html` shard's first attempt
+  stopped in `html-reader-offline` before its first session started (the
+  probe stayed at `Loading guide…` for 15 s), the WebView2 open hang T09.1
+  and T14.3 also recorded; it passed on attempt 2 of the same run.
+- **Screenshots** in [evidence/t14-4-reader-settings](evidence/t14-4-reader-settings/):
+  TXT, HTML and PDF Readers at 1500 and 600 px in light and dark, the open
+  PDF overflow menu in both themes, Settings wide and narrow, and the
+  `theme-selector` gate at 768×519. Reviewed: one Back; "Game · format";
+  end-bar and font-size glyphs; the separator on TXT and PDF only; one HTML
+  frame in dark (WebView2's square corner isn't distinguishable from the
+  card fill, so no inset was added); the menu in the window's theme; the
+  Settings sections and drop-downs. The text-size label still sits about
+  4 px below the icons' center line (a deferred minor).
+- **Literal check.** The plan's grep over the Reader and Settings XAML
+  finds nothing.
+- **Final review** (fresh reviewer): ready with fixes. Fixed: Settings
+  didn't clear the previous route's bar. Not reproduced: Alt+Left under an
+  open dialog (a dialog's popup is outside `ShellRoot`, so the accelerator
+  doesn't fire); the guard and the check stay. Added: progress-line absence
+  checks after failed and finished loads. Deferred minors: the HTML and PDF
+  ring hides before the page shows; a card notice survives a later reader
+  failure; marking completion on the Game page re-renders it; the hidden
+  ring stays active outside the Reader; an empty page-colored card on an
+  unexpected HTML open failure; the label offset; small nits.
+- **Not run here:** the host `-ProviderOnly` pass (the installer trusts its
+  signing certificate in `LocalMachine`, which needs an elevated task) and
+  listening with Narrator; both wait for the user. High contrast, text scale
+  and 200% display scale are T16.2's.
 
 ## Risks
 
