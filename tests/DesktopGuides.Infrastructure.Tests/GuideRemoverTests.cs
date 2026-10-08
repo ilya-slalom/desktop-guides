@@ -117,7 +117,8 @@ public sealed class GuideRemoverTests : IAsyncLifetime
 
         Assert.Equal(new GuideRemovalResult(GuideRemovalOutcome.Removed, false), result);
         Assert.Equal(
-            [RemovalCheckpoint.Prepared, RemovalCheckpoint.Moved, RemovalCheckpoint.InCommit, RemovalCheckpoint.Committed],
+            [RemovalCheckpoint.Prepared, RemovalCheckpoint.TrashCreated, RemovalCheckpoint.Moved,
+             RemovalCheckpoint.InCommit, RemovalCheckpoint.Committed],
             seen);
         Assert.Equal("0|0|0", library.RowsFor(guideId));
         Assert.False(Directory.Exists(Content(guideId)));

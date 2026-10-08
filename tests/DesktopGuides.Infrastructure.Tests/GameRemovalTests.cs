@@ -157,8 +157,9 @@ public sealed class GameRemovalTests : IAsyncLifetime
 
         Assert.Equal(new GameRemovalResult(GameRemovalOutcome.Removed, false, null), result);
         Assert.Equal(
-            [RemovalCheckpoint.Prepared, RemovalCheckpoint.MovedGuide, RemovalCheckpoint.MovedGuide,
-             RemovalCheckpoint.Moved, RemovalCheckpoint.InCommit, RemovalCheckpoint.Committed],
+            [RemovalCheckpoint.Prepared, RemovalCheckpoint.TrashCreated, RemovalCheckpoint.MovedGuide,
+             RemovalCheckpoint.MovedGuide, RemovalCheckpoint.Moved, RemovalCheckpoint.InCommit,
+             RemovalCheckpoint.Committed, RemovalCheckpoint.BeforeArtworkDelete],
             seen);
         Assert.Equal("0", GameRows(game.Id));
         Assert.Null(await library.Repository.FindLinkedGameAsync(ProviderGameLink.Igdb, "900500"));
