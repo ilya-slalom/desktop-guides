@@ -395,13 +395,21 @@ public sealed class GameRemovalTests : IAsyncLifetime
     public async Task ContentHeldOpenFailsAndRestoresEveryGuide()
     {
         if (!OperatingSystem.IsWindows()) return;
-        using (new FileStream(Path.Combine(Content(mapsId), "images/map.png"), FileMode.Open, FileAccess.Read, FileShare.Read))
+        // Hold a file in the guide that moves second, so the first one is
+        // moved and has to come back.
+        bool walkthroughFirst = string.CompareOrdinal(walkthroughId.ToString("N"), mapsId.ToString("N")) < 0;
+        string held = walkthroughFirst
+            ? Path.Combine(Content(mapsId), "images/map.png")
+            : Path.Combine(Content(walkthroughId), "guide.txt");
+        List<RemovalCheckpoint> seen = [];
+        using (new FileStream(held, FileMode.Open, FileAccess.Read, FileShare.Read))
         {
             GameRemovalException error = await Assert.ThrowsAsync<GameRemovalException>(
-                () => Remover().RemoveAsync(game.Id, 2));
+                () => Remover(seen.Add).RemoveAsync(game.Id, 2));
 
             Assert.Equal(GameRemovalIssue.Failed, error.Issue);
         }
+        Assert.Equal(1, seen.Count(point => point == RemovalCheckpoint.MovedGuide));
         AssertGameIntact();
     }
 

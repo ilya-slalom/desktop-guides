@@ -1,6 +1,6 @@
 # T15.4 fault-injection matrix design
 
-Status: design agreed in brainstorming on 8 October 2026; not implemented.
+Status: implemented on `feat/p1-t15-4-fault-injection`; see the verification record.
 Prerequisites T04.3 (PR #26), T06.3 (PR #19), T15.2 (PR #5) and T15.3
 (PR #22) are merged.
 
@@ -275,3 +275,53 @@ When T15.4 is implemented, update these:
   failure, crash and restart, cancellation and failed rollback, plus the NTFS
   link and name cases. Small defects found are fixed; others are tracked.
   There is no UI change, so there is no screenshot.
+
+## T15.4 verification record
+
+- **Unit tests.** On `pcsx2-win`, Core 932/932 (unchanged) and
+  Infrastructure 678/678 passed. Infrastructure was 593 before T15.4, and
+  the 85 new cells are:
+  - `LibrarySnapshotTests`, 6;
+  - `CheckpointOrderTests`, 4;
+  - `ImportFaultMatrixTests`, 26;
+  - `GuideRemovalFaultMatrixTests`, 19;
+  - `GameRemovalFaultMatrixTests`, 22;
+  - `NtfsFaultTests`, 8. These cells run only on Windows.
+- **Characterization.** These cells passed on the code as it was before
+  their task:
+  - all 26 import cells;
+  - all 19 guide-removal cells;
+  - all 22 game-removal cells;
+  - 5 of the 8 NTFS cells: the junctioned `.staging/<op>`, `.trash/<op>` and
+    `.trash/<op>/<guide>` cells; the hard-linked guide file; and the unknown
+    trash folders.
+- **Fixes.** Each fix has a cell that failed first.
+  - **A junctioned `content/<guide>`** now maps to `Unsafe` in both removers.
+    Before, it escaped as a raw `InvalidDataException`. Cell:
+    `AJunctionedGuideFolderIsUnsafeToRemove`.
+  - **`ManagedArtworkStore.Delete`** no longer deletes through a filesystem
+    link. The junctioned-artwork cell showed that it deleted the outside
+    file, so the suspected defect was real. Cell:
+    `AJunctionedArtworkFolderKeepsTheOutsideFile`.
+  - **A guide holding `CON` or `x.`** can now be removed. Before, removal
+    was refused as `Failed`, because a plain Win32 path turns `x.` into
+    `x`. `OwnedGuideTree` now reads and deletes through `\\?\` paths. This
+    defect was found by the matrix and was not in the list above. Supported
+    imports can't create these names. Cell:
+    `ReservedNamesInARemovedGuideReachAConsistentOutcome`.
+  - **`ContentHeldOpenFailsAndRestoresEveryGuide`** now always holds the
+    guide that moves second, and asserts one `MovedGuide`. This changes
+    only the test, so no product code failed first.
+- **Tracking issues.**
+  [#61](https://github.com/ilya-slalom/desktop-guides/issues/61): an
+  import rolls back when its empty staging folder can't be deleted.
+- **Rulings.**
+  - **The existing remover order tests now include the new checkpoints.**
+    The plan expected them to stay unchanged. In fact
+    `RemoveDeletesTheGuideItsStateAndItsFiles` and
+    `RemoveDeletesTheGameItsGuidesAndTheirFiles` assert the full checkpoint
+    sequence. Both now include `TrashCreated`, and the game test also
+    includes `BeforeArtworkDelete`, because that game has artwork.
+  - **The reserved-name defect was fixed in T15.4 instead of tracked.** The
+    fix touches one file and changes no protocol step or journal format.
+- **Not run.** No installed smoke, because T15.4 has no UI.

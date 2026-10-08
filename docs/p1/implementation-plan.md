@@ -971,6 +971,8 @@ flows work by keyboard and with the recorded accessibility checks.
 T20.1 was merged through PR #59 on 8 October 2026 (merge commit `47ccf3a`;
 CI run 37765505021); see the
 [design](t20-1-library-export-design.md#t201-verification-record).
+T15.4 is implemented on `feat/p1-t15-4-fault-injection`; see the
+[design](t15-4-fault-injection-design.md#t154-verification-record).
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
