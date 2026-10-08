@@ -509,13 +509,18 @@ public sealed partial class ShellWindow : Window
         await RunNavigationAsync(GoBackAsync);
     }
 
+    private bool DialogOpen() =>
+        ShellRoot.XamlRoot is XamlRoot root &&
+        VisualTreeHelper.GetOpenPopupsForXamlRoot(root).Any(popup => popup.Child is ContentDialog);
+
     private void TitleBarPaneToggleRequested(TitleBar sender, object args) =>
         Navigation.IsPaneOpen = !Navigation.IsPaneOpen;
 
     private async void BackAcceleratorInvoked(
         KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
-        if (!AppTitleBar.IsBackButtonEnabled) return;
+        // An open ContentDialog owns the keyboard, as in ReaderToolbar.
+        if (!AppTitleBar.IsBackButtonEnabled || DialogOpen()) return;
         args.Handled = true;
         CancelReaderLoad();
         await RunNavigationAsync(GoBackAsync);
@@ -1895,6 +1900,9 @@ public sealed partial class ShellWindow : Window
 
                 case SettingsRoute:
                     SettingsPanel.Visibility = Visibility.Visible;
+                    // T14.4: like the other routes' loads, Settings clears
+                    // the previous route's bar.
+                    HideStatus();
                     await ProviderSettings.ReloadIfUnreadableAsync();
                     AnnounceStatus("Settings ready.");
                     break;
