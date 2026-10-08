@@ -3822,6 +3822,7 @@ try {
             [void](Wait-Name 'ReaderLoadError' $missingMessage)
             Assert-Absent 'ReaderTextLines'
             Assert-Absent 'ReaderLoading'
+            Assert-Absent 'RouteProgress'
             Assert-NoReaderCommands 'Missing File Guide'
             $report.phases += 'txt-missing'
 
@@ -3833,6 +3834,7 @@ try {
             [void](Wait-Name 'ReaderLoadError' 'Re-import this guide to read it.')
             Assert-Absent 'ReaderTextLines'
             Assert-Absent 'ReaderLoading'
+            Assert-Absent 'RouteProgress'
             Assert-NoReaderCommands 'Web Page Guide'
             $report.phases += 'html-no-manifest'
 
@@ -4153,6 +4155,7 @@ try {
             [void](Wait-Status 'Guide ready.' -Seconds 60)
             [void](Wait-VisibleById 'ReaderCommands')
             Assert-Absent 'ShellStatus'
+            Assert-Absent 'RouteProgress'
             Start-Sleep -Milliseconds 400
             $report["$($reader.name)WideScreenshot"] =
                 Save-WindowScreenshot "reader-$($reader.name)-wide"
@@ -5323,6 +5326,19 @@ try {
         $report.phases += 'remove-confirm'
 
         if ($Mode -eq 'remove-guide-cancel') {
+            # T14.4: Alt+Left belongs to the dialog while it's open: it
+            # neither leaves the Game page behind it nor runs after it closes.
+            Press-Back
+            Start-Sleep -Milliseconds 500
+            [void](Wait-VisibleById 'RemoveGuideDialog')
+            Invoke-Element (Wait-EnabledById 'CloseButton')
+            [void](Wait-HiddenById 'RemoveGuideDialog')
+            Start-Sleep -Milliseconds 1000
+            [void](Wait-Name 'GameHeading' 'Import Test Game')
+            Assert-Absent 'LibraryHeading'
+            $report.phases += 'back-key-ignored-under-dialog'
+            Invoke-Element (Wait-EnabledById 'RemoveSelectedGuide')
+            [void](Wait-VisibleById 'RemoveGuideDialog')
             Invoke-Element (Wait-EnabledById 'CloseButton')
             [void](Wait-HiddenById 'RemoveGuideDialog')
             Wait-FocusedId 'RemoveSelectedGuide'
@@ -5696,6 +5712,16 @@ try {
             throw 'A Reader opened after the later guide was removed.'
         }
         $report.phases += 'later-guide-failed-without-opening-reader'
+        # T14.4: opening Settings clears the previous route's bar, as every
+        # other route load does.
+        Select-Element 'Settings'
+        [void](Wait-Name 'SettingsHeading' 'Settings')
+        [void](Wait-Status 'Settings ready.')
+        [void](Wait-HiddenById 'ShellStatus')
+        Go-Back
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Status 'Game ready.')
+        $report.phases += 'settings-clears-previous-bar'
         Go-Back
         [void](Wait-Name 'LibraryHeading' 'Library')
         [void](Wait-Status 'Library ready.')
@@ -5713,6 +5739,7 @@ try {
         Assert-Absent 'GameHeading'
         Assert-Absent 'LibraryHeading'
         Assert-Absent 'ReaderLoading'
+        Assert-Absent 'RouteProgress'
         $report.phases += 'reader-render-read-failed-on-reader-route'
     }
     elseif ($Mode -eq 'reader-render-error-result') {
