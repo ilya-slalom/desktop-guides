@@ -52,7 +52,14 @@ Windows Firewall outbound block rule for the app's executable while a scenario
 with saved credentials runs. The rule blocks only the test executable, lasts
 at most 10 minutes, and requires the user's explicit authorization each time.
 The elevated controller removes the rule and reports its removal. Without the
-switch, the blocked-network scenario is recorded as not run. The full run adds
+switch, the blocked-network scenario is recorded as not run. On the host, start the
+installer from an interactive task with `-RunLevel Highest` (it trusts its
+temporary certificate in `LocalMachine`), restore
+`tools/p1/DesktopGuides.ShellSeed` first (the installer builds it with
+`--no-restore`), and build the MSIX on the host from the same staged sources:
+a CI-built package compiled from a CRLF checkout embeds different schema text
+than a seed tool built from an LF copy, and the app then rejects the seeded
+library as altered (T14.4). The full run adds
 the provider pass after the material passes, starting from an empty profile.
 
 Installed UI checks test what the app code controls, not Windows or WinUI.

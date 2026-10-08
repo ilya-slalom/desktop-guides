@@ -424,10 +424,16 @@ Found while running the checks:
   failure; marking completion on the Game page re-renders it; the hidden
   ring stays active outside the Reader; an empty page-colored card on an
   unexpected HTML open failure; the label offset; small nits.
-- **Not run here:** the host `-ProviderOnly` pass (the installer trusts its
-  signing certificate in `LocalMachine`, which needs an elevated task) and
-  listening with Narrator; both wait for the user. High contrast, text scale
-  and 200% display scale are T16.2's.
+- **Host provider pass** on VEGA (Windows 11 x64), 8 October 2026, with the
+  user's approval: `-ProviderOnly` through a one-off elevated interactive
+  task, with an MSIX built on the host from the branch's sources. Every
+  provider phase passed, including `saved-status-closes` and
+  `notice-opens-expanded-provider-settings`; both credential scans found no
+  file holding a credential value; the package, the temporary certificate and
+  the task were removed. The blocked-network pass wasn't run (no firewall rule).
+  Result: [provider-settings-host.json](evidence/t14-4-reader-settings/provider-settings-host.json).
+- **Not run here:** listening with Narrator, which waits for the user. High
+  contrast, text scale and 200% display scale are T16.2's.
 
 ## Risks
 

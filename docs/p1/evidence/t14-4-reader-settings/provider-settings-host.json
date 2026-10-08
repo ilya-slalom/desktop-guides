@@ -1,0 +1,20 @@
+﻿{
+    "mode":  "provider-settings",
+    "invocationId":  "8c1d77261e1048b19ea0bad32c102923",
+    "observedAt":  "2026-10-08T02:28:33.1208941Z",
+    "processId":  61944,
+    "sessionId":  1,
+    "exitDelayMilliseconds":  0,
+    "expectedScalePercent":  0,
+    "success":  true,
+    "phases":  [
+                   "library",
+                   "test-with-no-credentials-asks-for-them",
+                   "wrong-secret-is-rejected",
+                   "real-credentials-connect",
+                   "credentials-saved",
+                   "saved-status-closes"
+               ],
+    "steamGridDbTested":  true,
+    "settingsScreenshot":  "E:\\work\\desktop-guides\\t14-4-results\\providers-elevated-3\\run\\provider-settings.provider-settings-saved.png"
+}
