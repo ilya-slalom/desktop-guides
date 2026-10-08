@@ -9,16 +9,28 @@ public sealed class ImportFaultMatrixTests : IAsyncLifetime
 {
     private FaultFixture fixture = null!;
     private LibrarySnapshot before = null!;
+    private IReadOnlyList<FileFingerprint> sources = null!;
 
     public async Task InitializeAsync()
     {
         fixture = await FaultFixture.CreateAsync();
         before = fixture.Capture();
+        sources = FileFingerprint.Of(fixture.Sources.Root);
     }
 
     public async Task DisposeAsync() => await fixture.DisposeAsync();
 
     private static ImportCheckpoint Point(string name) => Enum.Parse<ImportCheckpoint>(name);
+
+    /// <summary>Nothing in the library changed, and the source files were never touched.</summary>
+    private void AssertNoTrace()
+    {
+        SnapshotAssert.Unchanged(before, fixture.Capture());
+        Assert.Equal(sources, FileFingerprint.Of(fixture.Sources.Root));
+    }
+
+    private long FileOperationCount() =>
+        Convert.ToInt64(fixture.Library.Scalar("SELECT COUNT(*) FROM FileOperations"));
 
     /// <summary>The new guide's 7 rows and 7 file-tree entries were added, and nothing else changed.</summary>
     private void AssertPublished()
@@ -39,6 +51,7 @@ public sealed class ImportFaultMatrixTests : IAsyncLifetime
             },
             added.Order(StringComparer.Ordinal));
         SnapshotAssert.Exactly(LibrarySnapshot.Diff(before, after), added, []);
+        Assert.Equal(sources, FileFingerprint.Of(fixture.Sources.Root));
     }
 
     [Theory]
@@ -54,7 +67,7 @@ public sealed class ImportFaultMatrixTests : IAsyncLifetime
             fixture.ImportAsync(fixture.Publisher(FaultFixture.FaultAt(Point(checkpoint)))));
 
         Assert.Equal(ImportIssue.SaveFailed, error.Issue);
-        SnapshotAssert.Unchanged(before, fixture.Capture());
+        AssertNoTrace();
     }
 
     [Theory]
@@ -68,10 +81,14 @@ public sealed class ImportFaultMatrixTests : IAsyncLifetime
     {
         await Assert.ThrowsAsync<GuideImportException>(() => fixture.ImportAsync(
             fixture.Publisher(FaultFixture.FaultAt(Point(checkpoint)), rollBack: FaultFixture.SkipImportRollBack)));
+        Assert.Equal(1, FileOperationCount());
 
         await fixture.RestartAsync();
 
-        SnapshotAssert.Unchanged(before, fixture.Capture());
+        Assert.Equal(1, fixture.Library.Repository.LastStartupReconciliation!.ResolvedOperationCount);
+        AssertNoTrace();
+        await fixture.ImportAsync(fixture.Publisher());
+        AssertPublished();
     }
 
     [Fact]
@@ -107,7 +124,7 @@ public sealed class ImportFaultMatrixTests : IAsyncLifetime
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.ImportAsync(
             fixture.Publisher(FaultFixture.CancelAt(Point(checkpoint), cancel)), cancel.Token));
 
-        SnapshotAssert.Unchanged(before, fixture.Capture());
+        AssertNoTrace();
     }
 
     [Theory]
@@ -116,43 +133,51 @@ public sealed class ImportFaultMatrixTests : IAsyncLifetime
     public async Task CancelOncePublishingStartsIsIgnored(string checkpoint)
     {
         using CancellationTokenSource cancel = new();
+        List<ImportProgress> reports = [];
 
         Guid id = await fixture.ImportAsync(
-            fixture.Publisher(FaultFixture.CancelAt(Point(checkpoint), cancel)), cancel.Token);
+            fixture.Publisher(FaultFixture.CancelAt(Point(checkpoint), cancel)), cancel.Token,
+            new SyncProgress(reports.Add));
 
         Assert.Equal(fixture.ImportGuideId, id);
         AssertPublished();
+        Assert.Equal(new ImportProgress(1, true), reports[^1]);
+        Assert.All(reports.SkipLast(1), report => Assert.True(report is { Publishing: false, Fraction: < 1 }));
     }
 
-    /// <summary>The first staged file writes normally; the second hits a full disk.</summary>
-    private static Func<string, Stream> FullDiskOnSecondFile()
+    /// <summary>Staged files before <paramref name="failingFile"/> write normally; that one hits a full disk.</summary>
+    private static Func<string, Stream> FullDiskOnFile(int failingFile)
     {
         int calls = 0;
-        return path => ++calls == 1
+        return path => ++calls < failingFile
             ? new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true)
             : new DiskFullStream();
     }
 
-    [Fact]
-    public async Task ACopyFaultAfterTheFirstFileLeavesNoTrace()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task AFullDiskLeavesNoTraceAndSaysSo(int failingFile)
     {
         GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(() =>
-            fixture.ImportAsync(fixture.Publisher(createStagedFile: FullDiskOnSecondFile())));
+            fixture.ImportAsync(fixture.Publisher(createStagedFile: FullDiskOnFile(failingFile))));
 
-        Assert.Equal(ImportIssue.NotEnoughSpace, error.Issue);
-        SnapshotAssert.Unchanged(before, fixture.Capture());
+        Assert.Equal(
+            (ImportIssue.NotEnoughSpace, "There isn't enough free space to import this guide."),
+            (error.Issue, error.Message));
+        AssertNoTrace();
     }
 
     [Fact]
     public async Task ACrashMidCopyIsUndoneAtStartup()
     {
         await Assert.ThrowsAsync<GuideImportException>(() => fixture.ImportAsync(fixture.Publisher(
-            createStagedFile: FullDiskOnSecondFile(), rollBack: FaultFixture.SkipImportRollBack)));
+            createStagedFile: FullDiskOnFile(2), rollBack: FaultFixture.SkipImportRollBack)));
         Assert.NotEmpty(Directory.EnumerateFileSystemEntries(fixture.Paths.StagingRoot));
 
         await fixture.RestartAsync();
 
-        SnapshotAssert.Unchanged(before, fixture.Capture());
+        AssertNoTrace();
     }
 
     [Theory]
@@ -169,7 +194,7 @@ public sealed class ImportFaultMatrixTests : IAsyncLifetime
             fixture.ImportAsync(fixture.Publisher()));
 
         Assert.Equal(ImportIssue.SaveFailed, error.Issue);
-        SnapshotAssert.Unchanged(before, fixture.Capture());
+        AssertNoTrace();
     }
 
     [Fact]
@@ -182,6 +207,24 @@ public sealed class ImportFaultMatrixTests : IAsyncLifetime
 
         await fixture.RestartAsync();
 
-        SnapshotAssert.Unchanged(before, fixture.Capture());
+        AssertNoTrace();
+    }
+
+    [Fact]
+    public async Task AFailedRollBackAfterAFullDiskStillSaysNotEnoughSpace()
+    {
+        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(() => fixture.ImportAsync(
+            fixture.Publisher(createStagedFile: FullDiskOnFile(1), rollBack: (_, _) => throw new InjectedFault())));
+        Assert.Equal(ImportIssue.NotEnoughSpace, error.Issue);
+        Assert.Equal(1, FileOperationCount());
+
+        await fixture.RestartAsync();
+
+        AssertNoTrace();
+    }
+
+    private sealed class SyncProgress(Action<ImportProgress> report) : IProgress<ImportProgress>
+    {
+        public void Report(ImportProgress value) => report(value);
     }
 }

@@ -281,31 +281,6 @@ public sealed class GuideImportPublisherTests
         harness.AssertNothingLeft();
     }
 
-    [Theory]
-    [InlineData(nameof(ImportCheckpoint.Prepared))]
-    [InlineData(nameof(ImportCheckpoint.Copied))]
-    [InlineData(nameof(ImportCheckpoint.Verified))]
-    [InlineData(nameof(ImportCheckpoint.Renamed))]
-    public async Task CancellationBeforeCommitRollsBack(string checkpoint)
-    {
-        ImportCheckpoint at = Enum.Parse<ImportCheckpoint>(checkpoint);
-        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
-        string source = harness.Sources.Copy("txt-utf8.txt", "notes.txt");
-        IReadOnlyList<FileFingerprint> original = FileFingerprint.Of(source);
-        ImportManifest manifest = await harness.InspectAsync(source);
-        using CancellationTokenSource cancel = new();
-        GuideImportPublisher publisher = harness.Publisher(checkpoint: point =>
-        {
-            if (point == at) cancel.Cancel();
-        });
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => harness.PublishAsync(publisher, manifest, token: cancel.Token));
-
-        harness.AssertNothingLeft();
-        Assert.Equal(original, FileFingerprint.Of(source));
-    }
-
     [Fact]
     public async Task CancellationFromProgressRollsBack()
     {
@@ -320,40 +295,6 @@ public sealed class GuideImportPublisherTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => harness.PublishAsync(harness.Publisher(), manifest, progress, cancel.Token));
 
-        harness.AssertNothingLeft();
-    }
-
-    [Fact]
-    public async Task CancellationInsideTheCommitIsIgnored()
-    {
-        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
-        ImportManifest manifest = await harness.InspectAsync(harness.Sources.Copy("txt-utf8.txt", "notes.txt"));
-        using CancellationTokenSource cancel = new();
-        List<ImportProgress> reports = [];
-        GuideImportPublisher publisher = harness.Publisher(checkpoint: point =>
-        {
-            if (point == ImportCheckpoint.InCommit) cancel.Cancel();
-        });
-
-        Guid id = await harness.PublishAsync(publisher, manifest, new SyncProgress(reports.Add), cancel.Token);
-
-        Assert.NotNull(await harness.Repository.GetGuideAsync(id));
-        Assert.Equal(new ImportProgress(1, true), reports[^1]);
-        Assert.All(reports.SkipLast(1), report => Assert.True(report is { Publishing: false, Fraction: < 1 }));
-    }
-
-    [Fact]
-    public async Task FullDiskIsNotEnoughSpace()
-    {
-        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
-        ImportManifest manifest = await harness.InspectAsync(harness.Sources.Copy("txt-utf8.txt", "notes.txt"));
-
-        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(
-            () => harness.PublishAsync(harness.Publisher(createStagedFile: _ => new DiskFullStream()), manifest));
-
-        Assert.Equal(
-            (ImportIssue.NotEnoughSpace, "There isn't enough free space to import this guide."),
-            (error.Issue, error.Message));
         harness.AssertNothingLeft();
     }
 
@@ -376,86 +317,6 @@ public sealed class GuideImportPublisherTests
         Assert.Equal("not ours", File.ReadAllText(foreign));
         Assert.Empty(Directory.EnumerateFileSystemEntries(harness.Paths.StagingRoot));
         Assert.Equal(0, harness.Count("Guides") + harness.Count("FileOperations"));
-    }
-
-    [Fact]
-    public async Task FailureInsideTheCommitIsSaveFailed()
-    {
-        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
-        ImportManifest manifest = await harness.InspectAsync(harness.Sources.Copy("txt-utf8.txt", "notes.txt"));
-        GuideImportPublisher publisher = harness.Publisher(checkpoint: point =>
-        {
-            if (point == ImportCheckpoint.InCommit) throw new InvalidOperationException("injected");
-        });
-
-        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(
-            () => harness.PublishAsync(publisher, manifest));
-
-        Assert.Equal(ImportIssue.SaveFailed, error.Issue);
-        harness.AssertNothingLeft();
-    }
-
-    [Fact]
-    public async Task GameDeletedBeforeCommitIsSaveFailed()
-    {
-        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
-        ImportManifest manifest = await harness.InspectAsync(harness.Sources.Copy("txt-utf8.txt", "notes.txt"));
-        GuideImportPublisher publisher = harness.Publisher(checkpoint: point =>
-        {
-            if (point == ImportCheckpoint.Renamed) harness.Execute("DELETE FROM Games WHERE Id = $id", harness.Game.Id);
-        });
-
-        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(
-            () => harness.PublishAsync(publisher, manifest));
-
-        Assert.Equal(ImportIssue.SaveFailed, error.Issue);
-        harness.AssertNothingLeft();
-    }
-
-    [Theory]
-    [InlineData(nameof(ImportCheckpoint.Prepared))]
-    [InlineData(nameof(ImportCheckpoint.Copied))]
-    [InlineData(nameof(ImportCheckpoint.Verified))]
-    [InlineData(nameof(ImportCheckpoint.Renamed))]
-    [InlineData(nameof(ImportCheckpoint.InCommit))]
-    public async Task CrashIsRolledBackAtStartup(string checkpoint)
-    {
-        ImportCheckpoint at = Enum.Parse<ImportCheckpoint>(checkpoint);
-        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
-        ImportManifest manifest = await harness.InspectAsync(harness.Sources.Copy("txt-utf8.txt", "notes.txt"));
-        GuideImportPublisher crashing = harness.Publisher(
-            checkpoint: point =>
-            {
-                if (point == at) throw new InvalidOperationException("crash");
-            },
-            rollBack: (_, _) => { });
-        await Assert.ThrowsAsync<GuideImportException>(() => harness.PublishAsync(crashing, manifest));
-        Assert.Equal(1, harness.Count("FileOperations"));
-
-        await harness.Repository.InitializeAsync();
-
-        Assert.Equal(1, harness.Repository.LastStartupReconciliation!.ResolvedOperationCount);
-        harness.AssertNothingLeft();
-        Guid later = await harness.PublishAsync(harness.Publisher(), manifest);
-        Assert.NotNull(await harness.Repository.GetGuideAsync(later));
-    }
-
-    [Fact]
-    public async Task FailedRollBackStillReportsTheOriginalIssue()
-    {
-        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
-        ImportManifest manifest = await harness.InspectAsync(harness.Sources.Copy("txt-utf8.txt", "notes.txt"));
-        GuideImportPublisher publisher = harness.Publisher(
-            createStagedFile: _ => new DiskFullStream(),
-            rollBack: (_, _) => throw new IOException("rollback failed"));
-
-        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(
-            () => harness.PublishAsync(publisher, manifest));
-
-        Assert.Equal(ImportIssue.NotEnoughSpace, error.Issue);
-        Assert.Equal(1, harness.Count("FileOperations"));
-        await harness.Repository.InitializeAsync();
-        harness.AssertNothingLeft();
     }
 
     [Fact]
@@ -605,23 +466,6 @@ public sealed class GuideImportPublisherTests
             Assert.Equal(bytes.LongLength, asset.ByteCount);
             Assert.Equal(Convert.ToHexStringLower(SHA256.HashData(bytes)), asset.Sha256);
         }
-    }
-
-    [Fact]
-    public async Task AFailureInsideTheCommitLeavesNoAssetRows()
-    {
-        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
-        string entry = CopyHtmlStatic(harness, "guide.html");
-        GuideImportPublisher publisher = harness.Publisher(checkpoint: point =>
-        {
-            if (point == ImportCheckpoint.InCommit) throw new IOException("Injected inside the commit.");
-        });
-
-        await Assert.ThrowsAnyAsync<Exception>(
-            async () => await harness.PublishAsync(publisher, await harness.InspectAsync(entry)));
-
-        Assert.Equal(0, harness.Count("GuideAssets"));
-        harness.AssertNothingLeft();
     }
 
     [Theory]

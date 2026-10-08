@@ -49,6 +49,7 @@ public sealed class GuideRemovalFaultMatrixTests : IAsyncLifetime
             fixture.GuideRemover(FaultFixture.FaultAt(Point(checkpoint))).RemoveAsync(fixture.SubjectGuide));
 
         Assert.Equal(GuideRemovalIssue.Failed, error.Issue);
+        Assert.IsType<InjectedFault>(error.InnerException);
         SnapshotAssert.Unchanged(before, fixture.Capture());
     }
 
@@ -65,6 +66,7 @@ public sealed class GuideRemovalFaultMatrixTests : IAsyncLifetime
 
         await fixture.RestartAsync();
 
+        Assert.Equal(new StartupReconciliationReport(1, 0), fixture.Library.Repository.LastStartupReconciliation);
         SnapshotAssert.Unchanged(before, fixture.Capture());
     }
 

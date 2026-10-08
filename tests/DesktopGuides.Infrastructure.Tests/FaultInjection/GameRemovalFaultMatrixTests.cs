@@ -1,6 +1,7 @@
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Providers;
 using DesktopGuides.Infrastructure.Storage;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace DesktopGuides.Infrastructure.Tests.FaultInjection;
@@ -62,6 +63,7 @@ public sealed class GameRemovalFaultMatrixTests : IAsyncLifetime
             Remove(fixture.GameRemover(FaultFixture.FaultAt(Point(checkpoint)))));
 
         Assert.Equal(GameRemovalIssue.Failed, error.Issue);
+        Assert.IsType<InjectedFault>(error.InnerException);
         SnapshotAssert.Unchanged(before, fixture.Capture());
     }
 
@@ -77,6 +79,7 @@ public sealed class GameRemovalFaultMatrixTests : IAsyncLifetime
             FaultFixture.FaultAt(Point(checkpoint)), rollBack: FaultFixture.SkipDeletionRollBack)));
 
         await fixture.RestartAsync();
+        await fixture.RestartAsync();
 
         SnapshotAssert.Unchanged(before, fixture.Capture());
     }
@@ -87,6 +90,7 @@ public sealed class GameRemovalFaultMatrixTests : IAsyncLifetime
         GameRemovalException error = await Assert.ThrowsAsync<GameRemovalException>(() => Remove(fixture.GameRemover(
             FaultFixture.FaultAt(RemovalCheckpoint.Moved), rollBack: FaultFixture.FailDeletionRollBack)));
         Assert.Equal(GameRemovalIssue.RestoreFailed, error.Issue);
+        Assert.Equal("DeleteGame|Prepared", fixture.Library.Scalar("SELECT Kind || '|' || Phase FROM FileOperations"));
 
         await fixture.RestartAsync();
 
@@ -128,17 +132,20 @@ public sealed class GameRemovalFaultMatrixTests : IAsyncLifetime
         AssertRemoved();
     }
 
-    [Fact]
-    public async Task ARefusedDeleteRestoresTheGame()
+    [Theory]
+    [InlineData("INSERT ON FileOperations")]
+    [InlineData("DELETE ON Games")]
+    public async Task ARefusedDatabaseWriteRestoresTheGame(string write)
     {
-        fixture.Library.Execute("""
-            CREATE TRIGGER RefuseDelete BEFORE DELETE ON Games
+        fixture.Library.Execute($"""
+            CREATE TRIGGER RefuseWrite BEFORE {write}
             BEGIN SELECT RAISE(ABORT, 'fault'); END
             """);
 
         GameRemovalException error = await Assert.ThrowsAsync<GameRemovalException>(() => Remove(fixture.GameRemover()));
 
         Assert.Equal(GameRemovalIssue.Failed, error.Issue);
+        Assert.IsType<SqliteException>(error.InnerException);
         SnapshotAssert.Unchanged(before, fixture.Capture());
     }
 
@@ -147,7 +154,7 @@ public sealed class GameRemovalFaultMatrixTests : IAsyncLifetime
     {
         GameRemovalResult result = await Remove(fixture.GameRemover());
 
-        Assert.Equal((GameRemovalOutcome.Removed, false), (result.Outcome, result.CleanupPending));
+        Assert.Equal(new GameRemovalResult(GameRemovalOutcome.Removed, false, null), result);
         AssertRemoved();
     }
 
@@ -220,5 +227,7 @@ public sealed class GameRemovalFaultMatrixTests : IAsyncLifetime
         await fixture.GameRemover().RemoveAsync(game, 0);
 
         SnapshotAssert.Exactly(LibrarySnapshot.Diff(start, fixture.Capture()), [], start.KeysContaining(game));
+        (Guid again, _) = await AddEmptyGameAsync();
+        Assert.NotEqual(game, again);
     }
 }

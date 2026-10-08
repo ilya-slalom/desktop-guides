@@ -4,7 +4,6 @@ using DesktopGuides.Core.Providers;
 using DesktopGuides.Infrastructure.Artwork;
 using DesktopGuides.Infrastructure.Storage;
 using DesktopGuides.Infrastructure.Tests.Import;
-using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace DesktopGuides.Infrastructure.Tests;
@@ -63,11 +62,6 @@ public sealed class GameRemovalTests : IAsyncLifetime
 
     private int TrashEntries() =>
         Directory.EnumerateFileSystemEntries(library.Paths.TrashRoot).Count();
-
-    private static Action<RemovalCheckpoint> FaultAt(RemovalCheckpoint fault) => reached =>
-    {
-        if (reached == fault) throw new InvalidOperationException("fault");
-    };
 
     private void HoldTrashedMap(out FileStream held)
     {
@@ -149,43 +143,6 @@ public sealed class GameRemovalTests : IAsyncLifetime
     // Remove
 
     [Fact]
-    public async Task RemoveDeletesTheGameItsGuidesAndTheirFiles()
-    {
-        List<RemovalCheckpoint> seen = [];
-
-        GameRemovalResult result = await Remover(seen.Add).RemoveAsync(game.Id, 2);
-
-        Assert.Equal(new GameRemovalResult(GameRemovalOutcome.Removed, false, null), result);
-        Assert.Equal(
-            [RemovalCheckpoint.Prepared, RemovalCheckpoint.TrashCreated, RemovalCheckpoint.MovedGuide,
-             RemovalCheckpoint.MovedGuide, RemovalCheckpoint.Moved, RemovalCheckpoint.InCommit,
-             RemovalCheckpoint.Committed, RemovalCheckpoint.BeforeArtworkDelete],
-            seen);
-        Assert.Equal("0", GameRows(game.Id));
-        Assert.Null(await library.Repository.FindLinkedGameAsync(ProviderGameLink.Igdb, "900500"));
-        Assert.Equal("0|0|0", library.RowsFor(walkthroughId));
-        Assert.Equal("0|0|0", library.RowsFor(mapsId));
-        Assert.False(Directory.Exists(Content(walkthroughId)));
-        Assert.False(Directory.Exists(Content(mapsId)));
-        Assert.False(File.Exists(artworkFile));
-        Assert.False(Directory.Exists(Path.GetDirectoryName(artworkFile)));
-        Assert.Equal(0, TrashEntries());
-        Assert.Equal("0", OperationCount());
-        await AssertOtherGameKeptAsync();
-    }
-
-    [Fact]
-    public async Task RemoveClearsAResumeGuideThatWasTheGames()
-    {
-        await library.Repository.SaveSettingsAsync(
-            await library.Repository.GetSettingsAsync() with { LastActiveGuideId = mapsId });
-
-        await Remover().RemoveAsync(game.Id, 2);
-
-        Assert.Null((await library.Repository.GetSettingsAsync()).LastActiveGuideId);
-    }
-
-    [Fact]
     public async Task RemoveKeepsAResumeGuideFromAnotherGame()
     {
         await library.Repository.SaveSettingsAsync(
@@ -209,21 +166,6 @@ public sealed class GameRemovalTests : IAsyncLifetime
         Assert.Null(await library.Repository.GetGameAsync(id));
         AssertGameIntact();
         await AssertOtherGameKeptAsync();
-    }
-
-    [Fact]
-    public async Task ALinkedGameWithoutGuidesLosesItsArtworkAndCanBeAddedAgain()
-    {
-        Game empty = await AddLinkedAsync("Empty Linked Game", "900700");
-        string file = store.ResolveFile(empty.ArtworkRelativePath!)!;
-
-        Assert.Equal(GameRemovalOutcome.Removed, (await Remover().RemoveAsync(empty.Id, 0)).Outcome);
-
-        Assert.False(File.Exists(file));
-        Assert.False(Directory.Exists(Path.GetDirectoryName(file)));
-        Assert.Null(await library.Repository.FindLinkedGameAsync(ProviderGameLink.Igdb, "900700"));
-        Game again = await AddLinkedAsync("Empty Linked Game", "900700");
-        Assert.NotEqual(empty.Id, again.Id);
     }
 
     [Fact]
@@ -347,49 +289,7 @@ public sealed class GameRemovalTests : IAsyncLifetime
         harness.AssertNothingLeft();
     }
 
-    [Fact]
-    public async Task RemoveWithACancelledTokenWritesNothing()
-    {
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => Remover().RemoveAsync(game.Id, 2, new CancellationToken(canceled: true)));
-
-        AssertGameIntact();
-    }
-
     // Crash points
-
-    [Theory]
-    [InlineData("Prepared")]
-    [InlineData("MovedGuide")]
-    [InlineData("Moved")]
-    [InlineData("InCommit")]
-    public async Task AFaultBeforeTheCommitRestoresEveryGuide(string point)
-    {
-        // MovedGuide faults at the first of the two moves.
-        GameRemovalException error = await Assert.ThrowsAsync<GameRemovalException>(
-            () => Remover(FaultAt(Enum.Parse<RemovalCheckpoint>(point))).RemoveAsync(game.Id, 2));
-
-        Assert.Equal(GameRemovalIssue.Failed, error.Issue);
-        Assert.IsType<InvalidOperationException>(error.InnerException);
-        AssertGameIntact();
-        await AssertOtherGameKeptAsync();
-    }
-
-    [Fact]
-    public async Task APrepareFailureChangesNothing()
-    {
-        library.Execute("""
-            CREATE TRIGGER RefuseOperations BEFORE INSERT ON FileOperations
-            BEGIN SELECT RAISE(ABORT, 'fault'); END
-            """);
-
-        GameRemovalException error = await Assert.ThrowsAsync<GameRemovalException>(
-            () => Remover().RemoveAsync(game.Id, 2));
-
-        Assert.Equal(GameRemovalIssue.Failed, error.Issue);
-        Assert.IsType<SqliteException>(error.InnerException);
-        AssertGameIntact();
-    }
 
     [Fact]
     public async Task ContentHeldOpenFailsAndRestoresEveryGuide()
@@ -524,15 +424,4 @@ public sealed class GameRemovalTests : IAsyncLifetime
         Assert.Equal("1|1|1", library.RowsFor(otherGuideId));
     }
 
-    [Fact]
-    public async Task AFaultWhileCommittingAGameWithoutGuidesKeepsIt()
-    {
-        Guid id = await library.AddGameAsync("Empty Manual Game");
-
-        GameRemovalException error = await Assert.ThrowsAsync<GameRemovalException>(
-            () => Remover(FaultAt(RemovalCheckpoint.InCommit)).RemoveAsync(id, 0));
-
-        Assert.Equal(GameRemovalIssue.Failed, error.Issue);
-        Assert.NotNull(await library.Repository.GetGameAsync(id));
-    }
 }
