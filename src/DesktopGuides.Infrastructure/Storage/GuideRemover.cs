@@ -3,7 +3,7 @@ using DesktopGuides.Core.Paths;
 
 namespace DesktopGuides.Infrastructure.Storage;
 
-internal enum RemovalCheckpoint { Prepared, MovedGuide, Moved, InCommit, Committed }
+internal enum RemovalCheckpoint { Prepared, TrashCreated, MovedGuide, Moved, InCommit, Committed, BeforeArtworkDelete }
 
 /// <summary>
 /// Removes a guide and its owned files. The removal holds the library write
@@ -22,12 +22,18 @@ public sealed class GuideRemover
     {
     }
 
+    private readonly Action<IDeletionJournal, Guid> rollBack;
+    private readonly Action<IDeletionJournal, Guid> finish;
+
     internal GuideRemover(
-        SqliteLibraryRepository repository, ILibraryPaths paths, Action<RemovalCheckpoint> checkpoint)
+        SqliteLibraryRepository repository, ILibraryPaths paths, Action<RemovalCheckpoint> checkpoint,
+        Action<IDeletionJournal, Guid>? rollBack = null, Action<IDeletionJournal, Guid>? finish = null)
     {
         this.repository = repository ?? throw new ArgumentNullException(nameof(repository));
         this.paths = paths ?? throw new ArgumentNullException(nameof(paths));
         this.checkpoint = checkpoint ?? throw new ArgumentNullException(nameof(checkpoint));
+        this.rollBack = rollBack ?? ((journal, operationId) => journal.RollBack(operationId));
+        this.finish = finish ?? ((journal, operationId) => journal.Finish(operationId));
     }
 
     /// <summary>The guide and its file count, or null when it's already gone.</summary>
@@ -80,6 +86,7 @@ public sealed class GuideRemover
             {
                 string trashPath = paths.GetTrashedGuideRoot(operationId, guideId);
                 Directory.CreateDirectory(Path.GetDirectoryName(trashPath)!);
+                checkpoint(RemovalCheckpoint.TrashCreated);
                 Directory.Move(contentPath, trashPath);
             }
             checkpoint(RemovalCheckpoint.Moved);
@@ -89,7 +96,7 @@ public sealed class GuideRemover
         {
             try
             {
-                journal.RollBack(operationId);
+                rollBack(journal, operationId);
             }
             catch (Exception rollBackError)
             {
@@ -102,7 +109,7 @@ public sealed class GuideRemover
         try
         {
             checkpoint(RemovalCheckpoint.Committed);
-            journal.Finish(operationId);
+            finish(journal, operationId);
             return new GuideRemovalResult(GuideRemovalOutcome.Removed, false);
         }
         catch (Exception)
