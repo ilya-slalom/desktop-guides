@@ -74,8 +74,9 @@ internal sealed class FaultFixture : IAsyncDisposable
             rollBack ?? ((journal, operation) => journal.RollBack(operation)));
     }
 
-    public Task<Guid> ImportAsync(GuideImportPublisher publisher, CancellationToken token = default) =>
-        publisher.PublishAsync(HtmlManifest, SubjectGame, "Imported Guide", false, null, token);
+    public Task<Guid> ImportAsync(
+        GuideImportPublisher publisher, CancellationToken token = default, IProgress<ImportProgress>? progress = null) =>
+        publisher.PublishAsync(HtmlManifest, SubjectGame, "Imported Guide", false, progress, token);
 
     public GuideRemover GuideRemover(
         Action<RemovalCheckpoint>? checkpoint = null,

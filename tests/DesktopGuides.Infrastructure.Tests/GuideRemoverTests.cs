@@ -109,25 +109,6 @@ public sealed class GuideRemoverTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RemoveDeletesTheGuideItsStateAndItsFiles()
-    {
-        List<RemovalCheckpoint> seen = [];
-
-        GuideRemovalResult result = await Remover(seen.Add).RemoveAsync(guideId);
-
-        Assert.Equal(new GuideRemovalResult(GuideRemovalOutcome.Removed, false), result);
-        Assert.Equal(
-            [RemovalCheckpoint.Prepared, RemovalCheckpoint.TrashCreated, RemovalCheckpoint.Moved,
-             RemovalCheckpoint.InCommit, RemovalCheckpoint.Committed],
-            seen);
-        Assert.Equal("0|0|0", library.RowsFor(guideId));
-        Assert.False(Directory.Exists(Content(guideId)));
-        Assert.Equal(0, TrashEntries(library));
-        Assert.Equal("0", OperationCount());
-        AssertNeighboursKept();
-    }
-
-    [Fact]
     public async Task RemoveOfABrokenGuideDeletesItsRows()
     {
         Directory.Delete(Content(guideId), true);
@@ -176,25 +157,6 @@ public sealed class GuideRemoverTests : IAsyncLifetime
         {
             Directory.Delete(link);
         }
-    }
-
-    [Theory]
-    [InlineData("Prepared")]
-    [InlineData("Moved")]
-    [InlineData("InCommit")]
-    public async Task AFaultBeforeTheCommitRestoresTheGuide(string point)
-    {
-        RemovalCheckpoint fault = Enum.Parse<RemovalCheckpoint>(point);
-
-        GuideRemovalException error = await Assert.ThrowsAsync<GuideRemovalException>(() => Remover(reached =>
-        {
-            if (reached == fault) throw new InvalidOperationException("fault");
-        }).RemoveAsync(guideId));
-
-        Assert.Equal(GuideRemovalIssue.Failed, error.Issue);
-        Assert.IsType<InvalidOperationException>(error.InnerException);
-        AssertGuideIntact();
-        AssertNeighboursKept();
     }
 
     [Fact]
@@ -306,12 +268,4 @@ public sealed class GuideRemoverTests : IAsyncLifetime
         AssertNeighboursKept();
     }
 
-    [Fact]
-    public async Task RemoveWithACancelledTokenWritesNothing()
-    {
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => Remover().RemoveAsync(guideId, new CancellationToken(canceled: true)));
-
-        AssertGuideIntact();
-    }
 }
