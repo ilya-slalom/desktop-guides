@@ -1,0 +1,885 @@
+{
+    "runId":  "c52a709535894dacbc244f6f350cffe0",
+    "observedAt":  "2026-10-08T04:20:24.3301027Z",
+    "osBuild":  "10.0.26200.0",
+    "cpuArchitecture":  "AMD64",
+    "mode":  "portable",
+    "scenarioScope":  "core,html,pdf",
+    "scenarioGroupsRun":  [
+                              "core",
+                              "html"
+                          ],
+    "success":  false,
+    "windowsAppRuntime":  [
+                              "2.2.0.0",
+                              "2.3.1.0",
+                              "2.4.0.0",
+                              "2.5.1.0"
+                          ],
+    "dotnetSdk":  "10.0.401",
+    "portableExecutable":  "E:\\work\\desktop-guides\\portable-80d2647\\verify\\DesktopGuides.Production.exe",
+    "portableExecutableSha256":  "1016FDC1BF52360A44A276F21776AE6132B549358A60AF42AD35A234FFDE086E",
+    "launchedProcessId":  57472,
+    "launchedSessionId":  1,
+    "empty":  {
+                  "mode":  "empty",
+                  "invocationId":  "b687478d891b4c3d8af3752ab5e8313d",
+                  "observedAt":  "2026-10-08T04:20:32.2123973Z",
+                  "processId":  28860,
+                  "sessionId":  1,
+                  "exitDelayMilliseconds":  2000,
+                  "expectedScalePercent":  0,
+                  "success":  true,
+                  "phases":  [
+                                 "library",
+                                 "empty-library"
+                             ]
+              },
+    "emptyAfterDelayedTask":  {
+                                  "mode":  "empty",
+                                  "invocationId":  "2d9084bc3ac6441db8a9f19443734e86",
+                                  "observedAt":  "2026-10-08T04:20:36.5701949Z",
+                                  "processId":  28860,
+                                  "sessionId":  1,
+                                  "exitDelayMilliseconds":  0,
+                                  "expectedScalePercent":  0,
+                                  "success":  true,
+                                  "phases":  [
+                                                 "library",
+                                                 "empty-library"
+                                             ]
+                              },
+    "secondLaunchProcessId":  63052,
+    "backgroundActivation":  {
+                                 "handoffToken":  "4c154da555c9407ba743fd318235b63d",
+                                 "foregroundTargetProcessId":  28860,
+                                 "probeWindowHandle":  711725412,
+                                 "foregroundWindowBefore":  711725412,
+                                 "targetWindowHandle":  6687832,
+                                 "foregroundWindowHandle":  6687832,
+                                 "childExited":  true,
+                                 "success":  true
+                             },
+    "redirectedActivationObserved":  true,
+    "secondLaunchProcessIds":  [
+                                   28860
+                               ],
+    "singleInstanceProcessId":  28860,
+    "emptyAfterSecondLaunch":  {
+                                   "mode":  "empty",
+                                   "invocationId":  "83ba7572782945bb88baf5149e1b8ae6",
+                                   "observedAt":  "2026-10-08T04:20:41.0138727Z",
+                                   "processId":  28860,
+                                   "sessionId":  1,
+                                   "exitDelayMilliseconds":  0,
+                                   "expectedScalePercent":  0,
+                                   "success":  true,
+                                   "phases":  [
+                                                  "library",
+                                                  "empty-library"
+                                              ]
+                               },
+    "gameEditor":  {
+                       "mode":  "game-editor",
+                       "invocationId":  "5d0bd67b428a457c8fbf6b76e83aa3ef",
+                       "observedAt":  "2026-10-08T04:20:43.4507132Z",
+                       "processId":  28860,
+                       "sessionId":  1,
+                       "exitDelayMilliseconds":  0,
+                       "expectedScalePercent":  0,
+                       "success":  true,
+                       "phases":  [
+                                      "library",
+                                      "cancel-and-invalid-title-leave-empty-library",
+                                      "keyboard-add-unicode-and-optional-fields",
+                                      "cancel-edit-preserves-game",
+                                      "long-notes-preserve-guide-area",
+                                      "edit-by-id-and-clear-optional-fields",
+                                      "duplicate-title-games-are-distinct"
+                                  ],
+                       "addGameScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\game-editor.add-game.png",
+                       "editGameScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\game-editor.edit-game.png",
+                       "longNotesScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\game-editor.long-notes.png"
+                   },
+    "closedGracefully":  true,
+    "gameEditorPersisted":  {
+                                "mode":  "game-editor-persisted",
+                                "invocationId":  "0557d95f524a4c849d3365baad9e26af",
+                                "observedAt":  "2026-10-08T04:20:53.4690032Z",
+                                "processId":  56492,
+                                "sessionId":  1,
+                                "exitDelayMilliseconds":  0,
+                                "expectedScalePercent":  0,
+                                "success":  true,
+                                "phases":  [
+                                               "library",
+                                               "edited-and-duplicate-games-survive-relaunch"
+                                           ]
+                            },
+    "gameEditorClosePrepared":  {
+                                    "mode":  "prepare-game-editor-close",
+                                    "invocationId":  "88fc86cf4ea345c4a03ebf3f4880e633",
+                                    "observedAt":  "2026-10-08T04:20:57.6482930Z",
+                                    "processId":  32828,
+                                    "sessionId":  1,
+                                    "exitDelayMilliseconds":  0,
+                                    "expectedScalePercent":  0,
+                                    "success":  true,
+                                    "phases":  [
+                                                   "library",
+                                                   "game-ready-for-editor-close"
+                                               ]
+                                },
+    "gameEditorQueuedBeforeClose":  {
+                                        "mode":  "queue-game-editor",
+                                        "invocationId":  "7fd66143c758478fbe65afea7ec3c28f",
+                                        "observedAt":  "2026-10-08T04:21:00.7671996Z",
+                                        "processId":  32828,
+                                        "sessionId":  1,
+                                        "exitDelayMilliseconds":  0,
+                                        "expectedScalePercent":  0,
+                                        "success":  true,
+                                        "phases":  [
+                                                       "game-editor-read-started"
+                                                   ]
+                                    },
+    "normal":  {
+                   "mode":  "normal",
+                   "invocationId":  "008f5c9238eb4aae8ee4edf009142a1f",
+                   "observedAt":  "2026-10-08T04:21:04.5320740Z",
+                   "processId":  57740,
+                   "sessionId":  1,
+                   "exitDelayMilliseconds":  0,
+                   "expectedScalePercent":  0,
+                   "success":  true,
+                   "phases":  [
+                                  "library",
+                                  "resume-reader",
+                                  "reader-pane-toggle",
+                                  "reader-back-game",
+                                  "uia-reopen-selected-guide",
+                                  "pointer-reopen-selected-guide",
+                                  "keyboard-reopen-selected-guide",
+                                  "focused-guide-enter",
+                                  "restore-route-guide",
+                                  "game-back-library",
+                                  "pointer-library-game-reader-game",
+                                  "keyboard-library-game-reader-game",
+                                  "settings",
+                                  "settings-back-library",
+                                  "rapid-game-settings-back-game",
+                                  "rapid-guide-settings-back-reader",
+                                  "library-game-reader-game",
+                                  "restore-last-guide-for-relaunch"
+                              ],
+                   "readerScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\normal.reader.png",
+                   "gameScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\normal.game.png"
+               },
+    "pendingGuide":  {
+                         "mode":  "queue-guide-write",
+                         "invocationId":  "3f636c0605af416c8c5e4e72ac42a11c",
+                         "observedAt":  "2026-10-08T04:21:22.9704725Z",
+                         "processId":  57740,
+                         "sessionId":  1,
+                         "exitDelayMilliseconds":  0,
+                         "expectedScalePercent":  0,
+                         "success":  true,
+                         "phases":  [
+                                        "guide-reader-open-while-save-blocked"
+                                    ]
+                     },
+    "closeHandoffOverlapObserved":  true,
+    "waitingDuringClose":  {
+                               "mode":  "waiting-handoff",
+                               "invocationId":  "d07e49715108465caeac7290a4c6e199",
+                               "observedAt":  "2026-10-08T04:21:27.6780310Z",
+                               "processId":  63932,
+                               "sessionId":  1,
+                               "exitDelayMilliseconds":  0,
+                               "expectedScalePercent":  0,
+                               "success":  true,
+                               "phases":  [
+                                              "waiting-for-library-lease"
+                                          ]
+                           },
+    "relaunchDuringCloseProcessId":  63932,
+    "normalAfterCloseRelaunch":  {
+                                     "mode":  "normal",
+                                     "invocationId":  "df25680979a84ac4a9398e4c3ec1d123",
+                                     "observedAt":  "2026-10-08T04:21:30.2354043Z",
+                                     "processId":  63932,
+                                     "sessionId":  1,
+                                     "exitDelayMilliseconds":  0,
+                                     "expectedScalePercent":  0,
+                                     "success":  true,
+                                     "phases":  [
+                                                    "library",
+                                                    "resume-reader",
+                                                    "reader-pane-toggle",
+                                                    "reader-back-game",
+                                                    "uia-reopen-selected-guide",
+                                                    "pointer-reopen-selected-guide",
+                                                    "keyboard-reopen-selected-guide",
+                                                    "focused-guide-enter",
+                                                    "restore-route-guide",
+                                                    "game-back-library",
+                                                    "pointer-library-game-reader-game",
+                                                    "keyboard-library-game-reader-game",
+                                                    "settings",
+                                                    "settings-back-library",
+                                                    "rapid-game-settings-back-game",
+                                                    "rapid-guide-settings-back-reader",
+                                                    "library-game-reader-game",
+                                                    "restore-last-guide-for-relaunch"
+                                                ],
+                                     "readerScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\normal.reader.png",
+                                     "gameScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\normal.game.png"
+                                 },
+    "closingTargetSelected":  true,
+    "closingTargetRelaunchProcessId":  50772,
+    "normalAfterClosingTarget":  {
+                                     "mode":  "normal",
+                                     "invocationId":  "520cf30e43ff4421b9d28e5c483a8be3",
+                                     "observedAt":  "2026-10-08T04:21:51.3074429Z",
+                                     "processId":  50772,
+                                     "sessionId":  1,
+                                     "exitDelayMilliseconds":  0,
+                                     "expectedScalePercent":  0,
+                                     "success":  true,
+                                     "phases":  [
+                                                    "library",
+                                                    "resume-reader",
+                                                    "reader-pane-toggle",
+                                                    "reader-back-game",
+                                                    "uia-reopen-selected-guide",
+                                                    "pointer-reopen-selected-guide",
+                                                    "keyboard-reopen-selected-guide",
+                                                    "focused-guide-enter",
+                                                    "restore-route-guide",
+                                                    "game-back-library",
+                                                    "pointer-library-game-reader-game",
+                                                    "keyboard-library-game-reader-game",
+                                                    "settings",
+                                                    "settings-back-library",
+                                                    "rapid-game-settings-back-game",
+                                                    "rapid-guide-settings-back-reader",
+                                                    "library-game-reader-game",
+                                                    "restore-last-guide-for-relaunch"
+                                                ],
+                                     "readerScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\normal.reader.png",
+                                     "gameScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\normal.game.png"
+                                 },
+    "activationQueuedBeforeClose":  true,
+    "queuedActivationRelaunchProcessId":  47552,
+    "normalAfterQueuedActivation":  {
+                                        "mode":  "normal",
+                                        "invocationId":  "038f49b641ff4ec0ab538ea2e05bf6cd",
+                                        "observedAt":  "2026-10-08T04:22:12.2636781Z",
+                                        "processId":  47552,
+                                        "sessionId":  1,
+                                        "exitDelayMilliseconds":  0,
+                                        "expectedScalePercent":  0,
+                                        "success":  true,
+                                        "phases":  [
+                                                       "library",
+                                                       "resume-reader",
+                                                       "reader-pane-toggle",
+                                                       "reader-back-game",
+                                                       "uia-reopen-selected-guide",
+                                                       "pointer-reopen-selected-guide",
+                                                       "keyboard-reopen-selected-guide",
+                                                       "focused-guide-enter",
+                                                       "restore-route-guide",
+                                                       "game-back-library",
+                                                       "pointer-library-game-reader-game",
+                                                       "keyboard-library-game-reader-game",
+                                                       "settings",
+                                                       "settings-back-library",
+                                                       "rapid-game-settings-back-game",
+                                                       "rapid-guide-settings-back-reader",
+                                                       "library-game-reader-game",
+                                                       "restore-last-guide-for-relaunch"
+                                                   ],
+                                        "readerScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\normal.reader.png",
+                                        "gameScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\normal.game.png"
+                                    },
+    "pendingBeforeLateClose":  {
+                                   "mode":  "queue-guide",
+                                   "invocationId":  "16ab67f8fc4b49f3bc6b0b340127ff96",
+                                   "observedAt":  "2026-10-08T04:22:31.2718625Z",
+                                   "processId":  47552,
+                                   "sessionId":  1,
+                                   "exitDelayMilliseconds":  0,
+                                   "expectedScalePercent":  0,
+                                   "success":  true,
+                                   "phases":  [
+                                                  "guide-action-started"
+                                              ]
+                               },
+    "lateGuideAfterClose":  {
+                                "mode":  "late-guide-after-close",
+                                "invocationId":  "1402d193f1ca439483762d43ac41cb3a",
+                                "observedAt":  "2026-10-08T04:22:33.8312045Z",
+                                "processId":  47552,
+                                "sessionId":  1,
+                                "exitDelayMilliseconds":  0,
+                                "expectedScalePercent":  0,
+                                "success":  true,
+                                "phases":  [
+                                               "guide-selected-after-close-request"
+                                           ]
+                            },
+    "normalAfterLateClose":  {
+                                 "mode":  "normal",
+                                 "invocationId":  "79095e8b1a194ed08505cf75f63dc440",
+                                 "observedAt":  "2026-10-08T04:22:38.8325510Z",
+                                 "processId":  57664,
+                                 "sessionId":  1,
+                                 "exitDelayMilliseconds":  0,
+                                 "expectedScalePercent":  0,
+                                 "success":  true,
+                                 "phases":  [
+                                                "library",
+                                                "resume-reader",
+                                                "reader-pane-toggle",
+                                                "reader-back-game",
+                                                "uia-reopen-selected-guide",
+                                                "pointer-reopen-selected-guide",
+                                                "keyboard-reopen-selected-guide",
+                                                "focused-guide-enter",
+                                                "restore-route-guide",
+                                                "game-back-library",
+                                                "pointer-library-game-reader-game",
+                                                "keyboard-library-game-reader-game",
+                                                "settings",
+                                                "settings-back-library",
+                                                "rapid-game-settings-back-game",
+                                                "rapid-guide-settings-back-reader",
+                                                "library-game-reader-game",
+                                                "restore-last-guide-for-relaunch"
+                                            ],
+                                 "readerScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\normal.reader.png",
+                                 "gameScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\normal.game.png"
+                             },
+    "queuedLaterGuide":  {
+                             "mode":  "queue-later-guide",
+                             "invocationId":  "026e2f37ca8d46c4af5d84bf2ad850cd",
+                             "observedAt":  "2026-10-08T04:22:57.9365190Z",
+                             "processId":  57664,
+                             "sessionId":  1,
+                             "exitDelayMilliseconds":  0,
+                             "expectedScalePercent":  0,
+                             "success":  true,
+                             "phases":  [
+                                            "later-guide-selected-while-first-read-blocked"
+                                        ]
+                         },
+    "laterGuideResult":  {
+                             "mode":  "later-guide-result",
+                             "invocationId":  "4b76739b420c40dea5ee3d684b011118",
+                             "observedAt":  "2026-10-08T04:23:00.9454801Z",
+                             "processId":  57664,
+                             "sessionId":  1,
+                             "exitDelayMilliseconds":  0,
+                             "expectedScalePercent":  0,
+                             "success":  true,
+                             "phases":  [
+                                            "later-guide-opened",
+                                            "later-guide-back-selection-and-focus",
+                                            "later-guide-persisted-for-resume"
+                                        ]
+                         },
+    "acceptedBeforeClose":  true,
+    "acceptedCloseDidNotRelaunch":  true,
+    "normalBeforeFailedGuide":  {
+                                    "mode":  "normal",
+                                    "invocationId":  "4928c9f2d8434cbda899a94dc6b87d0b",
+                                    "observedAt":  "2026-10-08T04:23:09.0817420Z",
+                                    "processId":  10096,
+                                    "sessionId":  1,
+                                    "exitDelayMilliseconds":  0,
+                                    "expectedScalePercent":  0,
+                                    "success":  true,
+                                    "phases":  [
+                                                   "library",
+                                                   "resume-reader",
+                                                   "reader-pane-toggle",
+                                                   "reader-back-game",
+                                                   "uia-reopen-selected-guide",
+                                                   "pointer-reopen-selected-guide",
+                                                   "keyboard-reopen-selected-guide",
+                                                   "focused-guide-enter",
+                                                   "restore-route-guide",
+                                                   "game-back-library",
+                                                   "pointer-library-game-reader-game",
+                                                   "keyboard-library-game-reader-game",
+                                                   "settings",
+                                                   "settings-back-library",
+                                                   "rapid-game-settings-back-game",
+                                                   "rapid-guide-settings-back-reader",
+                                                   "library-game-reader-game",
+                                                   "restore-last-guide-for-relaunch"
+                                               ],
+                                    "readerScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\normal.reader.png",
+                                    "gameScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\normal.game.png"
+                                },
+    "queuedBeforeFailedGuide":  {
+                                    "mode":  "queue-later-guide",
+                                    "invocationId":  "208a2e6af5ea444a9b11d4329efe7fc2",
+                                    "observedAt":  "2026-10-08T04:23:28.2012569Z",
+                                    "processId":  10096,
+                                    "sessionId":  1,
+                                    "exitDelayMilliseconds":  0,
+                                    "expectedScalePercent":  0,
+                                    "success":  true,
+                                    "phases":  [
+                                                   "later-guide-selected-while-first-read-blocked"
+                                               ]
+                                },
+    "failedLaterGuideResult":  {
+                                   "mode":  "later-guide-failed-result",
+                                   "invocationId":  "6acedc5ca62943c8858071b8be11d361",
+                                   "observedAt":  "2026-10-08T04:23:31.2626576Z",
+                                   "processId":  10096,
+                                   "sessionId":  1,
+                                   "exitDelayMilliseconds":  0,
+                                   "expectedScalePercent":  0,
+                                   "success":  true,
+                                   "phases":  [
+                                                  "later-guide-failed-without-opening-reader",
+                                                  "settings-clears-previous-bar",
+                                                  "superseded-guide-not-saved-as-resume"
+                                              ]
+                               },
+    "queuedBeforeRenderError":  {
+                                    "mode":  "queue-reader-render-error",
+                                    "invocationId":  "ed5c241328c249f8bfb68763ee570b9c",
+                                    "observedAt":  "2026-10-08T04:23:37.1603070Z",
+                                    "processId":  38864,
+                                    "sessionId":  1,
+                                    "exitDelayMilliseconds":  0,
+                                    "expectedScalePercent":  0,
+                                    "success":  true,
+                                    "phases":  [
+                                                   "reader-route-open-before-render-fault"
+                                               ]
+                                },
+    "readerRenderError":  {
+                              "mode":  "reader-render-error-observed",
+                              "invocationId":  "8f169f70688d425c802369e7ba91aa18",
+                              "observedAt":  "2026-10-08T04:23:40.7108559Z",
+                              "processId":  38864,
+                              "sessionId":  1,
+                              "exitDelayMilliseconds":  0,
+                              "expectedScalePercent":  0,
+                              "success":  true,
+                              "phases":  [
+                                             "reader-render-read-failed-on-reader-route"
+                                         ]
+                          },
+    "readerRenderRecovery":  {
+                                 "mode":  "reader-render-error-result",
+                                 "invocationId":  "72c9a1d8448a43b6bc84a9e7f30d8ea7",
+                                 "observedAt":  "2026-10-08T04:23:42.7885309Z",
+                                 "processId":  38864,
+                                 "sessionId":  1,
+                                 "exitDelayMilliseconds":  0,
+                                 "expectedScalePercent":  0,
+                                 "success":  true,
+                                 "phases":  [
+                                                "reader-render-error-did-not-save-resume"
+                                            ]
+                             },
+    "stale":  {
+                  "mode":  "stale",
+                  "invocationId":  "a4afd8f15ede49f8bb09297105722024",
+                  "observedAt":  "2026-10-08T04:23:48.4897324Z",
+                  "processId":  21772,
+                  "sessionId":  1,
+                  "exitDelayMilliseconds":  0,
+                  "expectedScalePercent":  0,
+                  "success":  true,
+                  "phases":  [
+                                 "library",
+                                 "stale-resume-hidden"
+                             ]
+              },
+    "longList":  {
+                     "mode":  "long-list",
+                     "invocationId":  "c205a0c1e2a64b2b98f5cc6c73a3b6a7",
+                     "observedAt":  "2026-10-08T04:23:55.1712417Z",
+                     "processId":  66428,
+                     "sessionId":  1,
+                     "exitDelayMilliseconds":  0,
+                     "expectedScalePercent":  0,
+                     "success":  true,
+                     "phases":  [
+                                    "library",
+                                    "tail-guide-outside-initial-viewport",
+                                    "opened-guide-back-focus-first-row",
+                                    "opened-guide-enter-reopen"
+                                ],
+                     "realizedGuideRows":  46
+                 },
+    "switchGamePreparation":  {
+                                  "mode":  "switch-game-prepare",
+                                  "invocationId":  "48117193e326499180ca53bb3b8f6e26",
+                                  "observedAt":  "2026-10-08T04:24:03.0936580Z",
+                                  "processId":  3212,
+                                  "sessionId":  1,
+                                  "exitDelayMilliseconds":  0,
+                                  "expectedScalePercent":  0,
+                                  "success":  true,
+                                  "phases":  [
+                                                 "library",
+                                                 "first-game-guide-retained-before-switch"
+                                             ]
+                              },
+    "switchGameLoading":  {
+                              "mode":  "switch-game-loading",
+                              "invocationId":  "4beaa3e9bec3471a9e2ed2d76890967f",
+                              "observedAt":  "2026-10-08T04:24:07.3580050Z",
+                              "processId":  3212,
+                              "sessionId":  1,
+                              "exitDelayMilliseconds":  0,
+                              "expectedScalePercent":  0,
+                              "success":  true,
+                              "phases":  [
+                                             "game-switch-loading-clears-old-guide"
+                                         ]
+                          },
+    "switchGame":  {
+                       "mode":  "switch-game",
+                       "invocationId":  "d51ad51bca144bf598cbe33684ff7f6b",
+                       "observedAt":  "2026-10-08T04:24:09.8760118Z",
+                       "processId":  3212,
+                       "sessionId":  1,
+                       "exitDelayMilliseconds":  0,
+                       "expectedScalePercent":  0,
+                       "success":  true,
+                       "phases":  [
+                                      "game-switch-clears-old-guide",
+                                      "game-switch-opens-current-guide",
+                                      "game-switch-uia-reopen"
+                                  ]
+                   },
+    "htmlReader":  {
+                       "guideA":  "82b0f94ea65a4f61b625b34c776b64a4",
+                       "guideB":  "aea7f8f51e9e468898f62a01dea0d476",
+                       "html-reader-online":  {
+                                                  "mode":  "html-reader",
+                                                  "invocationId":  "eaa4bbdb7aaa4b5a89d4f85d2e5ed096",
+                                                  "observedAt":  "2026-10-08T04:24:16.9757735Z",
+                                                  "processId":  31760,
+                                                  "sessionId":  1,
+                                                  "exitDelayMilliseconds":  0,
+                                                  "expectedScalePercent":  0,
+                                                  "success":  true,
+                                                  "phases":  [
+                                                                 "html-canary-a",
+                                                                 "html-external-links",
+                                                                 "html-canary-b",
+                                                                 "html-crash"
+                                                             ],
+                                                  "canaryLines":  [
+                                                                      "before-a=1",
+                                                                      "loaded-a=1",
+                                                                      "after-refresh=1",
+                                                                      "after-cross-guide-link=1",
+                                                                      "after-external-link=1",
+                                                                      "after-blank-link=1",
+                                                                      "after-links=1",
+                                                                      "before-crash=1",
+                                                                      "opened-b=1",
+                                                                      "closed-b=1"
+                                                                  ],
+                                                  "webView2Runtime":  "154.0.4258.62",
+                                                  "webView2ProxyArguments":  true,
+                                                  "htmlExternalLinkScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\html-reader-online.html-external-link.png",
+                                                  "htmlCrashScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\html-reader-online.html-crash.png"
+                                              },
+                       "profileSweep":  "removed",
+                       "online":  {
+                                      "sessions":  [
+                                                       {
+                                                           "guideId":  "82b0f94ea65a4f61b625b34c776b64a4",
+                                                           "served":  [
+                                                                          "guide.html",
+                                                                          "images/a.png",
+                                                                          "style.css"
+                                                                      ],
+                                                           "denied":  [
+                                                                          {
+                                                                              "reason":  "CrossGuide",
+                                                                              "context":  "Document",
+                                                                              "count":  1
+                                                                          },
+                                                                          {
+                                                                              "reason":  "External",
+                                                                              "context":  "Document",
+                                                                              "count":  2
+                                                                          }
+                                                                      ],
+                                                           "rejectedCaptures":  0,
+                                                           "restores":  {
+
+                                                                        },
+                                                           "entryNavigations":  1,
+                                                           "appearance":  {
+                                                                              "theme":  "Light",
+                                                                              "scale":  1,
+                                                                              "applications":  1,
+                                                                              "failures":  0,
+                                                                              "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                              "bodyColor":  "rgb(0, 0, 0)",
+                                                                              "rootZoom":  "1"
+                                                                          }
+                                                       },
+                                                       {
+                                                           "guideId":  "aea7f8f51e9e468898f62a01dea0d476",
+                                                           "served":  [
+                                                                          "Canary Guide B (PS1) - Walkthrough\u0027s 100% Café – v2_files/b.png",
+                                                                          "Canary Guide B (PS1) - Walkthrough\u0027s 100% Café – v2_files/style.css",
+                                                                          "guide.html"
+                                                                      ],
+                                                           "denied":  [
+
+                                                                      ],
+                                                           "rejectedCaptures":  0,
+                                                           "restores":  {
+
+                                                                        },
+                                                           "entryNavigations":  1,
+                                                           "appearance":  {
+                                                                              "theme":  "Light",
+                                                                              "scale":  1,
+                                                                              "applications":  1,
+                                                                              "failures":  0,
+                                                                              "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                              "bodyColor":  "rgb(0, 0, 0)",
+                                                                              "rootZoom":  "1"
+                                                                          }
+                                                       },
+                                                       {
+                                                           "guideId":  "aea7f8f51e9e468898f62a01dea0d476",
+                                                           "served":  [
+                                                                          "Canary Guide B (PS1) - Walkthrough\u0027s 100% Café – v2_files/b.png",
+                                                                          "Canary Guide B (PS1) - Walkthrough\u0027s 100% Café – v2_files/style.css",
+                                                                          "guide.html"
+                                                                      ],
+                                                           "denied":  [
+
+                                                                      ],
+                                                           "rejectedCaptures":  0,
+                                                           "restores":  {
+
+                                                                        },
+                                                           "entryNavigations":  1,
+                                                           "appearance":  {
+                                                                              "theme":  "Light",
+                                                                              "scale":  1,
+                                                                              "applications":  1,
+                                                                              "failures":  0,
+                                                                              "bodyBackground":  "rgba(0, 0, 0, 0)",
+                                                                              "bodyColor":  "rgb(0, 0, 0)",
+                                                                              "rootZoom":  "1"
+                                                                          }
+                                                       }
+                                                   ],
+                                      "externalLaunches":  [
+                                                               "https://example.com/desktop-guides-canary"
+                                                           ],
+                                      "canaryLinesBefore":  1
+                                  },
+                       "html-reader-offline":  {
+                                                   "mode":  "html-reader",
+                                                   "invocationId":  "26333f4b67844ad6ae8a2c6fe609b09b",
+                                                   "observedAt":  "2026-10-08T04:24:37.4227026Z",
+                                                   "processId":  56612,
+                                                   "sessionId":  1,
+                                                   "exitDelayMilliseconds":  0,
+                                                   "expectedScalePercent":  0,
+                                                   "success":  true,
+                                                   "phases":  [
+                                                                  "html-canary-a",
+                                                                  "html-external-links",
+                                                                  "html-canary-b",
+                                                                  "html-crash"
+                                                              ],
+                                                   "canaryLines":  [
+                                                                       "before-a=1",
+                                                                       "loaded-a=1",
+                                                                       "after-refresh=1",
+                                                                       "after-cross-guide-link=1",
+                                                                       "after-external-link=1",
+                                                                       "after-blank-link=1",
+                                                                       "after-links=1",
+                                                                       "before-crash=1",
+                                                                       "opened-b=1",
+                                                                       "closed-b=1"
+                                                                   ],
+                                                   "webView2Runtime":  "154.0.4258.62",
+                                                   "webView2ProxyArguments":  true,
+                                                   "htmlExternalLinkScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\html-reader-offline.html-external-link.png",
+                                                   "htmlCrashScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\html-reader-offline.html-crash.png"
+                                               },
+                       "offline":  {
+                                       "sessions":  [
+                                                        {
+                                                            "guideId":  "82b0f94ea65a4f61b625b34c776b64a4",
+                                                            "served":  [
+                                                                           "guide.html",
+                                                                           "images/a.png",
+                                                                           "style.css"
+                                                                       ],
+                                                            "denied":  [
+                                                                           {
+                                                                               "reason":  "CrossGuide",
+                                                                               "context":  "Document",
+                                                                               "count":  1
+                                                                           },
+                                                                           {
+                                                                               "reason":  "External",
+                                                                               "context":  "Document",
+                                                                               "count":  2
+                                                                           }
+                                                                       ],
+                                                            "rejectedCaptures":  0,
+                                                            "restores":  {
+
+                                                                         },
+                                                            "entryNavigations":  1,
+                                                            "appearance":  {
+                                                                               "theme":  "Dark",
+                                                                               "scale":  1,
+                                                                               "applications":  1,
+                                                                               "failures":  0,
+                                                                               "bodyBackground":  "rgb(30, 30, 30)",
+                                                                               "bodyColor":  "rgb(230, 230, 230)",
+                                                                               "rootZoom":  "1"
+                                                                           }
+                                                        },
+                                                        {
+                                                            "guideId":  "aea7f8f51e9e468898f62a01dea0d476",
+                                                            "served":  [
+                                                                           "Canary Guide B (PS1) - Walkthrough\u0027s 100% Café – v2_files/b.png",
+                                                                           "Canary Guide B (PS1) - Walkthrough\u0027s 100% Café – v2_files/style.css",
+                                                                           "guide.html"
+                                                                       ],
+                                                            "denied":  [
+
+                                                                       ],
+                                                            "rejectedCaptures":  0,
+                                                            "restores":  {
+
+                                                                         },
+                                                            "entryNavigations":  1,
+                                                            "appearance":  {
+                                                                               "theme":  "Dark",
+                                                                               "scale":  1,
+                                                                               "applications":  1,
+                                                                               "failures":  0,
+                                                                               "bodyBackground":  "rgb(30, 30, 30)",
+                                                                               "bodyColor":  "rgb(230, 230, 230)",
+                                                                               "rootZoom":  "1"
+                                                                           }
+                                                        },
+                                                        {
+                                                            "guideId":  "aea7f8f51e9e468898f62a01dea0d476",
+                                                            "served":  [
+                                                                           "Canary Guide B (PS1) - Walkthrough\u0027s 100% Café – v2_files/b.png",
+                                                                           "Canary Guide B (PS1) - Walkthrough\u0027s 100% Café – v2_files/style.css",
+                                                                           "guide.html"
+                                                                       ],
+                                                            "denied":  [
+
+                                                                       ],
+                                                            "rejectedCaptures":  0,
+                                                            "restores":  {
+
+                                                                         },
+                                                            "entryNavigations":  1,
+                                                            "appearance":  {
+                                                                               "theme":  "Dark",
+                                                                               "scale":  1,
+                                                                               "applications":  1,
+                                                                               "failures":  0,
+                                                                               "bodyBackground":  "rgb(30, 30, 30)",
+                                                                               "bodyColor":  "rgb(230, 230, 230)",
+                                                                               "rootZoom":  "1"
+                                                                           }
+                                                        }
+                                                    ],
+                                       "externalLaunches":  [
+                                                                "https://example.com/desktop-guides-canary"
+                                                            ],
+                                       "canaryLinesBefore":  1
+                                   },
+                       "html-runtime-missing":  {
+                                                    "mode":  "html-runtime-missing",
+                                                    "invocationId":  "3bf5186d15f44e00a8a3d632ab309330",
+                                                    "observedAt":  "2026-10-08T04:24:55.5726774Z",
+                                                    "processId":  23272,
+                                                    "sessionId":  1,
+                                                    "exitDelayMilliseconds":  0,
+                                                    "expectedScalePercent":  0,
+                                                    "success":  true,
+                                                    "phases":  [
+                                                                   "html-runtime-missing",
+                                                                   "html-missing-entry",
+                                                                   "html-runtime-missing-txt"
+                                                               ],
+                                                    "htmlRuntimeMissingScreenshot":  "E:\\work\\desktop-guides\\portable-80d2647\\results\\single-file\\html-runtime-missing.html-runtime-missing.png"
+                                                },
+                       "runtimeMissing":  {
+                                              "sessions":  [
+                                                               {
+                                                                   "guideId":  "82b0f94ea65a4f61b625b34c776b64a4",
+                                                                   "served":  [
+
+                                                                              ],
+                                                                   "denied":  [
+
+                                                                              ],
+                                                                   "rejectedCaptures":  0,
+                                                                   "restores":  {
+
+                                                                                },
+                                                                   "entryNavigations":  0,
+                                                                   "appearance":  {
+                                                                                      "theme":  null,
+                                                                                      "scale":  null,
+                                                                                      "applications":  0,
+                                                                                      "failures":  0,
+                                                                                      "bodyBackground":  null,
+                                                                                      "bodyColor":  null,
+                                                                                      "rootZoom":  null
+                                                                                  }
+                                                               }
+                                                           ],
+                                              "externalLaunches":  [
+                                                                       "https://developer.microsoft.com/microsoft-edge/webview2/"
+                                                                   ],
+                                              "canaryLinesBefore":  2
+                                          }
+                   },
+    "htmlPosition":  {
+                         "guideLong":  "8752b8ae71e24f2a900369bab8d2b1c1",
+                         "guideChanged":  "f23a2b26cec040589c3864f0f052642a",
+                         "guidePictures":  "d530ea426c864deaa8a2a7d43ba8fe02",
+                         "guideFixedHeader":  "2d7d588c974a4b039621683ccfa707bf"
+                     },
+    "error":  "Installed html-position shell smoke failed: After a size step to 100% under a fixed header the page\u0027s top line was MARK-0023; expected MARK-0020 within one line (page top 552; 32 \r\nmark lines on screen in 138 ms).\r\nAt E:\\work\\desktop-guides\\portable-80d2647\\tools\\p1\\windows_shell_ui_smoke.ps1:1684 char:13\r\n+             throw \"After $step the page\u0027s top line was $seen; expecte ...\r\n+             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : OperationStopped: (After a size st...een in 138 ms).:String) [], RuntimeException\r\n    + FullyQualifiedErrorId : After a size step to 100% under a fixed header the page\u0027s top line was MARK-0023; expected MARK-0020 within one line (page top 552; 32 mark lines on \r\n    screen in 138 ms).\r\n \r\n\r\nAt E:\\work\\desktop-guides\\portable-80d2647\\tools\\p1\\windows_shell_install.ps1:806 char:9\r\n+         throw \"Installed $mode shell smoke failed: $($result.error)\"\r\n+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : OperationStopped: (Installed html-...n 138 ms).\r\n \r\n:String) [], RuntimeException\r\n    + FullyQualifiedErrorId : Installed html-position shell smoke failed: After a size step to 100% under a fixed header the page\u0027s top line was MARK-0023; expected MARK-0020 wit \r\n   hin one line (page top 552; 32 mark lines on screen in 138 ms).\r\nAt E:\\work\\desktop-guides\\portable-80d2647\\tools\\p1\\windows_shell_ui_smoke.ps1:1684 char:13\r\n+             throw \"After $step the page\u0027s top line was $seen; expecte ...\r\n+             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : OperationStopped: (After a size st...een in 138 ms).:String) [], RuntimeException\r\n        + FullyQualifiedErrorId : After a size step to 100% under a fixed header the page\u0027s top line was MARK-0023; expected MARK-0020 within one line (page top 552; 32 mark line \r\n   s on \r\n    screen in 138 ms).\r\n \r\n\r\n \r\n",
+    "processesAtFailure":  [
+                               {
+                                   "processId":  57472,
+                                   "sessionId":  1,
+                                   "created":  "2026-10-08T13:25:03.3466890+09:00",
+                                   "testOwned":  true
+                               }
+                           ],
+    "applicationEvents":  [
+
+                          ],
+    "portableDataStillPresent":  false
+}

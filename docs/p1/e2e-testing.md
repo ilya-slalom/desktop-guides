@@ -79,21 +79,39 @@ theme to `Custom.theme`, which this harness cannot restore.
 
 ## Portable build
 
-Releases also ship a portable, self-contained build. Build it with
+Releases also ship a portable build: one self-contained
+`DesktopGuides.Production.exe` that bundles .NET and the Windows App SDK.
+Build it with
 `dotnet restore src\DesktopGuides.Production\DesktopGuides.Production.csproj --locked-mode -p:Platform=x64 -p:Portable=true`
 and then `dotnet publish` with the same project, `-c Release --no-restore
 -p:Platform=x64 -p:Portable=true`. The output goes to
 `artifacts\portable\bin\DesktopGuides.Production\x64\Release\net10.0-windows10.0.19041.0\win-x64\publish\`,
-kept apart from the MSIX build's `bin` and `obj` folders. Pass
-`-PortableExecutable <publish folder>\DesktopGuides.Production.exe` instead of
+kept apart from the MSIX build's `bin` and `obj` folders. Start from an empty
+`artifacts\portable` folder, because publish doesn't delete files that an
+earlier build left there. Then run
+`tools\p1\package_portable_release.ps1 -Commit <full hash>`. It refuses a
+publish folder that holds anything besides the exe and never replaces an
+existing release. It writes `DesktopGuides-portable-x64-<short hash>.zip`,
+which holds the exe alone, plus a `.zip.sha256` file and a `.json` manifest
+with both hashes, to `artifacts\portable\release\`.
+
+On its first launch each build unpacks every bundled file to
+`%TEMP%\.net\DesktopGuides.Production\<bundle id>\` (551 files, 233 MB at
+`80d2647`) and reuses them afterwards. The Windows App SDK's single-file mode
+requires this full extraction for its DLL redirection. A newer build unpacks
+to a new folder, and nothing removes the older one. Deleting the folder while
+the app is closed is safe; the next launch unpacks it again.
+
+Pass `-PortableExecutable <folder>\DesktopGuides.Production.exe`, either the
+publish folder or the exe unpacked from the release zip, instead of
 `-PackagePath` to run the same scenarios against it. That mode skips the
 certificate, signing, install, and uninstall steps, so the interactive
 scheduled task needs no elevation. It refuses to start if
 `%LOCALAPPDATA%\DesktopGuides` exists, deletes only the folder it created, and
-rejects `-AllowOfflineFirewallRule`. It writes `portable-run.json` with
-`mode: "portable"`. A portable run is not evidence for any signed install,
-identity, upgrade, or package-data gate; the portable build's own release
-gates come later under T17.3.
+rejects `-AllowOfflineFirewallRule`. It leaves the `%TEMP%\.net` extraction
+in place. It writes `portable-run.json` with `mode: "portable"`. A portable run
+is not evidence for any signed install, identity, upgrade, or package-data
+gate; the portable build's own release gates come later under T17.3.
 
 ## Runner contract
 
@@ -274,6 +292,13 @@ When a host run installs a CI-built MSIX, stage the source with Windows line
 endings before building `DesktopGuides.ShellSeed`. The schema SQL is a raw
 string literal, so its stored text follows the source line endings, and the app
 rejects a library whose `sqlite_master` text differs from its own build.
+
+Copy sources to the host as a zip, for example from `git archive
+--format=zip`, and unpack them with `Expand-Archive`. Windows `tar` reads the
+UTF-8 names in a tar stream with the OEM code page, which renames Guide B's
+non-ASCII fixture; the html group then fails because the page's assets no
+longer match its folder name. `tests/fixtures/p0/generated` is gitignored, so
+copy it separately.
 
 ## Scenario checklist
 

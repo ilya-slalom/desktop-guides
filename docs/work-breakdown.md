@@ -539,8 +539,8 @@ machine. Missing WebView2 Runtime produces an actionable setup message.
   tested matrix and PDF limitations. Follow the
   [installed E2E procedure](p1/e2e-testing.md). Signed-MSIX runs do not
   cover the portable build; its release gates (first run without
-  installation, data location, and replacing the folder with a newer build)
-  are defined separately later.
+  installation, data location, and replacing the executable with a newer
+  build) are defined separately later.
 - **TR17.1** The final app needs no network access to display an imported TXT,
   HTML, or PDF guide after prerequisites are installed.
 - **TR17.2** No OS or architecture is advertised without a recorded install and

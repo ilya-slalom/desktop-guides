@@ -1335,3 +1335,60 @@ Selected evidence includes
 [search results](evidence/t04-provider-search/provider-live.search-results.png),
 [linked live game](evidence/t04-provider-search/provider-live.linked-game-live.png), and
 [offline search](evidence/t04-provider-search/provider-offline-blocked.search-offline.png).
+
+## Portable single-file release — host check, 8 October 2026
+
+The portable release is now one `DesktopGuides.Production.exe` in a zip,
+not a 544-file folder. The publish is single-file with full self-extraction,
+symbols are embedded, and `tools/p1/package_portable_release.ps1` builds the
+zip, its `.zip.sha256` file and a JSON manifest; see
+[Portable build](e2e-testing.md#portable-build).
+
+On the Windows 11 x64 host (build `10.0.26200.0`, .NET SDK `10.0.401`), from
+a zip staging of `80d2647`, the locked MSIX, ShellSeed and portable restores
+passed, publish gave 0 warnings, and the packaging test passed. The
+[release manifest](evidence/portable-single-file/release-manifest.json)
+records a 92,034,870-byte zip (SHA-256 `F9FABCAF…E14C`) holding a
+244,004,113-byte exe (SHA-256 `1016FDC1…086E`). The multi-file release from
+`f7c22e3` was 544 files in a 97,082,441-byte zip.
+
+Every run below used the exe unpacked from that zip, with the same SHA-256,
+in an interactive scheduled task without elevation:
+
+- `core` passed ([report](evidence/portable-single-file/core-html-run.json)).
+  The same run then failed `html-position`, as described below.
+- `html` passed in full, both `html-position` passes included
+  ([report](evidence/portable-single-file/html-run.json)).
+- `pdf`: `pdf-reader`, `pdf-zoom`, `pdf-jump` and `pdf-locked` passed in light
+  and dark ([report](evidence/portable-single-file/pdf-run.json)).
+  `pdf-keys` failed.
+
+Two checks fail on this host for the `f7c22e3` multi-file portable build as
+well, so the single-file change doesn't cause them. Hosted CI runners pass
+both.
+
+- `pdf-keys`: after Ctrl+G, `Expected keyboard focus on 'ReaderCommandInput',
+  found 'PdfPreviewScroller'`. It failed twice on the single exe and once on
+  the multi-file build.
+- `position-fixed-header`: after the size step back to 100%, the top line was
+  MARK-0023 instead of MARK-0020 (page top 552). It failed twice on the single
+  exe and once on the multi-file build, and passed in the `html` run above.
+
+The first run's `html` failure came from staging. Windows `tar` read the UTF-8
+names in the tar stream with the OEM code page, so the Guide B fixture no
+longer matched its companion folder. Staging from a zip fixed it. The `html`
+run above used a staging copy of `windows_shell_ui_smoke.ps1` with an
+environment-variable guard meant to skip `position-fixed-header`. The smoke
+runs as its own scheduled task and never saw the variable, so the guard never
+applied and the phase ran unchanged. The staging copy was restored afterwards.
+
+[Launch times](evidence/portable-single-file/launch-times.json), from start to
+a visible main window: 1.63 s for the first launch, which unpacks 551 files
+(233,305,709 bytes) to `%TEMP%\.net\DesktopGuides.Production`; 0.48 s for
+later launches; 0.47 s for the multi-file build.
+
+`%LOCALAPPDATA%\DesktopGuides` already existed. It was renamed to
+`DesktopGuides.bak-20261008` for the runs and renamed back afterwards. It held
+the P0 `P0-WebView` cache and a library created at 12:27 that day, before the
+move, and nothing in it changed. The extraction folders the runs created under
+`%TEMP%\.net` were removed. No scheduled task or app process was left behind.
