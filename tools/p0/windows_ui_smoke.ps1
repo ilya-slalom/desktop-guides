@@ -143,11 +143,21 @@ function Enter-Password(
 }
 
 function Status {
-    $element = Find-ById 'StatusText'
-    if ($null -eq $element) {
-        throw 'Probe status is unavailable.'
-    }
-    return $element.Current.Name
+    # The status element can be briefly missing or stale while the probe
+    # swaps readers, so retry before treating it as gone.
+    $deadline = (Get-Date).AddSeconds(5)
+    do {
+        try {
+            $element = Find-ById 'StatusText'
+            if ($null -ne $element) {
+                return $element.Current.Name
+            }
+        }
+        catch [System.Windows.Automation.ElementNotAvailableException] {
+        }
+        Start-Sleep -Milliseconds 100
+    } while ((Get-Date) -lt $deadline)
+    throw 'Probe status is unavailable.'
 }
 
 function Page-Status {
