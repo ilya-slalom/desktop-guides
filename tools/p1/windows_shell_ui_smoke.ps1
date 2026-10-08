@@ -3496,6 +3496,18 @@ try {
                 if (-not $reset) { throw "The Reader toolbar overflow has no visible 'Reset text size'." }
                 $actual = $reset.Current.IsEnabled
                 Send-Keys '{ESC}'
+                # Esc returns before the overflow closes, and until it has, the
+                # bar's text-size commands read as off-screen. Wait for both.
+                $closing = [Diagnostics.Stopwatch]::StartNew()
+                do {
+                    $closed = -not (Find-VisibleName 'Reset text size') -and
+                        (Find-VisibleName 'Larger text') -and (Find-VisibleName 'Smaller text')
+                    if ($closed) { break }
+                    Start-Sleep -Milliseconds 100
+                } while ($closing.Elapsed.TotalSeconds -lt 5)
+                if (-not $closed) { throw 'The Reader toolbar did not show its text-size commands after the overflow closed.' }
+                if (-not $report.Contains('overflowCloseMs')) { $report.overflowCloseMs = @() }
+                $report.overflowCloseMs += [int]$closing.ElapsedMilliseconds
                 if ($actual -ne $enabled) { throw "'Reset text size' is enabled=$actual; expected $enabled." }
             }
 
