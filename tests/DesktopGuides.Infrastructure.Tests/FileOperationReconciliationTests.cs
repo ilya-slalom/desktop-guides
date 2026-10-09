@@ -185,7 +185,7 @@ public sealed class FileOperationReconciliationTests
         WriteMarker(content);
         await repository.InitializeAsync();
         Assert.Equal(
-            new StartupReconciliationReport(0, 0),
+            new StartupReconciliationReport(0, 0, MissingGuides: [new(guideId, game.Id)]),
             repository.LastStartupReconciliation);
         InsertOperation(directory.Paths.DatabasePath, operationId, "Import", "Prepared",
             Manifest("Import", operationId, guideId));

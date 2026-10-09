@@ -247,7 +247,10 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             List<Guide> guides = [];
             while (reader.Read())
             {
-                guides.Add(ReadGuide(reader));
+                if (TryReadGuide(reader) is Guide guide)
+                {
+                    guides.Add(guide);
+                }
             }
             return guides;
         }, token);
@@ -335,8 +338,11 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             List<GuideSummary> summaries = [];
             while (reader.Read())
             {
-                summaries.Add(new GuideSummary(
-                    ReadGuide(reader), reader.IsDBNull(12) ? null : ReadReadingState(reader, 12)));
+                if (TryReadGuide(reader) is Guide guide)
+                {
+                    summaries.Add(new GuideSummary(
+                        guide, reader.IsDBNull(12) ? null : ReadReadingState(reader, 12)));
+                }
             }
             return summaries;
         }, token);
@@ -710,7 +716,13 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         {
             StartupReconciliationReport report = new FileOperationReconciler(paths).Run(connection);
             int artworkReview = new ManagedArtworkStore(paths).Sweep(ReadArtworkReferences(connection));
-            LastStartupReconciliation = report with { ArtworkReviewCount = artworkReview };
+            (List<MissingGuideFile> missing, int unreadable) = ScanGuideFiles(connection);
+            LastStartupReconciliation = report with
+            {
+                ArtworkReviewCount = artworkReview,
+                MissingGuides = missing,
+                UnreadableGuideCount = unreadable
+            };
         }
     }
 
@@ -1400,6 +1412,59 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         reader.IsDBNull(first + 2) ? null : reader.GetDouble(first + 2),
         reader.IsDBNull(first + 3) ? null : FromUnixMilliseconds(reader.GetInt64(first + 3)),
         reader.IsDBNull(first + 4) ? null : FromUnixMilliseconds(reader.GetInt64(first + 4)));
+
+    // A row an external edit broke is skipped by the lists and counted at
+    // startup; GetGuide still throws, so the Reader route reports it.
+    private static Guide? TryReadGuide(SqliteDataReader reader)
+    {
+        try
+        {
+            return ReadGuide(reader);
+        }
+        catch (Exception error) when (error is InvalidDataException or FormatException or
+                                          ArgumentOutOfRangeException)
+        {
+            return null;
+        }
+    }
+
+    // Reads every guide row once. Only an absent entry path is missing: a
+    // folder, a link or an unsafe path is left for the reader to report.
+    // Nothing is hashed or followed.
+    private (List<MissingGuideFile> Missing, int Unreadable) ScanGuideFiles(SqliteConnection connection)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT Id, GameId, Title, Format, ManagedRelativeRoot,
+                   PrimaryRelativePath, ContentSha256, ContentBytes,
+                   SourceLabel, TextCodePage, ImportedUtcMs, UpdatedUtcMs
+            FROM Guides ORDER BY Id
+            """;
+        using SqliteDataReader reader = command.ExecuteReader();
+        List<MissingGuideFile> missing = [];
+        int unreadable = 0;
+        while (reader.Read())
+        {
+            if (TryReadGuide(reader) is not Guide guide)
+            {
+                unreadable++;
+                continue;
+            }
+            try
+            {
+                string planned = paths.GetPlannedGuideFile(guide.Id, guide.PrimaryRelativePath);
+                if (!File.Exists(planned) && !Directory.Exists(planned))
+                {
+                    missing.Add(new MissingGuideFile(guide.Id, guide.GameId));
+                }
+            }
+            catch (Exception error) when (error is InvalidDataException or ArgumentException or
+                                              IOException or UnauthorizedAccessException)
+            {
+            }
+        }
+        return (missing, unreadable);
+    }
 
     private static Guide ReadGuide(SqliteDataReader reader)
     {
