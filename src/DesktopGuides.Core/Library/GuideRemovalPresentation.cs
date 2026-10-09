@@ -7,6 +7,12 @@ public static class GuideRemovalPresentation
 
     public static string DialogBody(int fileCount)
     {
+        // A guide whose file is missing has nothing left to count.
+        if (fileCount == 0)
+        {
+            return "This removes the guide and its reading progress from Desktop Guides. " +
+                "The original file you imported isn't affected.";
+        }
         string files = fileCount == 1 ? "1 managed file" : $"{fileCount} managed files";
         return $"This removes the guide, its reading progress, and its {files} from Desktop Guides. " +
             "The original file you imported isn't affected.";

@@ -54,7 +54,7 @@ public sealed partial class ShellWindow : Window
     private bool libraryFocusPending;
     private int libraryFocusGeneration = -1;
     private int renderGeneration;
-    private HtmlGuideLoadAction readerErrorAction;
+    private GuideLoadAction readerErrorAction;
     private int readerErrorGeneration;
     private long gameGuideIntentVersion;
     private long statusSequence;
@@ -1390,18 +1390,18 @@ public sealed partial class ShellWindow : Window
 
     private void ShowReaderSurface(
         bool loading, string? error = null, UIElement? view = null,
-        HtmlGuideLoadAction action = HtmlGuideLoadAction.None)
+        GuideLoadAction action = GuideLoadAction.None)
     {
         ReaderLoading.Visibility = loading ? Visibility.Visible : Visibility.Collapsed;
         ReaderLoadingRing.IsActive = loading;
         ReaderLoadError.Text = error ?? string.Empty;
         ReaderLoadError.Visibility = error is null ? Visibility.Collapsed : Visibility.Visible;
-        readerErrorAction = error is null ? HtmlGuideLoadAction.None : action;
+        readerErrorAction = error is null ? GuideLoadAction.None : action;
         readerErrorGeneration = renderGeneration;
-        ReaderLoadErrorAction.Content = readerErrorAction == HtmlGuideLoadAction.None
+        ReaderLoadErrorAction.Content = readerErrorAction == GuideLoadAction.None
             ? null
             : HtmlGuideLoadMessages.ActionLabel(readerErrorAction);
-        ReaderLoadErrorAction.Visibility = readerErrorAction == HtmlGuideLoadAction.None
+        ReaderLoadErrorAction.Visibility = readerErrorAction == GuideLoadAction.None
             ? Visibility.Collapsed
             : Visibility.Visible;
         PdfUnlockPanel.Visibility = Visibility.Collapsed;

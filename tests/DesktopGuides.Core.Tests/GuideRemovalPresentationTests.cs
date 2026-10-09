@@ -10,7 +10,6 @@ public sealed class GuideRemovalPresentationTests
         Assert.Equal("Remove Walkthrough?", GuideRemovalPresentation.DialogTitle("Walkthrough"));
 
     [Theory]
-    [InlineData(0, "0 managed files")]
     [InlineData(1, "1 managed file")]
     [InlineData(3, "3 managed files")]
     public void DialogBodyCountsManagedFiles(int count, string files) =>
@@ -50,4 +49,10 @@ public sealed class GuideRemovalPresentationTests
         Assert.Equal(GuideRemovalIssue.Failed, error.Issue);
         Assert.Same(cause, error.InnerException);
     }
+
+    [Fact]
+    public void DialogBodyWithNoFilesLeftSkipsTheCount() =>
+        Assert.Equal(
+            "This removes the guide and its reading progress from Desktop Guides. The original file you imported isn't affected.",
+            GuideRemovalPresentation.DialogBody(0));
 }

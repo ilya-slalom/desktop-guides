@@ -190,10 +190,10 @@ public sealed partial class ShellWindow
         int generation = readerErrorGeneration;
         switch (readerErrorAction)
         {
-            case HtmlGuideLoadAction.GetRuntime:
+            case GuideLoadAction.GetRuntime:
                 await LaunchExternalAsync(new Uri(HtmlGuideLoadMessages.RuntimeDownloadUrl));
                 break;
-            case HtmlGuideLoadAction.Reopen:
+            case GuideLoadAction.Reopen:
                 // A click queued behind a navigation away does nothing.
                 await RunNavigationAsync(async () =>
                 {
