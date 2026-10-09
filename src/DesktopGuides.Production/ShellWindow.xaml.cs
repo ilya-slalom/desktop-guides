@@ -1308,6 +1308,21 @@ public sealed partial class ShellWindow : Window
         {
             removeRequested = false;
             ReaderLoadErrorAction.IsEnabled = true;
+            if (!closeRequested)
+            {
+                // The Game page rendered while the removal still held Remove game.
+                UpdateRemoveGameAction();
+                if (navigator.Current == route)
+                {
+                    // Cancel or a failed removal returns focus to the action.
+                    ReaderLoadErrorAction.Focus(FocusState.Programmatic);
+                }
+                else if (navigator.Current is GameRoute game && game.GameId == route.GameId &&
+                    GuideList.Items.Count == 0)
+                {
+                    ImportGuideButton.Focus(FocusState.Programmatic);
+                }
+            }
         }
     }
 
