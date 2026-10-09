@@ -1451,6 +1451,93 @@ public sealed class SqliteLibraryRepositoryTests
         }
     }
 
+    [Fact]
+    public async Task StartupReportsGuidesWhoseFileIsMissing()
+    {
+        using TestLibrary directory = new();
+        Guid present = Guid.NewGuid();
+        Guid missing = Guid.NewGuid();
+        Game game;
+        await using (SqliteLibraryRepository first = new(directory.Paths, new FixedTimeProvider(Now)))
+        {
+            await first.InitializeAsync();
+            game = await first.AddGameAsync("Health", null, null);
+        }
+        InsertGuide(directory.Paths.DatabasePath, present, game.Id);
+        InsertGuide(directory.Paths.DatabasePath, missing, game.Id);
+        WriteGuideFile(directory.Paths, present);
+
+        await using SqliteLibraryRepository repository = new(directory.Paths, new FixedTimeProvider(Now));
+        await repository.InitializeAsync();
+
+        StartupReconciliationReport report = Assert.IsType<StartupReconciliationReport>(
+            repository.LastStartupReconciliation);
+        Assert.Equal([new MissingGuideFile(missing, game.Id)], report.MissingGuides);
+        Assert.Equal(0, report.UnreadableGuideCount);
+        Assert.Equal(2, (await repository.ListGuidesAsync(game.Id)).Count);
+    }
+
+    // A folder where the file should be isn't missing: the reader reports it
+    // as changed when the guide is opened.
+    [Fact]
+    public async Task AFolderAtTheGuidePathIsNotMissing()
+    {
+        using TestLibrary directory = new();
+        Guid guide = Guid.NewGuid();
+        Game game;
+        await using (SqliteLibraryRepository first = new(directory.Paths, new FixedTimeProvider(Now)))
+        {
+            await first.InitializeAsync();
+            game = await first.AddGameAsync("Health", null, null);
+        }
+        InsertGuide(directory.Paths.DatabasePath, guide, game.Id);
+        Directory.CreateDirectory(directory.Paths.GetPlannedGuideFile(guide, "guide.txt"));
+
+        await using SqliteLibraryRepository repository = new(directory.Paths, new FixedTimeProvider(Now));
+        await repository.InitializeAsync();
+
+        Assert.Empty(repository.LastStartupReconciliation!.MissingGuides);
+    }
+
+    // Ruling 17: integrity_check validates CHECK constraints, so the fixture
+    // breaks a value the schema allows but ReadGuide can't convert.
+    [Fact]
+    public async Task UnreadableGuideRowIsHiddenAndCounted()
+    {
+        using TestLibrary directory = new();
+        Guid good = Guid.NewGuid();
+        Guid bad = Guid.NewGuid();
+        Game game;
+        await using (SqliteLibraryRepository first = new(directory.Paths, new FixedTimeProvider(Now)))
+        {
+            await first.InitializeAsync();
+            game = await first.AddGameAsync("Health", null, null);
+        }
+        InsertGuide(directory.Paths.DatabasePath, good, game.Id);
+        InsertGuide(directory.Paths.DatabasePath, bad, game.Id);
+        WriteGuideFile(directory.Paths, good);
+        WriteGuideFile(directory.Paths, bad);
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        using (SqliteCommand command = connection.CreateCommand())
+        {
+            command.CommandText = "UPDATE Guides SET UpdatedUtcMs = 9223372036854775807 WHERE Id = $id";
+            command.Parameters.AddWithValue("$id", bad.ToString("N"));
+            Assert.Equal(1, command.ExecuteNonQuery());
+        }
+
+        await using SqliteLibraryRepository repository = new(directory.Paths, new FixedTimeProvider(Now));
+        await repository.InitializeAsync();
+
+        StartupReconciliationReport report = repository.LastStartupReconciliation!;
+        Assert.Equal(1, report.UnreadableGuideCount);
+        Assert.Empty(report.MissingGuides);
+        Assert.Equal(good, Assert.Single(await repository.ListGuidesAsync(game.Id)).Id);
+        Assert.Equal(good, Assert.Single(await repository.ListGuideSummariesAsync(game.Id)).Guide.Id);
+        // Ruling 14: the game's count still includes the hidden row.
+        Assert.Equal(2, Assert.Single(await repository.ListGameSummariesAsync()).GuideCount);
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => repository.GetGuideAsync(bad));
+    }
+
     private static long ReadUserVersion(string databasePath)
     {
         using SqliteConnection connection = OpenWithForeignKeys(databasePath);
@@ -1483,6 +1570,14 @@ public sealed class SqliteLibraryRepositoryTests
         command.Parameters.AddWithValue("$hash", new string('a', 64));
         command.Parameters.AddWithValue("$now", Now.ToUnixTimeMilliseconds());
         command.ExecuteNonQuery();
+    }
+
+    // InsertGuide's PrimaryRelativePath is guide.txt.
+    private static void WriteGuideFile(ManagedPathResolver paths, Guid guideId)
+    {
+        string file = paths.GetPlannedGuideFile(guideId, "guide.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        File.WriteAllText(file, "guide");
     }
 
     private static void CreatePopulatedVersionOne(

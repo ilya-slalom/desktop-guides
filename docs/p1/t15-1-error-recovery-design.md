@@ -1,6 +1,6 @@
 # T15.1 error recovery design
 
-Status: PR a implemented on `feat/p1-t15-1-error-recovery`; verified by CI run 37928644369. PR b and PR c are planned.
+Status: PR a merged in #74; PR b implemented on `feat/p1-t15-1-guide-health`, verified by CI run 37944327625. PR c is planned.
 Prerequisites T03.2, T06.3, T09.1 and T10.1 are merged.
 
 ## Intent
@@ -310,3 +310,40 @@ produces one), so they are hidden rather than shown as removable rows.
 - **Evidence.**
   - [Damaged library](evidence/t15-1-error-recovery/library-damaged.png)
   - [Missing library](evidence/t15-1-error-recovery/library-missing.png)
+
+### PR b: guide health and the reader
+
+- **Unit tests.** On `pcsx2-win`, Infrastructure 687/687 and Core 995/995
+  passed. The new tests are:
+  - `GuideFileHealthTests`: marking, forgetting, the per-game count and
+    a reset from the startup report;
+  - `CatalogPresentationTests`: the `File missing` and `File damaged`
+    facts lead a guide row, and a game row adds
+    "1 guide needs attention" or "{n} guides need attention" after its count;
+  - `HtmlGuideLoadMessagesTests`, `PdfGuideLoadMessagesTests` and
+    `TextGuideLoadMessagesTests`: the new missing and changed copy, which
+    errors offer **Remove guide**, and each error's file status;
+  - `GuideRemovalPresentationTests`: a guide with no files left gets the
+    dialog body without a file count;
+  - `SqliteLibraryRepositoryTests` and `StartupReconciliationReportTests`:
+    startup lists guides whose managed file is gone, counts unreadable guide
+    rows, and the guide lists skip those rows.
+- **Installed.** CI run [37944327625](https://github.com/ilya-slalom/desktop-guides/actions/runs/37944327625)
+  passed `production-shell-ui`. In the TXT group:
+  - the Library row for Text Reader Game ended "1 guide needs attention",
+    and Missing File Guide's row led with `File missing`;
+  - its reader error offered **Remove guide**. Cancel kept the error and
+    returned focus to Remove guide; Remove returned to the game without the
+    guide, with Remove game enabled, and ASCII Map Guide still opened;
+  - Web Page Guide offered **Remove guide**, and its row then led with
+    `File damaged`.
+  In the HTML and PDF groups, the missing entry, the missing PDF and the
+  damaged PDF offered **Remove guide**.
+- **Rulings.** Rulings 1–24 in the [plan](t15-1-error-recovery-plan.md#rulings-against-the-spec),
+  plus:
+  - removing a guide from the Game page also clears its file status, so the
+    Library attention count doesn't stay stale until the next start;
+  - the reader-action rename touched eight Production sites, not seven.
+- **Evidence.**
+  - [Missing guide row](evidence/t15-1-error-recovery/guide-missing-row.png)
+  - [Remove from the reader](evidence/t15-1-error-recovery/guide-missing-remove.png)

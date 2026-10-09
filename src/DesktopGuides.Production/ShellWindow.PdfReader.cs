@@ -63,6 +63,7 @@ public sealed partial class ShellWindow
         session.Failed += OnPdfSessionFailed;
         session.ZoomChanged += OnPdfZoomChanged;
         session.View.PreviewKeyDown += OnPdfPreviewKeyDown;
+        MarkReaderGuide(GuideFileStatus.Ok);
         ShowReaderSurface(loading: false, view: session.View);
         try
         {
@@ -128,6 +129,7 @@ public sealed partial class ShellWindow
     private void ShowPdfLoadError(PdfGuideLoadError error)
     {
         string message = PdfGuideLoadMessages.For(error);
+        MarkReaderGuide(PdfGuideLoadMessages.StatusFor(error));
         ShowReaderSurface(loading: false, error: message, action: PdfGuideLoadMessages.ActionFor(error));
         ShowWarningStatus(message);
     }

@@ -247,4 +247,46 @@ public sealed class CatalogPresentationTests
 
         Assert.Equal(["PC", "Manual", "2 guides"], Labels(CatalogPresentation.GameFacts(summary, null)));
     }
+
+    [Fact]
+    public void AttentionFollowsTheCountAndPrecedesTheMatchedGuide()
+    {
+        LibraryGameSummary summary = new(GameWith("PC"), 3, Now, []);
+
+        Assert.Equal(
+            ["PC", "Manual", "3 guides", "1 guide needs attention", "Guide: Maps"],
+            Labels(CatalogPresentation.GameFacts(summary, "Maps", attentionCount: 1)));
+        Assert.Equal(
+            ["PC", "Manual", "3 guides", "2 guides need attention"],
+            Labels(CatalogPresentation.GameFacts(summary, attentionCount: 2)));
+    }
+
+    [Fact]
+    public void NoAttentionFactWhenEveryGuideIsOk()
+    {
+        LibraryGameSummary summary = new(GameWith("PC"), 3, Now, []);
+
+        Assert.Equal(["PC", "Manual", "3 guides"], Labels(CatalogPresentation.GameFacts(summary, attentionCount: 0)));
+    }
+
+    [Theory]
+    [InlineData(GuideFileStatus.Missing, "File missing")]
+    [InlineData(GuideFileStatus.Damaged, "File damaged")]
+    public void AFileStatusIsTheFirstGuideFact(GuideFileStatus status, string expected)
+    {
+        IReadOnlyList<CatalogFact> facts = CatalogPresentation.GuideFacts(
+            new GuideSummary(GuideWith(GuideFormat.Txt), null), AtNow, EnGb, status);
+
+        Assert.Equal([expected, "Text (TXT)", "Not started"], Labels(facts));
+        Assert.Equal(expected, facts[0].AccessibleLabel);
+    }
+
+    [Fact]
+    public void AnOkGuideHasNoStatusFact()
+    {
+        Assert.Equal(
+            Labels(GuideFacts(null)),
+            Labels(CatalogPresentation.GuideFacts(
+                new GuideSummary(GuideWith(GuideFormat.Txt), null), AtNow, EnGb, GuideFileStatus.Ok)));
+    }
 }

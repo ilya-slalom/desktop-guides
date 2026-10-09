@@ -1,18 +1,21 @@
 using DesktopGuides.Core.Html;
+using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Reading;
 
 namespace DesktopGuides.Core.Pdf;
 
 // New members go at the end, so existing values keep their numbers.
 public enum PdfGuideLoadError { Missing, Changed, Unreadable, Damaged, PasswordProtected, Failed, PasswordRequired, PasswordIncorrect }
 
-// Actions reuse HtmlGuideLoadAction because the Reader's error surface is
-// typed to it; a PDF error only ever offers None or Reopen.
+// Action labels come from HtmlGuideLoadMessages so every format reads alike.
 public static class PdfGuideLoadMessages
 {
     public static string For(PdfGuideLoadError error) => error switch
     {
-        PdfGuideLoadError.Missing => "This guide's file is missing from the library.",
-        PdfGuideLoadError.Changed => "This guide's files have changed. Re-import it to read it.",
+        PdfGuideLoadError.Missing =>
+            "This guide's file is missing from the library. Remove it, then import the original again.",
+        PdfGuideLoadError.Changed =>
+            "This guide's file changed after it was imported, so it can't be opened safely. Remove it, then import the original again.",
         PdfGuideLoadError.Unreadable =>
             "This guide's file can't be opened. Close any app that's using it, then open the guide again.",
         PdfGuideLoadError.Damaged => "This PDF is damaged, so it can't be opened. Re-import it from the original file.",
@@ -24,14 +27,25 @@ public static class PdfGuideLoadMessages
         _ => throw new ArgumentOutOfRangeException(nameof(error))
     };
 
-    public static HtmlGuideLoadAction ActionFor(PdfGuideLoadError error) => error switch
+    public static GuideLoadAction ActionFor(PdfGuideLoadError error) => error switch
     {
-        PdfGuideLoadError.Unreadable or PdfGuideLoadError.Failed => HtmlGuideLoadAction.Reopen,
-        PdfGuideLoadError.Missing or PdfGuideLoadError.Changed or PdfGuideLoadError.Damaged or
-            PdfGuideLoadError.PasswordProtected or PdfGuideLoadError.PasswordRequired or
-            PdfGuideLoadError.PasswordIncorrect => HtmlGuideLoadAction.None,
+        PdfGuideLoadError.Unreadable or PdfGuideLoadError.Failed => GuideLoadAction.Reopen,
+        PdfGuideLoadError.Missing or PdfGuideLoadError.Changed or PdfGuideLoadError.Damaged =>
+            GuideLoadAction.Remove,
+        PdfGuideLoadError.PasswordProtected or PdfGuideLoadError.PasswordRequired or
+            PdfGuideLoadError.PasswordIncorrect => GuideLoadAction.None,
         _ => throw new ArgumentOutOfRangeException(nameof(error))
     };
 
-    public static string ActionLabel(HtmlGuideLoadAction action) => HtmlGuideLoadMessages.ActionLabel(action);
+    // What a failed open says about the guide's file; null leaves it as it was.
+    public static GuideFileStatus? StatusFor(PdfGuideLoadError error) => error switch
+    {
+        PdfGuideLoadError.Missing => GuideFileStatus.Missing,
+        PdfGuideLoadError.Changed or PdfGuideLoadError.Damaged => GuideFileStatus.Damaged,
+        PdfGuideLoadError.Unreadable or PdfGuideLoadError.PasswordProtected or PdfGuideLoadError.Failed or
+            PdfGuideLoadError.PasswordRequired or PdfGuideLoadError.PasswordIncorrect => null,
+        _ => throw new ArgumentOutOfRangeException(nameof(error))
+    };
+
+    public static string ActionLabel(GuideLoadAction action) => HtmlGuideLoadMessages.ActionLabel(action);
 }

@@ -50,6 +50,7 @@ public sealed partial class ShellWindow
         session.UnavailableLinkRequested += OnUnavailableLinkRequested;
         session.Failed += OnReaderSessionFailed;
         session.AppearanceRestored += OnAppearanceRestored;
+        MarkReaderGuide(GuideFileStatus.Ok);
         ShowReaderSurface(loading: false, view: session.View);
         try
         {
@@ -87,6 +88,7 @@ public sealed partial class ShellWindow
     private void ShowHtmlLoadError(HtmlGuideLoadError error)
     {
         string message = HtmlGuideLoadMessages.For(error);
+        MarkReaderGuide(HtmlGuideLoadMessages.StatusFor(error));
         ShowReaderSurface(loading: false, error: message, action: HtmlGuideLoadMessages.ActionFor(error));
         ShowWarningStatus(message);
     }
@@ -190,10 +192,10 @@ public sealed partial class ShellWindow
         int generation = readerErrorGeneration;
         switch (readerErrorAction)
         {
-            case HtmlGuideLoadAction.GetRuntime:
+            case GuideLoadAction.GetRuntime:
                 await LaunchExternalAsync(new Uri(HtmlGuideLoadMessages.RuntimeDownloadUrl));
                 break;
-            case HtmlGuideLoadAction.Reopen:
+            case GuideLoadAction.Reopen:
                 // A click queued behind a navigation away does nothing.
                 await RunNavigationAsync(async () =>
                 {
@@ -203,6 +205,9 @@ public sealed partial class ShellWindow
                     }
                     await RenderCurrentAsync();
                 });
+                break;
+            case GuideLoadAction.Remove:
+                await RemoveReaderGuideAsync(generation);
                 break;
         }
     }

@@ -1,3 +1,6 @@
+using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Reading;
+
 namespace DesktopGuides.Core.Html;
 
 // New members go at the end, so existing values keep their numbers.
@@ -6,9 +9,6 @@ public enum HtmlGuideLoadError { RuntimeMissing, NoManifest, Changed, Missing, R
 // How far the entry page got during an open: never asked for, served, or
 // refused because its managed copy changed or is missing.
 public enum HtmlEntryState { NotRequested, Served, Changed, Missing }
-
-// The one thing the Reader offers to do about an error.
-public enum HtmlGuideLoadAction { None, GetRuntime, Reopen }
 
 public static class HtmlGuideLoadMessages
 {
@@ -19,9 +19,11 @@ public static class HtmlGuideLoadMessages
         HtmlGuideLoadError.RuntimeMissing => "Web page guides need the Microsoft Edge WebView2 Runtime.",
         HtmlGuideLoadError.RuntimeFailed => "Web page guides couldn't start.",
         HtmlGuideLoadError.Crashed => "This guide stopped responding.",
-        HtmlGuideLoadError.Missing => "This guide's file is missing from the library.",
+        HtmlGuideLoadError.Missing =>
+            "This guide's file is missing from the library. Remove it, then import the original again.",
         HtmlGuideLoadError.NoManifest => "Re-import this guide to read it.",
-        HtmlGuideLoadError.Changed => "This guide's files have changed. Re-import it to read it.",
+        HtmlGuideLoadError.Changed =>
+            "This guide's file changed after it was imported, so it can't be opened safely. Remove it, then import the original again.",
         _ => throw new ArgumentOutOfRangeException(nameof(error))
     };
 
@@ -37,19 +39,29 @@ public static class HtmlGuideLoadMessages
             _ => throw new ArgumentOutOfRangeException(nameof(entry))
         };
 
-    public static HtmlGuideLoadAction ActionFor(HtmlGuideLoadError error) => error switch
+    public static GuideLoadAction ActionFor(HtmlGuideLoadError error) => error switch
     {
-        HtmlGuideLoadError.RuntimeMissing => HtmlGuideLoadAction.GetRuntime,
-        HtmlGuideLoadError.RuntimeFailed or HtmlGuideLoadError.Crashed => HtmlGuideLoadAction.Reopen,
+        HtmlGuideLoadError.RuntimeMissing => GuideLoadAction.GetRuntime,
+        HtmlGuideLoadError.RuntimeFailed or HtmlGuideLoadError.Crashed => GuideLoadAction.Reopen,
         HtmlGuideLoadError.Missing or HtmlGuideLoadError.NoManifest or HtmlGuideLoadError.Changed =>
-            HtmlGuideLoadAction.None,
+            GuideLoadAction.Remove,
         _ => throw new ArgumentOutOfRangeException(nameof(error))
     };
 
-    public static string ActionLabel(HtmlGuideLoadAction action) => action switch
+    // What a failed open says about the guide's file; null leaves it as it was.
+    public static GuideFileStatus? StatusFor(HtmlGuideLoadError error) => error switch
     {
-        HtmlGuideLoadAction.GetRuntime => "Get WebView2 Runtime",
-        HtmlGuideLoadAction.Reopen => "Reopen",
+        HtmlGuideLoadError.Missing => GuideFileStatus.Missing,
+        HtmlGuideLoadError.NoManifest or HtmlGuideLoadError.Changed => GuideFileStatus.Damaged,
+        HtmlGuideLoadError.RuntimeMissing or HtmlGuideLoadError.RuntimeFailed or HtmlGuideLoadError.Crashed => null,
+        _ => throw new ArgumentOutOfRangeException(nameof(error))
+    };
+
+    public static string ActionLabel(GuideLoadAction action) => action switch
+    {
+        GuideLoadAction.GetRuntime => "Get WebView2 Runtime",
+        GuideLoadAction.Reopen => "Reopen",
+        GuideLoadAction.Remove => "Remove guide",
         _ => throw new ArgumentOutOfRangeException(nameof(action))
     };
 }
