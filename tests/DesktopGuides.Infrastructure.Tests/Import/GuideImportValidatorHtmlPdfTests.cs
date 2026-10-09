@@ -266,22 +266,16 @@ public sealed class GuideImportValidatorHtmlPdfTests
         Assert.Equal("pdf-short", manifest.SuggestedTitle);
     }
 
-    [Fact]
-    public async Task ScannedPdfHasNoText()
+    // A scanned PDF has no text; a copy-restricted one is still accepted with its text.
+    [Theory]
+    [InlineData("pdf-scan.pdf", false)]
+    [InlineData("pdf-access.pdf", true)]
+    public async Task OnePagePdfReportsWhetherItHasText(string file, bool hasText)
     {
-        PdfImportManifest manifest = await Manifest<PdfImportManifest>(P0Fixtures.Resolve("pdf-scan.pdf"));
+        PdfImportManifest manifest = await Manifest<PdfImportManifest>(P0Fixtures.Resolve(file));
 
         Assert.Equal(1, manifest.PageCount);
-        Assert.False(manifest.HasText);
-    }
-
-    [Fact]
-    public async Task CopyRestrictedPdfIsAccepted()
-    {
-        PdfImportManifest manifest = await Manifest<PdfImportManifest>(P0Fixtures.Resolve("pdf-access.pdf"));
-
-        Assert.Equal(1, manifest.PageCount);
-        Assert.True(manifest.HasText);
+        Assert.Equal(hasText, manifest.HasText);
     }
 
     private const string WrongAttempt = "wrong-7Q2x";

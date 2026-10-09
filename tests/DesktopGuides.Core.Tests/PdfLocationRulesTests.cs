@@ -83,24 +83,16 @@ public sealed class PdfLocationRulesTests
         Assert.Equal(PdfLocationRules.ClampedReason, restore.Outcome.Reason);
     }
 
-    [Fact]
-    public void ChangedBytesKeepThePointButAreApproximate()
+    // A missing page goes to the nearest page's top; a present one keeps the point.
+    [Theory]
+    [InlineData(57, 57, 0.4)]
+    [InlineData(250, 199, 0)]
+    public void ChangedBytesRestoreApproximately(int page, int expectedPage, double expectedFraction)
     {
-        PdfRestore restore = PdfLocationRules.Restore(At(57, 0.4, "ff00"), Sha, 200);
+        PdfRestore restore = PdfLocationRules.Restore(At(page, 0.4, "ff00"), Sha, 200);
 
-        Assert.Equal(57, restore.PageIndex);
-        Assert.Equal(0.4, restore.PageFraction);
-        Assert.Equal(RestoreKind.Approximate, restore.Outcome.Kind);
-        Assert.Equal(PdfLocationRules.ChangedReason, restore.Outcome.Reason);
-    }
-
-    [Fact]
-    public void ChangedBytesWithAMissingPageGoToTheNearestPageTop()
-    {
-        PdfRestore restore = PdfLocationRules.Restore(At(250, 0.4, "ff00"), Sha, 200);
-
-        Assert.Equal(199, restore.PageIndex);
-        Assert.Equal(0, restore.PageFraction);
+        Assert.Equal(expectedPage, restore.PageIndex);
+        Assert.Equal(expectedFraction, restore.PageFraction);
         Assert.Equal(RestoreKind.Approximate, restore.Outcome.Kind);
         Assert.Equal(PdfLocationRules.ChangedReason, restore.Outcome.Reason);
     }
@@ -125,14 +117,12 @@ public sealed class PdfLocationRulesTests
         Assert.Equal(PdfLocationRules.ChangedReason, restore.Outcome.Reason);
     }
 
-    [Fact]
-    public void AnotherFormatIsUnavailable() =>
-        AssertUnavailable(new ReaderLocation(GuideFormat.Txt, ReaderLocationCodec.CurrentVersion, Sha,
-            new TextPosition(0, "x"), null));
-
-    [Fact]
-    public void APdfLocationWithATextPayloadIsUnavailable() =>
-        AssertUnavailable(new ReaderLocation(GuideFormat.Pdf, ReaderLocationCodec.CurrentVersion, Sha,
+    // Txt: another format. Pdf: a PDF location with a text payload.
+    [Theory]
+    [InlineData(GuideFormat.Txt)]
+    [InlineData(GuideFormat.Pdf)]
+    public void ATextPayloadIsUnavailable(GuideFormat format) =>
+        AssertUnavailable(new ReaderLocation(format, ReaderLocationCodec.CurrentVersion, Sha,
             new TextPosition(0, "x"), null));
 
     [Fact]
