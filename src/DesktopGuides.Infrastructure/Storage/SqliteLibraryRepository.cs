@@ -686,12 +686,67 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
     private void Initialize()
     {
         LastStartupReconciliation = null;
-        paths.EnsureCreated();
-        using SqliteConnection connection = OpenConnection(create: true);
-        MigrateOrValidate(connection);
-        StartupReconciliationReport report = new FileOperationReconciler(paths).Run(connection);
-        int artworkReview = new ManagedArtworkStore(paths).Sweep(ReadArtworkReferences(connection));
-        LastStartupReconciliation = report with { ArtworkReviewCount = artworkReview };
+        SqliteConnection connection;
+        try
+        {
+            paths.EnsureCreated();
+            connection = OpenConnection(create: IsFirstRun());
+            try
+            {
+                ProbeWrite(connection);
+                MigrateOrValidate(connection);
+            }
+            catch
+            {
+                connection.Dispose();
+                throw;
+            }
+        }
+        catch (Exception error) when (LibraryOpenErrors.Map(error) is { } mapped)
+        {
+            throw mapped;
+        }
+        using (connection)
+        {
+            StartupReconciliationReport report = new FileOperationReconciler(paths).Run(connection);
+            int artworkReview = new ManagedArtworkStore(paths).Sweep(ReadArtworkReferences(connection));
+            LastStartupReconciliation = report with { ArtworkReviewCount = artworkReview };
+        }
+    }
+
+    // A missing or empty database is a first run only in an unused data folder.
+    // Otherwise nothing is created, so a restore can still succeed.
+    private bool IsFirstRun()
+    {
+        FileInfo database = new(paths.DatabasePath);
+        if (database.Exists && database.Length > 0)
+        {
+            return false;
+        }
+        if (HasEntries(paths.ContentRoot) || HasEntries(paths.ArtworkRoot) ||
+            HasEntries(paths.RecoveryRoot) || File.Exists(paths.DatabasePath + "-wal"))
+        {
+            throw new LibraryOpenException(LibraryOpenIssue.Missing);
+        }
+        return true;
+    }
+
+    private static bool HasEntries(string directory) =>
+        Directory.Exists(directory) && Directory.EnumerateFileSystemEntries(directory).Any();
+
+    // An open can succeed read-only, and before the header is read, so a
+    // rolled-back write surfaces NoAccess or Damaged before anything changes.
+    private static void ProbeWrite(SqliteConnection connection)
+    {
+        using SqliteCommand read = connection.CreateCommand();
+        read.CommandText = "PRAGMA user_version";
+        long version = (long)read.ExecuteScalar()!;
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        using SqliteCommand write = connection.CreateCommand();
+        write.Transaction = transaction;
+        write.CommandText = $"PRAGMA user_version = {version}";
+        write.ExecuteNonQuery();
+        transaction.Rollback();
     }
 
     private static HashSet<string> ReadArtworkReferences(SqliteConnection connection)
@@ -711,8 +766,10 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         long currentVersion = (long)version.ExecuteScalar()!;
         if (currentVersion > LibrarySchema.CurrentVersion)
         {
-            throw new InvalidDataException(
-                $"Library schema version {currentVersion} is newer than this app supports. Update Desktop Guides.");
+            throw new LibraryOpenException(
+                LibraryOpenIssue.NewerVersion,
+                inner: new InvalidDataException(
+                    $"Library schema version {currentVersion} is newer than this app supports."));
         }
         if (currentVersion == LibrarySchema.CurrentVersion)
         {
@@ -759,9 +816,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         }
         catch (Exception error) when (recoveryCopy is not null)
         {
-            throw new InvalidDataException(
-                $"Library upgrade failed. Pre-upgrade recovery copy: {recoveryCopy}",
-                error);
+            throw new LibraryOpenException(LibraryOpenIssue.MigrationFailed, recoveryCopy, error);
         }
     }
 

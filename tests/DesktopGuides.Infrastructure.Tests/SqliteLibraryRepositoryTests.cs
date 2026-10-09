@@ -485,7 +485,8 @@ public sealed class SqliteLibraryRepositoryTests
         }
 
         await using SqliteLibraryRepository repository = new(directory.Paths);
-        await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+        LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(() => repository.InitializeAsync());
+        Assert.Equal(LibraryOpenIssue.Damaged, error.Issue);
         using SqliteConnection reopened = OpenWithForeignKeys(directory.Paths.DatabasePath);
         using SqliteCommand verify = reopened.CreateCommand();
         verify.CommandText = "SELECT Value FROM UnknownData";
@@ -505,7 +506,8 @@ public sealed class SqliteLibraryRepositoryTests
         }
 
         await using SqliteLibraryRepository repository = new(directory.Paths);
-        await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+        LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(() => repository.InitializeAsync());
+        Assert.Equal(LibraryOpenIssue.Damaged, error.Issue);
         using SqliteConnection reopened = OpenWithForeignKeys(directory.Paths.DatabasePath);
         using SqliteCommand verify = reopened.CreateCommand();
         verify.CommandText = "PRAGMA application_id";
@@ -587,9 +589,10 @@ public sealed class SqliteLibraryRepositoryTests
                 }
             }))
         {
-            InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(
+            LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(
                 () => failing.InitializeAsync());
-            Assert.Contains("recovery copy:", error.Message);
+            Assert.Equal(LibraryOpenIssue.MigrationFailed, error.Issue);
+            Assert.True(File.Exists(error.RecoveryCopyPath));
             Assert.IsType<IOException>(error.InnerException);
         }
 
@@ -645,9 +648,10 @@ public sealed class SqliteLibraryRepositoryTests
         }
 
         await using SqliteLibraryRepository repository = new(directory.Paths);
-        InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(
+        LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(
             () => repository.InitializeAsync());
-        Assert.Contains("Update Desktop Guides", error.Message);
+        Assert.Equal(LibraryOpenIssue.NewerVersion, error.Issue);
+        Assert.Contains("newer than this app supports", error.InnerException!.Message);
         using SqliteConnection original = OpenWithForeignKeys(directory.Paths.DatabasePath);
         using SqliteCommand verify = original.CreateCommand();
         verify.CommandText = "SELECT Value FROM FutureData";
@@ -674,9 +678,10 @@ public sealed class SqliteLibraryRepositoryTests
         }
 
         await using SqliteLibraryRepository repository = new(directory.Paths);
-        InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(
+        LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(
             () => repository.InitializeAsync());
-        Assert.Contains("orphaned records", error.Message);
+        Assert.Equal(LibraryOpenIssue.Damaged, error.Issue);
+        Assert.Contains("orphaned records", error.InnerException!.Message);
         using SqliteConnection original = OpenWithForeignKeys(directory.Paths.DatabasePath);
         using SqliteCommand version = original.CreateCommand();
         version.CommandText = "PRAGMA user_version";
@@ -698,9 +703,10 @@ public sealed class SqliteLibraryRepositoryTests
             drop.ExecuteNonQuery();
         }
 
-        InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(
+        LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(
             () => repository.InitializeAsync());
-        Assert.Contains("schema is incomplete", error.Message);
+        Assert.Equal(LibraryOpenIssue.Damaged, error.Issue);
+        Assert.Contains("schema is incomplete", error.InnerException!.Message);
         Assert.Equal("Keep", (await repository.GetGameAsync(game.Id))?.Title);
     }
 
@@ -721,7 +727,8 @@ public sealed class SqliteLibraryRepositoryTests
         try
         {
             await using SqliteLibraryRepository repository = new(directory.Paths);
-            await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+            LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(() => repository.InitializeAsync());
+            Assert.Equal(LibraryOpenIssue.Damaged, error.Issue);
             await Assert.ThrowsAsync<InvalidDataException>(() =>
                 repository.GetGameAsync(Guid.NewGuid()));
             Assert.Empty(Directory.GetFiles(directory.Paths.RecoveryRoot));
@@ -756,7 +763,8 @@ public sealed class SqliteLibraryRepositoryTests
         File.CreateSymbolicLink(sharedMemory, outside);
         try
         {
-            await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+            LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(() => repository.InitializeAsync());
+            Assert.Equal(LibraryOpenIssue.Damaged, error.Issue);
             await Assert.ThrowsAsync<InvalidDataException>(() =>
                 repository.GetGameAsync(Guid.NewGuid()));
             Assert.Equal(sentinel, File.ReadAllBytes(outside));
@@ -802,7 +810,8 @@ public sealed class SqliteLibraryRepositoryTests
                      FileAttributes.ReparsePoint) == 0);
 
         await using SqliteLibraryRepository repository = new(directory.Paths);
-        await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+        LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(() => repository.InitializeAsync());
+        Assert.Equal(LibraryOpenIssue.Damaged, error.Issue);
         Assert.Empty(Directory.GetFiles(directory.Paths.RecoveryRoot));
         using SqliteConnection original = OpenWithForeignKeys(outside);
         using SqliteCommand version = original.CreateCommand();
@@ -835,7 +844,8 @@ public sealed class SqliteLibraryRepositoryTests
         }
 
         await using SqliteLibraryRepository repository = new(directory.Paths);
-        await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+        LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(() => repository.InitializeAsync());
+        Assert.Equal(LibraryOpenIssue.Damaged, error.Issue);
         Assert.Empty(Directory.GetFiles(directory.Paths.RecoveryRoot));
 
         using SqliteConnection original = OpenWithForeignKeys(directory.Paths.DatabasePath);
@@ -860,7 +870,8 @@ public sealed class SqliteLibraryRepositoryTests
             alter.ExecuteNonQuery();
         }
 
-        await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+        LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(() => repository.InitializeAsync());
+        Assert.Equal(LibraryOpenIssue.Damaged, error.Issue);
         using SqliteConnection original = OpenWithForeignKeys(directory.Paths.DatabasePath);
         using SqliteCommand verify = original.CreateCommand();
         verify.CommandText = "SELECT Title FROM Games";
@@ -1002,7 +1013,8 @@ public sealed class SqliteLibraryRepositoryTests
             if (version == 3) throw new IOException("Injected after v3 columns were added.");
         }))
         {
-            await Assert.ThrowsAsync<InvalidDataException>(() => failing.InitializeAsync());
+            LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(() => failing.InitializeAsync());
+            Assert.Equal(LibraryOpenIssue.MigrationFailed, error.Issue);
         }
 
         Assert.Equal(2L, ReadUserVersion(directory.Paths.DatabasePath));
@@ -1207,7 +1219,8 @@ public sealed class SqliteLibraryRepositoryTests
             if (version == 4) throw new IOException("Injected after the v4 table was created.");
         }))
         {
-            await Assert.ThrowsAsync<InvalidDataException>(() => failing.InitializeAsync());
+            LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(() => failing.InitializeAsync());
+            Assert.Equal(LibraryOpenIssue.MigrationFailed, error.Issue);
         }
 
         Assert.Equal(3L, ReadUserVersion(directory.Paths.DatabasePath));
@@ -1333,6 +1346,111 @@ public sealed class SqliteLibraryRepositoryTests
         command.ExecuteNonQuery();
     }
 
+    [Fact]
+    public async Task NonDatabaseBytesAreDamagedAndUnchanged()
+    {
+        using TestLibrary directory = new();
+        directory.Paths.EnsureCreated();
+        byte[] bytes = Enumerable.Repeat((byte)0x5A, 4096).ToArray();
+        File.WriteAllBytes(directory.Paths.DatabasePath, bytes);
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(
+            () => repository.InitializeAsync());
+
+        Assert.Equal(LibraryOpenIssue.Damaged, error.Issue);
+        Assert.IsType<SqliteException>(error.InnerException);
+        Assert.Equal(bytes, File.ReadAllBytes(directory.Paths.DatabasePath));
+        Assert.Null(repository.LastStartupReconciliation);
+    }
+
+    [Fact]
+    public async Task DeletedDatabaseWithGuideContentIsMissingAndNotRecreated()
+    {
+        using TestLibrary directory = new();
+        directory.Paths.EnsureCreated();
+        string guideRoot = Path.Combine(directory.Paths.ContentRoot, Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(guideRoot);
+        File.WriteAllText(Path.Combine(guideRoot, "guide.txt"), "keep");
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(
+            () => repository.InitializeAsync());
+
+        Assert.Equal(LibraryOpenIssue.Missing, error.Issue);
+        Assert.False(File.Exists(directory.Paths.DatabasePath));
+    }
+
+    [Fact]
+    public async Task ZeroByteDatabaseWithArtworkIsMissingAndStaysEmpty()
+    {
+        using TestLibrary directory = new();
+        directory.Paths.EnsureCreated();
+        File.WriteAllBytes(Path.Combine(directory.Paths.ArtworkRoot, "cover.png"), [1, 2, 3]);
+        File.WriteAllBytes(directory.Paths.DatabasePath, []);
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(
+            () => repository.InitializeAsync());
+
+        Assert.Equal(LibraryOpenIssue.Missing, error.Issue);
+        Assert.Equal(0, new FileInfo(directory.Paths.DatabasePath).Length);
+    }
+
+    [Fact]
+    public async Task WalWithoutDatabaseIsMissing()
+    {
+        using TestLibrary directory = new();
+        directory.Paths.EnsureCreated();
+        File.WriteAllBytes(directory.Paths.DatabasePath + "-wal", [1, 2, 3]);
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(
+            () => repository.InitializeAsync());
+
+        Assert.Equal(LibraryOpenIssue.Missing, error.Issue);
+        Assert.False(File.Exists(directory.Paths.DatabasePath));
+        Assert.Equal([1, 2, 3], File.ReadAllBytes(directory.Paths.DatabasePath + "-wal"));
+    }
+
+    // Guards the first run: it passes before and after the change.
+    [Fact]
+    public async Task EmptyDataFolderIsAFirstRun()
+    {
+        using TestLibrary directory = new();
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+
+        Assert.Equal(LibrarySchema.CurrentVersion, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.NotNull(repository.LastStartupReconciliation);
+    }
+
+    [Fact]
+    public async Task ReadOnlyDatabaseIsNoAccess()
+    {
+        using TestLibrary directory = new();
+        await using (SqliteLibraryRepository first = new(directory.Paths))
+        {
+            await first.InitializeAsync();
+        }
+        byte[] before = File.ReadAllBytes(directory.Paths.DatabasePath);
+        File.SetAttributes(directory.Paths.DatabasePath, FileAttributes.ReadOnly);
+        try
+        {
+            await using SqliteLibraryRepository repository = new(directory.Paths);
+            LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(
+                () => repository.InitializeAsync());
+
+            Assert.Equal(LibraryOpenIssue.NoAccess, error.Issue);
+            Assert.Equal(before, File.ReadAllBytes(directory.Paths.DatabasePath));
+        }
+        finally
+        {
+            File.SetAttributes(directory.Paths.DatabasePath, FileAttributes.Normal);
+        }
+    }
+
     private static long ReadUserVersion(string databasePath)
     {
         using SqliteConnection connection = OpenWithForeignKeys(databasePath);
@@ -1455,7 +1573,10 @@ public sealed class SqliteLibraryRepositoryTests
         if (!OperatingSystem.IsWindows()) return;
 
         using TestLibrary directory = new();
-        directory.Paths.EnsureCreated();
+        await using (SqliteLibraryRepository first = new(directory.Paths))
+        {
+            await first.InitializeAsync();
+        }
         string folder = Path.Combine(directory.Paths.ArtworkRoot, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
         // Windows refuses to remove a read-only directory.
