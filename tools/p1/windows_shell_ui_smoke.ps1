@@ -2349,15 +2349,17 @@ try {
             [void](Wait-Status 'Guide ready.')
             $savesBeforeJump = [int] (Read-ProgressCounts).saves
             Click-Element (Wait-PageVisible 'Jump to the middle')
-            $middle = Wait-HtmlPosition { param($p) $p.locator -and -not $p.quote } 'a capture with no text'
-            # The jump's own save can land late; take the baseline once it
-            # has, or after 10 s if the place was already saved.
+            [void](Wait-HtmlPosition { param($p) $p.locator -and -not $p.quote } 'a capture with no text')
+            # The jump's own save can land late, and the images can still
+            # move the place; take the baselines once it has, or after 10 s
+            # if the place was already saved.
             $deadline = (Get-Date).AddSeconds(10)
             while ([int] (Read-ProgressCounts).saves -le $savesBeforeJump -and
                 (Get-Date) -lt $deadline) {
                 Start-Sleep -Milliseconds 250
             }
             Start-Sleep -Seconds 1
+            $middle = Wait-HtmlPosition { param($p) $p.locator -and -not $p.quote } 'a settled capture with no text'
             $savesBefore = [int] (Read-ProgressCounts).saves
             foreach ($step in @(
                 @{ command = 'Larger text'; scale = 1.1; label = '110%' },
@@ -2369,7 +2371,7 @@ try {
                     throw "A size step to $($step.label) restored '$($after.appearanceKind)/$($after.appearanceStep)'; expected Approximate/Fraction."
                 }
                 if ($after.locator -cne $middle.locator) {
-                    throw "A size step to $($step.label) changed the locator."
+                    throw "A size step to $($step.label) changed the locator from $($middle.locator) to $($after.locator)."
                 }
                 if ($step.scale -eq 1.1) {
                     $report.htmlShiftedScreenshot = Save-WindowScreenshot 'html-place-shifted'
