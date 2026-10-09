@@ -1,5 +1,8 @@
+using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Reading;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Windows.System;
 
 namespace DesktopGuides.Production;
@@ -77,4 +80,23 @@ public sealed partial class ShellWindow
             ShowWarningStatus("Couldn't open the data folder.");
         }
     }
+
+    // T15.1: one background probe once the library is ready. The warning
+    // doesn't hide route progress, because a click may already be loading
+    // a page.
+    private async Task WarnIfRuntimeMissingAsync(string probedCacheRoot)
+    {
+        bool available = await Task.Run(
+            () => HtmlReaderSession.IsRuntimeAvailable(probedCacheRoot));
+        if (available || closeRequested)
+        {
+            return;
+        }
+        ShowStatus(HtmlGuideLoadMessages.RuntimeMissingAtStartup, InfoBarSeverity.Warning, true, false);
+        ShellStatusAction.Content = HtmlGuideLoadMessages.ActionLabel(GuideLoadAction.GetRuntime);
+        ShellStatusAction.Visibility = Visibility.Visible;
+    }
+
+    private async void ShellStatusActionClicked(object sender, RoutedEventArgs args) =>
+        await LaunchExternalAsync(new Uri(HtmlGuideLoadMessages.RuntimeDownloadUrl));
 }

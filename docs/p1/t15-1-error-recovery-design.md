@@ -1,6 +1,6 @@
 # T15.1 error recovery design
 
-Status: PR a merged in #74; PR b implemented on `feat/p1-t15-1-guide-health`, verified by CI run 37944327625. PR c is planned.
+Status: PR a merged in #74 and PR b in #75; PR c implemented on `feat/p1-t15-1-runtime-check` as #76, verified by CI run 37948919282.
 Prerequisites T03.2, T06.3, T09.1 and T10.1 are merged.
 
 ## Intent
@@ -347,3 +347,20 @@ produces one), so they are hidden rather than shown as removable rows.
 - **Evidence.**
   - [Missing guide row](evidence/t15-1-error-recovery/guide-missing-row.png)
   - [Remove from the reader](evidence/t15-1-error-recovery/guide-missing-remove.png)
+
+### PR c: the startup runtime check
+
+- **Unit tests.** On `pcsx2-win`, Core 996/996 passed, including
+  `HtmlGuideLoadMessagesTests.StartupWarningSaysWhatStillOpens`.
+- **Installed.** CI run [37948919282](https://github.com/ilya-slalom/desktop-guides/actions/runs/37948919282)
+  passed `production-shell-ui`. In the runtime-missing pass, the Library
+  showed "Web page guides need the Microsoft Edge WebView2 Runtime. Text and
+  PDF guides still open." with **Get WebView2 Runtime** before any guide was
+  opened, and the button reached the test launcher. The other HTML passes
+  showed no warning.
+- **Windows App SDK runtime.** The MSIX declares the framework dependency,
+  so Windows installs it or refuses to start the app before any app code
+  runs. No in-app check was added.
+- **Rulings.** None.
+- **Evidence.**
+  - [Missing runtime at startup](evidence/t15-1-error-recovery/runtime-missing-startup.png)

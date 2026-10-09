@@ -973,8 +973,8 @@ CI run 37765505021); see the
 [design](t20-1-library-export-design.md#t201-verification-record).
 T15.4 is implemented on `feat/p1-t15-4-fault-injection`; see the
 [design](t15-4-fault-injection-design.md#t154-verification-record).
-T15.1 PR a merged in #74; PR b is implemented on
-`feat/p1-t15-1-guide-health`; see the [design and verification
+T15.1 is implemented in #74, #75 and #76 (on `feat/p1-t15-1-runtime-check`);
+see the [design and verification
 record](t15-1-error-recovery-design.md#t151-verification-record).
 A library that can't be opened stops on a Library unavailable page with
 **Try again** and **Open data folder**. `Initialize` maps open failures to a
@@ -986,10 +986,13 @@ game rows say which guides need attention. A guide whose file is missing or
 damaged offers **Remove guide** in the Reader, through T15.3's removal.
 Unreadable guide rows are hidden with one warning, and other guides open.
 CI run 37944327625 passed the installed missing-file and removal runs.
+A missing WebView2 Runtime is reported once at startup with
+**Get WebView2 Runtime**, and TXT and PDF guides still open. CI run 37948919282
+passed the installed runtime-missing run.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
-| T15.1 | T03.2, T06.3, T09.1, T10.1 | Stable service errors and actionable UI for corrupt DB, missing guide, invalid content, and missing runtime. An unaffected guide still opens; a corrupt DB is never replaced by an empty one. | TR15.1 |
+| T15.1 | T03.2, T06.3, T09.1, T10.1 | Stable service errors and actionable UI for corrupt DB, missing guide, invalid content, and missing runtime. An unaffected guide still opens; a corrupt DB is never replaced by an empty one. PRs: #74, #75, #76. | TR15.1 |
 | T15.4 | T04.3, T06.3, T15.2, T15.3 | Headless fault-injection matrix across each import/delete protocol phase plus canceled operations. Assert exact DB rows and owned paths; Windows NTFS runs cover links and malformed names. | TR04.1, TR04.2, TR06.2, TR15.1, TR15.2 |
 | T20.1 | T03.2, T04.4, T06.3, T15.2 | Versioned ZIP manifest and consistent SQLite/files snapshot under one write gate, including provider snapshots and managed game artwork. Export is canceled cleanly, verified by checksums, and excludes source paths, credentials, remote caches, and transient profiles. | TR20.2 |
 | T20.2 | T14.4, T15.1, T15.4, T20.1 | Toolkit `SettingsCard` Export/Restore rows and `SettingsExpander` advanced restore details, out-of-app-data destination check, first-import export reminder, full staged archive validation of guide and provider-artwork references, native Cancel/Replace confirmation, and rollback marker. Clean and populated restore, missing artwork, corrupt/unsafe ZIP, cancel, and interrupted swap tests pass. | TR20.1, TR20.2 |

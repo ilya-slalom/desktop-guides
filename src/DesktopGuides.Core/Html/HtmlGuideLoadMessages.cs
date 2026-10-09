@@ -14,6 +14,10 @@ public static class HtmlGuideLoadMessages
 {
     public const string RuntimeDownloadUrl = "https://developer.microsoft.com/microsoft-edge/webview2/";
 
+    // T15.1: the startup check, shown before any web page guide is opened.
+    public const string RuntimeMissingAtStartup =
+        "Web page guides need the Microsoft Edge WebView2 Runtime. Text and PDF guides still open.";
+
     public static string For(HtmlGuideLoadError error) => error switch
     {
         HtmlGuideLoadError.RuntimeMissing => "Web page guides need the Microsoft Edge WebView2 Runtime.",

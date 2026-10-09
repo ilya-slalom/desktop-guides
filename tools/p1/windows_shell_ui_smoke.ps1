@@ -2249,6 +2249,17 @@ try {
         }
         elseif ($Mode -eq 'html-runtime-missing') {
             [void](Wait-Name 'LibraryHeading' 'Library')
+            # html-runtime-startup: before any web page guide is opened, the
+            # startup check warns and offers Microsoft's page; the click goes
+            # to the test launcher and leaves the warning showing.
+            $startupRuntime = 'Web page guides need the Microsoft Edge WebView2 Runtime. Text and PDF guides still open.'
+            [void](Wait-Name 'ShellStatus' $startupRuntime)
+            $startupAction = Wait-Name 'ShellStatusAction' 'Get WebView2 Runtime'
+            $report.htmlRuntimeStartupScreenshot = Save-WindowScreenshot 'html-runtime-startup'
+            Invoke-Element $startupAction
+            Start-Sleep -Seconds 1
+            [void](Wait-Name 'ShellStatus' $startupRuntime)
+            $report.phases += 'html-runtime-startup'
             Select-Element $textGame
             [void](Wait-Name 'GameHeading' $textGame)
             [void](Wait-Status 'Game ready.')

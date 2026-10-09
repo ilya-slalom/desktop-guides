@@ -83,7 +83,14 @@
                      IsOpen="False"
                      Severity="Informational"
                      AutomationProperties.AutomationId="ShellStatus"
-                     AutomationProperties.LiveSetting="Polite" />
+                     AutomationProperties.LiveSetting="Polite">
+                <InfoBar.ActionButton>
+                    <Button x:Name="ShellStatusAction"
+                            AutomationProperties.AutomationId="ShellStatusAction"
+                            Visibility="Collapsed"
+                            Click="ShellStatusActionClicked" />
+                </InfoBar.ActionButton>
+            </InfoBar>
 
             <local:AutomationGroup x:Name="LibraryUnavailablePanel"
                                    Grid.Row="1"

@@ -290,6 +290,7 @@ public sealed partial class ShellWindow : Window
         bool autoDismiss)
     {
         statusDismissTimer.Stop();
+        ShellStatusAction.Visibility = Visibility.Collapsed;
         ShellStatusInfoBar.Message = message;
         AutomationProperties.SetName(ShellStatusInfoBar, message);
         AutomationProperties.SetItemStatus(
@@ -417,6 +418,7 @@ public sealed partial class ShellWindow : Window
             {
                 ShowWarningStatus(GuideFilePresentation.Unreadable(report.UnreadableGuideCount));
             }
+            await WarnIfRuntimeMissingAsync(sweptRoot);
         }
         catch (OperationCanceledException) when (closeRequested)
         {

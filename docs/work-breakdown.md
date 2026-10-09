@@ -486,6 +486,8 @@ unaffected guides still open.
 
 - **T15.1** Handle missing/corrupt managed content and database exceptions at
   service boundaries with actionable messages.
+  The Windows App SDK runtime is satisfied by the MSIX framework
+  dependency, so the app adds no check of its own.
 - **T15.2** Clean orphaned staging directories and detect orphaned managed
   directories without deleting unknown user files.
 - **T15.3** Implement guide removal with confirmation and recoverable deletion
