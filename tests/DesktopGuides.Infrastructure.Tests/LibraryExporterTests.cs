@@ -300,7 +300,9 @@ public sealed class LibraryExporterTests : IAsyncLifetime
             string temp = Directory.EnumerateFiles(output, "*.tmp").Single();
             using FileStream stream = new(temp, FileMode.Open, FileAccess.ReadWrite);
             stream.Position = stream.Length / 2;
-            stream.WriteByte((byte)(stream.ReadByte() ^ 0xFF));
+            int original = stream.ReadByte();
+            stream.Position--;
+            stream.WriteByte((byte)(original ^ 0xFF));
         });
 
         await Fails(LibraryExportIssue.VerificationFailed, exporter);
