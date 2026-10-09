@@ -835,6 +835,58 @@ if (args.Length == 2 && args[0] == "change-progress-copies")
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "break-library" &&
+    args[2] is "damaged" or "missing" or "restore" or "describe")
+{
+    ManagedPathResolver fixturePaths = new(args[1]);
+    string database = fixturePaths.DatabasePath;
+    string backup = database + ".t15-1-backup";
+    string[] sidecars = [database + "-wal", database + "-shm", database + "-journal"];
+    if (args[2] is "damaged" or "missing")
+    {
+        if (File.Exists(backup))
+        {
+            throw new InvalidOperationException("The library is already broken; restore it first.");
+        }
+        // Folds the WAL into the file, so the backup is the whole library.
+        using (SqliteConnection connection = new(new SqliteConnectionStringBuilder
+        {
+            DataSource = database,
+            Mode = SqliteOpenMode.ReadWrite,
+            Pooling = false
+        }.ToString()))
+        {
+            connection.Open();
+            using SqliteCommand checkpoint = connection.CreateCommand();
+            checkpoint.CommandText = "PRAGMA wal_checkpoint(TRUNCATE)";
+            checkpoint.ExecuteNonQuery();
+        }
+        File.Move(database, backup);
+        foreach (string sidecar in sidecars)
+        {
+            File.Delete(sidecar);
+        }
+        if (args[2] == "damaged")
+        {
+            File.WriteAllBytes(database, Enumerable.Repeat((byte)0x5A, 4096).ToArray());
+        }
+    }
+    else if (args[2] == "restore")
+    {
+        File.Delete(database);
+        foreach (string sidecar in sidecars)
+        {
+            File.Delete(sidecar);
+        }
+        File.Move(backup, database);
+    }
+    FileInfo file = new(database);
+    string hash = file.Exists ? Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(database))) : "";
+    Console.WriteLine(
+        $"{file.Exists};{(file.Exists ? file.Length : 0)};{hash};{sidecars.Count(File.Exists)}");
+    return 0;
+}
+
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second" or
         "seed-design" or "seed-catalog" or "seed-facts" or "seed-search" or "seed-import" or
@@ -851,6 +903,7 @@ if (args.Length != 2 ||
         "or clear-reading-locations <app-data-root> " +
         "or change-progress-copies <app-data-root> " +
         "or corrupt-reader-guide|restore-reader-guide <app-data-root> " +
+        "or break-library <app-data-root> damaged|missing|restore|describe " +
         "or hold-write-lock|hold-read-lock <app-data-root> <ready-path> <release-path> [hold-seconds]");
     return 2;
 }

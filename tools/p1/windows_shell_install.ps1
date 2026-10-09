@@ -959,6 +959,7 @@ function Run-TxtReaderScenarios {
         Restore-AppThemePreference $originalTheme
     }
     Assert-TxtBackDuringLoad
+    Assert-LibraryRecovery
 }
 
 function Assert-TxtBackDuringLoad {
@@ -985,6 +986,28 @@ function Assert-TxtBackDuringLoad {
         $resume.Set() | Out-Null
         $resume.Dispose()
         $reached.Dispose()
+    }
+}
+
+function Assert-LibraryRecovery {
+    # T15.1: the shell must leave a broken library byte-for-byte unchanged,
+    # then open it after the seed restores it and Try again runs.
+    foreach ($break in @('damaged', 'missing')) {
+        $key = if ($break -eq 'damaged') { 'libraryDamaged' } else { 'libraryMissing' }
+        $before = Invoke-ShellSeed @('break-library', $dataRoot, $break)
+        try {
+            Start-InstalledShell
+            $report[$key] = Run-ShellSmoke "library-$break" -ResultName "library-$break"
+            $after = Invoke-ShellSeed @('break-library', $dataRoot, 'describe')
+            if ($after -ne $before) {
+                throw "The $break library changed while the shell showed it: '$before' became '$after'."
+            }
+        }
+        finally {
+            Invoke-ShellSeed @('break-library', $dataRoot, 'restore') | Out-Null
+        }
+        $report["${key}Retry"] = Run-ShellSmoke 'library-retry' -ResultName "library-$break-retry"
+        Close-InstalledShell
     }
 }
 
