@@ -3862,10 +3862,13 @@ try {
             [void](Wait-HiddenById 'RemoveGuideDialog')
             [void](Wait-Name 'ReaderHeading' 'Missing File Guide')
             [void](Wait-Name 'ReaderLoadError' $missingMessage)
+            # Focus returns to the action the dialog came from.
+            Wait-FocusedId 'ReaderLoadErrorAction'
             $report.phases += 'txt-missing-remove-cancelled'
 
             # Remove goes back to the game without the guide.
-            Invoke-Element (Wait-Name 'ReaderLoadErrorAction' 'Remove guide')
+            [void](Wait-Name 'ReaderLoadErrorAction' 'Remove guide')
+            Invoke-Element (Wait-EnabledById 'ReaderLoadErrorAction')
             [void](Wait-VisibleById 'RemoveGuideDialog')
             Invoke-Element (Wait-EnabledById 'PrimaryButton')
             [void](Wait-HiddenById 'RemoveGuideDialog')
@@ -3874,6 +3877,8 @@ try {
             if ((Get-GuideRowNames) -contains 'Missing File Guide') {
                 throw 'The removed Missing File Guide is still listed.'
             }
+            # The reader's removal releases the Game page's Remove game.
+            [void](Wait-EnabledById 'RemoveGameButton')
             $report.phases += 'txt-missing-removed'
 
             # A Web Page Guide with no saved asset rows (imported before
