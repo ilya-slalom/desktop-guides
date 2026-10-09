@@ -7,11 +7,13 @@ namespace DesktopGuides.Production;
 // by Guide.Id, never by row identity.
 public sealed class GuideRowItem : CatalogRowItem
 {
-    internal GuideRowItem(GuideSummary summary, TimeProvider clock, CultureInfo culture)
+    internal GuideRowItem(
+        GuideSummary summary, TimeProvider clock, CultureInfo culture,
+        GuideFileStatus fileStatus = GuideFileStatus.Ok)
         : base(
             summary.Guide.Title,
-            FormatGlyph(summary.Guide.Format),
-            CatalogPresentation.GuideFacts(summary, clock, culture))
+            fileStatus == GuideFileStatus.Ok ? FormatGlyph(summary.Guide.Format) : "\uE7BA", // Warning
+            CatalogPresentation.GuideFacts(summary, clock, culture, fileStatus))
     {
         Guide = summary.Guide;
         CompletedUtc = summary.State?.CompletedUtc;

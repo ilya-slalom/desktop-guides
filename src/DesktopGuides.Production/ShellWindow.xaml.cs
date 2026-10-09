@@ -56,6 +56,8 @@ public sealed partial class ShellWindow : Window
     private int renderGeneration;
     private GuideLoadAction readerErrorAction;
     private int readerErrorGeneration;
+    // Startup reports missing guide files; opening a guide updates its entry.
+    private readonly GuideFileHealth guideHealth = new();
     private long gameGuideIntentVersion;
     private long statusSequence;
     private bool readerNarrow;
@@ -368,6 +370,8 @@ public sealed partial class ShellWindow : Window
             artwork = new ManagedArtworkStore(paths);
             await repository.InitializeAsync();
             LibraryUnavailablePanel.Visibility = Visibility.Collapsed;
+            StartupReconciliationReport? startup = repository.LastStartupReconciliation;
+            guideHealth.Reset(startup?.MissingGuides ?? []);
             StartProgress(repository);
             guidePublisher = new GuideImportPublisher(repository, paths);
             guideRemover = new GuideRemover(repository, paths);
@@ -408,6 +412,10 @@ public sealed partial class ShellWindow : Window
             if (EffectiveMaterial != requestedMaterial)
             {
                 ShowWarningStatus(MaterialFallbackMessage(requestedMaterial));
+            }
+            if (startup is { UnreadableGuideCount: > 0 } report)
+            {
+                ShowWarningStatus(GuideFilePresentation.Unreadable(report.UnreadableGuideCount));
             }
         }
         catch (OperationCanceledException) when (closeRequested)
@@ -1142,6 +1150,7 @@ public sealed partial class ShellWindow : Window
                 }
                 if (preview is null)
                 {
+                    guideHealth.Forget(guide.Id);
                     rendered = true;
                     // The render resolves the removed guide to its nearest survivor.
                     pendingGuideFocus = guide.Id;
@@ -1175,6 +1184,7 @@ public sealed partial class ShellWindow : Window
                     ShowRemovalError(error, guide.Title);
                     return;
                 }
+                guideHealth.Forget(guide.Id);
                 if (!closeRequested && navigator.Current is GameRoute shown && shown.GameId == route.GameId)
                 {
                     rendered = true;
@@ -1210,6 +1220,94 @@ public sealed partial class ShellWindow : Window
             {
                 UpdateRemoveGameAction();
             }
+        }
+    }
+
+    // Ruling 13: the Game page's removal, offered on a reader whose guide
+    // can't open. After a removal the reader goes Back.
+    private async Task RemoveReaderGuideAsync(int generation)
+    {
+        if (removeRequested || closeRequested || navigator.Current is not ReaderRoute route)
+        {
+            return;
+        }
+        removeRequested = true;
+        ReaderLoadErrorAction.IsEnabled = false;
+        try
+        {
+            await RunNavigationAsync(async () =>
+            {
+                if (closeRequested || generation != renderGeneration || navigator.Current != route)
+                {
+                    return;
+                }
+                GuideRemover remover = guideRemover
+                    ?? throw new InvalidOperationException("The library is not ready.");
+                string title = ReaderHeading.Text;
+                GuideRemovalPreview? preview;
+                try
+                {
+                    preview = await remover.DescribeAsync(route.GuideId);
+                }
+                catch (Exception error)
+                {
+                    ShowRemovalError(error, title);
+                    return;
+                }
+                if (closeRequested)
+                {
+                    return;
+                }
+                if (preview is null)
+                {
+                    guideHealth.Forget(route.GuideId);
+                    await GoBackAsync();
+                    ShowTransientStatus(GuideRemovalPresentation.AlreadyRemoved(title));
+                    return;
+                }
+                title = preview.Title;
+                ContentDialog dialog = RemoveGuideDialog.Create(preview, Navigation.XamlRoot);
+                DialogSurface.Apply(dialog, EffectiveMaterial, DialogTheme);
+                activeRemoveDialog = dialog;
+                ContentDialogResult choice;
+                try
+                {
+                    choice = await dialog.ShowAsync();
+                }
+                finally
+                {
+                    activeRemoveDialog = null;
+                }
+                // Cancel leaves the error and its button where they were.
+                if (choice != ContentDialogResult.Primary || closeRequested)
+                {
+                    return;
+                }
+                GuideRemovalResult result;
+                try
+                {
+                    result = await remover.RemoveAsync(route.GuideId);
+                }
+                catch (Exception error)
+                {
+                    ShowRemovalError(error, title);
+                    return;
+                }
+                guideHealth.Forget(route.GuideId);
+                if (!closeRequested && navigator.Current == route)
+                {
+                    CancelReaderLoad();
+                    await GoBackAsync();
+                }
+                ShowTransientStatus(result.Outcome == GuideRemovalOutcome.NotFound
+                    ? GuideRemovalPresentation.AlreadyRemoved(title)
+                    : GuideRemovalPresentation.Removed(title, result.CleanupPending));
+            });
+        }
+        finally
+        {
+            removeRequested = false;
+            ReaderLoadErrorAction.IsEnabled = true;
         }
     }
 
@@ -1436,6 +1534,16 @@ public sealed partial class ShellWindow : Window
     // request that leaves the Reader cancels the load before it queues.
     private void CancelReaderLoad() => readerLoad?.Cancel();
 
+    // A failed or successful open is the newest word on the reader guide's
+    // file; null leaves the entry as it was.
+    private void MarkReaderGuide(GuideFileStatus? status)
+    {
+        if (status is GuideFileStatus known && navigator.Current is ReaderRoute route)
+        {
+            guideHealth.Mark(route.GuideId, route.GameId, known);
+        }
+    }
+
     // Every render closes the Reader: a load in flight is cancelled, and the
     // toolbar and surface drop the old session before it is disposed.
     private async Task CloseReaderSessionAsync()
@@ -1648,9 +1756,18 @@ public sealed partial class ShellWindow : Window
                     ShowRouteProgress("Loading library…");
                     IReadOnlyList<LibraryGameSummary> games = await library.ListGameSummariesAsync();
                     AppSettings settings = await library.GetSettingsAsync();
-                    Guide? resume = settings.LastActiveGuideId is Guid lastId
-                        ? await library.GetGuideAsync(lastId)
-                        : null;
+                    Guide? resume = null;
+                    if (settings.LastActiveGuideId is Guid lastId)
+                    {
+                        try
+                        {
+                            resume = await library.GetGuideAsync(lastId);
+                        }
+                        catch (Exception error) when (error is InvalidDataException or FormatException or ArgumentOutOfRangeException)
+                        {
+                            // An unreadable row stays hidden, so Resume hides too (Review Focus 1).
+                        }
+                    }
                     if (generation != renderGeneration)
                     {
                         return false;
@@ -1716,7 +1833,9 @@ public sealed partial class ShellWindow : Window
                     }
                     IReadOnlyList<GuideRowItem> guides =
                         (await library.ListGuideSummariesAsync(gameRoute.GameId))
-                        .Select(summary => new GuideRowItem(summary, TimeProvider.System, CultureInfo.CurrentCulture))
+                        .Select(summary => new GuideRowItem(
+                            summary, TimeProvider.System, CultureInfo.CurrentCulture,
+                            guideHealth[summary.Guide.Id]))
                         .ToList();
                     if (generation != renderGeneration)
                     {
@@ -1875,7 +1994,10 @@ public sealed partial class ShellWindow : Window
                     if (textLoad is TextGuideLoadFailed failed)
                     {
                         string message = TextGuideLoadMessages.For(failed.Error);
-                        ShowReaderSurface(loading: false, error: message);
+                        MarkReaderGuide(TextGuideLoadMessages.StatusFor(failed.Error));
+                        ShowReaderSurface(
+                            loading: false, error: message,
+                            action: TextGuideLoadMessages.ActionFor(failed.Error));
                         ShowWarningStatus(message);
                         break;
                     }
@@ -1904,6 +2026,7 @@ public sealed partial class ShellWindow : Window
                         document, maxColumns, textScale,
                         TextReaderSession.DiagnosticsFolderForTest(cacheRoot!));
                     readerSession = session;
+                    MarkReaderGuide(GuideFileStatus.Ok);
                     ShowReaderSurface(loading: false, view: session.View);
                     ReaderActions.SetSession(session);
                     BeginTextSize(guide.Id, textScale);
@@ -1980,7 +2103,9 @@ public sealed partial class ShellWindow : Window
         appliedLibraryQuery = LibrarySearchInput.Text.Trim();
         IReadOnlyList<LibrarySearchMatch> matches = LibrarySearch.Filter(librarySummaries, appliedLibraryQuery);
         gameArtwork.CancelAll();
-        GameList.ItemsSource = matches.Select(match => new LibraryGameItem(match)).ToList();
+        GameList.ItemsSource = matches
+            .Select(match => new LibraryGameItem(match, guideHealth.CountForGame(match.Summary.Game.Id)))
+            .ToList();
         LibraryNoResults.Text = $"No games or guides match \"{appliedLibraryQuery}\".";
         ShowLibraryView(
             librarySummaries.Count == 0 ? LibraryView.Empty
