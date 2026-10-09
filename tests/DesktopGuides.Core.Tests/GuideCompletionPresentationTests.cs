@@ -15,27 +15,22 @@ public sealed class GuideCompletionPresentationTests
         Assert.Equal("Complete", GuideCompletionPresentation.CompleteLabel);
     }
 
-    [Fact]
-    public void NoStoredTimeIsInProgress() =>
-        Assert.False(GuideCompletionPresentation.IsComplete(null));
-
-    [Fact]
-    public void AStoredTimeIsComplete() =>
-        Assert.True(GuideCompletionPresentation.IsComplete(Finished));
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OnlyAStoredTimeIsComplete(bool stored) =>
+        Assert.Equal(stored, GuideCompletionPresentation.IsComplete(stored ? Finished : null));
 
     [Fact]
     public void ChoiceNameNamesTheGuide() =>
         Assert.Equal("Completion for Walkthrough", GuideCompletionPresentation.ChoiceName("Walkthrough"));
 
-    [Fact]
-    public void AnnouncementForComplete() =>
-        Assert.Equal("Walkthrough marked complete.",
-            GuideCompletionPresentation.Announcement("Walkthrough", Finished));
-
-    [Fact]
-    public void AnnouncementForInProgress() =>
-        Assert.Equal("Walkthrough marked in progress.",
-            GuideCompletionPresentation.Announcement("Walkthrough", null));
+    [Theory]
+    [InlineData(true, "Walkthrough marked complete.")]
+    [InlineData(false, "Walkthrough marked in progress.")]
+    public void AnnouncementNamesTheNewState(bool complete, string expected) =>
+        Assert.Equal(expected,
+            GuideCompletionPresentation.Announcement("Walkthrough", complete ? Finished : null));
 
     [Fact]
     public void SaveFailedOffersARetry() =>
