@@ -1,8 +1,8 @@
 # P1 implementation plan and exit gates
 
-Status: 44 of the 55 tasks are merged, 8 October 2026. M0, M3 and M4 are
-complete; M1 still needs T17.1 and M2 the optional T11.5. M5 has started
-with T20.1, and M6 is planned.
+Status: 46 of the 55 tasks are merged, 10 October 2026. M0, M3 and M4 are
+complete; M1 still needs T17.1 and M2 the optional T11.5. M5 has T20.1, T15.4
+and T15.1 merged, and M6 is planned.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
 This plan orders all **16 P1 stories and 55 tasks** in the
@@ -971,9 +971,10 @@ flows work by keyboard and with the recorded accessibility checks.
 T20.1 was merged through PR #59 on 8 October 2026 (merge commit `47ccf3a`;
 CI run 37765505021); see the
 [design](t20-1-library-export-design.md#t201-verification-record).
-T15.4 is implemented on `feat/p1-t15-4-fault-injection`; see the
+T15.4 was merged through PR #62 on 8 October 2026 (merge commit `70516da`;
+CI run 37787308392); see the
 [design](t15-4-fault-injection-design.md#t154-verification-record).
-T15.1 is implemented in #74, #75 and #76 (on `feat/p1-t15-1-runtime-check`);
+T15.1 merged in #74, #75 and #76 (merge commit `f82e86b`);
 see the [design and verification
 record](t15-1-error-recovery-design.md#t151-verification-record).
 A library that can't be opened stops on a Library unavailable page with
@@ -1023,7 +1024,7 @@ entry point and preserve the per-scenario evidence listed in the
 
 | Lane | Required result | Current status |
 | --- | --- | --- |
-| Headless Core/Infrastructure | Schema/migration, locator, path, transaction recovery, archive, import-security, and fault-injection tests on locked Windows CI; NTFS link/junction checks on Windows. | T03.2's merged [PR CI](results.md) passed 61 Core and 24 Infrastructure tests on x64 and native ARM64. T15.2's locked Windows 11 x64 run passed 61 Core and 41 Infrastructure tests after the uppercase-ID review fix, including NTFS junction, prepared-import collision, and retry cases. Earlier PR #5 CI passed 61 Core and 39 Infrastructure tests on x64 and native ARM64; current-head results are in PR checks. By PR #52 (T14.3) the suites had grown to 899 Core and 540 Infrastructure passes; see the [merged PR summary](results.md#merged-pr-summary). T15.4's fault-injection matrix and T20.1's archive tests are pending. |
+| Headless Core/Infrastructure | Schema/migration, locator, path, transaction recovery, archive, import-security, and fault-injection tests on locked Windows CI; NTFS link/junction checks on Windows. | T03.2's merged [PR CI](results.md) passed 61 Core and 24 Infrastructure tests on x64 and native ARM64. T15.2's locked Windows 11 x64 run passed 61 Core and 41 Infrastructure tests after the uppercase-ID review fix, including NTFS junction, prepared-import collision, and retry cases. Earlier PR #5 CI passed 61 Core and 39 Infrastructure tests on x64 and native ARM64; current-head results are in PR checks. By PR #52 (T14.3) the suites had grown to 899 Core and 540 Infrastructure passes; see the [merged PR summary](results.md#merged-pr-summary). T15.4's fault-injection matrix (#62) and T20.1's archive tests (#59) are merged. |
 | Windows 11 x64 installed app | Production UI workflow, keyboard, UIA/Narrator, high contrast/DPI, signed upgrade, and physically disconnected relaunch on `E:\work\desktop-guides` source. | T11.1 installed shell routes and the T11.3 pointer/keyboard route and capability-toolbar gates passed on a Windows 11 x64 CI runner. A [controlled local retest](evidence/production-shell-host-ssh-reinstall.json) reproduced `0x80070005` from SSH session 0 after uninstall and succeeded through an interactive scheduled task in desktop session 1; the package, backup, and launch were verified. Since PR #47 the `production-shell-ui` job runs 13 installed scenario groups, from `core` and `catalog` to `completion`, `theme` and `text-size`, in four shards. Full P1 flow and release gates remain open. |
 | Runtime-free Windows 11 x64 VM | Actual absent Windows App Runtime and WebView2 failures, prerequisite setup, recovery, and clean restore. | Deferred by user until a disposable VM is available. Do not claim clean-machine support before this lane passes. |
 | Windows 11 ARM64 | Native complete P1 installed workflow, backup, accessibility, and offline evidence before advertising ARM64. | P1 pending; P0 native Core/UI fixtures passed. |

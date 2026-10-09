@@ -1,6 +1,7 @@
 # T15.4 fault-injection matrix design
 
-Status: implemented on `feat/p1-t15-4-fault-injection`; see the verification record.
+Status: merged through PR #62 (merge commit `70516da`; CI run 37787308392); see
+the verification record.
 Prerequisites T04.3 (PR #26), T06.3 (PR #19), T15.2 (PR #5) and T15.3
 (PR #22) are merged.
 

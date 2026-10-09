@@ -1,8 +1,8 @@
 # P1 implementation results
 
 Status: P1 work is merged into `main` through
-[PR #59](https://github.com/ilya-slalom/desktop-guides/pull/59) (T20.1, merge commit
-`47ccf3a`) on 8 October 2026. The [merged PR summary](#merged-pr-summary)
+[PR #76](https://github.com/ilya-slalom/desktop-guides/pull/76) (T15.1 PR c, merge
+commit `f82e86b`) on 9 October 2026. The [merged PR summary](#merged-pr-summary)
 lists every PR since M0 with its CI run and test counts. The P1 first usable
 release remains in progress: the [dependency plan](implementation-plan.md)
 defines all task exit gates, and this file records only checks actually run.
@@ -24,7 +24,7 @@ PR #16. T14.4 merged in PR #54.
 
 ## Merged PR summary
 
-One row per PR merged into `main` after M0, through PR #59. The *Record* column
+One row per PR merged into `main` after M0, through PR #76. The *Record* column
 links the task's own verification section, which has the full evidence.
 
 - *Final CI run* is the run the PR cites as decisive. Where no CI run is
@@ -36,7 +36,8 @@ links the task's own verification section, which has the full evidence.
 - PRs record `shell-scope` only from #38 onward, when the input was added.
   From #47 a full run splits `production-shell-ui` into four shards.
 - Tasks for #33 (a T08.3 harness follow-up) and #37 are inferred from the PR
-  titles. #15, #21, #38, #43, #47, #53, #55, #56 and #58 aren't task PRs.
+  titles. #15, #21, #38, #43, #47, #53, #55, #56, #58, #60, #63–#66 and #68–#73
+  aren't task PRs. #61 is an issue, not a PR.
 
 | PR | Merged | Commit | Task | Final CI run | Core | Infra | Record | Caveats |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -82,6 +83,22 @@ links the task's own verification section, which has the full evidence.
 | [#57](https://github.com/ilya-slalom/desktop-guides/pull/57) | 2026-10-08 | `0f10a1c` | T14.4 (harness) | [37738588719](https://github.com/ilya-slalom/desktop-guides/actions/runs/37738588719) | 906 | 540 | — | Harness only: `Assert-ResetEnabled` now waits for the overflow to close, and `text-size-steps` recorded closes of 42, 38 and 51 ms. |
 | [#58](https://github.com/ilya-slalom/desktop-guides/pull/58) | 2026-10-08 | `b225803` | Docs | — | — | — | — | Docs only: records the #55–#57 merges. No CI run started: #47's docs-only skip held. |
 | [#59](https://github.com/ilya-slalom/desktop-guides/pull/59) | 2026-10-08 | `47ccf3a` | T20.1 | [37765505021](https://github.com/ilya-slalom/desktop-guides/actions/runs/37765505021) | 932 | 593 | [t20-1-library-export-design](t20-1-library-export-design.md#t201-verification-record) | Every job passed on the first attempt. Headless only: no installed smoke, because T20.1 has no UI. The final review's four fixes landed in `e0a4486`. |
+| [#60](https://github.com/ilya-slalom/desktop-guides/pull/60) | 2026-10-08 | `d213466` | Docs | — | — | — | — | Docs only: records the T20.1 merge (PR #59). No CI run started: #47's docs-only skip held. |
+| [#62](https://github.com/ilya-slalom/desktop-guides/pull/62) | 2026-10-08 | `70516da` | T15.4 | [37787308392](https://github.com/ilya-slalom/desktop-guides/actions/runs/37787308392) | 932 | 678 | [t15-4-fault-injection-design](t15-4-fault-injection-design.md#t154-verification-record) | The `pdf` shard passed on a rerun after `progress-burst had 1 failed saves`, the intermittent progress-save failure triaged [below](#intermittent-ci-failures--triage-9-october-2026). The status pages weren't updated for this merge until #77. |
+| [#63](https://github.com/ilya-slalom/desktop-guides/pull/63) | 2026-10-08 | `de76268` | Harness | — | 932 | 678 | — | Harness only: removes the unused M0 PDF candidate scripts and the `PdfTextSpike` tool, about 1,050 lines. No CI run cited; its PR run [37799135598](https://github.com/ilya-slalom/desktop-guides/actions/runs/37799135598) passed every job. |
+| [#64](https://github.com/ilya-slalom/desktop-guides/pull/64) | 2026-10-08 | `960b086` | Flake fix | — | 933 | 678 | [triage](#intermittent-ci-failures--triage-9-october-2026) | Fix 1 of the triage: failed progress saves in the `pdf` shard. It also adds the triage to this file. No CI run cited; its PR run [37799879160](https://github.com/ilya-slalom/desktop-guides/actions/runs/37799879160) passed every job. |
+| [#65](https://github.com/ilya-slalom/desktop-guides/pull/65) | 2026-10-08 | `6a3a190` | Flake fix | — | 938 | 678 | [triage](#intermittent-ci-failures--triage-9-october-2026) | Fix 2 of the triage: an HTML open stuck on "Loading guide…" now ends with the right error. No CI run cited; its PR run [37800408807](https://github.com/ilya-slalom/desktop-guides/actions/runs/37800408807) passed every job. |
+| [#66](https://github.com/ilya-slalom/desktop-guides/pull/66) | 2026-10-08 | `2148560` | Flake fix | — | 932 | 678 | [triage](#intermittent-ci-failures--triage-9-october-2026) | Harness only: fixes 3 and 4 of the triage, three smoke waits. The run predates #64 and #65, so Core shows 932. No CI run cited; its PR run [37801200516](https://github.com/ilya-slalom/desktop-guides/actions/runs/37801200516) passed every job. |
+| [#67](https://github.com/ilya-slalom/desktop-guides/pull/67) | 2026-10-08 | `92ef515` | T15.4 (harness) | — | 939 | 648 | — | Tests only: 21 older failure tests fold into the T15.4 matrices, so Infrastructure drops from 678 to 648. No CI run cited; its PR run [37805466953](https://github.com/ilya-slalom/desktop-guides/actions/runs/37805466953) passed on attempt 2 after an `html-position` read race failed the `html` shard, fixed in #68. |
+| [#68](https://github.com/ilya-slalom/desktop-guides/pull/68) | 2026-10-09 | `7d89594` | Flake fix | — | 939 | 648 | — | Harness only: the `html-position` smoke no longer reads before a position exists. No CI run cited; its PR run [37863948658](https://github.com/ilya-slalom/desktop-guides/actions/runs/37863948658) passed every job. |
+| [#69](https://github.com/ilya-slalom/desktop-guides/pull/69) | 2026-10-09 | `bd6402b` | Flake fix | — | 939 | 648 | — | Tests only: the T20.1 corruption test now flips the byte it reads. No CI run cited; its PR run [37864336670](https://github.com/ilya-slalom/desktop-guides/actions/runs/37864336670) passed every job. |
+| [#70](https://github.com/ilya-slalom/desktop-guides/pull/70) | 2026-10-09 | `addaf8f` | Harness | — | 939 | 648 | — | Harness only: drops smoke passes, mostly dark-theme repeats, that other passes or unit tests already cover. No CI run cited; its PR run [37870459329](https://github.com/ilya-slalom/desktop-guides/actions/runs/37870459329) passed every job. |
+| [#71](https://github.com/ilya-slalom/desktop-guides/pull/71) | 2026-10-09 | `d29e1ca` | Harness | [37874810342](https://github.com/ilya-slalom/desktop-guides/actions/runs/37874810342) | 939 | 648 | — | Harness only: a lighter relaunch check and rebalanced `production-shell-ui` shards. The cited run is a dev-fast dispatch; the full PR run [37875580501](https://github.com/ilya-slalom/desktop-guides/actions/runs/37875580501) on the same head also passed every job. |
+| [#72](https://github.com/ilya-slalom/desktop-guides/pull/72) | 2026-10-09 | `c1a2826` | Tests | — | 939 | 648 | — | Tests only: five `[Fact]` pairs become `[Theory]` tests. No CI run cited; its PR run [37879608098](https://github.com/ilya-slalom/desktop-guides/actions/runs/37879608098) passed every job. |
+| [#73](https://github.com/ilya-slalom/desktop-guides/pull/73) | 2026-10-09 | `2e70ac9` | Issue #18 | — | 939 | 660 | — | Import fix: HTML guides inside a OneDrive or other cloud-synced folder now import. Real links are still refused, and the refusal names the cause. No CI run cited; its PR run [37883647268](https://github.com/ilya-slalom/desktop-guides/actions/runs/37883647268) passed every job. |
+| [#74](https://github.com/ilya-slalom/desktop-guides/pull/74) | 2026-10-09 | `b5e44d3` | T15.1 (PR a) | [37928644369](https://github.com/ilya-slalom/desktop-guides/actions/runs/37928644369) | 952 (host) | 672 (host) | [t15-1-error-recovery-design](t15-1-error-recovery-design.md#t151-verification-record) | TXT group only. Attempt 1 stopped in `core-tests` at an unrelated process-cleanup timeout; the rerun passed. The uncited PR-head run [37930853631](https://github.com/ilya-slalom/desktop-guides/actions/runs/37930853631) passed every job. |
+| [#75](https://github.com/ilya-slalom/desktop-guides/pull/75) | 2026-10-09 | `9a9e0b0` | T15.1 (PR b) | [37944327625](https://github.com/ilya-slalom/desktop-guides/actions/runs/37944327625) | 995 (host) | 687 (host) | [t15-1-error-recovery-design](t15-1-error-recovery-design.md#t151-verification-record) | The RED run [37939386537](https://github.com/ilya-slalom/desktop-guides/actions/runs/37939386537) failed on the focus check before the final-review fix. The uncited PR-head run [37946353236](https://github.com/ilya-slalom/desktop-guides/actions/runs/37946353236) passed every job. |
+| [#76](https://github.com/ilya-slalom/desktop-guides/pull/76) | 2026-10-09 | `f82e86b` | T15.1 (PR c) | [37951285448](https://github.com/ilya-slalom/desktop-guides/actions/runs/37951285448) | 996 (host) | 687 (host) | [t15-1-error-recovery-design](t15-1-error-recovery-design.md#t151-verification-record) | Full run on the head; the `html` dispatch [37948919282](https://github.com/ilya-slalom/desktop-guides/actions/runs/37948919282) covered the startup runtime check first. |
 
 ## M2 T04.1 game editor — implementation check, 27 September 2026
 
