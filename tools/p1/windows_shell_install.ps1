@@ -787,7 +787,7 @@ function Run-ShellSmoke(
     Register-ScheduledTask -TaskName $smokeTask -Action $action `
         -Principal $principal -Force | Out-Null
     Start-ScheduledTask -TaskName $smokeTask
-    $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*' -or $mode -like 'completion-*') { 240 }
+    $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*' -or $mode -like 'completion-*' -or $mode -eq 'html-position') { 240 }
         elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*' -or $mode -like 'theme-*' -or $mode -like 'text-size-*') { 120 }
         else { 60 }
     $deadline = (Get-Date).AddSeconds($timeoutSeconds)
