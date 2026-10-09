@@ -1,7 +1,6 @@
 # T15.1 error recovery design
 
-Status: written spec approved; changed TXT/PDF copies keep opening (revised
-during planning).
+Status: PR a implemented on `feat/p1-t15-1-error-recovery`; verified by CI run 37928644369. PR b and PR c are planned.
 Prerequisites T03.2, T06.3, T09.1 and T10.1 are merged.
 
 ## Intent
@@ -277,3 +276,37 @@ produces one), so they are hidden rather than shown as removable rows.
   PR links as each PR merges.
 - [work-breakdown.md](../work-breakdown.md): T15.1 notes that the Windows App
   SDK runtime is satisfied by the MSIX dependency.
+
+## T15.1 verification record
+
+### PR a: the library won't open
+
+- **Unit tests.** On `pcsx2-win`, Infrastructure 672/672 and Core 952/952
+  passed. The new tests are:
+  - `LibraryOpenMessagesTests`: every issue's title and body, and the shared
+    "stopped before changing anything" sentence;
+  - `LibraryOpenErrorsTests`: each SQLite code (including extended 261),
+    `InvalidDataException`, `UnauthorizedAccessException`, a full disk, and
+    the errors that stay unmapped;
+  - `SqliteLibraryRepositoryTests`: non-database bytes, a deleted database
+    with guide content, a 0-byte database with artwork, a `-wal` file with
+    no database, an empty data folder, a read-only database, and the
+    existing NewerVersion and migration-failure tests now expecting
+    `LibraryOpenException`.
+- **Installed.** CI run [37928644369](https://github.com/ilya-slalom/desktop-guides/actions/runs/37928644369)
+  passed `production-shell-ui` on its second attempt. The first attempt
+  stopped in `core-tests` at the unrelated process-cleanup check, which timed
+  out waiting for its helper; its re-run passed. In the TXT group:
+  - `library-damaged` and `library-missing` showed the Library unavailable
+    page with its title, body, data folder line, **Try again** and **Open
+    data folder**, and the database bytes (or their absence) were unchanged;
+  - after the seed restored the database, **Try again** opened the Library
+    with Text Reader Game listed.
+- **Rulings.** Rulings 1–24 in the [plan](t15-1-error-recovery-plan.md#rulings-against-the-spec),
+  plus:
+  - `StartupLeavesAnEmptyGameFolderItCannotDelete` now creates the database
+    before seeding its artwork folder, because an artwork folder with no
+    database is now a missing library.
+- **Evidence.**
+  - [Damaged library](evidence/t15-1-error-recovery/library-damaged.png)
+  - [Missing library](evidence/t15-1-error-recovery/library-missing.png)
