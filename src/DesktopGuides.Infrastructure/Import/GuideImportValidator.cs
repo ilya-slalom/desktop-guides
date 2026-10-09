@@ -201,7 +201,9 @@ public sealed class GuideImportValidator : IGuideImportValidator
         }
         catch (StaticHtmlValidationException error) when (error.Issue == StaticHtmlValidationIssue.UnsafePath)
         {
-            throw new GuideImportException(ImportIssue.Unreadable, "The guide refers to a file outside its folder.");
+            throw new GuideImportException(ImportIssue.Unreadable,
+                "The guide's folder reaches files through a link to another location. " +
+                "Copy the guide and its files to a regular folder, then import again.");
         }
         catch (StaticHtmlValidationException error) when (error.Issue == StaticHtmlValidationIssue.CaseCollision)
         {

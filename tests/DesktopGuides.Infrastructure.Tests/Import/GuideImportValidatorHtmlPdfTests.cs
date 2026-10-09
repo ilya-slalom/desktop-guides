@@ -135,7 +135,9 @@ public sealed class GuideImportValidatorHtmlPdfTests
         GuideImportException error = await Rejected(entry);
 
         Assert.Equal(ImportIssue.Unreadable, error.Issue);
-        Assert.Equal("The guide refers to a file outside its folder.", error.Message);
+        Assert.Equal(
+            "The guide's folder reaches files through a link to another location. " +
+            "Copy the guide and its files to a regular folder, then import again.", error.Message);
     }
 
     public static TheoryData<StaticScanLimit, string> HtmlLimitCases => new()

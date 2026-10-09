@@ -230,8 +230,11 @@ internal sealed class RootedStaticHtmlAssetSource
             current = Path.Combine(current, segment);
             try
             {
+                // A Cloud Files placeholder (OneDrive and similar) is a
+                // reparse point that doesn't redirect the path.
                 if ((File.GetAttributes(current) &
-                    FileAttributes.ReparsePoint) != 0)
+                    FileAttributes.ReparsePoint) != 0 &&
+                    !ReparseTag.IsCloudPlaceholder(ReparseTag.Of(current)))
                 {
                     throw UnsafePath();
                 }

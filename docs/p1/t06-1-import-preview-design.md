@@ -160,7 +160,7 @@ This delegates to the existing `StaticHtmlImportValidator.PreviewAsync`, with
 | Scanner result | Import result |
 | --- | --- |
 | `StaticHtmlScanException(Limit)` | `TooLarge`, naming which limit was hit (entry size, asset count, per-asset size or total size) |
-| `StaticHtmlValidationException(UnsafePath)` | `Unreadable`: "The guide refers to a file outside its folder." |
+| `StaticHtmlValidationException(UnsafePath)` | `Unreadable`: "The guide's folder reaches files through a link to another location. Copy the guide and its files to a regular folder, then import again." |
 | `StaticHtmlValidationException(CaseCollision)` | `Unreadable`: "The guide's folder has files whose names differ only by case." |
 | `FileNotFoundException` for the entry | `Missing` |
 | `StaticHtmlPreviewWarning` | `ImportWarning(RelativePath or RawTarget, Message)`, passed through |
@@ -402,11 +402,13 @@ screenshots of the preview.
     future scanner error of that type is described as a style-sheet problem.
   - The first picker catches any failure, and the group headers use the
     dialog heading style.
-  - Not fixed here: the P0 scanner rejects every reparse point, so an HTML
-    guide in a OneDrive or other cloud-synced folder is likely refused as
-    "refers to a file outside its folder". Accepting cloud reparse tags
-    relaxes an untrusted-path check and needs its own design and a host
-    check; TXT and PDF are unaffected. Cost if wrong: HTML guides saved to a
-    OneDrive-backed Desktop or Documents folder can't be imported until the
-    follow-up lands. Tracked in
-    [#18](https://github.com/ilya-slalom/desktop-guides/issues/18).
+  - Fixed after T06.1 in
+    [#18](https://github.com/ilya-slalom/desktop-guides/issues/18): the
+    source walk read only the reparse-point attribute, so a process that
+    sees Cloud Files placeholders refused every HTML guide under a OneDrive
+    or other sync root. It now reads each reparse tag from the directory
+    entry, without opening or downloading the file, and lets only the
+    `IO_REPARSE_TAG_CLOUD*` family through. Symlinks, junctions and unknown
+    tags are still refused, now with a message that names the link. An
+    online-only file that can't be downloaded still reads as "can't be
+    opened". TXT and PDF were never affected.
