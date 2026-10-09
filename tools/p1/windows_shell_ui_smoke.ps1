@@ -20,7 +20,8 @@ param(
         'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry',
         'theme-selector', 'theme-change', 'theme-restored', 'theme-error', 'theme-error-retry',
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
-        'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry')]
+        'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
+        'library-damaged', 'library-missing', 'library-retry')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -3983,6 +3984,42 @@ try {
             $report.phases += 'txt-horizontal'
             $remeasure.Dispose()
         }
+    }
+    elseif ($Mode -in @('library-damaged', 'library-missing')) {
+        # T15.1: a library that can't be opened stops on its own page and
+        # offers Try again and the data folder.
+        $expected = if ($Mode -eq 'library-damaged') {
+            @{ Title = "Library can't be read"
+               Body = "Your library database can't be read. Desktop Guides stopped before changing anything. Your guide files are still in the data folder." }
+        } else {
+            @{ Title = 'Library database is missing'
+               Body = "Your library database is missing, but your guide files are still in the data folder. Desktop Guides stopped before changing anything. Restore library.sqlite, then try again." }
+        }
+        [void](Wait-Status $expected.Title -AllowHidden)
+        [void](Wait-VisibleById 'LibraryUnavailable')
+        [void](Wait-Name 'LibraryUnavailableTitle' $expected.Title)
+        [void](Wait-Name 'LibraryUnavailableBody' $expected.Body)
+        $folder = Wait-VisibleById 'LibraryUnavailableDataFolder'
+        if ($folder.Current.Name -notlike 'Data folder: *') {
+            throw "Unexpected data folder line '$($folder.Current.Name)'."
+        }
+        Assert-Absent 'LibraryUnavailableRecoveryPath'
+        Assert-Absent 'LibraryHeading'
+        [void](Wait-EnabledById 'LibraryUnavailableRetry')
+        [void](Wait-EnabledById 'LibraryUnavailableOpenFolder')
+        [void](Wait-Name 'LibraryUnavailableRetry' 'Try again')
+        [void](Wait-Name 'LibraryUnavailableOpenFolder' 'Open data folder')
+        [void](Wait-FocusedId 'LibraryUnavailableRetry')
+        $report.unavailableScreenshot = Save-WindowScreenshot 'unavailable'
+        $report.phases += 'unavailable'
+    }
+    elseif ($Mode -eq 'library-retry') {
+        Invoke-Element (Find-ById 'LibraryUnavailableRetry')
+        [void](Wait-Status 'Library ready.')
+        [void](Wait-Name 'LibraryHeading' 'Library')
+        Wait-HiddenById 'LibraryUnavailable'
+        [void](Wait-GameRow 'Text Reader Game')
+        $report.phases += 'retried'
     }
     else {
         [void](Wait-Status 'Library ready.')
