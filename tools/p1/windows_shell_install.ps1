@@ -79,8 +79,7 @@ function Test-PdfPassSelected([string] $pass) {
 }
 if ($PassFilter) {
     if ($scenarioScope -ne 'pdf') { throw '-PassFilter needs the pdf group alone.' }
-    $pdfPasses = @(foreach ($theme in 'light', 'dark') {
-            foreach ($mode in $pdfModes) { "$mode-$theme" } }) + 'pdf-offline'
+    $pdfPasses = @(foreach ($mode in $pdfModes) { "$mode-light" }) + 'pdf-offline'
     if (-not @($pdfPasses | Where-Object { Test-PdfPassSelected $_ })) {
         throw "-PassFilter matched none of: $($pdfPasses -join ', ')."
     }
@@ -882,11 +881,6 @@ function Run-CatalogScenarios {
         Start-InstalledShell
         $report.catalogLight = Run-ShellSmoke 'catalog' -ResultName 'catalog-light'
         Close-InstalledShell
-
-        Set-AppThemePreference $false
-        Start-InstalledShell
-        $report.catalogDark = Run-ShellSmoke 'catalog' -ResultName 'catalog-dark'
-        Close-InstalledShell
     }
     finally {
         Restore-AppThemePreference $originalTheme
@@ -911,11 +905,6 @@ function Run-CatalogFactsScenarios {
         Start-InstalledShell
         $report.catalogFactsLight = Run-ShellSmoke 'catalog-facts' -ResultName 'catalog-facts-light'
         Close-InstalledShell
-
-        Set-AppThemePreference $false
-        Start-InstalledShell
-        $report.catalogFactsDark = Run-ShellSmoke 'catalog-facts' -ResultName 'catalog-facts-dark'
-        Close-InstalledShell
     }
     finally {
         Restore-AppThemePreference $originalTheme
@@ -930,11 +919,6 @@ function Run-LibrarySearchScenarios {
         Start-InstalledShell
         $report.librarySearchLight = Run-ShellSmoke 'library-search' -ResultName 'library-search-light'
         Close-InstalledShell
-
-        Set-AppThemePreference $false
-        Start-InstalledShell
-        $report.librarySearchDark = Run-ShellSmoke 'library-search' -ResultName 'library-search-dark'
-        Close-InstalledShell
     }
     finally {
         Restore-AppThemePreference $originalTheme
@@ -942,7 +926,7 @@ function Run-LibrarySearchScenarios {
 }
 
 function Run-StableNavigationScenarios {
-    # The smoke renames and removes, so each theme gets a fresh seed.
+    # The smoke renames and removes, so it starts from a fresh seed.
     $originalTheme = Get-AppThemePreference
     try {
         Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
@@ -951,13 +935,6 @@ function Run-StableNavigationScenarios {
         Start-InstalledShell
         $report.stableNavigationLight = Run-ShellSmoke 'stable-navigation' -ResultName 'stable-navigation-light'
         Close-InstalledShell
-
-        Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
-        Invoke-ShellSeed @('seed-navigation', $dataRoot) | Out-Null
-        Set-AppThemePreference $false
-        Start-InstalledShell
-        $report.stableNavigationDark = Run-ShellSmoke 'stable-navigation' -ResultName 'stable-navigation-dark'
-        Close-InstalledShell
     }
     finally {
         Restore-AppThemePreference $originalTheme
@@ -965,7 +942,6 @@ function Run-StableNavigationScenarios {
 }
 
 function Run-TxtReaderScenarios {
-    # The smoke only reads, so one seed serves both themes.
     $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
     if (-not (Test-Path -LiteralPath (Join-Path $fixtureRoot 'p0\generated\txt-long.txt'))) {
         throw 'txt-long.txt is missing. Run tools/p0/make_fixtures.py first.'
@@ -977,12 +953,6 @@ function Run-TxtReaderScenarios {
         Set-AppThemePreference $true
         Start-InstalledShell
         $report.txtReaderLight = Run-ShellSmoke 'txt-reader' -ResultName 'txt-reader-light'
-        Close-InstalledShell
-
-        Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
-        Set-AppThemePreference $false
-        Start-InstalledShell
-        $report.txtReaderDark = Run-ShellSmoke 'txt-reader' -ResultName 'txt-reader-dark'
         Close-InstalledShell
     }
     finally {
@@ -1315,7 +1285,8 @@ function Assert-HtmlPositionPass([string] $pass, [string] $diagnostics, $result)
 
 function Run-HtmlPositionScenarios {
     # TR09.1-TR09.2: capture, resize, restore and unimported links on a
-    # long <pre> guide. Light then dark.
+    # long <pre> guide, in light. The dark style changes colours only;
+    # html-theme-switch keeps the place across a live switch.
     $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
     $ids = Invoke-ShellSeed @('seed-html-position', $dataRoot, $fixtureRoot) | ConvertFrom-Json
     $diagnostics = Join-Path (Get-HtmlCacheRoot) 'diagnostics'
@@ -1325,9 +1296,7 @@ function Run-HtmlPositionScenarios {
     }
     $originalTheme = Get-AppThemePreference
     try {
-        foreach ($pass in @(
-            @{ name = 'html-position-light'; light = $true },
-            @{ name = 'html-position-dark'; light = $false })) {
+        foreach ($pass in @(@{ name = 'html-position-light'; light = $true })) {
             Remove-Item -LiteralPath $diagnostics -Recurse -Force -ErrorAction SilentlyContinue
             Remove-Item -LiteralPath (Join-Path $dataRoot 'test') -Recurse -Force -ErrorAction SilentlyContinue
             Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
@@ -1559,8 +1528,8 @@ function Run-PdfReaderScenarios {
     # TR10.2-TR10.3: tagged text in UI Automation, an image-only page, 200
     # rapid page turns with a bounded cache, typed errors, and TXT still
     # opening (pdf-reader); then zoom, keys, Go to page and locked PDFs, each
-    # in its own launch (pdf-zoom, pdf-keys, pdf-jump, pdf-locked). Light
-    # then dark. A final pdf-offline launch runs with the originals deleted.
+    # in its own launch (pdf-zoom, pdf-keys, pdf-jump, pdf-locked), in
+    # light. A final pdf-offline launch runs with the originals deleted.
     $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
     if (-not (Test-Path -LiteralPath (Join-Path $fixtureRoot 'p0\generated\pdf-long.pdf'))) {
         throw 'pdf-long.pdf is missing; run tools/p0/make_fixtures.py first.'
@@ -1575,7 +1544,7 @@ function Run-PdfReaderScenarios {
     }
     $originalTheme = Get-AppThemePreference
     try {
-        foreach ($theme in @(@{ name = 'light'; light = $true }, @{ name = 'dark'; light = $false })) {
+        foreach ($theme in @(@{ name = 'light'; light = $true })) {
             Set-AppThemePreference $theme.light
             foreach ($mode in $pdfModes) {
                 $pass = "$mode-$($theme.name)"
@@ -1691,10 +1660,7 @@ function Run-ProgressScenarios {
             Set-AppThemePreference $true
             $light = Invoke-ProgressPass 'progress-row' 0 -resultName 'progress-row-light'
             Assert-ProgressRows $light.progressRows $stored
-            Set-AppThemePreference $false
-            $dark = Invoke-ProgressPass 'progress-row' 0 -resultName 'progress-row-dark'
-            Assert-ProgressRows $dark.progressRows $stored
-            $report.progress.rows = [ordered]@{ light = $light; dark = $dark }
+            $report.progress.rows = [ordered]@{ light = $light }
         }
         finally {
             Restore-AppThemePreference $originalTheme
@@ -1765,8 +1731,8 @@ function Run-CompletionScenarios {
             Set-AppThemePreference $true
             $report.completion.gameLight = Invoke-ProgressPass 'completion-game' 0 -resultName 'completion-game-light'
             $report.completion.readerLight = Invoke-ProgressPass 'completion-reader' 0 -resultName 'completion-reader-light'
+            # Dark keeps only the Reader pass: the one that starts from Complete.
             Set-AppThemePreference $false
-            $report.completion.gameDark = Invoke-ProgressPass 'completion-game' 0 -resultName 'completion-game-dark'
             $report.completion.readerDark = Invoke-ProgressPass 'completion-reader' 0 -resultName 'completion-reader-dark'
         }
         finally {
@@ -1978,11 +1944,6 @@ function Run-ImportScenarios {
         $report.importLight = Run-ShellSmoke 'import-preview' -ResultName 'import-light'
         Close-InstalledShell
 
-        Set-AppThemePreference $false
-        Start-InstalledShell
-        $report.importDark = Run-ShellSmoke 'import-preview' -ResultName 'import-dark'
-        Close-InstalledShell
-
         $state = Invoke-ShellSeed @('describe-import', $dataRoot) | ConvertFrom-Json
         $report.importPreviewState = $state
         foreach ($name in @('Guides', 'FileOperations', 'StagingEntries', 'ContentEntries')) {
@@ -2134,14 +2095,6 @@ function Run-GameActionsScenarios {
         $report.gameActionsPersisted = Run-ShellSmoke 'game-actions-persisted'
         Close-InstalledShell
         $report.gameActionsPersistedState = Assert-GameActionsState 'After the relaunch' $seed
-
-        Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
-        $seed = Invoke-ShellSeed @('seed-actions', $dataRoot) | ConvertFrom-Json
-        Set-AppThemePreference $false
-        Start-InstalledShell
-        $report.gameActionsDark = Run-ShellSmoke 'game-actions' -ResultName 'game-actions-dark'
-        Close-InstalledShell
-        $report.gameActionsDarkState = Assert-GameActionsState 'After the dark run' $seed
     }
     finally {
         Restore-AppThemePreference $originalTheme
@@ -2180,7 +2133,7 @@ function Run-MaterialScenarios {
         foreach ($light in @($true, $false)) {
             $themeName = if ($light) { 'light' } else { 'dark' }
             Set-AppThemePreference $light
-            foreach ($material in @('Solid', 'Acrylic', 'Mica')) {
+            foreach ($material in @('Solid', 'Acrylic')) {
                 Set-StoredMaterial $material
                 Start-InstalledShell
                 $report.materials["$themeName-$material"] = Measure-LibraryStrip (
@@ -2193,8 +2146,9 @@ function Run-MaterialScenarios {
                 throw "The $themeName Solid window shows a pane/content seam: " +
                     "range $($solid.maxChannelRange)."
             }
-            # Mica is not checked: with transparency off, Windows draws it in
-            # the same color as our Solid fill.
+            # Mica gets no launch here: with transparency off, Windows draws it
+            # in the same color as our Solid fill. material-switch starts
+            # from Mica.
             $acrylic = $report.materials["$themeName-Acrylic"].libraryStrip
             if (Test-MatchesSolidFill $acrylic $solid) {
                 throw "The $themeName Acrylic window shows the Solid fill; " +

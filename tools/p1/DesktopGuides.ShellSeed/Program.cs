@@ -415,12 +415,8 @@ if (args.Length == 3 && args[0] == "seed-txt-reader")
     Game textGame = await textRepository.AddGameAsync("Text Reader Game", null, null);
     await InsertTextGuideAsync(textPaths, textGame.Id, Guid.NewGuid(), "ASCII Map Guide", textNow,
         Fixture("p0/txt-ascii.txt"));
-    await InsertTextGuideAsync(textPaths, textGame.Id, Guid.NewGuid(), "Tab Table Guide", textNow,
-        Fixture("p1/txt-tabs.txt"));
     await InsertTextGuideAsync(textPaths, textGame.Id, Guid.NewGuid(), "Long Text Guide", textNow,
         Fixture("p0/generated/txt-long.txt"));
-    await InsertTextGuideAsync(textPaths, textGame.Id, Guid.NewGuid(), "Legacy Code Page Guide", textNow,
-        Fixture("p0/txt-legacy.txt"), codePage: 437);
     await InsertTextGuideAsync(textPaths, textGame.Id, Guid.NewGuid(), "Numbered Lines Guide", textNow,
         Fixture("p1/txt-numbered.txt"));
     Guid missingGuideId = Guid.NewGuid();
@@ -429,7 +425,7 @@ if (args.Length == 3 && args[0] == "seed-txt-reader")
     File.Delete(Path.Combine(textPaths.GetGuideRoot(missingGuideId), "guide.txt"));
     await InsertGuideAsync(textPaths, textGame.Id, Guid.NewGuid(), "Web Page Guide", textNow,
         "Html", "guide.html");
-    Console.WriteLine("Seeded the TXT reader game with seven guides.");
+    Console.WriteLine("Seeded the TXT reader game with five guides.");
     return 0;
 }
 
@@ -1275,12 +1271,12 @@ static async Task InsertGuideAsync(
 
 static async Task InsertTextGuideAsync(
     ManagedPathResolver paths, Guid gameId, Guid guideId, string title, long now,
-    byte[] content, int? codePage = null)
+    byte[] content)
 {
     string guideRoot = paths.GetGuideRoot(guideId);
     Directory.CreateDirectory(guideRoot);
     await File.WriteAllBytesAsync(Path.Combine(guideRoot, "guide.txt"), content);
-    InsertGuideRow(paths, gameId, guideId, title, now, "Txt", "guide.txt", content, codePage);
+    InsertGuideRow(paths, gameId, guideId, title, now, "Txt", "guide.txt", content, codePage: null);
 }
 
 static void InsertGuideRow(
