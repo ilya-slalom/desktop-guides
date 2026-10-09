@@ -985,7 +985,7 @@ Startup reports guides whose managed file is missing, and the Library and
 game rows say which guides need attention. A guide whose file is missing or
 damaged offers **Remove guide** in the Reader, through T15.3's removal.
 Unreadable guide rows are hidden with one warning, and other guides open.
-CI run 37935779817 passed the installed missing-file and removal runs.
+CI run 37944327625 passed the installed missing-file and removal runs.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |

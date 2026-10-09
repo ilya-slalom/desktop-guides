@@ -1,6 +1,6 @@
 # T15.1 error recovery design
 
-Status: PR a merged in #74; PR b implemented on `feat/p1-t15-1-guide-health`, verified by CI run 37935779817. PR c is planned.
+Status: PR a merged in #74; PR b implemented on `feat/p1-t15-1-guide-health`, verified by CI run 37944327625. PR c is planned.
 Prerequisites T03.2, T06.3, T09.1 and T10.1 are merged.
 
 ## Intent
@@ -328,13 +328,13 @@ produces one), so they are hidden rather than shown as removable rows.
   - `SqliteLibraryRepositoryTests` and `StartupReconciliationReportTests`:
     startup lists guides whose managed file is gone, counts unreadable guide
     rows, and the guide lists skip those rows.
-- **Installed.** CI run [37935779817](https://github.com/ilya-slalom/desktop-guides/actions/runs/37935779817)
+- **Installed.** CI run [37944327625](https://github.com/ilya-slalom/desktop-guides/actions/runs/37944327625)
   passed `production-shell-ui`. In the TXT group:
   - the Library row for Text Reader Game ended "1 guide needs attention",
     and Missing File Guide's row led with `File missing`;
-  - its reader error offered **Remove guide**. Cancel kept the error;
-    Remove returned to the game without the guide, and ASCII Map Guide
-    still opened;
+  - its reader error offered **Remove guide**. Cancel kept the error and
+    returned focus to Remove guide; Remove returned to the game without the
+    guide, with Remove game enabled, and ASCII Map Guide still opened;
   - Web Page Guide offered **Remove guide**, and its row then led with
     `File damaged`.
   In the HTML and PDF groups, the missing entry, the missing PDF and the
