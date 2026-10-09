@@ -1,6 +1,7 @@
 # T15.1 error recovery design
 
-Status: design approved in brainstorming; awaiting written-spec review.
+Status: written spec approved; changed TXT/PDF copies keep opening (revised
+during planning).
 Prerequisites T03.2, T06.3, T09.1 and T10.1 are merged.
 
 ## Intent
@@ -9,8 +10,10 @@ When something in the library is broken, Desktop Guides says what is wrong,
 protects what is still there, and offers one useful next step. A library
 database that can't be opened stops the app before anything is written and
 is never replaced by an empty one. A guide whose managed file is missing or
-changed stays visible with its status and can be removed, and every other
-guide still opens. A missing WebView2 Runtime is reported once at startup
+damaged stays visible with its status and can be removed, and every other
+guide still opens. A TXT or PDF copy that changed after import still opens
+with the approximate-restore notice; a changed HTML guide stays blocked. A
+missing WebView2 Runtime is reported once at startup
 without blocking text and PDF guides.
 
 Traces: the T15.1 row of [implementation-plan.md](implementation-plan.md)
@@ -22,8 +25,8 @@ Traces: the T15.1 row of [implementation-plan.md](implementation-plan.md)
 Decisions made during brainstorming:
 
 - **One spec, three PRs.** (a) the library won't open, (b) guide health and
-  the reader, (c) changed content and the startup runtime check. Each PR is
-  independently shippable in that order; (c) uses the Remove action from (b).
+  the reader, (c) the startup runtime check. Each PR is independently
+  shippable in that order.
 - **Missing database.** A missing or 0-byte `library.sqlite` is a fresh start
   only when the data folder holds no guides, artwork or recovery copies.
   Otherwise it is an error and nothing is created.
@@ -31,8 +34,9 @@ Decisions made during brainstorming:
   dialog. There is no Replace-file or re-import-in-place action.
 - **Health in memory.** Guide file status is detected at startup and on open
   and kept in memory. It is not stored in SQLite and needs no migration.
-- **Changed content blocks.** A TXT or PDF managed copy whose size or SHA-256
-  differs from its import record is not rendered, like HTML today.
+- **Changed content.** A TXT or PDF managed copy whose size or SHA-256
+  differs from its import record keeps opening with today's approximate-
+  restore notice. HTML Changed stays blocked, as today, and offers Remove.
 - **Approach A.** A typed `LibraryOpenException(LibraryOpenIssue)` and a
   dedicated "Library unavailable" page, following the codebase's
   exception-plus-issue convention.
@@ -166,6 +170,17 @@ public sealed class GuideFileHealth
 
 The shell owns one instance. Messages: "File missing", "File damaged".
 
+### Copy
+
+- Missing (all formats): "This guide's file is missing from the library.
+  Remove it, then import the original again."
+- Changed (HTML, and PDF when its managed path is a folder or crosses a
+  link): "This guide's file changed after it was imported, so it
+  can't be opened safely. Remove it, then import the original again."
+
+The existing "Re-import it" wording for these cases is replaced. A TXT or
+PDF copy whose bytes changed still opens and never produces Changed.
+
 Sources:
 
 1. **Startup.** `StartupReconciliationReport` gains
@@ -174,7 +189,8 @@ Sources:
    entry path with `File.Exists` through the existing path resolver. It hashes
    nothing and follows no links.
 2. **Reader.** A failed open marks the guide. Missing marks Missing.
-   Changed, PDF Damaged and TXT InvalidMetadata mark Damaged. Other errors
+   Changed, HTML NoManifest, PDF Damaged and TXT InvalidMetadata mark
+   Damaged. Other errors
    (TooLarge, NotUtf8, password errors, runtime errors) don't change status.
 3. **Recovery.** A successful open marks the guide Ok, so a file restored by
    hand clears its status.
@@ -191,8 +207,8 @@ Sources:
 
 - `HtmlGuideLoadAction` is renamed `GuideLoadAction` (TXT and PDF already
   reuse it) and gains `Remove`.
-- Missing and Changed (all formats), PDF Damaged and TXT InvalidMetadata
-  offer **Remove guide…**. It opens the existing `RemoveGuideDialog`. After
+- Missing (all formats), Changed (HTML and PDF), HTML NoManifest, PDF
+  Damaged and TXT InvalidMetadata offer **Remove guide…**. It opens the existing `RemoveGuideDialog`. After
   a removal the shell returns to the Game page with T15.3's selection rules.
   Cancel leaves the reader on the error.
 
@@ -216,38 +232,12 @@ produces one), so they are hidden rather than shown as removable rows.
   list reads return the other guides and the startup report's
   `UnreadableGuideCount` is 1.
 - Core: `GuideFileHealth` transitions (unknown → Ok, Mark, Reset).
-- Smoke: the existing `txt-missing`, `pdf-missing` and HTML missing or
-  changed modes also assert the row's `GuideFileStatus` and the reader's
+- Smoke: the existing `txt-missing`, `pdf-missing` and HTML missing-entry
+  phases also assert the row's `GuideFileStatus` and the reader's
   Remove action. One mode completes the removal and asserts the row is gone
   and the other guide still opens.
 
-## PR c: changed content and the startup runtime check
-
-### TXT
-
-`ManagedTextDecoder` already computes `ContentChanged`. When it is true the
-decoder returns `TextGuideLoadFailed(TextGuideLoadError.Changed)` (a new
-value) instead of the document, and `TextGuideLoaded` drops its
-`ContentChanged` flag. Nothing renders and no progress is written.
-
-### PDF
-
-`ManagedPdfGuideLoader` already hashes the file. It compares the length and
-hash with `Guide.ContentBytes` and `Guide.ContentSha256` and returns the
-existing `PdfGuideLoadError.Changed` on a mismatch, before the document is
-opened.
-
-### Copy
-
-All three formats use:
-
-- Changed: "This guide's file changed after it was imported, so it can't be
-  opened safely. Remove it, then import the original again."
-- Missing: "This guide's file is missing from the library. Remove it, then
-  import the original again."
-
-Both offer **Remove guide…** and mark the guide's status. The existing
-"Re-import it" wording is replaced.
+## PR c: the startup runtime check
 
 ### Runtime
 
@@ -266,14 +256,9 @@ Both offer **Remove guide…** and mark the guide's status. The existing
 
 ### Tests
 
-- Core: a TXT copy with one changed byte (same length) → Changed; a changed
-  length → Changed.
-- Infrastructure: a PDF copy with one changed byte → Changed, and the PDF
-  document is never opened.
-- Smoke: `txt-changed` and `pdf-changed` modes tamper with the managed copy
-  after the seed's import, then assert the error bar, the Remove action and
-  the row status. `html-runtime-missing` gains a phase asserting the startup
-  warning before any HTML guide is opened.
+- Smoke: `html-runtime-missing` gains a phase asserting the startup warning
+  before any HTML guide is opened. The existing `progress-changed` mode keeps
+  asserting that a changed TXT copy opens with the approximate notice.
 
 ## Rules that hold across all three PRs
 
