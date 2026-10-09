@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('empty', 'game-editor', 'game-editor-persisted',
-        'normal', 'design-language', 'design-readers', 'stale', 'long-list', 'switch-game',
+        'normal', 'relaunch-check', 'design-language', 'design-readers', 'stale', 'long-list', 'switch-game',
         'switch-game-prepare', 'switch-game-loading', 'queue-guide',
         'queue-guide-write', 'prepare-game-editor-close',
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
@@ -5999,6 +5999,28 @@ try {
         [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
         Wait-EditorClosed
         $report.phases += 'remove-restores-manual-add'
+    }
+    elseif ($Mode -eq 'relaunch-check') {
+        # A relaunched shell resumes the expected guide. It ends as 'normal'
+        # does: on Route Test Game with Route Test Guide opened last.
+        Invoke-Element (Wait-Name 'ResumeGuide' "Resume $ExpectedResumeGuide")
+        [void](Wait-Name 'ReaderHeading' $ExpectedResumeGuide)
+        [void](Wait-Name 'ReaderGameName' 'Route Test Game')
+        [void](Wait-Status 'Guide ready.')
+        $report.phases += 'resume-reader'
+        Go-Back
+        [void](Wait-Name 'GameHeading' 'Route Test Game')
+        [void](Wait-Status 'Game ready.')
+        if ($ExpectedResumeGuide -ne 'Route Test Guide') {
+            Open-GuideFromGame 'Route Test Guide'
+            [void](Wait-Name 'ReaderHeading' 'Route Test Guide')
+            [void](Wait-Status 'Guide ready.')
+            Go-Back
+            [void](Wait-Name 'GameHeading' 'Route Test Game')
+            [void](Wait-Status 'Game ready.')
+        }
+        [void](Wait-SelectedGuide 'Route Test Guide')
+        $report.phases += 'restore-last-guide-for-relaunch'
     }
     elseif ($Mode -eq 'normal') {
         $resume = Wait-Name 'ResumeGuide' "Resume $ExpectedResumeGuide"
