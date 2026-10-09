@@ -698,6 +698,22 @@ try {
         throw "$id rows were: $shown"
     }
 
+    # One realized row's help text, matched with -like.
+    function Assert-RowHelp([string] $id, [string] $name, [string] $pattern) {
+        $deadline = (Get-Date).AddSeconds(10)
+        $help = 'no row'
+        do {
+            $row = @(Get-ListRows $id | Where-Object { $_.Current.Name -eq $name }) |
+                Select-Object -First 1
+            if ($row) {
+                $help = $row.Current.HelpText
+                if ($help -like $pattern) { return $help }
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "$id row '$name' help text was: $help"
+    }
+
     # Counts screen pixels within 24 per channel of $rgb in the artwork column
     # of a row. UIA bounds and CopyFromScreen both use physical pixels.
     function Measure-RowArtwork($row, [int[]] $rgb, [double] $scale) {
@@ -1339,7 +1355,7 @@ try {
             elseif ($Mode -like 'progress-*' -or $Mode -like 'completion-*') { 'Progress Game' }
             elseif ($Mode -like 'text-size-*') { 'Text Size Game' }
             else { 'Text Reader Game' }
-        $missingMessage = "This guide's file is missing from the library."
+        $missingMessage = "This guide's file is missing from the library. Remove it, then import the original again."
         $listItem = New-Object System.Windows.Automation.PropertyCondition(
             [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
             [System.Windows.Automation.ControlType]::ListItem)
@@ -2251,11 +2267,11 @@ try {
             $report.phases += 'html-runtime-missing'
 
             # html-missing-entry: the loader runs before WebView2, so a
-            # deleted entry still says it is missing, with no action.
+            # deleted entry still says it is missing, and offers Remove guide.
             Back-ToTextGame
             Open-TextGuide 'Canary Guide B'
             [void](Wait-Name 'ReaderLoadError' $missingMessage)
-            Assert-Absent 'ReaderLoadErrorAction'
+            [void](Wait-Name 'ReaderLoadErrorAction' 'Remove guide')
             $report.phases += 'html-missing-entry'
 
             # TXT guides still open, and show no HTML action.
@@ -2705,7 +2721,7 @@ try {
             Open-TextGuide 'Damaged PDF Guide'
             [void](Wait-Status $damaged)
             [void](Wait-Name 'ReaderLoadError' $damaged)
-            Assert-Absent 'ReaderLoadErrorAction'
+            [void](Wait-Name 'ReaderLoadErrorAction' 'Remove guide')
             Assert-Absent 'PdfDocumentText'
             $report.pdfErrorScreenshot = Save-WindowScreenshot 'pdf-error'
             $report.phases += 'pdf-damaged'
@@ -2714,7 +2730,7 @@ try {
             Open-TextGuide 'Missing PDF Guide'
             [void](Wait-Status $missingMessage)
             [void](Wait-Name 'ReaderLoadError' $missingMessage)
-            Assert-Absent 'ReaderLoadErrorAction'
+            [void](Wait-Name 'ReaderLoadErrorAction' 'Remove guide')
             Assert-Absent 'PdfDocumentText'
             $report.phases += 'pdf-missing'
 
@@ -3739,6 +3755,9 @@ try {
                 "Local\DesktopGuides.Preview.TextRemeasure.$($process.Id)")
             $report.txtPosition = [ordered]@{}
             [void](Wait-Name 'LibraryHeading' 'Library')
+            # Startup found Missing File Guide's file gone (TR15.1).
+            $report.txtLibraryRow = Assert-RowHelp 'GameList' $textGame '*5 guides, 1 guide needs attention'
+            $report.phases += 'txt-library-attention'
             Select-Element $textGame
             [void](Wait-Name 'GameHeading' $textGame)
             [void](Wait-Status 'Game ready.')
@@ -3817,7 +3836,12 @@ try {
 
             Back-ToTextGame
 
-            # A missing managed file shows one sentence and no text or commands.
+            # A missing managed file leads its row, shows one sentence and
+            # no text or commands, and offers Remove guide.
+            Show-TextGuide 'Missing File Guide'
+            $report.missingRow = Assert-RowHelp 'GuideList' 'Missing File Guide' 'File missing, Text (TXT), *'
+            $report.txtMissingRowScreenshot = Save-WindowScreenshot 'txt-missing-row'
+            $report.phases += 'txt-missing-row'
             Open-TextGuide 'Missing File Guide'
             [void](Wait-Status $missingMessage)
             [void](Wait-Name 'ReaderLoadError' $missingMessage)
@@ -3825,22 +3849,51 @@ try {
             Assert-Absent 'ReaderLoading'
             Assert-Absent 'RouteProgress'
             Assert-NoReaderCommands 'Missing File Guide'
+            $removeAction = Wait-Name 'ReaderLoadErrorAction' 'Remove guide'
             $report.phases += 'txt-missing'
 
+            # Cancel keeps the guide and its error (TR15.2).
+            Invoke-Element $removeAction
+            [void](Wait-VisibleById 'RemoveGuideDialog')
+            [void](Wait-Name 'RemoveGuideMessage' ("This removes the guide and its reading progress " +
+                "from Desktop Guides. The original file you imported isn't affected."))
+            $report.txtMissingRemoveScreenshot = Save-WindowScreenshot 'txt-missing-remove'
+            Invoke-Element (Wait-EnabledById 'CloseButton')
+            [void](Wait-HiddenById 'RemoveGuideDialog')
+            [void](Wait-Name 'ReaderHeading' 'Missing File Guide')
+            [void](Wait-Name 'ReaderLoadError' $missingMessage)
+            $report.phases += 'txt-missing-remove-cancelled'
+
+            # Remove goes back to the game without the guide.
+            Invoke-Element (Wait-Name 'ReaderLoadErrorAction' 'Remove guide')
+            [void](Wait-VisibleById 'RemoveGuideDialog')
+            Invoke-Element (Wait-EnabledById 'PrimaryButton')
+            [void](Wait-HiddenById 'RemoveGuideDialog')
+            [void](Wait-Status 'Removed Missing File Guide.')
+            [void](Wait-Name 'GameHeading' $textGame)
+            if ((Get-GuideRowNames) -contains 'Missing File Guide') {
+                throw 'The removed Missing File Guide is still listed.'
+            }
+            $report.phases += 'txt-missing-removed'
+
             # A Web Page Guide with no saved asset rows (imported before
-            # schema v4) asks to be re-imported.
-            Back-ToTextGame
+            # schema v4) asks to be re-imported, offers Remove guide, and
+            # its row then says the file is damaged.
             Open-TextGuide 'Web Page Guide'
             [void](Wait-Status 'Re-import this guide to read it.')
             [void](Wait-Name 'ReaderLoadError' 'Re-import this guide to read it.')
+            [void](Wait-Name 'ReaderLoadErrorAction' 'Remove guide')
             Assert-Absent 'ReaderTextLines'
             Assert-Absent 'ReaderLoading'
             Assert-Absent 'RouteProgress'
             Assert-NoReaderCommands 'Web Page Guide'
             $report.phases += 'html-no-manifest'
+            Back-ToTextGame
+            Show-TextGuide 'Web Page Guide'
+            $report.webPageRow = Assert-RowHelp 'GuideList' 'Web Page Guide' 'File damaged, Web page (HTML), *'
+            $report.phases += 'html-no-manifest-row'
 
             # Reopening reads the file again.
-            Back-ToTextGame
             Open-TextGuide 'ASCII Map Guide'
             Assert-RowNames 'ASCII Map Guide (reopened)' $asciiNames
             $report.phases += 'txt-reopen'
