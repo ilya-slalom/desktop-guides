@@ -973,13 +973,19 @@ CI run 37765505021); see the
 [design](t20-1-library-export-design.md#t201-verification-record).
 T15.4 is implemented on `feat/p1-t15-4-fault-injection`; see the
 [design](t15-4-fault-injection-design.md#t154-verification-record).
-T15.1 PR a is implemented on `feat/p1-t15-1-error-recovery`; see the
-[design and verification record](t15-1-error-recovery-design.md#t151-verification-record).
+T15.1 PR a merged in #74; PR b is implemented on
+`feat/p1-t15-1-guide-health`; see the [design and verification
+record](t15-1-error-recovery-design.md#t151-verification-record).
 A library that can't be opened stops on a Library unavailable page with
 **Try again** and **Open data folder**. `Initialize` maps open failures to a
 `LibraryOpenIssue`, never creates a database in a used data folder, and
 probes for write access before migrating. CI run 37928644369 passed the
 installed damaged and missing library runs.
+Startup reports guides whose managed file is missing, and the Library and
+game rows say which guides need attention. A guide whose file is missing or
+damaged offers **Remove guide** in the Reader, through T15.3's removal.
+Unreadable guide rows are hidden with one warning, and other guides open.
+CI run 37935779817 passed the installed missing-file and removal runs.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
