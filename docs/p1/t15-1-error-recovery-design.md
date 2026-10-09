@@ -1,6 +1,6 @@
 # T15.1 error recovery design
 
-Status: PR a merged in #74 and PR b in #75; PR c implemented on `feat/p1-t15-1-runtime-check`, verified by CI run 37948919282.
+Status: PR a merged in #74 and PR b in #75; PR c implemented on `feat/p1-t15-1-runtime-check` as #76, verified by CI run 37948919282.
 Prerequisites T03.2, T06.3, T09.1 and T10.1 are merged.
 
 ## Intent

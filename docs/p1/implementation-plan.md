@@ -973,7 +973,7 @@ CI run 37765505021); see the
 [design](t20-1-library-export-design.md#t201-verification-record).
 T15.4 is implemented on `feat/p1-t15-4-fault-injection`; see the
 [design](t15-4-fault-injection-design.md#t154-verification-record).
-T15.1 is implemented in #74, #75 and PR c on `feat/p1-t15-1-runtime-check`;
+T15.1 is implemented in #74, #75 and #76 (on `feat/p1-t15-1-runtime-check`);
 see the [design and verification
 record](t15-1-error-recovery-design.md#t151-verification-record).
 A library that can't be opened stops on a Library unavailable page with
@@ -992,7 +992,7 @@ passed the installed runtime-missing run.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
-| T15.1 | T03.2, T06.3, T09.1, T10.1 | Stable service errors and actionable UI for corrupt DB, missing guide, invalid content, and missing runtime. An unaffected guide still opens; a corrupt DB is never replaced by an empty one. PRs: #74, #75, PR c. | TR15.1 |
+| T15.1 | T03.2, T06.3, T09.1, T10.1 | Stable service errors and actionable UI for corrupt DB, missing guide, invalid content, and missing runtime. An unaffected guide still opens; a corrupt DB is never replaced by an empty one. PRs: #74, #75, #76. | TR15.1 |
 | T15.4 | T04.3, T06.3, T15.2, T15.3 | Headless fault-injection matrix across each import/delete protocol phase plus canceled operations. Assert exact DB rows and owned paths; Windows NTFS runs cover links and malformed names. | TR04.1, TR04.2, TR06.2, TR15.1, TR15.2 |
 | T20.1 | T03.2, T04.4, T06.3, T15.2 | Versioned ZIP manifest and consistent SQLite/files snapshot under one write gate, including provider snapshots and managed game artwork. Export is canceled cleanly, verified by checksums, and excludes source paths, credentials, remote caches, and transient profiles. | TR20.2 |
 | T20.2 | T14.4, T15.1, T15.4, T20.1 | Toolkit `SettingsCard` Export/Restore rows and `SettingsExpander` advanced restore details, out-of-app-data destination check, first-import export reminder, full staged archive validation of guide and provider-artwork references, native Cancel/Replace confirmation, and rollback marker. Clean and populated restore, missing artwork, corrupt/unsafe ZIP, cancel, and interrupted swap tests pass. | TR20.1, TR20.2 |
