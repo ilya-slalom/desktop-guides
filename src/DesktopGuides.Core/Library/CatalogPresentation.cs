@@ -8,7 +8,7 @@ namespace DesktopGuides.Core.Library;
 public static class CatalogPresentation
 {
     public static IReadOnlyList<CatalogFact> GameFacts(
-        LibraryGameSummary summary, string? matchedGuideTitle = null)
+        LibraryGameSummary summary, string? matchedGuideTitle = null, int attentionCount = 0)
     {
         List<string> labels = [];
         if (!string.IsNullOrWhiteSpace(summary.Game.Platform))
@@ -22,6 +22,10 @@ public static class CatalogPresentation
             1 => "1 guide",
             int count => $"{count} guides"
         });
+        if (attentionCount > 0)
+        {
+            labels.Add(GuideFilePresentation.Attention(attentionCount));
+        }
         // A search that matched only a guide names it, so the row explains itself.
         if (matchedGuideTitle is not null)
         {
@@ -31,10 +35,19 @@ public static class CatalogPresentation
     }
 
     public static IReadOnlyList<CatalogFact> GuideFacts(
-        GuideSummary summary, TimeProvider clock, CultureInfo culture)
+        GuideSummary summary, TimeProvider clock, CultureInfo culture,
+        GuideFileStatus fileStatus = GuideFileStatus.Ok)
     {
         string format = ImportPresentation.FormatLabel(summary.Guide.Format);
-        List<CatalogFact> facts = [new(format, format), ReadingStateFact(summary.State)];
+        List<CatalogFact> facts = [];
+        // A broken file leads the row, before the facts that assume it opens.
+        if (fileStatus != GuideFileStatus.Ok)
+        {
+            string status = GuideFilePresentation.StatusLabel(fileStatus);
+            facts.Add(new(status, status));
+        }
+        facts.Add(new(format, format));
+        facts.Add(ReadingStateFact(summary.State));
         if (summary.State?.LastOpenedUtc is DateTimeOffset opened)
         {
             facts.Add(OpenedFact(opened, clock, culture));
