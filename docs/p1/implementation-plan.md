@@ -1,8 +1,8 @@
 # P1 implementation plan and exit gates
 
-Status: 44 of the 55 tasks are merged, 8 October 2026. M0, M3 and M4 are
-complete; M1 still needs T17.1 and M2 the optional T11.5. M5 has started
-with T20.1, and M6 is planned.
+Status: 45 of the 55 tasks are merged, 10 October 2026. M0, M3 and M4 are
+complete; M1 still needs T17.1 and M2 the optional T11.5. M5 has T20.1 and
+T15.1 merged, and M6 is planned.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
 This plan orders all **16 P1 stories and 55 tasks** in the
@@ -973,7 +973,7 @@ CI run 37765505021); see the
 [design](t20-1-library-export-design.md#t201-verification-record).
 T15.4 is implemented on `feat/p1-t15-4-fault-injection`; see the
 [design](t15-4-fault-injection-design.md#t154-verification-record).
-T15.1 is implemented in #74, #75 and #76 (on `feat/p1-t15-1-runtime-check`);
+T15.1 merged in #74, #75 and #76 (merge commit `f82e86b`);
 see the [design and verification
 record](t15-1-error-recovery-design.md#t151-verification-record).
 A library that can't be opened stops on a Library unavailable page with
