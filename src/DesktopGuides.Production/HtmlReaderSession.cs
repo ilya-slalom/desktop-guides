@@ -121,6 +121,23 @@ internal sealed class HtmlReaderSession : IReaderSession
             ? Path.Combine(cacheRoot, "missing-runtime-test")
             : null;
 
+    // T15.1: the startup check and each open ask the same question, so a
+    // runtime installed later is found on the next open.
+    public static bool IsRuntimeAvailable(string cacheRoot)
+    {
+        string? browserFolder = MissingRuntimeFolderForTest(cacheRoot);
+        try
+        {
+            if (browserFolder is not null) Directory.CreateDirectory(browserFolder);
+            return !string.IsNullOrEmpty(
+                CoreWebView2Environment.GetAvailableBrowserVersionString(browserFolder));
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     public Task OpenAsync(ManagedGuideSource source, CancellationToken token) =>
         OpenAsync(source, new ReaderAppearance(ReaderTheme.Light, 1.0), token);
 
@@ -163,21 +180,11 @@ internal sealed class HtmlReaderSession : IReaderSession
         }
         ObjectDisposedException.ThrowIf(disposed, this);
         contentSha256 = source.Guide.ContentSha256;
+        if (!IsRuntimeAvailable(cacheRoot))
+        {
+            throw new HtmlGuideLoadException(HtmlGuideLoadError.RuntimeMissing);
+        }
         string? browserFolder = MissingRuntimeFolderForTest(cacheRoot);
-        string? version;
-        try
-        {
-            if (browserFolder is not null) Directory.CreateDirectory(browserFolder);
-            version = CoreWebView2Environment.GetAvailableBrowserVersionString(browserFolder);
-        }
-        catch (Exception error) when (error is not OperationCanceledException)
-        {
-            throw new HtmlGuideLoadException(HtmlGuideLoadError.RuntimeMissing);
-        }
-        if (string.IsNullOrEmpty(version))
-        {
-            throw new HtmlGuideLoadException(HtmlGuideLoadError.RuntimeMissing);
-        }
         try
         {
             Directory.CreateDirectory(profile);

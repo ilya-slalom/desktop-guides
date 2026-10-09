@@ -82,4 +82,10 @@ public sealed class HtmlGuideLoadMessagesTests
         Assert.Throws<ArgumentOutOfRangeException>(() => HtmlGuideLoadMessages.StatusFor((HtmlGuideLoadError)99));
         Assert.Throws<ArgumentOutOfRangeException>(() => HtmlGuideLoadMessages.ActionLabel((GuideLoadAction)99));
     }
+
+    [Fact]
+    public void StartupWarningSaysWhatStillOpens() =>
+        Assert.Equal(
+            "Web page guides need the Microsoft Edge WebView2 Runtime. Text and PDF guides still open.",
+            HtmlGuideLoadMessages.RuntimeMissingAtStartup);
 }

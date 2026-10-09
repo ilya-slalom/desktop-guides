@@ -1058,7 +1058,23 @@ function Get-HtmlCanaryLines([string] $logPath) {
 }
 
 function Invoke-HtmlReaderPass([string] $resultName, [string] $mode = 'html-reader', [switch] $NoRuntime) {
-    Start-InstalledShell
+    # Ruling 19 of the T15.1 plan: the startup runtime probe runs as soon as
+    # the library opens, so the shell waits on the lease until the gate exists.
+    $lease = $null
+    if ($NoRuntime) {
+        $lease = [System.IO.File]::Open(
+            (Join-Path $dataRoot 'library.session.lock'),
+            [System.IO.FileMode]::OpenOrCreate,
+            [System.IO.FileAccess]::ReadWrite,
+            [System.IO.FileShare]::None)
+    }
+    try {
+        Start-InstalledShell
+    }
+    catch {
+        if ($lease) { $lease.Dispose() }
+        throw
+    }
     $processId = $report.launchedProcessId
     $diagnosticsGate = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
@@ -1073,6 +1089,7 @@ function Invoke-HtmlReaderPass([string] $resultName, [string] $mode = 'html-read
             $false, [System.Threading.EventResetMode]::ManualReset,
             "Local\DesktopGuides.Preview.WebView2Missing.$processId")
     }
+    if ($lease) { $lease.Dispose() }
     try {
         $report.htmlReader[$resultName] = Run-ShellSmoke $mode -ResultName $resultName
         Close-InstalledShell
@@ -1222,7 +1239,8 @@ function Run-HtmlReaderScenarios {
         Save-HtmlDiagnostics 'html-runtime-missing' $cacheRoot
         $report.htmlReader.runtimeMissing = Assert-HtmlReaderPass 'runtime-missing' $cacheRoot `
             @(@{ guideId = $ids.guideA; served = '' }) `
-            @('https://developer.microsoft.com/microsoft-edge/webview2/') $logPath $baseline
+            @('https://developer.microsoft.com/microsoft-edge/webview2/',
+              'https://developer.microsoft.com/microsoft-edge/webview2/') $logPath $baseline
     }
     finally {
         Stop-HtmlCanary $canary
