@@ -472,7 +472,7 @@ function Assert-RelaunchDuringClose {
     }
     Wait-InstalledShellExit $closingProcessId
     $report.relaunchDuringCloseProcessId = $report.launchedProcessId
-    $report.normalAfterCloseRelaunch = Run-ShellSmoke 'normal' 'Blocked Write Guide'
+    $report.resumeAfterCloseRelaunch = Run-ShellSmoke 'relaunch-check' 'Blocked Write Guide'
 }
 
 function Assert-GameEditorDoesNotOpenDuringClose {
@@ -522,12 +522,12 @@ function Assert-LateGuideAfterClose {
     }
     Wait-InstalledShellExit $closingProcessId
     Start-InstalledShell
-    $report.normalAfterLateClose = Run-ShellSmoke 'normal' 'Blocked Write Guide'
+    $report.resumeAfterLateClose = Run-ShellSmoke 'relaunch-check' 'Blocked Write Guide'
 }
 
 function Assert-FailedLaterGuideDoesNotSaveEarlier {
     Start-InstalledShell
-    $report.normalBeforeFailedGuide = Run-ShellSmoke 'normal' 'Blocked Write Guide'
+    $report.resumeBeforeFailedGuide = Run-ShellSmoke 'relaunch-check' 'Blocked Write Guide'
     dotnet $seedDll `
         invalidate-blocked-guide $dataRoot
     if ($LASTEXITCODE -ne 0) {
@@ -635,7 +635,7 @@ function Assert-ClosingTargetRedirect {
         $resume.Set() | Out-Null
         Wait-InstalledShellWindow ([int]$secondLaunch.processId)
         $report.closingTargetRelaunchProcessId = $report.launchedProcessId
-        $report.normalAfterClosingTarget = Run-ShellSmoke 'normal'
+        $report.resumeAfterClosingTarget = Run-ShellSmoke 'relaunch-check'
     }
     finally {
         $resume.Set() | Out-Null
@@ -667,7 +667,7 @@ function Assert-QueuedActivationClose {
         $resume.Set() | Out-Null
         Wait-InstalledShellWindow ([int]$secondLaunch.processId)
         $report.queuedActivationRelaunchProcessId = $report.launchedProcessId
-        $report.normalAfterQueuedActivation = Run-ShellSmoke 'normal'
+        $report.resumeAfterQueuedActivation = Run-ShellSmoke 'relaunch-check'
     }
     finally {
         $resume.Set() | Out-Null
