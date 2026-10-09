@@ -352,14 +352,22 @@ public sealed partial class ShellWindow : Window
                 () => ApplicationData.Current.LocalFolder.Path,
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
             this.dataRoot = dataRoot;
-            ShowBusyStatus("Waiting for previous window…");
-            libraryLease = await LibrarySessionLease.AcquireAsync(
-                dataRoot, leaseWait.Token);
+            if (libraryLease is null)
+            {
+                ShowBusyStatus("Waiting for previous window…");
+                libraryLease = await LibrarySessionLease.AcquireAsync(dataRoot, leaseWait.Token);
+            }
             ShowRouteProgress("Loading library…");
             ManagedPathResolver paths = new(dataRoot);
+            if (repository is not null)
+            {
+                await repository.DisposeAsync();
+                repository = null;
+            }
             repository = new SqliteLibraryRepository(paths);
             artwork = new ManagedArtworkStore(paths);
             await repository.InitializeAsync();
+            LibraryUnavailablePanel.Visibility = Visibility.Collapsed;
             StartProgress(repository);
             guidePublisher = new GuideImportPublisher(repository, paths);
             guideRemover = new GuideRemover(repository, paths);
@@ -405,6 +413,14 @@ public sealed partial class ShellWindow : Window
         catch (OperationCanceledException) when (closeRequested)
         {
             // The waiting window was closed before it acquired the library.
+        }
+        catch (LibraryOpenException error)
+        {
+            ready = false;
+            if (!closeRequested)
+            {
+                ShowLibraryUnavailable(error);
+            }
         }
         catch (Exception error)
         {
@@ -1601,6 +1617,7 @@ public sealed partial class ShellWindow : Window
         GamePanel.Visibility = Visibility.Collapsed;
         ReaderPanel.Visibility = Visibility.Collapsed;
         SettingsPanel.Visibility = Visibility.Collapsed;
+        LibraryUnavailablePanel.Visibility = Visibility.Collapsed;
         OpenSelectedGuideButton.Visibility = Visibility.Collapsed;
         RemoveSelectedGuideButton.Visibility = Visibility.Collapsed;
         GameCompletionChoice.Hide();

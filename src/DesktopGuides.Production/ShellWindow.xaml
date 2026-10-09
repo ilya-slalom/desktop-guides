@@ -85,6 +85,44 @@
                      AutomationProperties.AutomationId="ShellStatus"
                      AutomationProperties.LiveSetting="Polite" />
 
+            <local:AutomationGroup x:Name="LibraryUnavailablePanel"
+                                   Grid.Row="1"
+                                   Visibility="Collapsed"
+                                   AutomationProperties.AutomationId="LibraryUnavailable">
+                <StackPanel Spacing="{StaticResource DesktopGuidesSpacing16}" MaxWidth="640" HorizontalAlignment="Left">
+                    <TextBlock x:Name="LibraryUnavailableTitle"
+                               Style="{StaticResource DesktopGuidesPageTitleStyle}"
+                               AutomationProperties.AutomationId="LibraryUnavailableTitle" />
+                    <TextBlock x:Name="LibraryUnavailableBody"
+                               TextWrapping="Wrap"
+                               Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                               AutomationProperties.AutomationId="LibraryUnavailableBody" />
+                    <TextBlock x:Name="LibraryUnavailableDataFolder"
+                               TextWrapping="Wrap"
+                               IsTextSelectionEnabled="True"
+                               Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                               AutomationProperties.AutomationId="LibraryUnavailableDataFolder" />
+                    <TextBlock x:Name="LibraryUnavailableRecoveryPath"
+                               TextWrapping="Wrap"
+                               IsTextSelectionEnabled="True"
+                               Visibility="Collapsed"
+                               Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                               AutomationProperties.AutomationId="LibraryUnavailableRecoveryPath" />
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource DesktopGuidesSpacing12}">
+                        <Button x:Name="LibraryUnavailableRetry"
+                                Content="Try again"
+                                Style="{StaticResource DesktopGuidesPrimaryActionButtonStyle}"
+                                Click="LibraryUnavailableRetryClicked"
+                                AutomationProperties.AutomationId="LibraryUnavailableRetry" />
+                        <Button x:Name="LibraryUnavailableOpenFolder"
+                                Content="Open data folder"
+                                Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                                Click="LibraryUnavailableOpenFolderClicked"
+                                AutomationProperties.AutomationId="LibraryUnavailableOpenFolder" />
+                    </StackPanel>
+                </StackPanel>
+            </local:AutomationGroup>
+
             <Grid x:Name="LibraryPanel"
                   Grid.Row="1"
                   RowSpacing="{StaticResource DesktopGuidesSpacing16}">
