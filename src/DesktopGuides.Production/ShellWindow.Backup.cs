@@ -4,6 +4,7 @@ using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Navigation;
 using DesktopGuides.Infrastructure.Storage;
 using DesktopGuides.Production.Materials;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -334,8 +335,7 @@ public sealed partial class ShellWindow
         RestoreSettingsExpander.IsExpanded = true;
         RestoreCancelButton.IsEnabled = true;
         ShowRestoreProgress(new LibraryRestoreProgress(LibraryRestorePhase.Copying, 0, 0));
-        FocusAfterLayout(RestoreCancelButton);
-        RestoreProgressCard.StartBringIntoView();
+        FocusAfterLayout(RestoreCancelButton, RestoreProgressCard);
         try
         {
             await PauseForTestAsync("Backup", cancel.Token);
@@ -389,36 +389,42 @@ public sealed partial class ShellWindow
                 SetLibraryBusy(false);
                 ChooseBackupButton.IsEnabled = ready;
                 ExportBackupButton.IsEnabled = ready;
-                FocusAfterLayout(stagedBackup is null ? ChooseBackupButton : ReplaceLibraryButton);
-                // The details and the status open below the expander's
-                // header, often below the fold.
                 if (stagedBackup is not null)
                 {
-                    RestoreMadeCard.StartBringIntoView(
-                        new BringIntoViewOptions { VerticalAlignmentRatio = 0 });
+                    FocusAfterLayout(ReplaceLibraryButton, RestoreMadeCard);
                 }
-                else if (RestoreStatus.IsOpen)
+                else
                 {
-                    RestoreStatus.StartBringIntoView();
+                    FocusAfterLayout(ChooseBackupButton, RestoreStatus.IsOpen ? RestoreStatus : null);
                 }
             }
         }
     }
 
-    // A card that just appeared may not be laid out yet; as GoToExportAsync does.
-    private void FocusAfterLayout(Control control)
+    // A card that just appeared may not be laid out yet; as GoToExportAsync
+    // does. The restore cards open below the expander's header, often below
+    // the fold, so once laid out, scroll the top of `reveal` into view.
+    private void FocusAfterLayout(Control control, FrameworkElement? reveal = null)
     {
         SettingsPanel.UpdateLayout();
-        if (!control.Focus(FocusState.Programmatic))
+        bool focused = control.Focus(FocusState.Programmatic);
+        if (focused && reveal is null)
         {
-            DispatcherQueue.TryEnqueue(() =>
+            return;
+        }
+        // Low priority runs after the pending layout, which places a card
+        // that an expanding SettingsExpander only just realized.
+        DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        {
+            if (navigator.Current is SettingsRoute && !closeRequested)
             {
-                if (navigator.Current is SettingsRoute && !closeRequested)
+                if (!focused)
                 {
                     control.Focus(FocusState.Programmatic);
                 }
-            });
-        }
+                reveal?.StartBringIntoView(new BringIntoViewOptions { VerticalAlignmentRatio = 0 });
+            }
+        });
     }
 
     private void ShowRestoreProgress(LibraryRestoreProgress report)
