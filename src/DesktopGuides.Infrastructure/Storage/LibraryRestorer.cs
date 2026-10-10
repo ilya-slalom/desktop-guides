@@ -127,10 +127,13 @@ public sealed class LibraryRestorer
             .Where(entry => entry.Path != LibraryArchiveManifest.DatabasePath)
             .Select(entry => (entry.Path, entry.Bytes, entry.Sha256))
             .ToHashSet();
+        HashSet<(string, long, string)> planned = plan.Files
+            .Select(file => (file.ArchivePath, file.Bytes, file.Sha256))
+            .ToHashSet();
         PlannedArchiveFile[] unmatched = plan.Files
             .Where(file => !listed.Contains((file.ArchivePath, file.Bytes, file.Sha256)))
             .ToArray();
-        if (unmatched.Length > 0 || plan.Files.Count != listed.Count ||
+        if (!planned.SetEquals(listed) ||
             plan.Games != manifest.Games || plan.Guides != manifest.Guides)
         {
             Guid[] guideIds = unmatched.Select(file => file.GuideId).OfType<Guid>().Distinct().ToArray();
