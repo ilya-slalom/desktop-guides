@@ -1093,6 +1093,7 @@ public sealed partial class ShellWindow : Window
                         imported = true;
                         pendingGuideFocus = guideId;
                         await RenderCurrentAsync();
+                        await RemindToExportAsync();
                     }
                     else if (dialog.OpenGuideId is Guid existingId)
                     {
@@ -1628,9 +1629,9 @@ public sealed partial class ShellWindow : Window
     }
 
     // Holds a TXT load until the installed test continues it or the load is cancelled.
-    private static async Task PauseTextLoadForTestAsync(CancellationToken token)
+    private static async Task PauseForTestAsync(string gate, CancellationToken token)
     {
-        string prefix = $@"Local\DesktopGuides.Preview.TextLoad.{Environment.ProcessId}";
+        string prefix = $@"Local\DesktopGuides.Preview.{gate}.{Environment.ProcessId}";
         try
         {
             if (!EventWaitHandle.TryOpenExisting(
@@ -1653,7 +1654,7 @@ public sealed partial class ShellWindow : Window
                     token.ThrowIfCancellationRequested();
                     if (signaled == WaitHandle.WaitTimeout)
                     {
-                        throw new TimeoutException("TXT load test gate timed out.");
+                        throw new TimeoutException($"{gate} test gate timed out.");
                     }
                 }
             }
@@ -2008,7 +2009,7 @@ public sealed partial class ShellWindow : Window
                     TextGuideLoad textLoad;
                     try
                     {
-                        await PauseTextLoadForTestAsync(readerToken);
+                        await PauseForTestAsync("TextLoad", readerToken);
                         textLoad = await textLoader!.LoadAsync(guide, readerToken);
                     }
                     catch (OperationCanceledException) when (readerToken.IsCancellationRequested)

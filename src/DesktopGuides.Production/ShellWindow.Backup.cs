@@ -1,6 +1,6 @@
-// src/DesktopGuides.Production/ShellWindow.Backup.cs
 using DesktopGuides.Core.Backup;
 using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Navigation;
 using DesktopGuides.Infrastructure.Storage;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -63,6 +63,68 @@ public sealed partial class ShellWindow
         await backupTask;
     }
 
+    // After the first import: uninstalling removes the live library.
+    private async Task RemindToExportAsync()
+    {
+        if (repository is not SqliteLibraryRepository library)
+        {
+            return;
+        }
+        try
+        {
+            if ((await library.GetSettingsAsync()).ExportReminderShown)
+            {
+                return;
+            }
+        }
+        catch (Exception)
+        {
+            return;
+        }
+        try
+        {
+            await library.UpdateSettingsAsync(settings => settings with { ExportReminderShown = true });
+        }
+        catch (Exception)
+        {
+            // It shows again after the next import.
+        }
+        if (closeRequested)
+        {
+            return;
+        }
+        ShowStatus(LibraryBackupMessages.ExportReminder, InfoBarSeverity.Informational, true, false);
+        ShowStatusAction(LibraryBackupMessages.GoToExport, GoToExportAsync);
+    }
+
+    private async Task GoToExportAsync()
+    {
+        if (libraryBusy)
+        {
+            return;
+        }
+        CancelReaderLoad();
+        await RunNavigationAsync(async () =>
+        {
+            navigator.OpenSettings();
+            await RenderCurrentAsync();
+            // Settings was collapsed until this render; lay it out so the
+            // button can take focus from the status action that closed.
+            SettingsPanel.UpdateLayout();
+            ExportSettingsCard.StartBringIntoView();
+            if (!ExportBackupButton.Focus(FocusState.Programmatic))
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (navigator.Current is SettingsRoute)
+                    {
+                        ExportBackupButton.Focus(FocusState.Programmatic);
+                    }
+                });
+            }
+        });
+    }
+
     private async Task<string?> PickBackupDestinationAsync()
     {
         FileSavePicker picker = new(AppWindow.Id)
@@ -90,6 +152,7 @@ public sealed partial class ShellWindow
         ExportCancelButton.Focus(FocusState.Programmatic);
         try
         {
+            await PauseForTestAsync("Backup", cancel.Token);
             Progress<LibraryExportProgress> progress = new(report =>
             {
                 if (ReferenceEquals(backupCancel, cancel) && !closeRequested)
