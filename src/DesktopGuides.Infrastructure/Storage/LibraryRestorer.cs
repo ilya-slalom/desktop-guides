@@ -98,6 +98,83 @@ public sealed class LibraryRestorer
         }
     }
 
+    /// <summary>
+    /// Swaps the staged library in. The caller holds the session lease and has
+    /// no repository open. The marker stays: startup confirms or rolls back.
+    /// </summary>
+    public Task ReplaceAsync(LibraryRestoreStage stage, CancellationToken token) =>
+        Task.Run(() => Replace(stage.StageId), token);
+
+    private void Replace(Guid stageId)
+    {
+        string staged = RestoreMarker.StagedLibrary(paths, stageId);
+        string prior = RestoreMarker.PriorRoot(paths, stageId);
+        string live = paths.LibraryRoot;
+        bool priorExists;
+        try
+        {
+            ManagedPathResolver.RejectFilesystemLinks(staged);
+            ManagedPathResolver.RejectFilesystemLinks(live);
+            ManagedPathResolver.RejectFilesystemLinks(paths.RecoveryRoot);
+            if (!Directory.Exists(staged))
+            {
+                throw new DirectoryNotFoundException("The staged library is gone.");
+            }
+            priorExists = Directory.Exists(live);
+            new RestoreMarker(stageId, priorExists, RestoreMarkerPhase.Swapping).Write(paths);
+        }
+        catch (Exception error) when (IsSwapError(error))
+        {
+            TryDeleteMarker();
+            throw new LibraryRestoreException(LibraryRestoreIssue.SwapFailed, inner: error);
+        }
+        checkpoint(RestoreCheckpoint.MarkerWritten);
+
+        if (priorExists)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(prior)!);
+                ManagedPathResolver.RejectFilesystemLinks(Path.GetDirectoryName(prior)!);
+                Directory.Move(live, prior);
+            }
+            catch (Exception error) when (IsSwapError(error))
+            {
+                DeleteTree(Path.GetDirectoryName(prior)!);
+                TryDeleteMarker();
+                throw new LibraryRestoreException(LibraryRestoreIssue.SwapFailed, inner: error);
+            }
+        }
+        checkpoint(RestoreCheckpoint.PriorMoved);
+
+        try
+        {
+            Directory.Move(staged, live);
+        }
+        catch (Exception error) when (IsSwapError(error))
+        {
+            // Put the prior root back. If that fails too, the marker stays and
+            // startup finishes the rollback.
+            if (priorExists)
+            {
+                Directory.Move(prior, live);
+            }
+            TryDeleteMarker();
+            throw new LibraryRestoreException(LibraryRestoreIssue.SwapFailed, inner: error);
+        }
+        checkpoint(RestoreCheckpoint.Promoted);
+    }
+
+    private static bool IsSwapError(Exception error) =>
+        error is IOException or UnauthorizedAccessException or InvalidDataException;
+
+    private void TryDeleteMarker()
+    {
+        try { RestoreMarker.Delete(paths); }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
     private static void ValidateStagedLibrary(string stageRoot, LibraryArchiveManifest manifest)
     {
         ManagedPathResolver staged = new(stageRoot);

@@ -50,11 +50,28 @@ internal sealed class RestoreFixture : IAsyncDisposable
         Func<string, long>? freeBytes = null, CancellationToken token = default) =>
         Restorer(checkpoint, freeBytes).StageAsync(backup ?? Backup, null, token);
 
-    /// <summary>Every live entry except staging, which a stage is allowed to add.</summary>
-    public IReadOnlyDictionary<string, string> LiveEntries() =>
-        LibrarySnapshot.Capture(Target.Paths).Entries
+    /// <summary>Every live entry except staging; a missing library reads as one entry.</summary>
+    public IReadOnlyDictionary<string, string> LiveEntries()
+    {
+        if (!Directory.Exists(Target.Paths.LibraryRoot))
+        {
+            return new Dictionary<string, string> { ["library"] = "absent" };
+        }
+        return LibrarySnapshot.Capture(Target.Paths).Entries
             .Where(entry => !entry.Key.StartsWith("fs:" + LibraryRestorer.StagingFolderName, StringComparison.Ordinal))
             .ToDictionary(entry => entry.Key, entry => entry.Value);
+    }
+
+    /// <summary>A target with no library folder, as before the first run.</summary>
+    public async Task ClearTargetAsync()
+    {
+        await Target.Repository.DisposeAsync();
+        Directory.Delete(Target.Paths.LibraryRoot, recursive: true);
+    }
+
+    public Task<Guid> AddPriorGameAsync() => Target.AddGameAsync("Prior Game");
+
+    public string MarkerPath => Path.Combine(Target.Paths.DataRoot, "restore.marker");
 
     public void AssertNoStage() =>
         Assert.True(!Directory.Exists(StagingParent) || !Directory.EnumerateFileSystemEntries(StagingParent).Any(),
