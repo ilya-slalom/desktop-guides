@@ -556,7 +556,9 @@ its PR. PR a's PR includes a screenshot of the Export card and the reminder.
 - **Wiring.** Nothing is wired into the app yet (startup recovery and the
   in-session swap land in PR c, ruling 7), so there is no installed smoke and
   no screenshot.
-- **CI.** PR run: CI_RUN_PLACEHOLDER.
+- **CI.** The `pull_request` run
+  [38047804306](https://github.com/ilya-slalom/desktop-guides/actions/runs/38047804306)
+  passed every job (head `a01a3ae`).
 - **Not run.** No separate RED was captured for Task 6 (exact-string tests
   were written with the code). The extraction byte cap is defence in depth
   with no direct test, because verification refuses an oversized entry first.
