@@ -1,4 +1,3 @@
-// tests/DesktopGuides.Infrastructure.Tests/Restore/RestoreFixture.cs
 using System.IO.Compression;
 using System.Security.Cryptography;
 using DesktopGuides.Core.Backup;

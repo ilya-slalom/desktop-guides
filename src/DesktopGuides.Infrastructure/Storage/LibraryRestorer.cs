@@ -1,9 +1,9 @@
-// src/DesktopGuides.Infrastructure/Storage/LibraryRestorer.cs
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using DesktopGuides.Core.Backup;
 using DesktopGuides.Core.Paths;
+using Microsoft.Data.Sqlite;
 
 namespace DesktopGuides.Infrastructure.Storage;
 
@@ -23,6 +23,9 @@ public sealed class LibraryRestorer
     public const string StagingFolderName = ".restore-staging";
     internal const string ArchiveFileName = "archive.zip";
     internal const string LibraryFolderName = "library";
+    /// <summary>The first schema an exporter wrote (T20.1); older archives can't exist.</summary>
+    internal const int FirstArchivedSchema = 4;
+
     private const int BufferBytes = 81920;
     private const long ProgressStepBytes = 1024 * 1024;
 
@@ -76,6 +79,10 @@ public sealed class LibraryRestorer
             checkpoint(RestoreCheckpoint.Extracted);
             token.ThrowIfCancellationRequested();
 
+            ValidateStagedLibrary(stageRoot, manifest);
+            checkpoint(RestoreCheckpoint.Validated);
+            token.ThrowIfCancellationRequested();
+
             return new LibraryRestoreStage(stageId, manifest.CreatedUtc, manifest.AppVersion,
                 manifest.SchemaVersion, manifest.Games, manifest.Guides, manifest.TotalBytes);
         }
@@ -88,6 +95,116 @@ public sealed class LibraryRestorer
         {
             DeleteTree(stageRoot);
             throw;
+        }
+    }
+
+    private static void ValidateStagedLibrary(string stageRoot, LibraryArchiveManifest manifest)
+    {
+        ManagedPathResolver staged = new(stageRoot);
+        ValidateStagedDatabase(staged.DatabasePath, manifest.SchemaVersion);
+        LibraryArchivePlan plan;
+        try
+        {
+            plan = LibraryArchivePlan.Read(staged.DatabasePath, staged);
+        }
+        catch (LibraryExportException error) when (error.Issue == LibraryExportIssue.ManagedFilesDamaged)
+        {
+            throw new LibraryRestoreException(LibraryRestoreIssue.ReferencesInvalid, error.GuideIds, error.GameIds,
+                TitlesFor(staged.DatabasePath, error.GuideIds, error.GameIds), inner: error);
+        }
+        catch (LibraryExportException error)
+        {
+            throw new LibraryRestoreException(LibraryRestoreIssue.ArchiveInvalid, inner: error);
+        }
+        catch (Exception error) when (error is SqliteException or InvalidDataException or FormatException)
+        {
+            throw new LibraryRestoreException(LibraryRestoreIssue.DatabaseInvalid, inner: error);
+        }
+
+        // The archive must hold exactly what the database references, with the
+        // sizes and hashes the database recorded, and nothing else.
+        HashSet<(string, long, string)> listed = manifest.Entries
+            .Where(entry => entry.Path != LibraryArchiveManifest.DatabasePath)
+            .Select(entry => (entry.Path, entry.Bytes, entry.Sha256))
+            .ToHashSet();
+        PlannedArchiveFile[] unmatched = plan.Files
+            .Where(file => !listed.Contains((file.ArchivePath, file.Bytes, file.Sha256)))
+            .ToArray();
+        if (unmatched.Length > 0 || plan.Files.Count != listed.Count ||
+            plan.Games != manifest.Games || plan.Guides != manifest.Guides)
+        {
+            Guid[] guideIds = unmatched.Select(file => file.GuideId).OfType<Guid>().Distinct().ToArray();
+            Guid[] gameIds = unmatched.Select(file => file.GameId).OfType<Guid>().Distinct().ToArray();
+            throw new LibraryRestoreException(LibraryRestoreIssue.ReferencesInvalid, guideIds, gameIds,
+                TitlesFor(staged.DatabasePath, guideIds, gameIds));
+        }
+    }
+
+    // Read before the stage is deleted, so the message can name what's missing.
+    private static IReadOnlyList<string> TitlesFor(
+        string database, IReadOnlyList<Guid> guideIds, IReadOnlyList<Guid> gameIds)
+    {
+        List<string> titles = [];
+        try
+        {
+            using SqliteConnection connection = new(new SqliteConnectionStringBuilder
+            {
+                DataSource = database,
+                Mode = SqliteOpenMode.ReadWrite,
+                Pooling = false
+            }.ToString());
+            connection.Open();
+            foreach ((string table, Guid id) in guideIds.Select(id => ("Guides", id))
+                         .Concat(gameIds.Select(id => ("Games", id))))
+            {
+                using SqliteCommand command = connection.CreateCommand();
+                command.CommandText = $"SELECT Title FROM {table} WHERE Id = $id";
+                command.Parameters.AddWithValue("$id", id.ToString("N"));
+                if (command.ExecuteScalar() is string title)
+                {
+                    titles.Add(title);
+                }
+            }
+        }
+        catch (SqliteException)
+        {
+            // Unnamed is better than no message.
+        }
+        return titles;
+    }
+
+    private static void ValidateStagedDatabase(string database, int manifestVersion)
+    {
+        try
+        {
+            using SqliteConnection connection = new(new SqliteConnectionStringBuilder
+            {
+                DataSource = database,
+                Mode = SqliteOpenMode.ReadWrite,
+                Pooling = false
+            }.ToString());
+            connection.Open();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = "PRAGMA user_version";
+            long version = (long)command.ExecuteScalar()!;
+            if (version > LibrarySchema.CurrentVersion)
+            {
+                throw new LibraryRestoreException(LibraryRestoreIssue.NewerVersion);
+            }
+            if (version < FirstArchivedSchema || version != manifestVersion)
+            {
+                throw new LibraryRestoreException(LibraryRestoreIssue.DatabaseInvalid);
+            }
+            SqliteLibraryRepository.ValidateDatabase(connection, null, (int)version);
+            command.CommandText = "SELECT COUNT(*) FROM FileOperations";
+            if ((long)command.ExecuteScalar()! != 0)
+            {
+                throw new LibraryRestoreException(LibraryRestoreIssue.DatabaseInvalid);
+            }
+        }
+        catch (Exception error) when (error is SqliteException or InvalidDataException)
+        {
+            throw new LibraryRestoreException(LibraryRestoreIssue.DatabaseInvalid, inner: error);
         }
     }
 

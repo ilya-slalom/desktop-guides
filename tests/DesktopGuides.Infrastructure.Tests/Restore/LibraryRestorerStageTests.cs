@@ -1,4 +1,3 @@
-// tests/DesktopGuides.Infrastructure.Tests/Restore/LibraryRestorerStageTests.cs
 using DesktopGuides.Core.Backup;
 using DesktopGuides.Infrastructure.Storage;
 using DesktopGuides.Infrastructure.Tests.FaultInjection;
