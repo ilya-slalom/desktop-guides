@@ -1104,6 +1104,32 @@ try {
         throw "Expected visible '$id'."
     }
 
+    # For a screenshot: a card at the bottom edge counts as visible, so keep
+    # scrolling until all of it is inside the window.
+    function Show-SettingsCardFully([string] $id) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $element = Show-SettingsCard $id
+            $bounds = $element.Current.BoundingRectangle
+            $window = $root.Current.BoundingRectangle
+            if ($bounds.Top -ge $window.Top -and $bounds.Bottom -le ($window.Bottom - 8)) { return $element }
+            $moved = $false
+            $scrollable = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::IsScrollPatternAvailableProperty, $true)
+            foreach ($viewer in $root.FindAll($scope, $scrollable)) {
+                $pattern = $viewer.GetCurrentPattern([System.Windows.Automation.ScrollPattern]::Pattern)
+                if ($pattern.Current.VerticallyScrollable -and $pattern.Current.VerticalScrollPercent -lt 100) {
+                    $pattern.Scroll([System.Windows.Automation.ScrollAmount]::NoAmount,
+                        [System.Windows.Automation.ScrollAmount]::SmallIncrement)
+                    $moved = $true
+                }
+            }
+            if (-not $moved) { return $element }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw "Expected '$id' fully inside the window."
+    }
+
     $uia = [System.Windows.Automation.AutomationElement]
 
     function Wait-FilePicker {
@@ -6215,6 +6241,8 @@ try {
         if ($Mode -eq 'export-backup') {
             [void](Wait-Status ('Backup saved: ' + (Split-Path -Leaf $BackupPath) + ' (') -Prefix -Seconds 120)
             Wait-FocusedId 'ExportBackupButton'
+            # The status bar above Settings pushes the card toward the bottom edge.
+            [void](Show-SettingsCardFully 'ExportSettingsCard')
             $report.exportSavedScreenshot = Save-WindowScreenshot 'export-saved'
             $report.phases += 'export-saved'
         }
