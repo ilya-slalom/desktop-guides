@@ -3,6 +3,7 @@ using DesktopGuides.Core.Backup;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Navigation;
 using DesktopGuides.Infrastructure.Storage;
+using DesktopGuides.Production.Materials;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -71,6 +72,11 @@ public sealed partial class ShellWindow
         }
         if (path is null || closeRequested || libraryBusy)
         {
+            // Ruling 5: don't leave behind an empty file the picker created.
+            if (path is not null)
+            {
+                DeleteIfStillEmpty(path);
+            }
             return;
         }
         backupTask = RunExportAsync(active, path);
@@ -328,7 +334,7 @@ public sealed partial class ShellWindow
         RestoreSettingsExpander.IsExpanded = true;
         RestoreCancelButton.IsEnabled = true;
         ShowRestoreProgress(new LibraryRestoreProgress(LibraryRestorePhase.Copying, 0, 0));
-        RestoreCancelButton.Focus(FocusState.Programmatic);
+        FocusAfterLayout(RestoreCancelButton);
         try
         {
             await PauseForTestAsync("Backup", cancel.Token);
@@ -382,9 +388,24 @@ public sealed partial class ShellWindow
                 SetLibraryBusy(false);
                 ChooseBackupButton.IsEnabled = ready;
                 ExportBackupButton.IsEnabled = ready;
-                (stagedBackup is null ? (Control)ChooseBackupButton : ReplaceLibraryButton)
-                    .Focus(FocusState.Programmatic);
+                FocusAfterLayout(stagedBackup is null ? ChooseBackupButton : ReplaceLibraryButton);
             }
+        }
+    }
+
+    // A card that just appeared may not be laid out yet; as GoToExportAsync does.
+    private void FocusAfterLayout(Control control)
+    {
+        SettingsPanel.UpdateLayout();
+        if (!control.Focus(FocusState.Programmatic))
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (navigator.Current is SettingsRoute && !closeRequested)
+                {
+                    control.Focus(FocusState.Programmatic);
+                }
+            });
         }
     }
 
@@ -470,13 +491,117 @@ public sealed partial class ShellWindow
             active.DiscardStage(stage);
         }
         stagedBackup = null;
+        DiscardStagedDetails();
+    }
+
+    // Set by a swap for the next initialization to report.
+    private string? pendingRestoreError;
+    private LibraryRestoreStage? pendingRestore;
+
+    private async void ReplaceLibraryClicked(object sender, RoutedEventArgs args)
+    {
+        if (libraryBusy || !ready || closeRequested ||
+            stagedBackup is not LibraryRestoreStage stage || restorer is not LibraryRestorer active)
+        {
+            return;
+        }
+        (int games, int guides) = await CurrentCountsAsync();
+        ContentDialog dialog = ReplaceLibraryDialog.Create(games, guides, stage, Navigation.XamlRoot);
+        DialogSurface.Apply(dialog, EffectiveMaterial, DialogTheme);
+        activeRemoveDialog = dialog;
+        ContentDialogResult result;
+        try
+        {
+            result = await dialog.ShowAsync();
+        }
+        finally
+        {
+            activeRemoveDialog = null;
+        }
+        if (result != ContentDialogResult.Primary || closeRequested || libraryBusy)
+        {
+            if (!closeRequested)
+            {
+                ReplaceLibraryButton.Focus(FocusState.Programmatic);
+            }
+            return;
+        }
+        backupTask = ReplaceLibraryAsync(active, stage);
+        await backupTask;
+    }
+
+    // Closes everything that uses the library, swaps it, and opens the
+    // restored one through startup, which confirms it or rolls it back.
+    private async Task ReplaceLibraryAsync(LibraryRestorer active, LibraryRestoreStage stage)
+    {
+        SetLibraryBusy(true);
+        foreach (Control control in new Control[]
+                 { ReplaceLibraryButton, DiscardStageButton, ChooseBackupButton, ExportBackupButton })
+        {
+            control.IsEnabled = false;
+        }
+        ShowRouteProgress("Restoring library…");
+        try
+        {
+            // Queued work finishes first; ready = false then stops new work,
+            // including an action that takes the queue right after this one.
+            await RunNavigationAsync(() =>
+            {
+                ready = false;
+                return Task.CompletedTask;
+            });
+            ready = false;
+            CancelReaderLoad();
+            refreshCancel?.Cancel();
+            try
+            {
+                await refreshTask;
+            }
+            catch (Exception)
+            {
+                // A cancelled refresh; nothing to report during a restore.
+            }
+            await CloseReaderSessionAsync();
+            await DisposeProgressTrackingAsync();
+            if (repository is not null)
+            {
+                await repository.DisposeAsync();
+                repository = null;
+            }
+            stagedBackup = null;
+            DiscardStagedDetails();
+            navigator.ResetToLibrary();
+            try
+            {
+                await active.ReplaceAsync(stage, CancellationToken.None);
+                pendingRestore = stage;
+            }
+            catch (LibraryRestoreException error)
+            {
+                pendingRestoreError = LibraryBackupMessages.RestoreFailed(error.Issue, error.Titles, error.BytesNeeded);
+                active.DiscardStage(stage);
+            }
+            initializationTask = InitializeCoreAsync(verifyRestore: pendingRestore is not null);
+            await initializationTask;
+        }
+        finally
+        {
+            pendingRestore = null;
+            pendingRestoreError = null;
+            if (!closeRequested)
+            {
+                SetLibraryBusy(false);
+            }
+        }
+    }
+
+    // Hides the staged details without touching a stage being swapped in.
+    private void DiscardStagedDetails()
+    {
         RestoreMadeCard.Visibility = Visibility.Collapsed;
         RestoreHoldsCard.Visibility = Visibility.Collapsed;
         RestoreCurrentCard.Visibility = Visibility.Collapsed;
         RestoreActionsCard.Visibility = Visibility.Collapsed;
-    }
-
-    private void ReplaceLibraryClicked(object sender, RoutedEventArgs args)
-    {
+        RestoreStatus.IsOpen = false;
     }
 }

@@ -349,7 +349,7 @@ public sealed partial class ShellWindow : Window
 
     internal bool IsClosing => closeRequested;
 
-    private async Task InitializeCoreAsync()
+    private async Task InitializeCoreAsync(bool verifyRestore = false)
     {
         try
         {
@@ -374,9 +374,28 @@ public sealed partial class ShellWindow : Window
                 await repository.DisposeAsync();
                 repository = null;
             }
+            // T20.2: finish or undo a restore before anything opens the library.
+            RestoreRecoveryOutcome recovery = await Task.Run(
+                () => LibraryRestoreRecovery.Run(paths, verifyRestore));
             repository = new SqliteLibraryRepository(paths);
             artwork = new ManagedArtworkStore(paths);
-            await repository.InitializeAsync();
+            try
+            {
+                await repository.InitializeAsync();
+            }
+            catch (Exception) when (recovery == RestoreRecoveryOutcome.PendingVerify)
+            {
+                // The restored library didn't open: put the previous one back.
+                await repository.DisposeAsync();
+                await Task.Run(() => LibraryRestoreRecovery.RollBack(paths));
+                recovery = RestoreRecoveryOutcome.RolledBack;
+                repository = new SqliteLibraryRepository(paths);
+                await repository.InitializeAsync();
+            }
+            if (recovery == RestoreRecoveryOutcome.PendingVerify)
+            {
+                await Task.Run(() => LibraryRestoreRecovery.Complete(paths));
+            }
             LibraryUnavailablePanel.Visibility = Visibility.Collapsed;
             StartupReconciliationReport? startup = repository.LastStartupReconciliation;
             guideHealth.Reset(startup?.MissingGuides ?? []);
@@ -428,6 +447,19 @@ public sealed partial class ShellWindow : Window
                 ShowWarningStatus(GuideFilePresentation.Unreadable(report.UnreadableGuideCount));
             }
             await WarnIfRuntimeMissingAsync(sweptRoot);
+            if (pendingRestoreError is string swapError)
+            {
+                ShowErrorStatus(swapError);
+            }
+            else if (recovery == RestoreRecoveryOutcome.RolledBack)
+            {
+                ShowWarningStatus(LibraryBackupMessages.RestoreKept);
+            }
+            else if (recovery == RestoreRecoveryOutcome.PendingVerify && pendingRestore is { } restored)
+            {
+                ShowStatus(LibraryBackupMessages.Restored(restored.Games, restored.Guides),
+                    InfoBarSeverity.Success, true, false);
+            }
         }
         catch (OperationCanceledException) when (closeRequested)
         {
