@@ -990,7 +990,7 @@ CI run 37944327625 passed the installed missing-file and removal runs.
 A missing WebView2 Runtime is reported once at startup with
 **Get WebView2 Runtime**, and TXT and PDF guides still open. CI run 37948919282
 passed the installed runtime-missing run.
-T20.2 is in progress. PR a adds Settings export to a `.zip` outside app data
+T20.2 is in progress. PR a (merged in #78) adds Settings export to a `.zip` outside app data
 (refusing the app's own data folders), with progress and Cancel, and a
 one-time reminder after the first import to export a backup. CI runs
 [38027063797](https://github.com/ilya-slalom/desktop-guides/actions/runs/38027063797),
@@ -999,7 +999,9 @@ and
 [38030077234](https://github.com/ilya-slalom/desktop-guides/actions/runs/38030077234)
 passed the installed `backup` group; see the
 [verification record](t20-2-export-restore-design.md#t202-verification-record).
-Restore follows in PRs b and c.
+PR b (the restore engine, in review) stages and fully checks a backup,
+swaps it in behind a marker and confirms or rolls it back at startup; nothing
+is wired into the app yet. The restore UI follows in PR c.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |

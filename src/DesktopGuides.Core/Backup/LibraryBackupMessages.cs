@@ -70,6 +70,58 @@ public static class LibraryBackupMessages
         _ => throw new ArgumentOutOfRangeException(nameof(issue))
     };
 
+    public const string ReplaceTitle = "Replace your library?";
+    public const string RestoreKept = "The backup couldn't be opened, so your previous library was kept.";
+    public const string RestoreCanceled = "Restore canceled.";
+
+    public static string RestorePhase(LibraryRestorePhase phase) => phase switch
+    {
+        LibraryRestorePhase.Copying => "Copying backup…",
+        LibraryRestorePhase.Checking => "Checking backup…",
+        LibraryRestorePhase.Extracting => "Unpacking backup…",
+        _ => throw new ArgumentOutOfRangeException(nameof(phase))
+    };
+
+    public static string BackupMade(DateTime localCreated, string appVersion) =>
+        string.Create(CultureInfo.InvariantCulture,
+            $"Backup made: {localCreated:d MMMM yyyy, HH:mm}, by version {appVersion}");
+
+    public static string BackupHolds(int games, int guides, long bytes) =>
+        $"Backup holds: {Counts(games, guides)}, {Size(bytes)}";
+
+    public static string LibraryHas(int games, int guides) => $"This library has: {Counts(games, guides)}";
+
+    public static string ReplaceBody(int currentGames, int currentGuides, int games, int guides) =>
+        currentGames == 0 && currentGuides == 0
+            ? $"The backup's {Pair(games, guides)} will be restored."
+            : $"Your {Pair(currentGames, currentGuides)}, with their reading progress, will be replaced by the backup's {Pair(games, guides)}. This can't be undone. To keep the current library, export it first.";
+
+    public static string Restored(int games, int guides) => $"Library restored: {Counts(games, guides)}.";
+
+    public static string RestoreFailed(LibraryRestoreIssue issue, IReadOnlyList<string> titles, long? bytesNeeded) => issue switch
+    {
+        LibraryRestoreIssue.SourceUnavailable =>
+            "The backup file couldn't be read. Check it's still there, then try again.",
+        LibraryRestoreIssue.ArchiveInvalid => "This file isn't a Desktop Guides backup, or it's damaged.",
+        LibraryRestoreIssue.ArchiveUnsafe =>
+            "This backup contains file names that aren't allowed, so it wasn't opened.",
+        LibraryRestoreIssue.NotEnoughSpace => bytesNeeded is long needed
+            ? $"There isn't enough free space to restore this backup. It needs {Size(needed)}."
+            : "There isn't enough free space to restore this backup.",
+        LibraryRestoreIssue.NewerVersion =>
+            "This backup is from a newer version of Desktop Guides. Update the app, then try again.",
+        LibraryRestoreIssue.DatabaseInvalid => "The library database in this backup is damaged.",
+        LibraryRestoreIssue.ReferencesInvalid => titles.Count == 0
+            ? "This backup is missing some guide or artwork files."
+            : $"This backup is missing files for: {Titles(titles)}.",
+        LibraryRestoreIssue.SwapFailed =>
+            "The library couldn't be replaced. Close other programs that might be using it, then try again.",
+        _ => throw new ArgumentOutOfRangeException(nameof(issue))
+    };
+
+    private static string Pair(int games, int guides) =>
+        $"{Plural(games, "game")} and {Plural(guides, "guide")}";
+
     private static string Plural(int count, string noun) =>
         string.Create(CultureInfo.InvariantCulture, $"{count} {noun}{(count == 1 ? "" : "s")}");
 }

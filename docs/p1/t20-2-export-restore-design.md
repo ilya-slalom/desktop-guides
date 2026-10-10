@@ -1,6 +1,6 @@
 # T20.2 export and restore design
 
-Status: PR a (export UI and reminder) in review; PRs b and c planned.
+Status: PR a merged in #78; PR b (restore engine) in review; PR c planned.
 Prerequisites T14.4 (PR #54), T15.1 (PRs #74–#76), T15.4 (PR #62) and T20.1
 (PR #59) are merged.
 
@@ -61,7 +61,7 @@ Decisions made during brainstorming:
   not renamed to `.recovery` itself, which already holds migration recovery
   copies.
 - **"Quarantine" renames and then deletes.** An unverified promoted root is
-  renamed to `.recovery/restore-<stageId>-unverified/` so the prior root can
+  renamed to `.restore-staging/<stageId>-unverified/` so the prior root can
   move back at once, then deleted on a best-effort basis. The user still has
   the `.zip`; keeping the copy would silently double disk use. A copy that
   can't be deleted is removed at the next startup.
@@ -197,7 +197,7 @@ public sealed record LibraryRestoreStage(
 ```csharp
 public sealed class LibraryRestorer
 {
-    public LibraryRestorer(ILibraryPaths paths, string dataRoot);
+    public LibraryRestorer(ILibraryPaths paths);
     public Task<LibraryRestoreStage> StageAsync(string zipPath,
         IProgress<LibraryRestoreProgress>? progress, CancellationToken token);
     public Task ReplaceAsync(LibraryRestoreStage stage, CancellationToken token);
@@ -249,7 +249,8 @@ is deleted and `library/` is untouched.
    fails with the affected guide and game IDs. This is TR20.1.
 
 `StageAsync` returns the stage with the manifest's counts and creation time.
-`DiscardStage` deletes the folder.
+`DiscardStage` deletes the folder, unless the restore marker names that
+stage or can't be read: startup recovery owns it then.
 
 ### Swap
 
@@ -257,8 +258,10 @@ is deleted and `library/` is untouched.
 open and that the process holds the session lease.
 
 The marker is `<data>/restore.marker`: UTF-8 JSON holding `stageId`,
-`priorExists` and `priorPath` (`<data>/.recovery/restore-<stageId>/library`),
-written to a temporary file, flushed and renamed into place.
+`priorExists` and `phase` (`Swapping`, `Confirmed` or `RollingBack`),
+written to a temporary file, flushed and renamed into place. `priorPath`
+below is derived from the stage ID, not stored:
+`<data>/.recovery/restore-<stageId>/library`.
 
 1. Write the marker. (`MarkerWritten`)
 2. If `library/` exists, move it to `priorPath`. (`PriorMoved`)
@@ -270,7 +273,7 @@ at step 3 moves the prior root back, deletes the marker and fails with
 
 ### Startup recovery
 
-`LibraryRestoreRecovery.Run(dataRoot, paths, verifyRestore)` runs in
+`LibraryRestoreRecovery.Run(paths, verifyRestore)` runs in
 `InitializeCoreAsync` right after the lease is acquired and before the
 repository opens. It decides from what is on disk, so every step is
 idempotent:
@@ -283,12 +286,15 @@ idempotent:
 - **Marker, promoted root in place, `verifyRestore` false** (an interrupted
   startup): roll back.
 - **Marker, promoted root in place, `verifyRestore` true** (the session that
-  swapped): return `PendingVerify`. The shell opens the repository with the
+  swapped): return `PendingVerify`. With no `library/` in place it rolls
+  back instead. The shell opens the repository with the
   normal `InitializeAsync`. On success it calls `Complete`, which deletes
-  `priorPath` and the stage, then the marker last. On failure it calls
-  `RollBack` and initializes again.
+  `priorPath` and the stage, then the marker last; on a marker that isn't
+  `Confirmed` or a promoted `Swapping` it throws `RestoreIncomplete` and
+  changes nothing. On failure it calls `RollBack` and initializes again;
+  `RollBack` on a `Confirmed` marker finishes the completion instead.
 - **Roll back:** rename the promoted root to
-  `.recovery/restore-<stageId>-unverified/`, move `priorPath` back if
+  `.restore-staging/<stageId>-unverified/`, move `priorPath` back if
   `priorExists`, delete the marker, then delete the unverified copy on a
   best-effort basis. The shell shows: "The backup couldn't be opened, so your
   previous library was kept."
@@ -512,3 +518,61 @@ its PR. PR a's PR includes a screenshot of the Export card and the reminder.
   on a build that shows the reminder twice. `export-cancel` and
   `export-protected` don't record whether the picker created the empty
   file. Restore (PRs b and c) is not implemented.
+
+### PR b: the restore engine
+
+- **Unit tests.** On `pcsx2-win`, Core 1027/1027 (after Task 6) and
+  Infrastructure 758/758 (after Task 10) passed. Commits: `baed5b3` (restore
+  contracts and copy), `b9c0076` (staging), `7901284` and `a812aa9`
+  (validation and the set-equality fix), `da3f21b` and `50625fc` (swap and
+  its fix round), `f93157e` (startup recovery).
+- **Cells.**
+  - Staging: 19 (`LibraryRestorerStageTests`).
+  - Validation: 11 (`LibraryRestorerValidationTests`).
+  - Swap: 10, plus 3 added in the fix round (a failed rollback keeps the
+    marker; an existing marker refuses a second swap).
+  - Recovery: 19 from the plan, plus 2 implementer guards
+    (`AMissingParkedLibraryBehindAPromotedRestoreIsIncomplete` and
+    `AMissingParkedLibraryBeforePromotionIsIncomplete`).
+- **NTFS.** All cells ran on Windows. The two swap cells
+  `AJunctionedRecoveryFolderFailsTheSwap` and `AJunctionedStageFailsTheSwap`
+  create real junctions and delete them in a `finally`.
+- **Rulings.** Rulings 1-4, 7, 9 and 13 in the
+  [plan](t20-2-export-restore-plan.md#rulings-against-the-spec), plus:
+  - `RestoreIncomplete` is excluded from the "stopped before changing
+    anything" copy test: a failed restore is the one issue where the library
+    may have changed, so that sentence would be false.
+  - Theories over the internal `RestoreCheckpoint` take the name as a string
+    and `Enum.Parse` it (a public xUnit theory can't take an internal enum:
+    CS0051, xUnit1000, xUnit1010).
+  - The reference check requires the staged files to equal the referenced
+    set. It is defence in depth: a duplicate artwork reference is unreachable
+    because the `Games.ArtworkRelativePath` CHECK ties the path to the row's
+    Id (bypassing it fails `integrity_check` with `DatabaseInvalid`), so no
+    test reproduces it.
+  - `Replace` refuses when a marker already exists (a second swap would
+    overwrite the pending marker and could orphan the original library under
+    `.recovery`), and keeps the marker and throws `SwapFailed` when its
+    rollback fails; startup recovery then returns the parked prior root.
+  - Two tamper guards in `LibraryRestoreRecovery`: a `Swapping` marker with a
+    prior library whose parked copy is missing, and an unpromoted swap whose
+    prior and live roots are both gone, each return `RestoreIncomplete`
+    and keep the marker. The brief's code would report `RolledBack` over the
+    restored library or drop the marker.
+- **Wiring.** Nothing is wired into the app yet (startup recovery and the
+  in-session swap land in PR c, ruling 7), so there is no installed smoke and
+  no screenshot.
+- **CI.** The `pull_request` run
+  [38047804306](https://github.com/ilya-slalom/desktop-guides/actions/runs/38047804306)
+  passed every job (head `a01a3ae`).
+- **Final-review fixes.** Guarded `Complete`/`RollBack`/`PendingVerify`,
+  marker-aware `DiscardStage`, rollback without `.restore-staging`, cleanup
+  of the parked folder after a failed promotion, link-safe best-effort
+  leftover cleanup and undefined-phase rejection (`ba9cf96`..`00b2f0c`, 10
+  new cells); Core 1027/1027 and Infrastructure 768/768 on `pcsx2-win`, and
+  `pull_request` run
+  [38050027037](https://github.com/ilya-slalom/desktop-guides/actions/runs/38050027037)
+  passed every job (head `00b2f0c`).
+- **Not run.** No separate RED was captured for Task 6 (exact-string tests
+  were written with the code). The extraction byte cap is defence in depth
+  with no direct test, because verification refuses an oversized entry first.

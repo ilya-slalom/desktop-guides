@@ -895,7 +895,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         }
     }
 
-    private static void ValidateDatabase(
+    internal static void ValidateDatabase(
         SqliteConnection connection, SqliteTransaction? transaction, int expectedVersion)
     {
         using SqliteCommand check = connection.CreateCommand();
