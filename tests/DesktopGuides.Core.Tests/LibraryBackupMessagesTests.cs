@@ -75,4 +75,54 @@ public sealed class LibraryBackupMessagesTests
             Assert.EndsWith("…", LibraryBackupMessages.ExportPhase(phase));
         }
     }
+
+    [Fact]
+    public void EveryRestoreIssueHasAMessage()
+    {
+        foreach (LibraryRestoreIssue issue in Enum.GetValues<LibraryRestoreIssue>())
+        {
+            Assert.False(string.IsNullOrWhiteSpace(LibraryBackupMessages.RestoreFailed(issue, [], null)));
+        }
+    }
+
+    [Fact]
+    public void ANewerBackupSaysToUpdate() =>
+        Assert.Equal("This backup is from a newer version of Desktop Guides. Update the app, then try again.",
+            LibraryBackupMessages.RestoreFailed(LibraryRestoreIssue.NewerVersion, [], null));
+
+    [Fact]
+    public void MissingFilesNameTheGuides() =>
+        Assert.Equal("This backup is missing files for: Maps and Linked Game.",
+            LibraryBackupMessages.RestoreFailed(LibraryRestoreIssue.ReferencesInvalid, ["Maps", "Linked Game"], null));
+
+    [Fact]
+    public void NotEnoughSpaceSaysHowMuch() =>
+        Assert.Equal("There isn't enough free space to restore this backup. It needs 1.5 GB.",
+            LibraryBackupMessages.RestoreFailed(LibraryRestoreIssue.NotEnoughSpace, [], 1536L * 1024 * 1024));
+
+    [Fact]
+    public void TheStagedDetailsReadAsSentences()
+    {
+        // The shell passes the creation time already converted to local time.
+        Assert.Equal("Backup made: 8 October 2026, 16:12, by version 1.0.0.0",
+            LibraryBackupMessages.BackupMade(new DateTime(2026, 10, 8, 16, 12, 0), "1.0.0.0"));
+        Assert.Equal("Backup holds: 12 games, 40 guides, 310 MB",
+            LibraryBackupMessages.BackupHolds(12, 40, 310L * 1024 * 1024));
+        Assert.Equal("This library has: 9 games, 31 guides", LibraryBackupMessages.LibraryHas(9, 31));
+    }
+
+    [Fact]
+    public void ReplacingAPopulatedLibraryWarns() =>
+        Assert.Equal(
+            "Your 9 games and 31 guides, with their reading progress, will be replaced by the backup's 12 games and 40 guides. This can't be undone. To keep the current library, export it first.",
+            LibraryBackupMessages.ReplaceBody(9, 31, 12, 40));
+
+    [Fact]
+    public void ReplacingAnEmptyLibraryDoesnt() =>
+        Assert.Equal("The backup's 12 games and 40 guides will be restored.",
+            LibraryBackupMessages.ReplaceBody(0, 0, 12, 40));
+
+    [Fact]
+    public void TheRestoredMessageCountsTheLibrary() =>
+        Assert.Equal("Library restored: 1 game, 2 guides.", LibraryBackupMessages.Restored(1, 2));
 }

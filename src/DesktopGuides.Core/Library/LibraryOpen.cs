@@ -1,7 +1,7 @@
 namespace DesktopGuides.Core.Library;
 
 // Why InitializeAsync stopped. Every issue leaves the library unchanged.
-public enum LibraryOpenIssue { Damaged, Missing, NewerVersion, MigrationFailed, Locked, NoAccess, DiskFull }
+public enum LibraryOpenIssue { Damaged, Missing, NewerVersion, MigrationFailed, Locked, NoAccess, DiskFull, RestoreIncomplete }
 
 // The message is the user-facing body; technical detail stays in InnerException.
 public sealed class LibraryOpenException(
@@ -34,6 +34,8 @@ public static class LibraryOpenMessages
             $"Desktop Guides doesn't have permission to read or change your library. {Unchanged}. Check the data folder's permissions, then try again."),
         LibraryOpenIssue.DiskFull => new("Not enough disk space",
             $"There isn't enough free disk space to open your library. {Unchanged}. Free up some space, then try again."),
+        LibraryOpenIssue.RestoreIncomplete => new("Restore didn't finish",
+            "A restore didn't finish and Desktop Guides couldn't put your previous library back. Your previous library is in the .recovery folder inside the data folder. Close other programs that might be using it, then try again."),
         _ => throw new ArgumentOutOfRangeException(nameof(issue))
     };
 

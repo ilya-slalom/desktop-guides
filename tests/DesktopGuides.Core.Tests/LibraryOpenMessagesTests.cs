@@ -26,12 +26,25 @@ public sealed class LibraryOpenMessagesTests
     [Fact]
     public void EveryBodySaysNothingWasChanged()
     {
-        foreach (LibraryOpenIssue issue in Enum.GetValues<LibraryOpenIssue>())
+        // A failed restore is the one case where the library may have changed.
+        foreach (LibraryOpenIssue issue in Enum.GetValues<LibraryOpenIssue>()
+                     .Where(issue => issue != LibraryOpenIssue.RestoreIncomplete))
         {
             Assert.Contains(
                 "Desktop Guides stopped before changing anything",
                 LibraryOpenMessages.For(issue).Body);
         }
+    }
+
+    [Fact]
+    public void AnUnfinishedRestoreNamesTheRecoveryFolder()
+    {
+        LibraryOpenMessage message = LibraryOpenMessages.For(LibraryOpenIssue.RestoreIncomplete);
+
+        Assert.Equal("Restore didn't finish", message.Title);
+        Assert.Equal(
+            "A restore didn't finish and Desktop Guides couldn't put your previous library back. Your previous library is in the .recovery folder inside the data folder. Close other programs that might be using it, then try again.",
+            message.Body);
     }
 
     [Fact]
