@@ -56,7 +56,22 @@ public sealed class LibraryRestorer
         string zipPath, IProgress<LibraryRestoreProgress>? progress, CancellationToken token) =>
         Task.Run(() => Stage(zipPath, progress, token), token);
 
-    public void DiscardStage(LibraryRestoreStage stage) => DeleteTree(StageRoot(paths, stage.StageId));
+    public void DiscardStage(LibraryRestoreStage stage)
+    {
+        // Startup recovery owns a stage that the marker names, or might name.
+        try
+        {
+            if (RestoreMarker.Read(paths)?.StageId == stage.StageId)
+            {
+                return;
+            }
+        }
+        catch (Exception error) when (IsSwapError(error))
+        {
+            return;
+        }
+        DeleteTree(StageRoot(paths, stage.StageId));
+    }
 
     private LibraryRestoreStage Stage(
         string zipPath, IProgress<LibraryRestoreProgress>? progress, CancellationToken token)

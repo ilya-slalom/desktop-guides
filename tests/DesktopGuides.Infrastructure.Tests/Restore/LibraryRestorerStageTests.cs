@@ -49,6 +49,26 @@ public sealed class LibraryRestorerStageTests : IAsyncLifetime
         fixture.AssertNoStage();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DiscardKeepsAStageThatAMarkerMayName(bool malformed)
+    {
+        LibraryRestoreStage stage = await fixture.StageAsync();
+        if (malformed)
+        {
+            File.WriteAllText(fixture.MarkerPath, "not json");
+        }
+        else
+        {
+            new RestoreMarker(stage.StageId, true, RestoreMarkerPhase.Swapping).Write(fixture.Target.Paths);
+        }
+
+        fixture.Restorer().DiscardStage(stage);
+
+        Assert.True(Directory.Exists(RestoreMarker.StagedLibrary(fixture.Target.Paths, stage.StageId)));
+    }
+
     [Fact]
     public async Task AMissingFileIsUnavailable() =>
         await Refused(Path.Combine(fixture.Target.Root, "nowhere.zip"), LibraryRestoreIssue.SourceUnavailable);
