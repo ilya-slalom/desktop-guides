@@ -40,6 +40,14 @@ public sealed class LibraryRestoreRecoveryTests : IAsyncLifetime
             : []);
     }
 
+    // Every file and folder under the data root, with each file's size.
+    private string[] DataTree() =>
+        new DirectoryInfo(Paths.DataRoot).EnumerateFileSystemInfos("*", SearchOption.AllDirectories)
+            .Select(entry => Path.GetRelativePath(Paths.DataRoot, entry.FullName) +
+                             (entry is FileInfo file ? $":{file.Length}" : "/"))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
     [Theory]
     [InlineData(nameof(RestoreCheckpoint.MarkerWritten), true)]
     [InlineData(nameof(RestoreCheckpoint.MarkerWritten), false)]
@@ -121,6 +129,69 @@ public sealed class LibraryRestoreRecoveryTests : IAsyncLifetime
         Assert.Equal("2", fixture.Target.Scalar("SELECT COUNT(*) FROM Games"));
         Assert.False(File.Exists(fixture.MarkerPath));
         Assert.Empty(Directory.EnumerateDirectories(Paths.RecoveryRoot, "restore-*"));
+    }
+
+    [Fact]
+    public async Task CompletingAnUnfinishedRollbackIsIncomplete()
+    {
+        (LibraryRestoreStage stage, _) = await PrepareAsync(true);
+        await fixture.Restorer().ReplaceAsync(stage, CancellationToken.None);
+        Assert.Throws<InjectedFault>(() =>
+            LibraryRestoreRecovery.Run(Paths, verifyRestore: false, FaultFixture.FaultAt(RestoreCheckpoint.RolledAside)));
+
+        LibraryOpenException error = Assert.Throws<LibraryOpenException>(() => LibraryRestoreRecovery.Complete(Paths));
+
+        Assert.Equal(LibraryOpenIssue.RestoreIncomplete, error.Issue);
+        Assert.Equal(new RestoreMarker(stage.StageId, true, RestoreMarkerPhase.RollingBack), RestoreMarker.Read(Paths));
+        Assert.True(Directory.Exists(RestoreMarker.PriorRoot(Paths, stage.StageId)));
+    }
+
+    [Fact]
+    public async Task CompletingAnUnpromotedSwapIsIncompleteAndChangesNothing()
+    {
+        (LibraryRestoreStage stage, _) = await PrepareAsync(true);
+        await Assert.ThrowsAsync<InjectedFault>(() =>
+            fixture.Restorer(FaultFixture.FaultAt(RestoreCheckpoint.PriorMoved)).ReplaceAsync(stage, CancellationToken.None));
+        string[] tree = DataTree();
+        string marker = File.ReadAllText(fixture.MarkerPath);
+
+        LibraryOpenException error = Assert.Throws<LibraryOpenException>(() => LibraryRestoreRecovery.Complete(Paths));
+
+        Assert.Equal(LibraryOpenIssue.RestoreIncomplete, error.Issue);
+        Assert.Equal(marker, File.ReadAllText(fixture.MarkerPath));
+        Assert.Equal(tree, DataTree());
+        Assert.True(Directory.Exists(RestoreMarker.StagedLibrary(Paths, stage.StageId)));
+        Assert.True(Directory.Exists(RestoreMarker.PriorRoot(Paths, stage.StageId)));
+    }
+
+    [Fact]
+    public async Task RollingBackAConfirmedRestoreKeepsTheRestoredLibrary()
+    {
+        (LibraryRestoreStage stage, _) = await PrepareAsync(true);
+        await fixture.Restorer().ReplaceAsync(stage, CancellationToken.None);
+        Assert.Equal(RestoreRecoveryOutcome.PendingVerify, LibraryRestoreRecovery.Run(Paths, verifyRestore: true));
+        await fixture.Target.RestartAsync();
+        Assert.Throws<InjectedFault>(() =>
+            LibraryRestoreRecovery.Complete(Paths, FaultFixture.FaultAt(RestoreCheckpoint.Confirmed)));
+
+        LibraryRestoreRecovery.RollBack(Paths);
+
+        Assert.Equal("2", fixture.Target.Scalar("SELECT COUNT(*) FROM Games"));
+        Assert.False(File.Exists(fixture.MarkerPath));
+        fixture.AssertNoStage();
+        Assert.Empty(Directory.EnumerateDirectories(Paths.RecoveryRoot, "restore-*"));
+    }
+
+    [Fact]
+    public async Task AMissingPromotedLibraryRollsBackEvenWhenVerifying()
+    {
+        (LibraryRestoreStage stage, IReadOnlyDictionary<string, string> before) = await PrepareAsync(true);
+        await fixture.Restorer().ReplaceAsync(stage, CancellationToken.None);
+        Directory.Delete(Paths.LibraryRoot, recursive: true);
+
+        Assert.Equal(RestoreRecoveryOutcome.RolledBack, LibraryRestoreRecovery.Run(Paths, verifyRestore: true));
+
+        AssertRolledBackTo(before);
     }
 
     [Theory]

@@ -54,7 +54,8 @@ public static class LibraryRestoreRecovery
                 DeleteLeftovers(paths);
                 return RestoreRecoveryOutcome.RolledBack;
             }
-            if (verifyRestore)
+            // Only a promoted library that is still there can be verified.
+            if (verifyRestore && Directory.Exists(paths.LibraryRoot))
             {
                 return RestoreRecoveryOutcome.PendingVerify;
             }
@@ -72,6 +73,18 @@ public static class LibraryRestoreRecovery
             {
                 return 0;
             }
+            if (marker.Phase == RestoreMarkerPhase.Confirmed)
+            {
+                FinishComplete(paths, marker);
+                return 0;
+            }
+            // Only a promoted swap can be kept: the stage is gone and library/ is there.
+            if (marker.Phase != RestoreMarkerPhase.Swapping ||
+                Directory.Exists(RestoreMarker.StagedLibrary(paths, marker.StageId)) ||
+                !Directory.Exists(paths.LibraryRoot))
+            {
+                throw new InvalidDataException("The restore wasn't promoted, so it can't be kept.");
+            }
             // Confirmed first, so a crash below can only finish the cleanup.
             RestoreMarker confirmed = marker with { Phase = RestoreMarkerPhase.Confirmed };
             confirmed.Write(paths);
@@ -86,7 +99,16 @@ public static class LibraryRestoreRecovery
     internal static void RollBack(ILibraryPaths paths, Action<RestoreCheckpoint> checkpoint) =>
         Guarded(() =>
         {
-            if (RestoreMarker.Read(paths) is { } marker)
+            if (RestoreMarker.Read(paths) is not { } marker)
+            {
+                return 0;
+            }
+            // A confirmed restore is already kept: only its cleanup is left.
+            if (marker.Phase == RestoreMarkerPhase.Confirmed)
+            {
+                FinishComplete(paths, marker);
+            }
+            else
             {
                 BeginRollBack(paths, marker, checkpoint);
             }
