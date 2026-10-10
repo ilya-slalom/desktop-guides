@@ -448,4 +448,36 @@ public sealed class LibraryExporterTests : IAsyncLifetime
             scanner?.Dispose();
         }
     }
+
+    private string[] PackagedRoots()
+    {
+        string root = fixture.Library.Root;
+        return BackupDestinationPolicy.ProtectedRoots(
+            true, Path.Combine(root, "Local", "Packages", "DesktopGuides.Preview_abc", "LocalState"),
+            Path.Combine(root, "Local"), Path.Combine(root, "Roaming")).ToArray();
+    }
+
+    [Theory]
+    [InlineData("Local", "Packages", "DesktopGuides.Preview_abc")]
+    [InlineData("Local", "Other")]
+    [InlineData("Roaming", "Other")]
+    public async Task ExportRefusesEveryPackagedProtectedRoot(params string[] folders)
+    {
+        string target = Path.Combine([fixture.Library.Root, .. folders]);
+        Directory.CreateDirectory(target);
+
+        LibraryExportException error = await Assert.ThrowsAsync<LibraryExportException>(() =>
+            Export(Exporter(protectedRoots: PackagedRoots()), Path.Combine(target, "backup.zip")));
+
+        Assert.Equal(LibraryExportIssue.DestinationNotAllowed, error.Issue);
+        Assert.Empty(Directory.EnumerateFiles(target));
+    }
+
+    [Fact]
+    public async Task ExportAllowsAFolderOutsideThePackagedRoots()
+    {
+        LibraryExportResult result = await Export(Exporter(protectedRoots: PackagedRoots()));
+
+        Assert.True(File.Exists(result.Path));
+    }
 }

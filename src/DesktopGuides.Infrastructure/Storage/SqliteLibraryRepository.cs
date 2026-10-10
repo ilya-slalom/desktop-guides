@@ -608,6 +608,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         ThemePreference theme = ThemePreference.System;
         Guid? lastGuide = null;
         WindowMaterial material = WindowMaterial.Mica;
+        bool reminderShown = false;
         while (reader.Read())
         {
             string key = reader.GetString(0);
@@ -639,8 +640,13 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                     material = WindowMaterial.Mica;
                 }
             }
+            else if (key == "ExportReminderShown")
+            {
+                // Anything but "true", such as a value from a newer build, shows the reminder again.
+                reminderShown = value == "true";
+            }
         }
-        return new AppSettings(theme, lastGuide, material);
+        return new AppSettings(theme, lastGuide, material, reminderShown);
     }
 
     private static void WriteSettings(
@@ -680,6 +686,16 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                 """;
             material.Parameters.AddWithValue("$value", settings.WindowMaterial.ToString());
             material.ExecuteNonQuery();
+        }
+        using (SqliteCommand reminder = connection.CreateCommand())
+        {
+            reminder.Transaction = transaction;
+            reminder.CommandText = """
+                INSERT INTO Settings (Key, Value) VALUES ('ExportReminderShown', $value)
+                ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value
+                """;
+            reminder.Parameters.AddWithValue("$value", settings.ExportReminderShown ? "true" : "false");
+            reminder.ExecuteNonQuery();
         }
     }
 
