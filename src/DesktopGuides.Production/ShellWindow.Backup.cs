@@ -167,6 +167,9 @@ public sealed partial class ShellWindow
         bool saved = false;
         SetLibraryBusy(true);
         ExportBackupButton.IsEnabled = false;
+        ChooseBackupButton.IsEnabled = false;
+        ReplaceLibraryButton.IsEnabled = false;
+        DiscardStageButton.IsEnabled = false;
         ExportCancelButton.IsEnabled = true;
         ExportCancelButton.Visibility = Visibility.Visible;
         ShowExportProgress(new LibraryExportProgress(LibraryExportPhase.Preparing, 0, 0));
@@ -225,6 +228,9 @@ public sealed partial class ShellWindow
             {
                 SetLibraryBusy(false);
                 ExportBackupButton.IsEnabled = ready;
+                ChooseBackupButton.IsEnabled = ready;
+                ReplaceLibraryButton.IsEnabled = stagedBackup is not null;
+                DiscardStageButton.IsEnabled = stagedBackup is not null;
                 ExportBackupButton.Focus(FocusState.Programmatic);
             }
         }
