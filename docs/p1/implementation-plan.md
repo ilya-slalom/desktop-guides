@@ -990,6 +990,12 @@ CI run 37944327625 passed the installed missing-file and removal runs.
 A missing WebView2 Runtime is reported once at startup with
 **Get WebView2 Runtime**, and TXT and PDF guides still open. CI run 37948919282
 passed the installed runtime-missing run.
+T20.2 is in progress. PR a adds Settings export to a `.zip` outside app data
+(refusing the app's own data folders), with progress and Cancel, and a
+one-time reminder after the first import to export a backup. CI run
+38027063797 passed the installed `backup` group; see the
+[verification record](t20-2-export-restore-design.md#t202-verification-record).
+Restore follows in PRs b and c.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |

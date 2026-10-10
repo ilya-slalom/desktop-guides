@@ -1,6 +1,6 @@
 # T20.2 export and restore design
 
-Status: design approved, 10 October 2026; not yet implemented.
+Status: PR a (export UI and reminder) in review; PRs b and c planned.
 Prerequisites T14.4 (PR #54), T15.1 (PRs #74–#76), T15.4 (PR #62) and T20.1
 (PR #59) are merged.
 
@@ -439,4 +439,63 @@ its PR. PR a's PR includes a screenshot of the Export card and the reminder.
 
 ## T20.2 verification record
 
-Not yet run.
+### PR a: export UI and the first-import reminder
+
+- **Unit tests.** On `pcsx2-win`, Core 1018/1018 and Infrastructure 694/694
+  passed. The new tests are:
+  - `BackupDestinationPolicyTests`: the protected roots, including the
+    packaged app-data root, and what each refusal says;
+  - `LibraryBackupMessagesTests`: the export copy, plurals, sizes and
+    damaged-guide titles;
+  - `ExportReminderSettingTests`: `ExportReminderShown` defaults to false
+    and round-trips through the settings table;
+  - `LibraryExporterTests`: characterization of the packaged roots.
+- **Installed.** The `backup` group passed in CI run
+  [38027063797](https://github.com/ilya-slalom/desktop-guides/actions/runs/38027063797)
+  (head `11a60ea`), with these phases:
+  - `export-reminder-shown`, `export-reminder-opens-settings` and
+    `export-reminder-once`: the first import shows the reminder, **Go to
+    Export** opens Settings at the Export card, and a second import
+    doesn't repeat it (a 3 s polling watch of the status bar and the
+    content status);
+  - `export-saved`: Backup saved, with the counts;
+  - `export-cancel-no-file` and `export-protected-refused`: Cancel and a
+    protected folder leave no file;
+  - `describe-backup`: `{"verified":true,"games":1,"guides":2,"files":3,"credentials":false}`.
+- **Full run.** [38025953925](https://github.com/ilya-slalom/desktop-guides/actions/runs/38025953925)
+  (`shell-scope=all`, head `1c9c342`) passed every job; the design shard ran
+  `design, catalog, completion, backup`, and `design-light` and
+  `design-dark` passed `settings-narrow` and `settings-wide` with
+  `ExportSettingsCard`.
+- **CI history.**
+  - [38020372769](https://github.com/ilya-slalom/desktop-guides/actions/runs/38020372769):
+    the harness alone, red as intended; `import-reminder` waited for a
+    reminder that didn't exist yet.
+  - 38021693034: focus fell to the title bar after **Go to Export**.
+  - 38022839444 and 38023775682: the Save dialog saved under its suggested
+    name.
+  - 38024576095: a diagnostic run for that dialog.
+  - [38025373384](https://github.com/ilya-slalom/desktop-guides/actions/runs/38025373384):
+    the first green `backup` group, before the fix-round history was
+    squashed (head `c41d318`, same tree as `1c9c342`).
+- **Rulings.** Rulings 5, 6, 8, 10 and 11 in the
+  [plan](t20-2-export-restore-plan.md#rulings-against-the-spec), plus:
+  - Commit trailers name the implementing model (Sonnet 5.5).
+  - `GoToExportAsync` calls `SettingsPanel.UpdateLayout()` and retries
+    `Focus` once on the dispatcher, because Settings is collapsed until the
+    render and focus otherwise fell to the title bar.
+  - `windows_shell_foreground_probe.cs` gains `GetText` and `TypeText`
+    (WM_CHAR per character) because the Save dialog ignores WM_SETTEXT for
+    the name it returns; `Choose-SavePath` reads the box back before
+    pressing Save.
+  - `export-*` modes use the 240 s smoke tier, since the picker wait and
+    the Backup saved wait exceed the default 60 s.
+  - `export-reminder-once` is a 3 s polling watch, not the plan's
+    pattern-match check, which could pass without reading the UI.
+- **Evidence.**
+  - [Reminder](evidence/t20-2-export-restore/export-reminder.png)
+  - [Backup saved](evidence/t20-2-export-restore/export-saved.png)
+- **Not run.** The reminder check has only been seen passing, never failing
+  on a build that shows the reminder twice. `export-cancel` and
+  `export-protected` don't record whether the picker created the empty
+  file. Restore (PRs b and c) is not implemented.
