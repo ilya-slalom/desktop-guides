@@ -73,7 +73,7 @@ app and `%LOCALAPPDATA%\DesktopGuides` for the portable build. It holds:
 - `library/`;
 - `.recovery/`, the pre-migration database copies and, during a restore, the
   parked prior library (`restore-<stage-id>/library`);
-- `.restore-staging/`, one folder per restore stage: the downloaded archive,
+- `.restore-staging/`, one folder per restore stage: a copy of the chosen backup file,
   the extracted and checked library, and, after a failed swap, the unverified
   promoted copy;
 - `restore.marker`, the phase of an in-flight restore swap;
@@ -219,7 +219,8 @@ transaction, then run both `integrity_check` and `foreign_key_check`. Failure
 rolls back and leaves the old file/copy for recovery. A populated v1 fixture
 must upgrade to v2 with the last-opened index and all rows intact. T04.4 adds
 a populated v2-to-v3 fixture that proves existing games and guides survive,
-the metadata-link table and unique provider key are present, and a failed v3
+the new `Games` metadata columns and the unique provider index are present,
+and a failed v3
 migration preserves the v2 database or recovery copy.
 Reject filesystem links at `library.sqlite`, its `-wal`, `-shm`, and
 `-journal` sidecars, and their parent paths before each database open. On
@@ -518,21 +519,21 @@ project uses a provisional package identity until T17.1 sets the public one.
   service; if the count changed, refresh the dialog rather than deleting an
   unexpected set. Use the multi-guide trash protocol in section 2. Verify
   confirmed, canceled, failed-move, failed-commit, and startup-recovery
-  cases; remove the exact provider snapshot and managed artwork root, and
-  touch no unrelated game directory.
+  cases; delete the game's metadata columns and its managed artwork file after
+  the gated commit, and touch no unrelated game directory.
 - **T04.4** Record a provider decision covering catalog/edition coverage,
   public-client authentication, licensing, attribution, rate limits,
   availability, and artwork terms. A provider requiring a confidential
   credential must use an approved service boundary or be rejected; never
   ship that secret in the desktop package. Add the schema-v3 migration,
-  preserve pending manifest-v1 operations, and introduce manifest v2 with
-  explicit Game IDs. Add a provider-neutral Core contract with bounded,
+  and keep file-operation manifest v1 unchanged. Add a provider-neutral Core contract with bounded,
   cancellation-aware search and detail/artwork retrieval. The Add game dialog searches online,
   distinguishes editions by platform/release data, and offers
   `Create manually` at all times. Selecting a result allocates a local Game
-  ID, stages and validates bounded artwork, then publishes the Game, unique
-  provider link, normalized snapshot, and managed artwork through the
-  recovery journal. Store no remote URL as an offline display dependency.
+  ID, stages and validates bounded artwork, then inserts the Game with its
+  provider columns and normalized snapshot after moving the artwork from
+  `.artwork-staging` to `artwork/<game-id>/<sha256>.<ext>`; no journal row is
+  written, and a startup sweep removes unreferenced artwork. Store no remote URL as an offline display dependency.
   Explicit refresh updates the source snapshot while preserving editable
   local title/platform/notes. Test v2 migration and rollback, duplicate
   provider IDs, cancellation, timeout, rate limiting, malformed/oversized
