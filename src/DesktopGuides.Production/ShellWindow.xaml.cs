@@ -1760,7 +1760,7 @@ public sealed partial class ShellWindow : Window
         ReaderCompletionChoice.Hide();
         loadedGameGuideCount = null;
         UpdateRemoveGameAction();
-        AppTitleBar.IsBackButtonEnabled = navigator.CanGoBack;
+        AppTitleBar.IsBackButtonEnabled = !libraryBusy && navigator.CanGoBack;
         Navigation.SelectedItem = navigator.Current is SettingsRoute
             ? Navigation.SettingsItem
             : LibraryItem;
