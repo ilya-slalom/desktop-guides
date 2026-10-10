@@ -54,6 +54,7 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
     [InlineData("{}")]
     [InlineData("not json")]
     [InlineData("{\"stageId\":\"x\",\"priorExists\":true,\"phase\":\"Swapping\"}")]
+    [InlineData("{\"stageId\":\"0123456789abcdef0123456789abcdef\",\"priorExists\":true,\"phase\":\"7\"}")]
     public void AMalformedMarkerIsInvalid(string text)
     {
         File.WriteAllText(fixture.MarkerPath, text);

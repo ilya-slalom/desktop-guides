@@ -67,10 +67,15 @@ internal sealed record RestoreMarker(Guid StageId, bool PriorExists, RestoreMark
         {
             using JsonDocument document = JsonDocument.Parse(File.ReadAllBytes(path));
             JsonElement root = document.RootElement;
+            RestoreMarkerPhase phase = Enum.Parse<RestoreMarkerPhase>(root.GetProperty("phase").GetString()!);
+            if (!Enum.IsDefined(phase))
+            {
+                throw new FormatException($"Unknown restore phase {phase}.");
+            }
             return new RestoreMarker(
                 Guid.ParseExact(root.GetProperty("stageId").GetString()!, "N"),
                 root.GetProperty("priorExists").GetBoolean(),
-                Enum.Parse<RestoreMarkerPhase>(root.GetProperty("phase").GetString()!));
+                phase);
         }
         catch (Exception error) when (error is JsonException or KeyNotFoundException or FormatException or
                                       ArgumentException or InvalidOperationException)
