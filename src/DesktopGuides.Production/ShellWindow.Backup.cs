@@ -15,7 +15,6 @@ namespace DesktopGuides.Production;
 public sealed partial class ShellWindow
 {
     private ManagedPathResolver? libraryPaths;
-    private LibraryExporter? exporter;
     private CancellationTokenSource? backupCancel;
     private Task backupTask = Task.CompletedTask;
     private bool libraryBusy;
@@ -41,8 +40,22 @@ public sealed partial class ShellWindow
 
     private async void ExportBackupClicked(object sender, RoutedEventArgs args)
     {
-        if (libraryBusy || !ready || closeRequested || exporter is not LibraryExporter active)
+        if (libraryBusy || !ready || closeRequested
+            || repository is not SqliteLibraryRepository library
+            || libraryPaths is not ManagedPathResolver paths)
         {
+            return;
+        }
+        // Built here, not at startup: the library must open even when a
+        // protected folder (such as Roaming AppData) can't be resolved.
+        LibraryExporter active;
+        try
+        {
+            active = CreateExporter(library, paths, AppDataRoot.HasPackageIdentity());
+        }
+        catch (ArgumentException)
+        {
+            ShowErrorStatus(LibraryBackupMessages.ExportFailed(LibraryExportIssue.DestinationUnavailable, []));
             return;
         }
         string? path;

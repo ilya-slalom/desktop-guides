@@ -382,7 +382,6 @@ public sealed partial class ShellWindow : Window
             guideRemover = new GuideRemover(repository, paths);
             completion = new GuideCompletionService(repository, TimeProvider.System);
             gameRemover = new GameRemover(repository, paths, artwork);
-            exporter = CreateExporter(repository, paths, AppDataRoot.HasPackageIdentity());
             textLoader = new ManagedTextGuideLoader(paths);
             htmlLoader = new ManagedHtmlGuideLoader(repository, paths);
             pdfLoader = new ManagedPdfGuideLoader(paths);
