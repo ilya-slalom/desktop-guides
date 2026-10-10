@@ -335,6 +335,7 @@ public sealed partial class ShellWindow
         RestoreCancelButton.IsEnabled = true;
         ShowRestoreProgress(new LibraryRestoreProgress(LibraryRestorePhase.Copying, 0, 0));
         FocusAfterLayout(RestoreCancelButton);
+        RestoreProgressCard.StartBringIntoView();
         try
         {
             await PauseForTestAsync("Backup", cancel.Token);
