@@ -627,6 +627,8 @@ its PR. PR a's PR includes a screenshot of the Export card and the reminder.
   - Full run: [38064144850](https://github.com/ilya-slalom/desktop-guides/actions/runs/38064144850)
     (`shell-scope=all`, head `2936ade`) passed every job; the `dev-*` jobs
     were skipped, as in every run of this workflow.
+  - Pull request: [38065733809](https://github.com/ilya-slalom/desktop-guides/actions/runs/38065733809)
+    (#80, head `e7dc49a`) passed every job; the `dev-*` jobs were skipped.
 - **Screenshots** (from run 38063139795):
   - [Staged summary](evidence/t20-2-export-restore/restore-staged.png)
     (`restore-clean`): backup holds 2 games, 2 guides; this library has 0.
