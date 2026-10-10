@@ -1,6 +1,6 @@
 namespace DesktopGuides.Core.Library;
 
-// Why InitializeAsync stopped. Every issue leaves the library unchanged.
+// Why InitializeAsync stopped. Every issue except RestoreIncomplete leaves the library unchanged.
 public enum LibraryOpenIssue { Damaged, Missing, NewerVersion, MigrationFailed, Locked, NoAccess, DiskFull, RestoreIncomplete }
 
 // The message is the user-facing body; technical detail stays in InnerException.

@@ -61,7 +61,7 @@ Decisions made during brainstorming:
   not renamed to `.recovery` itself, which already holds migration recovery
   copies.
 - **"Quarantine" renames and then deletes.** An unverified promoted root is
-  renamed to `.recovery/restore-<stageId>-unverified/` so the prior root can
+  renamed to `.restore-staging/<stageId>-unverified/` so the prior root can
   move back at once, then deleted on a best-effort basis. The user still has
   the `.zip`; keeping the copy would silently double disk use. A copy that
   can't be deleted is removed at the next startup.
@@ -197,7 +197,7 @@ public sealed record LibraryRestoreStage(
 ```csharp
 public sealed class LibraryRestorer
 {
-    public LibraryRestorer(ILibraryPaths paths, string dataRoot);
+    public LibraryRestorer(ILibraryPaths paths);
     public Task<LibraryRestoreStage> StageAsync(string zipPath,
         IProgress<LibraryRestoreProgress>? progress, CancellationToken token);
     public Task ReplaceAsync(LibraryRestoreStage stage, CancellationToken token);
@@ -249,7 +249,8 @@ is deleted and `library/` is untouched.
    fails with the affected guide and game IDs. This is TR20.1.
 
 `StageAsync` returns the stage with the manifest's counts and creation time.
-`DiscardStage` deletes the folder.
+`DiscardStage` deletes the folder, unless the restore marker names that
+stage or can't be read: startup recovery owns it then.
 
 ### Swap
 
@@ -257,8 +258,10 @@ is deleted and `library/` is untouched.
 open and that the process holds the session lease.
 
 The marker is `<data>/restore.marker`: UTF-8 JSON holding `stageId`,
-`priorExists` and `priorPath` (`<data>/.recovery/restore-<stageId>/library`),
-written to a temporary file, flushed and renamed into place.
+`priorExists` and `phase` (`Swapping`, `Confirmed` or `RollingBack`),
+written to a temporary file, flushed and renamed into place. `priorPath`
+below is derived from the stage ID, not stored:
+`<data>/.recovery/restore-<stageId>/library`.
 
 1. Write the marker. (`MarkerWritten`)
 2. If `library/` exists, move it to `priorPath`. (`PriorMoved`)
@@ -270,7 +273,7 @@ at step 3 moves the prior root back, deletes the marker and fails with
 
 ### Startup recovery
 
-`LibraryRestoreRecovery.Run(dataRoot, paths, verifyRestore)` runs in
+`LibraryRestoreRecovery.Run(paths, verifyRestore)` runs in
 `InitializeCoreAsync` right after the lease is acquired and before the
 repository opens. It decides from what is on disk, so every step is
 idempotent:
@@ -283,12 +286,15 @@ idempotent:
 - **Marker, promoted root in place, `verifyRestore` false** (an interrupted
   startup): roll back.
 - **Marker, promoted root in place, `verifyRestore` true** (the session that
-  swapped): return `PendingVerify`. The shell opens the repository with the
+  swapped): return `PendingVerify`. With no `library/` in place it rolls
+  back instead. The shell opens the repository with the
   normal `InitializeAsync`. On success it calls `Complete`, which deletes
-  `priorPath` and the stage, then the marker last. On failure it calls
-  `RollBack` and initializes again.
+  `priorPath` and the stage, then the marker last; on a marker that isn't
+  `Confirmed` or a promoted `Swapping` it throws `RestoreIncomplete` and
+  changes nothing. On failure it calls `RollBack` and initializes again;
+  `RollBack` on a `Confirmed` marker finishes the completion instead.
 - **Roll back:** rename the promoted root to
-  `.recovery/restore-<stageId>-unverified/`, move `priorPath` back if
+  `.restore-staging/<stageId>-unverified/`, move `priorPath` back if
   `priorExists`, delete the marker, then delete the unverified copy on a
   best-effort basis. The shell shows: "The backup couldn't be opened, so your
   previous library was kept."
