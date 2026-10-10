@@ -225,8 +225,10 @@ public sealed partial class ShellWindow
     private void ShowExportProgress(LibraryExportProgress report)
     {
         ExportProgress.Visibility = Visibility.Visible;
-        ExportProgress.IsIndeterminate = report.BytesTotal <= 0;
-        ExportProgress.Value = report.BytesTotal > 0 ? 100.0 * report.BytesDone / report.BytesTotal : 0;
+        // Verifying restarts its count at 0, so a bar would jump back from 100%.
+        bool determinate = report.Phase != LibraryExportPhase.Verifying && report.BytesTotal > 0;
+        ExportProgress.IsIndeterminate = !determinate;
+        ExportProgress.Value = determinate ? 100.0 * report.BytesDone / report.BytesTotal : 0;
         AutomationProperties.SetName(ExportProgress, LibraryBackupMessages.ExportPhase(report.Phase));
     }
 
