@@ -772,12 +772,6 @@
                                                 AutomationProperties.AutomationId="RestoreCancelButton" />
                                     </StackPanel>
                                 </toolkit:SettingsCard>
-                                <InfoBar x:Name="RestoreStatus"
-                                         IsOpen="False"
-                                         IsClosable="False"
-                                         Severity="Error"
-                                         AutomationProperties.AutomationId="RestoreStatus"
-                                         AutomationProperties.LiveSetting="Assertive" />
                                 <toolkit:SettingsCard x:Name="RestoreMadeCard"
                                                       Visibility="Collapsed"
                                                       AutomationProperties.AutomationId="RestoreMadeCard" />
@@ -805,6 +799,12 @@
                                 </toolkit:SettingsCard>
                             </toolkit:SettingsExpander.Items>
                         </toolkit:SettingsExpander>
+                        <InfoBar x:Name="RestoreStatus"
+                                 IsOpen="False"
+                                 IsClosable="False"
+                                 Severity="Error"
+                                 AutomationProperties.AutomationId="RestoreStatus"
+                                 AutomationProperties.LiveSetting="Assertive" />
                         <TextBlock x:Name="SettingsGameDataHeading"
                                    Text="Game data"
                                    Style="{StaticResource DesktopGuidesSettingsSectionStyle}"
