@@ -568,7 +568,7 @@ its PR. PR a's PR includes a screenshot of the Export card and the reminder.
 - **Final-review fixes.** Guarded `Complete`/`RollBack`/`PendingVerify`,
   marker-aware `DiscardStage`, rollback without `.restore-staging`, cleanup
   of the parked folder after a failed promotion, link-safe best-effort
-  leftover cleanup and undefined-phase rejection (`ba9cf96`..`00b2f0c`, 11
+  leftover cleanup and undefined-phase rejection (`ba9cf96`..`00b2f0c`, 10
   new cells); Core 1027/1027 and Infrastructure 768/768 on `pcsx2-win`, and
   `pull_request` run
   [38050027037](https://github.com/ilya-slalom/desktop-guides/actions/runs/38050027037)
