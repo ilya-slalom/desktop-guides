@@ -111,6 +111,18 @@ public sealed class LibraryRestorer
         string prior = RestoreMarker.PriorRoot(paths, stageId);
         string live = paths.LibraryRoot;
         bool priorExists;
+        // Another pending swap owns the marker; leave it exactly as it is.
+        try
+        {
+            if (RestoreMarker.Read(paths) is not null)
+            {
+                throw new IOException("A restore is already pending.");
+            }
+        }
+        catch (Exception error) when (IsSwapError(error))
+        {
+            throw new LibraryRestoreException(LibraryRestoreIssue.SwapFailed, inner: error);
+        }
         try
         {
             ManagedPathResolver.RejectFilesystemLinks(staged);
@@ -157,7 +169,15 @@ public sealed class LibraryRestorer
             // startup finishes the rollback.
             if (priorExists)
             {
-                Directory.Move(prior, live);
+                try
+                {
+                    Directory.Move(prior, live);
+                }
+                catch (Exception rollbackError) when (IsSwapError(rollbackError))
+                {
+                    // The marker stays so startup returns the parked prior root.
+                    throw new LibraryRestoreException(LibraryRestoreIssue.SwapFailed, inner: error);
+                }
             }
             TryDeleteMarker();
             throw new LibraryRestoreException(LibraryRestoreIssue.SwapFailed, inner: error);

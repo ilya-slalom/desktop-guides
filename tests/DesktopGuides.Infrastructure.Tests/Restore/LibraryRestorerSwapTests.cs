@@ -147,4 +147,72 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
         Assert.Equal(LibraryRestoreIssue.SwapFailed, error.Issue);
         Assert.Equal(before, fixture.LiveEntries());
     }
+
+    [Fact]
+    public async Task AFailedRollbackKeepsTheMarkerAndParkedLibrary()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        await fixture.AddPriorGameAsync();
+        Guid stageId = Guid.Empty;
+        List<FileStream> locks = [];
+        LibraryRestorer restorer = fixture.Restorer(checkpoint =>
+        {
+            if (checkpoint != RestoreCheckpoint.PriorMoved) return;
+            foreach (string folder in new[]
+                     {
+                         RestoreMarker.StagedLibrary(fixture.Target.Paths, stageId),
+                         RestoreMarker.PriorRoot(fixture.Target.Paths, stageId)
+                     })
+            {
+                locks.Add(new FileStream(Path.Combine(folder, "library.sqlite"),
+                    FileMode.Open, FileAccess.Read, FileShare.None));
+            }
+        });
+        LibraryRestoreStage stage = await restorer.StageAsync(fixture.Backup, null, CancellationToken.None);
+        stageId = stage.StageId;
+
+        try
+        {
+            LibraryRestoreException error = await Assert.ThrowsAsync<LibraryRestoreException>(
+                () => restorer.ReplaceAsync(stage, CancellationToken.None));
+
+            Assert.Equal(LibraryRestoreIssue.SwapFailed, error.Issue);
+        }
+        finally
+        {
+            foreach (FileStream held in locks) held.Dispose();
+        }
+
+        Assert.Equal(new RestoreMarker(stageId, true, RestoreMarkerPhase.Swapping),
+            RestoreMarker.Read(fixture.Target.Paths));
+        Assert.False(Directory.Exists(fixture.Target.Paths.LibraryRoot));
+        Assert.True(Directory.Exists(RestoreMarker.PriorRoot(fixture.Target.Paths, stageId)));
+        Assert.True(Directory.Exists(RestoreMarker.StagedLibrary(fixture.Target.Paths, stageId)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AnExistingMarkerRefusesTheSwapAndIsLeftAlone(bool malformed)
+    {
+        LibraryRestoreStage stage = await fixture.StageAsync();
+        if (malformed)
+        {
+            File.WriteAllText(fixture.MarkerPath, "not json");
+        }
+        else
+        {
+            new RestoreMarker(Guid.NewGuid(), true, RestoreMarkerPhase.Confirmed).Write(fixture.Target.Paths);
+        }
+        string markerBefore = File.ReadAllText(fixture.MarkerPath);
+        IReadOnlyDictionary<string, string> before = fixture.LiveEntries();
+
+        LibraryRestoreException error = await Assert.ThrowsAsync<LibraryRestoreException>(
+            () => fixture.Restorer().ReplaceAsync(stage, CancellationToken.None));
+
+        Assert.Equal(LibraryRestoreIssue.SwapFailed, error.Issue);
+        Assert.Equal(markerBefore, File.ReadAllText(fixture.MarkerPath));
+        Assert.Equal(before, fixture.LiveEntries());
+        Assert.True(Directory.Exists(RestoreMarker.StagedLibrary(fixture.Target.Paths, stage.StageId)));
+    }
 }
