@@ -21,7 +21,8 @@ param(
         'theme-selector', 'theme-change', 'theme-restored', 'theme-error', 'theme-error-retry',
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
-        'library-damaged', 'library-missing', 'library-retry')]
+        'library-damaged', 'library-missing', 'library-retry',
+        'import-reminder', 'export-backup', 'export-cancel', 'export-protected')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -85,7 +86,9 @@ param(
     # The app's LocalState and LocalCache folders, for HTML position gates.
     [string] $AppDataRoot = '',
 
-    [string] $AppCacheRoot = ''
+    [string] $AppCacheRoot = '',
+
+    [string] $BackupPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -1099,6 +1102,105 @@ try {
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
         throw "Expected visible '$id'."
+    }
+
+    # For a screenshot of the last Library card. UI Automation clips bounds
+    # to the viewport, so a card cut off at the bottom edge still reads as
+    # visible; scroll Settings to its end, where the Export card fits.
+    function Scroll-SettingsToEnd {
+        $scrollable = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::IsScrollPatternAvailableProperty, $true)
+        foreach ($viewer in $root.FindAll($scope, $scrollable)) {
+            $pattern = $viewer.GetCurrentPattern([System.Windows.Automation.ScrollPattern]::Pattern)
+            if ($pattern.Current.VerticallyScrollable) {
+                $pattern.SetScrollPercent([System.Windows.Automation.ScrollPattern]::NoScroll, 100)
+            }
+        }
+        Start-Sleep -Milliseconds 300
+    }
+
+    $uia = [System.Windows.Automation.AutomationElement]
+
+    function Wait-FilePicker {
+        # The picker runs in the app's process as a #32770 window. Look
+        # among top-level windows first, then under the shell window.
+        $condition = [System.Windows.Automation.AndCondition]::new(
+            [System.Windows.Automation.PropertyCondition]::new(
+                $uia::ClassNameProperty, '#32770'),
+            [System.Windows.Automation.PropertyCondition]::new(
+                $uia::ProcessIdProperty, $process.Id))
+        # The first picker after a fresh install can take well over 15 s
+        # to load the shell's file dialog components.
+        $deadline = (Get-Date).AddSeconds(30)
+        do {
+            $picker = $uia::RootElement.FindFirst(
+                [System.Windows.Automation.TreeScope]::Children, $condition)
+            if (-not $picker) {
+                $picker = $root.FindFirst(
+                    [System.Windows.Automation.TreeScope]::Children, $condition)
+            }
+            if ($picker) { return $picker }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        $windows = $uia::RootElement.FindAll(
+            [System.Windows.Automation.TreeScope]::Children,
+            [System.Windows.Automation.PropertyCondition]::new(
+                $uia::ProcessIdProperty, $process.Id))
+        $seen = @($windows | ForEach-Object {
+                "'$($_.Current.Name)' [$($_.Current.ClassName)]" })
+        throw ('The system Open dialog did not appear. Top-level windows ' +
+            "of the app: $(if ($seen) { $seen -join ', ' } else { 'none' }).")
+    }
+
+    # Managed UIA sees the dialog's Win32 controls as panes without
+    # patterns, so match them by control id and window class and drive
+    # them through their window handles.
+    function Find-InPicker($picker, [string] $id, [string] $className) {
+        $condition = [System.Windows.Automation.AndCondition]::new(
+            [System.Windows.Automation.PropertyCondition]::new(
+                $uia::AutomationIdProperty, $id),
+            [System.Windows.Automation.PropertyCondition]::new(
+                $uia::ClassNameProperty, $className))
+        $element = $picker.FindFirst($scope, $condition)
+        if (-not $element) { throw "The Open dialog has no '$id' $className." }
+        return [IntPtr]$element.Current.NativeWindowHandle
+    }
+
+    function Send-PickerCommand($picker, [int] $buttonId) {
+        [DesktopGuidesForegroundProbe]::Command(
+            [IntPtr]$picker.Current.NativeWindowHandle, $buttonId,
+            (Find-InPicker $picker ([string]$buttonId) 'Button'))
+    }
+
+    function Wait-PickerClosed($picker) {
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            try {
+                if ($picker.Current.ProcessId -ne $process.Id) { return }
+            }
+            catch [System.Windows.Automation.ElementNotAvailableException] {
+                return
+            }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        throw 'The system Open dialog did not close.'
+    }
+
+    function Choose-SavePath([string] $path) {
+        $picker = Wait-FilePicker
+        # The Save dialog's file-name box is an Edit with control id 1001.
+        # The dialog fills in the suggested name after it appears, and it
+        # keeps that name unless the box is typed into, so wait, then type.
+        $box = Find-InPicker $picker '1001' 'Edit'
+        $deadline = (Get-Date).AddSeconds(15)
+        while (-not [DesktopGuidesForegroundProbe]::GetText($box) -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Milliseconds 200
+        }
+        [DesktopGuidesForegroundProbe]::TypeText($box, $path)
+        $typed = [DesktopGuidesForegroundProbe]::GetText($box)
+        if ($typed -ne $path) { throw "The Save dialog's file name is '$typed', not '$path'." }
+        Send-PickerCommand $picker 1
+        Wait-PickerClosed $picker
     }
 
     function Expand-ProviderSettings {
@@ -4213,8 +4315,9 @@ try {
         Resize-ShellWindow $wideWidth $windowHeight
         Select-Element 'Settings'
         [void](Wait-Name 'SettingsHeading' 'Settings')
-        [void](Wait-Name 'LibraryStorageSettingsCard' (
-            'Library storage. Your library is stored on this device.'))
+        [void](Wait-Name 'ExportSettingsCard' (
+            'Back up library. Save your games, guides and reading progress to a .zip file. ' +
+            'Uninstalling the app removes your library, so keep the backup outside app data.'))
         [void](Wait-Status 'Settings ready.')
         [void](Wait-HiddenById 'ShellStatus')
         Assert-HeadingLevel 'SettingsHeading' 1
@@ -4224,12 +4327,12 @@ try {
         Assert-Below 'AppThemeSettingsCard' 'SettingsAppearanceHeading'
         Assert-Below 'WindowMaterialSettingsCard' 'AppThemeSettingsCard'
         Assert-Below 'SettingsLibraryHeading' 'WindowMaterialSettingsCard'
-        Assert-Below 'LibraryStorageSettingsCard' 'SettingsLibraryHeading'
-        Assert-Below 'SettingsGameDataHeading' 'LibraryStorageSettingsCard'
+        Assert-Below 'ExportSettingsCard' 'SettingsLibraryHeading'
+        Assert-Below 'SettingsGameDataHeading' 'ExportSettingsCard'
         Assert-Below 'ProviderSettingsExpander' 'SettingsGameDataHeading'
         Resize-ShellWindow $narrowWidth $windowHeight
         Assert-InsideWindow 'SettingsHeading'
-        Assert-InsideWindow 'LibraryStorageSettingsCard'
+        Assert-InsideWindow 'ExportSettingsCard'
         Assert-NoOverlap 'PART_PaneToggleButton' 'SettingsHeading'
         Assert-NoOverlap 'PART_BackButton' 'SettingsHeading'
         $report.settingsNarrowScreenshot =
@@ -4238,7 +4341,7 @@ try {
 
         Resize-ShellWindow $wideWidth $windowHeight
         Assert-InsideWindow 'SettingsHeading'
-        Assert-InsideWindow 'LibraryStorageSettingsCard'
+        Assert-InsideWindow 'ExportSettingsCard'
         $report.settingsWideScreenshot =
             Save-WindowScreenshot 'settings-wide'
         $report.phases += 'settings-wide'
@@ -5114,72 +5217,6 @@ try {
     elseif ($Mode -like 'import-*') {
         $fixtureRoot = (Resolve-Path -LiteralPath (
             Join-Path $PSScriptRoot '..\..\tests\fixtures\p0')).Path
-        $uia = [System.Windows.Automation.AutomationElement]
-
-        function Wait-FilePicker {
-            # The picker runs in the app's process as a #32770 window. Look
-            # among top-level windows first, then under the shell window.
-            $condition = [System.Windows.Automation.AndCondition]::new(
-                [System.Windows.Automation.PropertyCondition]::new(
-                    $uia::ClassNameProperty, '#32770'),
-                [System.Windows.Automation.PropertyCondition]::new(
-                    $uia::ProcessIdProperty, $process.Id))
-            # The first picker after a fresh install can take well over 15 s
-            # to load the shell's file dialog components.
-            $deadline = (Get-Date).AddSeconds(30)
-            do {
-                $picker = $uia::RootElement.FindFirst(
-                    [System.Windows.Automation.TreeScope]::Children, $condition)
-                if (-not $picker) {
-                    $picker = $root.FindFirst(
-                        [System.Windows.Automation.TreeScope]::Children, $condition)
-                }
-                if ($picker) { return $picker }
-                Start-Sleep -Milliseconds 200
-            } while ((Get-Date) -lt $deadline)
-            $windows = $uia::RootElement.FindAll(
-                [System.Windows.Automation.TreeScope]::Children,
-                [System.Windows.Automation.PropertyCondition]::new(
-                    $uia::ProcessIdProperty, $process.Id))
-            $seen = @($windows | ForEach-Object {
-                    "'$($_.Current.Name)' [$($_.Current.ClassName)]" })
-            throw ('The system Open dialog did not appear. Top-level windows ' +
-                "of the app: $(if ($seen) { $seen -join ', ' } else { 'none' }).")
-        }
-
-        # Managed UIA sees the dialog's Win32 controls as panes without
-        # patterns, so match them by control id and window class and drive
-        # them through their window handles.
-        function Find-InPicker($picker, [string] $id, [string] $className) {
-            $condition = [System.Windows.Automation.AndCondition]::new(
-                [System.Windows.Automation.PropertyCondition]::new(
-                    $uia::AutomationIdProperty, $id),
-                [System.Windows.Automation.PropertyCondition]::new(
-                    $uia::ClassNameProperty, $className))
-            $element = $picker.FindFirst($scope, $condition)
-            if (-not $element) { throw "The Open dialog has no '$id' $className." }
-            return [IntPtr]$element.Current.NativeWindowHandle
-        }
-
-        function Send-PickerCommand($picker, [int] $buttonId) {
-            [DesktopGuidesForegroundProbe]::Command(
-                [IntPtr]$picker.Current.NativeWindowHandle, $buttonId,
-                (Find-InPicker $picker ([string]$buttonId) 'Button'))
-        }
-
-        function Wait-PickerClosed($picker) {
-            $deadline = (Get-Date).AddSeconds(15)
-            do {
-                try {
-                    if ($picker.Current.ProcessId -ne $process.Id) { return }
-                }
-                catch [System.Windows.Automation.ElementNotAvailableException] {
-                    return
-                }
-                Start-Sleep -Milliseconds 200
-            } while ((Get-Date) -lt $deadline)
-            throw 'The system Open dialog did not close.'
-        }
 
         function Choose-PickerFile([string] $relativePath) {
             $picker = Wait-FilePicker
@@ -5327,6 +5364,60 @@ try {
             Assert-Absent 'ImportGuideDialog'
             Wait-FocusedId 'ImportGuideButton'
             $report.phases += 'import-picker-cancel'
+        }
+        elseif ($Mode -eq 'import-reminder') {
+            # T20.2: the first import reminds once; a later import doesn't.
+            $reminder = 'Your library lives in app data, and uninstalling the app removes it. ' +
+                'Export a backup from Settings.'
+            $title = 'Reminder Guide ' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+            Select-Element 'Import Test Game'
+            [void](Wait-Status 'Game ready.')
+            Click-Element (Wait-EnabledById 'ImportGuideButton')
+            Choose-PickerFile 'txt-legacy.txt'
+            [void](Wait-VisibleById 'ImportGuideDialog')
+            [void](Select-ById 'ImportEncodingCp437')
+            Set-Text 'GuideTitleInput' $title
+            Invoke-Element (Wait-EnabledById 'PrimaryButton')
+            [void](Wait-HiddenById 'ImportGuideDialog')
+            [void](Wait-SelectedGuide $title)
+            [void](Wait-Status $reminder)
+            [void](Wait-Name 'ShellStatusAction' 'Go to Export')
+            $report.reminderScreenshot = Save-WindowScreenshot 'export-reminder'
+            $report.phases += 'export-reminder-shown'
+
+            Invoke-Element (Wait-VisibleById 'ShellStatusAction')
+            [void](Wait-Name 'SettingsHeading' 'Settings')
+            Wait-FocusedId 'ExportBackupButton'
+            $report.phases += 'export-reminder-opens-settings'
+
+            Select-Element 'Library'
+            [void](Wait-Status 'Library ready.')
+            Select-Element 'Import Test Game'
+            [void](Wait-Status 'Game ready.')
+            Click-Element (Wait-EnabledById 'ImportGuideButton')
+            Choose-PickerFile 'txt-legacy.txt'
+            [void](Wait-VisibleById 'ImportGuideDialog')
+            [void](Select-ById 'ImportEncodingCp437')
+            [void](Wait-Name 'PrimaryButton' 'Import another copy')
+            Set-Text 'GuideTitleInput' ($title + ' copy')
+            Invoke-Element (Wait-EnabledById 'PrimaryButton')
+            [void](Wait-HiddenById 'ImportGuideDialog')
+            [void](Wait-SelectedGuide ($title + ' copy'))
+            # The app shows the reminder after it selects the guide, so
+            # watch both the status probe and the bar for a while.
+            $deadline = (Get-Date).AddSeconds(3)
+            do {
+                $probe = Find-RawById 'ShellContent'
+                $item = if ($probe) { $probe.Current.ItemStatus } else { '' }
+                $status = Find-ById 'ShellStatus'
+                if ($item.EndsWith('|' + $reminder) -or
+                    ($status -and -not $status.Current.IsOffscreen -and
+                        $status.Current.Name -eq $reminder)) {
+                    throw 'The export reminder showed again after a later import.'
+                }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            $report.phases += 'export-reminder-once'
         }
         else {
             if ($Mode -ne 'import-publish' -and -not $ExpectedGuideTitle) {
@@ -6128,6 +6219,39 @@ try {
         [void](Wait-SelectedGuide 'Route Test Guide')
         $report.phases += 'restore-last-guide-for-relaunch'
     }
+    elseif ($Mode -like 'export-*') {
+        # T20.2: export from Settings through the real Save dialog.
+        if (-not $BackupPath) { throw "$Mode needs -BackupPath." }
+        Select-Element 'Settings'
+        [void](Wait-Status 'Settings ready.')
+        [void](Show-SettingsCard 'ExportSettingsCard')
+        Invoke-Element (Wait-EnabledById 'ExportBackupButton')
+        Choose-SavePath $BackupPath
+        if ($Mode -eq 'export-backup') {
+            [void](Wait-Status ('Backup saved: ' + (Split-Path -Leaf $BackupPath) + ' (') -Prefix -Seconds 120)
+            Wait-FocusedId 'ExportBackupButton'
+            # The status bar above Settings pushes the card toward the bottom edge.
+            Scroll-SettingsToEnd
+            [void](Wait-VisibleById 'ExportBackupButton')
+            $report.exportSavedScreenshot = Save-WindowScreenshot 'export-saved'
+            $report.phases += 'export-saved'
+        }
+        elseif ($Mode -eq 'export-cancel') {
+            # The install script holds the export at its Backup test gate.
+            Invoke-Element (Wait-EnabledById 'ExportCancelButton')
+            [void](Wait-Status 'Export canceled.')
+            [void](Wait-HiddenById 'ExportCancelButton')
+            Wait-FocusedId 'ExportBackupButton'
+            if (Test-Path -LiteralPath $BackupPath) { throw 'A canceled export left its file.' }
+            $report.phases += 'export-cancel-no-file'
+        }
+        else {
+            [void](Wait-Status ("Choose a folder outside the app's data, such as Documents or a USB drive. " +
+                'Backups saved in app data are removed when the app is uninstalled.'))
+            if (Test-Path -LiteralPath $BackupPath) { throw 'A refused export left a file in app data.' }
+            $report.phases += 'export-protected-refused'
+        }
+    }
     elseif ($Mode -eq 'normal') {
         $resume = Wait-Name 'ResumeGuide' "Resume $ExpectedResumeGuide"
         Invoke-Element $resume
@@ -6296,7 +6420,7 @@ try {
 catch {
     $report.error = $_ | Out-String
     if (($Mode -eq 'game-editor' -or $Mode -eq 'catalog' -or $Mode -like 'import-*' -or $Mode -like 'remove-*' -or
-        $Mode -like 'provider-*' -or $Mode -like 'game-actions*') -and $root) {
+        $Mode -like 'provider-*' -or $Mode -like 'game-actions*' -or $Mode -like 'export-*') -and $root) {
         try {
             foreach ($id in @('ShellStatus', 'GameHeading',
                 'GameTitleFeedback', 'GameSaveError', 'GameSearchStatus',

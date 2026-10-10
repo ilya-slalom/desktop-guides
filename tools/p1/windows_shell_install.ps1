@@ -23,6 +23,7 @@ param(
     [switch] $ImportOnly,
     [switch] $GameActionsOnly,
     [switch] $ProviderOnly,
+    [switch] $BackupOnly,
 
     # Or name several groups, as CI shards do. They still run in the order
     # listed below. Don't combine with an *Only switch.
@@ -60,6 +61,7 @@ $scenarioGroups = [ordered]@{
     'import' = $ImportOnly.IsPresent
     'game-actions' = $GameActionsOnly.IsPresent
     'provider' = $ProviderOnly.IsPresent
+    'backup' = $BackupOnly.IsPresent
 }
 $selectedGroups = @($scenarioGroups.Keys | Where-Object { $scenarioGroups[$_] })
 if ($selectedGroups.Count -gt 1) {
@@ -729,7 +731,8 @@ function Run-ShellSmoke(
     [string] $ExpectedGuideTitle = '',
     [int] $ExpectedTopLine = 0,
     [string] $AppDataRoot = '',
-    [string] $AppCacheRoot = '') {
+    [string] $AppCacheRoot = '',
+    [string] $BackupPath = '') {
     $resultPath = Join-Path $ResultDirectory "$ResultName.json"
     Clear-ShellSmokeResult $resultPath
     $invocationId = [Guid]::NewGuid().ToString('N')
@@ -781,12 +784,13 @@ function Run-ShellSmoke(
     if ($AppCacheRoot) {
         $arguments += ' -AppCacheRoot "' + $AppCacheRoot + '"'
     }
+    if ($BackupPath) { $arguments += ' -BackupPath "' + $BackupPath + '"' }
     $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
         -Argument $arguments -WorkingDirectory $PSScriptRoot
     Register-ScheduledTask -TaskName $smokeTask -Action $action `
         -Principal $principal -Force | Out-Null
     Start-ScheduledTask -TaskName $smokeTask
-    $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*' -or $mode -like 'completion-*' -or $mode -eq 'html-position') { 240 }
+    $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*' -or $mode -like 'completion-*' -or $mode -like 'export-*' -or $mode -eq 'html-position') { 240 }
         elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*' -or $mode -like 'theme-*' -or $mode -like 'text-size-*') { 120 }
         else { 60 }
     $deadline = (Get-Date).AddSeconds($timeoutSeconds)
@@ -2285,6 +2289,77 @@ function Run-BlockedNetworkScenario {
     }
 }
 
+function Run-BackupScenarios {
+    # T20.2 PR a: the first-import reminder, export, cancel and a refused folder.
+    Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+    Invoke-ShellSeed @('seed-import', $dataRoot) | Out-Null
+    $backupRoot = Join-Path ([Environment]::GetFolderPath('MyDocuments')) (
+        'desktop-guides-backup-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $backupRoot | Out-Null
+    $protectedRoot = $null
+    try {
+        Start-InstalledShell
+        $report.importReminder = Run-ShellSmoke 'import-reminder'
+        Close-InstalledShell
+
+        $backup = Join-Path $backupRoot 'DesktopGuides-backup.zip'
+        Start-InstalledShell
+        $report.exportBackup = Run-ShellSmoke 'export-backup' -BackupPath $backup
+        Close-InstalledShell
+        $described = Invoke-ShellSeed @('describe-backup', $backup) | ConvertFrom-Json
+        $report.exportBackupDescribed = $described
+        if (-not $described.verified -or $described.guides -lt 2 -or $described.credentials) {
+            throw "The exported backup isn't complete: $($described | ConvertTo-Json -Compress)."
+        }
+
+        $canceled = Join-Path $backupRoot 'canceled.zip'
+        Start-InstalledShell
+        $prefix = "Local\DesktopGuides.Preview.Backup.$($report.launchedProcessId)"
+        $reached = [System.Threading.EventWaitHandle]::new(
+            $false, [System.Threading.EventResetMode]::AutoReset, "$prefix.Reached")
+        $resume = [System.Threading.EventWaitHandle]::new(
+            $false, [System.Threading.EventResetMode]::AutoReset, "$prefix.Continue")
+        try {
+            $report.exportCancel = Run-ShellSmoke 'export-cancel' -BackupPath $canceled
+        }
+        finally {
+            $resume.Set() | Out-Null
+            $resume.Dispose()
+            $reached.Dispose()
+        }
+        Close-InstalledShell
+        if ((Test-Path -LiteralPath $canceled) -or @(Get-ChildItem -LiteralPath $backupRoot -Filter '*.tmp').Count) {
+            throw 'A canceled export left a file behind.'
+        }
+
+        # Packaged: any folder under %LOCALAPPDATA% outside the package is
+        # refused. Portable protects only its own DesktopGuides folder.
+        $refused = if ($portable) {
+            Join-Path $dataRoot 'inside-app-data.zip'
+        }
+        else {
+            $protectedRoot = Join-Path $env:LOCALAPPDATA (
+                'desktop-guides-smoke-' + [Guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path $protectedRoot | Out-Null
+            Join-Path $protectedRoot 'outside-package.zip'
+        }
+        $report.exportProtectedPath = $refused
+        Start-InstalledShell
+        $report.exportProtected = Run-ShellSmoke 'export-protected' -BackupPath $refused
+        Close-InstalledShell
+        if (Test-Path -LiteralPath $refused) { throw 'A refused export left a file in app data.' }
+        if ($protectedRoot -and @(Get-ChildItem -LiteralPath $protectedRoot -Force).Count) {
+            throw 'A refused export left a file in the %LOCALAPPDATA% folder.'
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $backupRoot -Recurse -Force -ErrorAction SilentlyContinue
+        if ($protectedRoot) {
+            Remove-Item -LiteralPath $protectedRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 function Run-ProviderScenarios {
     $report.providers = [ordered]@{}
     $providers = $report.providers
@@ -2555,6 +2630,7 @@ try {
     if (Enter-ScenarioGroup 'game-actions') { Run-GameActionsScenarios }
 
     if (Enter-ScenarioGroup 'provider') { Run-ProviderScenarios }
+    if (Enter-ScenarioGroup 'backup') { Run-BackupScenarios }
 
     $report.success = $true
 }

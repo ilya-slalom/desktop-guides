@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using DesktopGuides.Core.Backup;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
@@ -884,6 +885,38 @@ if (args.Length == 3 && args[0] == "break-library" &&
     string hash = file.Exists ? Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(database))) : "";
     Console.WriteLine(
         $"{file.Exists};{(file.Exists ? file.Length : 0)};{hash};{sidecars.Count(File.Exists)}");
+    return 0;
+}
+
+if (args.Length == 2 && args[0] == "describe-backup")
+{
+    // A test-side check of the archive against its manifest, with public types only.
+    using ZipArchive archive = ZipFile.OpenRead(args[1]);
+    ZipArchiveEntry first = archive.Entries[0];
+    using MemoryStream json = new();
+    using (Stream stream = first.Open())
+    {
+        stream.CopyTo(json);
+    }
+    LibraryArchiveManifest manifest = LibraryArchiveManifest.Parse(json.ToArray());
+    bool verified = first.FullName == LibraryArchiveManifest.EntryName &&
+        archive.Entries.Count == manifest.Entries.Count + 1;
+    for (int index = 0; verified && index < manifest.Entries.Count; index++)
+    {
+        ZipArchiveEntry entry = archive.Entries[index + 1];
+        using Stream stream = entry.Open();
+        verified = entry.FullName == manifest.Entries[index].Path &&
+            Convert.ToHexStringLower(SHA256.HashData(stream)) == manifest.Entries[index].Sha256;
+    }
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        verified,
+        games = manifest.Games,
+        guides = manifest.Guides,
+        files = manifest.Entries.Count,
+        credentials = archive.Entries.Any(entry =>
+            entry.FullName.Contains("providers", StringComparison.OrdinalIgnoreCase))
+    }));
     return 0;
 }
 

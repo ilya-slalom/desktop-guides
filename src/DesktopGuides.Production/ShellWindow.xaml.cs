@@ -60,6 +60,7 @@ public sealed partial class ShellWindow : Window
     private readonly GuideFileHealth guideHealth = new();
     private long gameGuideIntentVersion;
     private long statusSequence;
+    private Func<Task>? statusAction;
     private bool readerNarrow;
     private bool settingGuideSelection;
     private bool ready;
@@ -291,6 +292,7 @@ public sealed partial class ShellWindow : Window
     {
         statusDismissTimer.Stop();
         ShellStatusAction.Visibility = Visibility.Collapsed;
+        statusAction = null;
         ShellStatusInfoBar.Message = message;
         AutomationProperties.SetName(ShellStatusInfoBar, message);
         AutomationProperties.SetItemStatus(
@@ -350,6 +352,7 @@ public sealed partial class ShellWindow : Window
     {
         try
         {
+            ExportBackupButton.IsEnabled = false;
             string dataRoot = AppDataRoot.Resolve(
                 AppDataRoot.HasPackageIdentity(),
                 () => ApplicationData.Current.LocalFolder.Path,
@@ -362,6 +365,7 @@ public sealed partial class ShellWindow : Window
             }
             ShowRouteProgress("Loading library…");
             ManagedPathResolver paths = new(dataRoot);
+            libraryPaths = paths;
             if (repository is not null)
             {
                 await repository.DisposeAsync();
@@ -408,6 +412,7 @@ public sealed partial class ShellWindow : Window
             WindowMaterialSelector.IsEnabled = true;
             AppThemeSelector.IsEnabled = true;
             ready = true;
+            ExportBackupButton.IsEnabled = true;
             // Queued like every other render, so a quick first click can't be overwritten.
             await RunNavigationAsync(() => RenderCurrentAsync());
             if (EffectiveMaterial != requestedMaterial)
@@ -457,6 +462,7 @@ public sealed partial class ShellWindow : Window
         activeImportDialog?.Hide();
         activeRemoveDialog?.Hide();
         refreshCancel?.Cancel();
+        backupCancel?.Cancel();
         ProviderSettings.Cancel();
         leaseWait.Cancel();
         CancelReaderLoad();
@@ -471,7 +477,7 @@ public sealed partial class ShellWindow : Window
         await Task.Yield();
         try
         {
-            await Task.WhenAll(initializationTask, pendingNavigation, refreshTask);
+            await Task.WhenAll(initializationTask, pendingNavigation, refreshTask, backupTask);
         }
         finally
         {
@@ -513,6 +519,10 @@ public sealed partial class ShellWindow : Window
     private async void NavigationInvoked(
         NavigationView sender, NavigationViewItemInvokedEventArgs args)
     {
+        if (libraryBusy)
+        {
+            return;
+        }
         bool openSettings = args.IsSettingsInvoked;
         CancelReaderLoad();
         await RunNavigationAsync(async () =>
@@ -1082,6 +1092,7 @@ public sealed partial class ShellWindow : Window
                         imported = true;
                         pendingGuideFocus = guideId;
                         await RenderCurrentAsync();
+                        await RemindToExportAsync();
                     }
                     else if (dialog.OpenGuideId is Guid existingId)
                     {
@@ -1616,10 +1627,11 @@ public sealed partial class ShellWindow : Window
         }
     }
 
-    // Holds a TXT load until the installed test continues it or the load is cancelled.
-    private static async Task PauseTextLoadForTestAsync(CancellationToken token)
+    // Holds work at a named gate (such as a TXT load or a backup) until the
+    // installed test continues it or the work is cancelled.
+    private static async Task PauseForTestAsync(string gate, CancellationToken token)
     {
-        string prefix = $@"Local\DesktopGuides.Preview.TextLoad.{Environment.ProcessId}";
+        string prefix = $@"Local\DesktopGuides.Preview.{gate}.{Environment.ProcessId}";
         try
         {
             if (!EventWaitHandle.TryOpenExisting(
@@ -1642,7 +1654,7 @@ public sealed partial class ShellWindow : Window
                     token.ThrowIfCancellationRequested();
                     if (signaled == WaitHandle.WaitTimeout)
                     {
-                        throw new TimeoutException("TXT load test gate timed out.");
+                        throw new TimeoutException($"{gate} test gate timed out.");
                     }
                 }
             }
@@ -1749,7 +1761,7 @@ public sealed partial class ShellWindow : Window
         ReaderCompletionChoice.Hide();
         loadedGameGuideCount = null;
         UpdateRemoveGameAction();
-        AppTitleBar.IsBackButtonEnabled = navigator.CanGoBack;
+        AppTitleBar.IsBackButtonEnabled = !libraryBusy && navigator.CanGoBack;
         Navigation.SelectedItem = navigator.Current is SettingsRoute
             ? Navigation.SettingsItem
             : LibraryItem;
@@ -1997,7 +2009,7 @@ public sealed partial class ShellWindow : Window
                     TextGuideLoad textLoad;
                     try
                     {
-                        await PauseTextLoadForTestAsync(readerToken);
+                        await PauseForTestAsync("TextLoad", readerToken);
                         textLoad = await textLoader!.LoadAsync(guide, readerToken);
                     }
                     catch (OperationCanceledException) when (readerToken.IsCancellationRequested)
