@@ -99,6 +99,18 @@ public sealed class LibraryRestoreRecoveryTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task APromotedRestoreRollsBackWithoutAStagingFolder()
+    {
+        (LibraryRestoreStage stage, IReadOnlyDictionary<string, string> before) = await PrepareAsync(true);
+        await fixture.Restorer().ReplaceAsync(stage, CancellationToken.None);
+        Directory.Delete(fixture.StagingParent, recursive: true);
+
+        Assert.Equal(RestoreRecoveryOutcome.RolledBack, LibraryRestoreRecovery.Run(Paths, verifyRestore: false));
+
+        AssertRolledBackTo(before);
+    }
+
+    [Fact]
     public async Task ARestoredLibraryThatWontOpenRollsBack()
     {
         (LibraryRestoreStage stage, IReadOnlyDictionary<string, string> before) = await PrepareAsync(true);

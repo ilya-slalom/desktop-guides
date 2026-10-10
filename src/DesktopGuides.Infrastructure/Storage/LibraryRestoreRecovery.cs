@@ -146,6 +146,9 @@ public static class LibraryRestoreRecovery
         if (Directory.Exists(paths.LibraryRoot) && (priorParked || !marker.PriorExists))
         {
             ManagedPathResolver.RejectFilesystemLinks(paths.LibraryRoot);
+            string staging = Path.GetDirectoryName(unverified)!;
+            Directory.CreateDirectory(staging);
+            ManagedPathResolver.RejectFilesystemLinks(staging);
             LibraryRestorer.DeleteTree(unverified);
             Directory.Move(paths.LibraryRoot, unverified);
         }
