@@ -2296,6 +2296,7 @@ function Run-BackupScenarios {
     $backupRoot = Join-Path ([Environment]::GetFolderPath('MyDocuments')) (
         'desktop-guides-backup-' + [Guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $backupRoot | Out-Null
+    $protectedRoot = $null
     try {
         Start-InstalledShell
         $report.importReminder = Run-ShellSmoke 'import-reminder'
@@ -2331,14 +2332,31 @@ function Run-BackupScenarios {
             throw 'A canceled export left a file behind.'
         }
 
-        $refused = Join-Path $dataRoot 'inside-app-data.zip'
+        # Packaged: any folder under %LOCALAPPDATA% outside the package is
+        # refused. Portable protects only its own DesktopGuides folder.
+        $refused = if ($portable) {
+            Join-Path $dataRoot 'inside-app-data.zip'
+        }
+        else {
+            $protectedRoot = Join-Path $env:LOCALAPPDATA (
+                'desktop-guides-smoke-' + [Guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path $protectedRoot | Out-Null
+            Join-Path $protectedRoot 'outside-package.zip'
+        }
+        $report.exportProtectedPath = $refused
         Start-InstalledShell
         $report.exportProtected = Run-ShellSmoke 'export-protected' -BackupPath $refused
         Close-InstalledShell
         if (Test-Path -LiteralPath $refused) { throw 'A refused export left a file in app data.' }
+        if ($protectedRoot -and @(Get-ChildItem -LiteralPath $protectedRoot -Force).Count) {
+            throw 'A refused export left a file in the %LOCALAPPDATA% folder.'
+        }
     }
     finally {
         Remove-Item -LiteralPath $backupRoot -Recurse -Force -ErrorAction SilentlyContinue
+        if ($protectedRoot) {
+            Remove-Item -LiteralPath $protectedRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
