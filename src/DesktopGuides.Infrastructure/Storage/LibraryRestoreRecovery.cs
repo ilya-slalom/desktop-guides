@@ -167,22 +167,30 @@ public static class LibraryRestoreRecovery
     }
 
     // Only restore folders: .recovery also holds migration copies, which stay.
+    // Best effort: the marker is gone, so a leftover is only wasted space.
     private static void DeleteLeftovers(ILibraryPaths paths)
     {
-        string staging = Path.Combine(paths.DataRoot, LibraryRestorer.StagingFolderName);
-        if (Directory.Exists(staging))
+        try
         {
-            foreach (string folder in Directory.EnumerateDirectories(staging))
-            {
-                LibraryRestorer.DeleteTree(folder);
-            }
+            DeleteFolders(Path.Combine(paths.DataRoot, LibraryRestorer.StagingFolderName), "*");
+            DeleteFolders(paths.RecoveryRoot, "restore-*");
         }
-        if (Directory.Exists(paths.RecoveryRoot))
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
-            foreach (string folder in Directory.EnumerateDirectories(paths.RecoveryRoot, "restore-*"))
-            {
-                LibraryRestorer.DeleteTree(folder);
-            }
+        }
+    }
+
+    // Never enumerate through a link: its folders aren't ours.
+    private static void DeleteFolders(string parent, string pattern)
+    {
+        DirectoryInfo folder = new(parent);
+        if (!folder.Exists || folder.Attributes.HasFlag(FileAttributes.ReparsePoint))
+        {
+            return;
+        }
+        foreach (string child in Directory.EnumerateDirectories(parent, pattern))
+        {
+            LibraryRestorer.DeleteTree(child);
         }
     }
 

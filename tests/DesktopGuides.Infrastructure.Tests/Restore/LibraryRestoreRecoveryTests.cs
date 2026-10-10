@@ -313,4 +313,28 @@ public sealed class LibraryRestoreRecoveryTests : IAsyncLifetime
         Assert.False(Directory.Exists(Path.GetDirectoryName(parked)));
         Assert.True(File.Exists(migrationCopy));
     }
+
+    [Fact]
+    public void LeftoverCleanupDoesntFollowAJunctionedRecoveryFolder()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string outside = Path.Combine(fixture.Target.Root, "outside");
+        string kept = Path.Combine(outside, "restore-x");
+        Directory.CreateDirectory(kept);
+        Directory.Delete(Paths.RecoveryRoot, recursive: true);
+        RemovalLibrary.CreateJunction(Paths.RecoveryRoot, outside);
+
+        RestoreRecoveryOutcome outcome;
+        try
+        {
+            outcome = LibraryRestoreRecovery.Run(Paths, verifyRestore: false);
+        }
+        finally
+        {
+            Directory.Delete(Paths.RecoveryRoot);
+        }
+
+        Assert.Equal(RestoreRecoveryOutcome.None, outcome);
+        Assert.True(Directory.Exists(kept));
+    }
 }
