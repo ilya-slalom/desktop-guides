@@ -389,6 +389,12 @@ public sealed partial class ShellWindow
                 ChooseBackupButton.IsEnabled = ready;
                 ExportBackupButton.IsEnabled = ready;
                 FocusAfterLayout(stagedBackup is null ? ChooseBackupButton : ReplaceLibraryButton);
+                if (stagedBackup is not null)
+                {
+                    // The details open below the expander, often below the fold.
+                    RestoreMadeCard.StartBringIntoView(
+                        new BringIntoViewOptions { VerticalAlignmentRatio = 0 });
+                }
             }
         }
     }
