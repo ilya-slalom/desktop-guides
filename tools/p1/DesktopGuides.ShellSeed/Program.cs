@@ -920,6 +920,107 @@ if (args.Length == 2 && args[0] == "describe-backup")
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "export-backup")
+{
+    ManagedPathResolver exportPaths = new(args[1]);
+    await using SqliteLibraryRepository exportRepository = new(exportPaths);
+    await exportRepository.InitializeAsync();
+    LibraryExportResult exported = await new LibraryExporter(exportRepository, exportPaths,
+            new LibraryExportOptions("1.0.0.0", "seed", []))
+        .ExportAsync(args[2], true, null, CancellationToken.None);
+    Console.WriteLine(exported.Path);
+    return 0;
+}
+
+if (args.Length == 4 && args[0] == "damage-backup" && args[3] is "truncate" or "missing-artwork")
+{
+    if (args[3] == "truncate")
+    {
+        byte[] whole = File.ReadAllBytes(args[1]);
+        File.WriteAllBytes(args[2], whole[..(whole.Length / 2)]);
+        return 0;
+    }
+    List<(string Name, byte[] Bytes)> kept = [];
+    LibraryArchiveManifest original;
+    using (ZipArchive source = ZipFile.OpenRead(args[1]))
+    {
+        using (Stream stream = source.Entries[0].Open())
+        using (MemoryStream json = new())
+        {
+            stream.CopyTo(json);
+            original = LibraryArchiveManifest.Parse(json.ToArray());
+        }
+        foreach (ZipArchiveEntry entry in source.Entries.Skip(1))
+        {
+            if (entry.FullName.StartsWith("library/artwork/", StringComparison.Ordinal)) continue;
+            using Stream stream = entry.Open();
+            using MemoryStream bytes = new();
+            stream.CopyTo(bytes);
+            kept.Add((entry.FullName, bytes.ToArray()));
+        }
+    }
+    if (kept.Count == original.Entries.Count)
+    {
+        throw new InvalidOperationException("The backup has no artwork to drop.");
+    }
+    LibraryArchiveManifest edited = original with
+    {
+        Entries = kept.Select(file => new LibraryArchiveEntry(
+            file.Name, file.Bytes.Length, Convert.ToHexStringLower(SHA256.HashData(file.Bytes)))).ToArray()
+    };
+    File.Delete(args[2]);
+    using (ZipArchive output = ZipFile.Open(args[2], ZipArchiveMode.Create))
+    {
+        foreach ((string name, byte[] bytes) in kept.Prepend((LibraryArchiveManifest.EntryName, LibraryArchiveManifest.Write(edited))))
+        {
+            using Stream stream = output.CreateEntry(name).Open();
+            stream.Write(bytes);
+        }
+    }
+    return 0;
+}
+
+if (args.Length == 3 && args[0] == "interrupt-restore")
+{
+    ManagedPathResolver restorePaths = new(args[1]);
+    LibraryRestorer interrupted = new(restorePaths);
+    LibraryRestoreStage stage = await interrupted.StageAsync(args[2], null, CancellationToken.None);
+    await interrupted.ReplaceAsync(stage, CancellationToken.None);
+    Console.WriteLine(stage.StageId.ToString("N"));
+    return 0;
+}
+
+if (args.Length == 2 && args[0] == "describe-library")
+{
+    ManagedPathResolver describedPaths = new(args[1]);
+    long Count(string sql)
+    {
+        if (!File.Exists(describedPaths.DatabasePath)) return 0;
+        using SqliteConnection connection = new(new SqliteConnectionStringBuilder
+        {
+            DataSource = describedPaths.DatabasePath,
+            Mode = SqliteOpenMode.ReadOnly,
+            Pooling = false
+        }.ToString());
+        connection.Open();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = sql;
+        return (long)command.ExecuteScalar()!;
+    }
+    string staging = Path.Combine(args[1], LibraryRestorer.StagingFolderName);
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        games = Count("SELECT COUNT(*) FROM Games"),
+        guides = Count("SELECT COUNT(*) FROM Guides"),
+        marker = File.Exists(Path.Combine(args[1], "restore.marker")),
+        stages = Directory.Exists(staging) ? Directory.EnumerateDirectories(staging).Count() : 0,
+        parked = Directory.Exists(describedPaths.RecoveryRoot)
+            ? Directory.EnumerateDirectories(describedPaths.RecoveryRoot, "restore-*").Count()
+            : 0
+    }));
+    return 0;
+}
+
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second" or
         "seed-design" or "seed-catalog" or "seed-facts" or "seed-search" or "seed-import" or
