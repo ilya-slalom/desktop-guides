@@ -1,6 +1,6 @@
 # T20.2 export and restore design
 
-Status: PR a merged in #78; PR b (restore engine) in review; PR c planned.
+Status: PRs a and b merged in #78 and #79; PR c in review.
 Prerequisites T14.4 (PR #54), T15.1 (PRs #74–#76), T15.4 (PR #62) and T20.1
 (PR #59) are merged.
 
@@ -354,7 +354,8 @@ Below the Export card in the Library section, `RestoreSettingsExpander`:
   and **Replace library…** (`ReplaceLibraryButton`) and **Discard**.
   Leaving Settings keeps the stage; closing the window or a later startup
   discards it.
-- **Errors** show in the expander's InfoBar, mapped by
+- **Errors** show in the `RestoreStatus` InfoBar directly below the
+  expander (not in its items; see the PR c verification record), mapped by
   `LibraryBackupMessages.ForRestore`:
 
 | Issue | Message |
@@ -576,3 +577,95 @@ its PR. PR a's PR includes a screenshot of the Export card and the reminder.
 - **Not run.** No separate RED was captured for Task 6 (exact-string tests
   were written with the code). The extraction byte cap is defence in depth
   with no direct test, because verification refuses an oversized entry first.
+
+### PR c: restore UI and the in-session swap
+
+- **Unit tests.** None added: Tasks 12 and 13 are WinUI wiring (declared TDD
+  exception) and Task 14 is seed tooling. The Production Release x64 build on
+  `pcsx2-win` had 0 warnings and 0 errors after Tasks 12 and 13 and after
+  every Task 15 app fix; the ShellSeed build had 0 warnings and 0 errors.
+  Core and Infrastructure are unchanged from PR b (1027 and 768).
+- **Host seed commands (Task 14).** Run on `pcsx2-win` against a scratch
+  folder: `export-backup`, `damage-backup` (truncate: 4739 to 2369 bytes;
+  missing-artwork, which `describe-backup` still reports as a verified,
+  consistent archive) and `interrupt-restore`. `describe-library` gave
+  `{"games":1,"guides":0,"marker":false,"stages":0,"parked":0}` before and
+  `{"games":1,"guides":0,"marker":true,"stages":1,"parked":1}` after
+  `interrupt-restore`.
+- **Commits.** `3d68705` (Task 12: Restore expander and staging), `c565bea`
+  and `71d0f41` (Task 13: Replace, in-session swap and its fix round),
+  `d0834fd` (Task 14: seed commands), `77fe4a6` (Task 15: installed
+  smokes), `d5f1f05`, `6c2eaa9`, `514498c`, `e9ee0f1`, `2e2376f` and
+  `2936ade` (Task 15 fixes).
+- **Installed.**
+  - RED: [38054743459](https://github.com/ilya-slalom/desktop-guides/actions/runs/38054743459)
+    ran the Task 12 code with the harness and failed in `restore-clean`
+    right after the Open dialog: the app crashed (0xc000027b in
+    `Microsoft.UI.Xaml.dll`) before the `Library restored` wait. See ruling
+    "RED accepted" below.
+  - Diagnostic: [38056080139](https://github.com/ilya-slalom/desktop-guides/actions/runs/38056080139)
+    carried a handler that failed fast with the exception. The stack showed
+    `SettingsExpander.ItemsRepeater_ElementPrepared` applying the
+    `SettingsCard` style to every item, so the `RestoreStatus` InfoBar in
+    `Items` threw "Cannot apply a Style with TargetType SettingsCard to
+    InfoBar" during `UpdateLayout`.
+  - Intermediate failed runs, each fixed in the app or the smoke:
+    38054745496 (the same crash on the branch), 38057384468 (details below
+    the fold), 38058651635 (`RestoreStatus` not visible), 38059747482 and
+    38061048449 (`RestoreCancelButton` off screen), 38062160756
+    (`restore-interrupted` waited for `Library ready.`).
+  - `backup` group: [38063139795](https://github.com/ilya-slalom/desktop-guides/actions/runs/38063139795)
+    (head `2936ade`) passed with no application events. Phases:
+    `restore-clean` (`restore-staged`, `restore-done`,
+    `restore-clean-guide-opens`); `restore-replace` (`restore-staged`,
+    `restore-confirm-cancel`, `restore-done`); `restore-corrupt-refused`;
+    `restore-missing-artwork-refused`; `restore-cancel`;
+    `restore-interrupted-kept`. The install script throws if a
+    `describe-library` comparison fails, so each held: no marker, no stage
+    and no parked library after a completed restore; the previous library
+    present after the interrupted one.
+  - Full run: [38064144850](https://github.com/ilya-slalom/desktop-guides/actions/runs/38064144850)
+    (`shell-scope=all`, head `2936ade`) passed every job; the `dev-*` jobs
+    were skipped, as in every run of this workflow.
+- **Screenshots** (from run 38063139795):
+  - [Staged summary](evidence/t20-2-export-restore/restore-staged.png)
+    (`restore-clean`): backup holds 2 games, 2 guides; this library has 0.
+  - [Replace confirmation](evidence/t20-2-export-restore/restore-confirm.png)
+    (`restore-replace`): taken after UI Automation found
+    `ReplaceLibraryDialog`, but the screen capture does not show the dialog
+    (the capture is the shell window's bounds); it shows the populated
+    library's staged summary behind it (1 game, 2 guides).
+  - [Restored library](evidence/t20-2-export-restore/restore-done.png):
+    "Library restored: 2 games, 2 guides."
+  - [Kept library](evidence/t20-2-export-restore/restore-kept.png)
+    (`restore-interrupted`): "The backup couldn't be opened, so your
+    previous library was kept."
+- **Rulings.** Plan rulings 6-8, 10 and 12 (see the
+  [plan](t20-2-export-restore-plan.md#rulings-against-the-spec)), plus:
+  - The restorer is created after `libraryPaths` is set (there is no
+    exporter field since PR a's fix); `Checking` shows an indeterminate bar.
+  - `ready` is set to false inside the queued drain step as well as after
+    it, closing a race in which a waiter behind the gate rendered against a
+    library being torn down.
+  - Replace has a double-click guard; teardown and swap are wrapped so any
+    exception becomes the swap-failed message and `InitializeCoreAsync`
+    always runs; one `ProviderServices` is reused across swaps (its
+    `providers.bin` sits outside `library/`); focus returns to the Library
+    page after a swap.
+  - The crash was a plan defect in Task 12's XAML: `RestoreStatus` moved out
+    of `SettingsExpander.Items` to directly below the expander (`d5f1f05`).
+  - App fixes beyond the plan: the restore cards, status and progress are
+    revealed after the expander lays them out, at `Low` dispatcher priority
+    (`2e2376f` supersedes `6c2eaa9`, `514498c` and `e9ee0f1`, which stay in
+    history), so focus never sits on an off-screen control; the
+    `restore-interrupted` smoke skips the `Library ready.` startup wait,
+    because startup correctly reports the kept library instead (`2936ade`).
+  - RED is run 38054743459 (the crash), weaker than planned: the swap path
+    never failed at the `Library restored` wait, so a RED for it was not
+    observed.
+- **Not run.** High contrast, 200% scaling and Narrator are T16.2's. The
+  deferred minors (reveal depends on Low-priority dispatch; the reveal can
+  push a focused Replace button off screen at small heights;
+  `RestoreStatus` stays visible with the expander collapsed; the
+  "Library restored" status overwrites the unreadable-guides warning) are in
+  the SDD progress ledger.
