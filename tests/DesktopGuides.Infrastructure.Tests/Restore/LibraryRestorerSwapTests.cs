@@ -149,6 +149,40 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AFailedPromotionPutsThePriorLibraryBack()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        await fixture.AddPriorGameAsync();
+        Guid stageId = Guid.Empty;
+        FileStream? held = null;
+        LibraryRestorer restorer = fixture.Restorer(checkpoint =>
+        {
+            if (checkpoint != RestoreCheckpoint.PriorMoved) return;
+            held = new FileStream(Path.Combine(RestoreMarker.StagedLibrary(fixture.Target.Paths, stageId), "library.sqlite"),
+                FileMode.Open, FileAccess.Read, FileShare.None);
+        });
+        LibraryRestoreStage stage = await restorer.StageAsync(fixture.Backup, null, CancellationToken.None);
+        stageId = stage.StageId;
+        IReadOnlyDictionary<string, string> before = fixture.LiveEntries();
+
+        LibraryRestoreException error;
+        try
+        {
+            error = await Assert.ThrowsAsync<LibraryRestoreException>(
+                () => restorer.ReplaceAsync(stage, CancellationToken.None));
+        }
+        finally
+        {
+            held?.Dispose();
+        }
+
+        Assert.Equal(LibraryRestoreIssue.SwapFailed, error.Issue);
+        Assert.Equal(before, fixture.LiveEntries());
+        Assert.False(File.Exists(fixture.MarkerPath));
+        Assert.True(Directory.Exists(RestoreMarker.StagedLibrary(fixture.Target.Paths, stageId)));
+    }
+
+    [Fact]
     public async Task AFailedRollbackKeepsTheMarkerAndParkedLibrary()
     {
         if (!OperatingSystem.IsWindows()) return;

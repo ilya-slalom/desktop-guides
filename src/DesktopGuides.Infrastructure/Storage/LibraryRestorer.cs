@@ -193,6 +193,7 @@ public sealed class LibraryRestorer
                     // The marker stays so startup returns the parked prior root.
                     throw new LibraryRestoreException(LibraryRestoreIssue.SwapFailed, inner: error);
                 }
+                DeleteTree(Path.GetDirectoryName(prior)!);
             }
             TryDeleteMarker();
             throw new LibraryRestoreException(LibraryRestoreIssue.SwapFailed, inner: error);
