@@ -1627,7 +1627,8 @@ public sealed partial class ShellWindow : Window
         }
     }
 
-    // Holds a TXT load until the installed test continues it or the load is cancelled.
+    // Holds work at a named gate (such as a TXT load or a backup) until the
+    // installed test continues it or the work is cancelled.
     private static async Task PauseForTestAsync(string gate, CancellationToken token)
     {
         string prefix = $@"Local\DesktopGuides.Preview.{gate}.{Environment.ProcessId}";
