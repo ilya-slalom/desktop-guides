@@ -22,7 +22,9 @@ param(
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
         'library-damaged', 'library-missing', 'library-retry',
-        'import-reminder', 'export-backup', 'export-cancel', 'export-protected')]
+        'import-reminder', 'export-backup', 'export-cancel', 'export-protected',
+        'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
+        'restore-cancel', 'restore-interrupted')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -1199,6 +1201,13 @@ try {
         [DesktopGuidesForegroundProbe]::TypeText($box, $path)
         $typed = [DesktopGuidesForegroundProbe]::GetText($box)
         if ($typed -ne $path) { throw "The Save dialog's file name is '$typed', not '$path'." }
+        Send-PickerCommand $picker 1
+        Wait-PickerClosed $picker
+    }
+
+    function Choose-OpenPath([string] $path) {
+        $picker = Wait-FilePicker
+        [DesktopGuidesForegroundProbe]::SetText((Find-InPicker $picker '1148' 'Edit'), $path)
         Send-PickerCommand $picker 1
         Wait-PickerClosed $picker
     }
@@ -6252,6 +6261,79 @@ try {
             $report.phases += 'export-protected-refused'
         }
     }
+    elseif ($Mode -like 'restore-*') {
+        # T20.2: restore from Settings through the real Open dialog.
+        if ($Mode -eq 'restore-interrupted') {
+            [void](Wait-Status "The backup couldn't be opened, so your previous library was kept." -AllowHidden -Seconds 30)
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            $report.restoreKeptScreenshot = Save-WindowScreenshot 'restore-kept'
+            $report.phases += 'restore-interrupted-kept'
+        }
+        else {
+            if (-not $BackupPath) { throw "$Mode needs -BackupPath." }
+            Select-Element 'Settings'
+            [void](Wait-Status 'Settings ready.')
+            [void](Show-SettingsCard 'RestoreSettingsExpander')
+            Invoke-Element (Wait-EnabledById 'ChooseBackupButton')
+            Choose-OpenPath $BackupPath
+            if ($Mode -eq 'restore-cancel') {
+                # The install script holds staging at its Backup test gate.
+                Invoke-Element (Wait-EnabledById 'RestoreCancelButton')
+                [void](Wait-Name 'RestoreStatus' 'Restore canceled.')
+                Wait-FocusedId 'ChooseBackupButton'
+                $report.phases += 'restore-cancel'
+            }
+            elseif ($Mode -eq 'restore-corrupt') {
+                [void](Wait-Name 'RestoreStatus' "This file isn't a Desktop Guides backup, or it's damaged.")
+                Assert-Absent 'ReplaceLibraryButton'
+                Wait-FocusedId 'ChooseBackupButton'
+                $report.restoreCorruptScreenshot = Save-WindowScreenshot 'restore-corrupt'
+                $report.phases += 'restore-corrupt-refused'
+            }
+            elseif ($Mode -eq 'restore-missing-artwork') {
+                [void](Wait-Name 'RestoreStatus' 'This backup is missing files for: Seeded Linked Game.')
+                Assert-Absent 'ReplaceLibraryButton'
+                $report.phases += 'restore-missing-artwork-refused'
+            }
+            else {
+                Wait-FocusedId 'ReplaceLibraryButton'
+                $holds = (Wait-VisibleById 'RestoreHoldsCard').Current.Name
+                if ($holds -notlike 'Backup holds: * game*, * guide*, *') {
+                    throw "Unexpected backup summary '$holds'."
+                }
+                [void](Wait-VisibleById 'RestoreMadeCard')
+                [void](Wait-VisibleById 'RestoreCurrentCard')
+                $report.restoreStagedScreenshot = Save-WindowScreenshot 'restore-staged'
+                $report.phases += 'restore-staged'
+                if ($Mode -eq 'restore-replace') {
+                    Invoke-Element (Wait-EnabledById 'ReplaceLibraryButton')
+                    [void](Wait-VisibleById 'ReplaceLibraryDialog')
+                    $report.restoreConfirmScreenshot = Save-WindowScreenshot 'restore-confirm'
+                    Invoke-Element (Wait-EnabledById 'CloseButton')
+                    [void](Wait-HiddenById 'ReplaceLibraryDialog')
+                    Wait-FocusedId 'ReplaceLibraryButton'
+                    $report.phases += 'restore-confirm-cancel'
+                }
+                Invoke-Element (Wait-EnabledById 'ReplaceLibraryButton')
+                [void](Wait-VisibleById 'ReplaceLibraryDialog')
+                Invoke-Element (Wait-EnabledById 'PrimaryButton')
+                [void](Wait-Status 'Library restored: ' -Prefix -Seconds 60)
+                [void](Wait-Name 'LibraryHeading' 'Library')
+                [void](Wait-GameRow 'Seeded Linked Game')
+                $report.restoredScreenshot = Save-WindowScreenshot 'restore-done'
+                $report.phases += 'restore-done'
+                if ($Mode -eq 'restore-clean') {
+                    # The restored guides are listed and one opens.
+                    Select-Element 'Import Test Game'
+                    [void](Wait-Status 'Game ready.')
+                    Wait-GuideRowCount 2
+                    Open-GuideFromGame (Get-GuideRowNames)[0]
+                    [void](Wait-Status 'Guide ready.' -Seconds 30)
+                    $report.phases += 'restore-clean-guide-opens'
+                }
+            }
+        }
+    }
     elseif ($Mode -eq 'normal') {
         $resume = Wait-Name 'ResumeGuide' "Resume $ExpectedResumeGuide"
         Invoke-Element $resume
@@ -6420,14 +6502,16 @@ try {
 catch {
     $report.error = $_ | Out-String
     if (($Mode -eq 'game-editor' -or $Mode -eq 'catalog' -or $Mode -like 'import-*' -or $Mode -like 'remove-*' -or
-        $Mode -like 'provider-*' -or $Mode -like 'game-actions*' -or $Mode -like 'export-*') -and $root) {
+        $Mode -like 'provider-*' -or $Mode -like 'game-actions*' -or $Mode -like 'export-*' -or
+        $Mode -like 'restore-*') -and $root) {
         try {
             foreach ($id in @('ShellStatus', 'GameHeading',
                 'GameTitleFeedback', 'GameSaveError', 'GameSearchStatus',
                 'ProviderSettingsStatus', 'GameEditorNotice', 'GameAttribution',
                 'ImportStatus', 'ImportGuideDialog', 'ImportBusyText',
                 'RemoveGuideDialog', 'RemoveGuideMessage', 'RemoveSelectedGuide',
-                'RemoveGameButton', 'RemoveGameCountChanged', 'RemoveGameDialog', 'RemoveGameMessage')) {
+                'RemoveGameButton', 'RemoveGameCountChanged', 'RemoveGameDialog', 'RemoveGameMessage',
+                'RestoreStatus', 'ReplaceLibraryDialog')) {
                 $element = Find-ById $id
                 if ($element) {
                     $report["failure$id"] = [ordered]@{

@@ -790,7 +790,7 @@ function Run-ShellSmoke(
     Register-ScheduledTask -TaskName $smokeTask -Action $action `
         -Principal $principal -Force | Out-Null
     Start-ScheduledTask -TaskName $smokeTask
-    $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*' -or $mode -like 'completion-*' -or $mode -like 'export-*' -or $mode -eq 'html-position') { 240 }
+    $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*' -or $mode -like 'completion-*' -or $mode -like 'export-*' -or $mode -like 'restore-*' -or $mode -eq 'html-position') { 240 }
         elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*' -or $mode -like 'theme-*' -or $mode -like 'text-size-*') { 120 }
         else { 60 }
     $deadline = (Get-Date).AddSeconds($timeoutSeconds)
@@ -2350,6 +2350,81 @@ function Run-BackupScenarios {
         if (Test-Path -LiteralPath $refused) { throw 'A refused export left a file in app data.' }
         if ($protectedRoot -and @(Get-ChildItem -LiteralPath $protectedRoot -Force).Count) {
             throw 'A refused export left a file in the %LOCALAPPDATA% folder.'
+        }
+
+        # T20.2 PR c: restore. The source backup holds the reminder's guides
+        # plus a linked game with artwork.
+        Invoke-ShellSeed @('seed-linked-game', $dataRoot) | Out-Null
+        $source = Join-Path $backupRoot 'restore-source.zip'
+        Invoke-ShellSeed @('export-backup', $dataRoot, $source) | Out-Null
+        $sourceState = Invoke-ShellSeed @('describe-library', $dataRoot) | ConvertFrom-Json
+        $truncated = Join-Path $backupRoot 'truncated.zip'
+        $missingArtwork = Join-Path $backupRoot 'missing-artwork.zip'
+        Invoke-ShellSeed @('damage-backup', $source, $truncated, 'truncate') | Out-Null
+        Invoke-ShellSeed @('damage-backup', $source, $missingArtwork, 'missing-artwork') | Out-Null
+
+        function Assert-Restored([string] $what) {
+            $state = Invoke-ShellSeed @('describe-library', $dataRoot) | ConvertFrom-Json
+            if ($state.games -ne $sourceState.games -or $state.guides -ne $sourceState.guides -or
+                $state.marker -or $state.stages -ne 0 -or $state.parked -ne 0) {
+                throw "$what left '$($state | ConvertTo-Json -Compress)'; expected the source library and no restore folders."
+            }
+        }
+
+        Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+        Start-InstalledShell
+        $report.restoreClean = Run-ShellSmoke 'restore-clean' -BackupPath $source
+        Close-InstalledShell
+        Assert-Restored 'A clean restore'
+
+        Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+        Invoke-ShellSeed @('seed', $dataRoot) | Out-Null
+        Start-InstalledShell
+        $report.restoreReplace = Run-ShellSmoke 'restore-replace' -BackupPath $source
+        Close-InstalledShell
+        Assert-Restored 'Replacing a populated library'
+
+        Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+        Invoke-ShellSeed @('seed', $dataRoot) | Out-Null
+        foreach ($case in @(
+                @{ Mode = 'restore-corrupt'; Path = $truncated },
+                @{ Mode = 'restore-missing-artwork'; Path = $missingArtwork },
+                @{ Mode = 'restore-cancel'; Path = $source })) {
+            $before = Invoke-ShellSeed @('describe-library', $dataRoot)
+            Start-InstalledShell
+            $gate = $null
+            if ($case.Mode -eq 'restore-cancel') {
+                $prefix = "Local\DesktopGuides.Preview.Backup.$($report.launchedProcessId)"
+                $gate = @(
+                    [System.Threading.EventWaitHandle]::new(
+                        $false, [System.Threading.EventResetMode]::AutoReset, "$prefix.Reached"),
+                    [System.Threading.EventWaitHandle]::new(
+                        $false, [System.Threading.EventResetMode]::AutoReset, "$prefix.Continue"))
+            }
+            try {
+                $report[$case.Mode] = Run-ShellSmoke $case.Mode -BackupPath $case.Path
+            }
+            finally {
+                if ($gate) {
+                    $gate[1].Set() | Out-Null
+                    $gate | ForEach-Object { $_.Dispose() }
+                }
+            }
+            Close-InstalledShell
+            $after = Invoke-ShellSeed @('describe-library', $dataRoot)
+            if ($after -ne $before) {
+                throw "$($case.Mode) changed the library: '$before' became '$after'."
+            }
+        }
+
+        $prior = Invoke-ShellSeed @('describe-library', $dataRoot)
+        Invoke-ShellSeed @('interrupt-restore', $dataRoot, $source) | Out-Null
+        Start-InstalledShell
+        $report.restoreInterrupted = Run-ShellSmoke 'restore-interrupted'
+        Close-InstalledShell
+        $after = Invoke-ShellSeed @('describe-library', $dataRoot)
+        if ($after -ne $prior) {
+            throw "An interrupted restore didn't put the previous library back: '$prior' became '$after'."
         }
     }
     finally {
