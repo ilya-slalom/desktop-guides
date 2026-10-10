@@ -500,28 +500,41 @@ public sealed partial class ShellWindow
 
     private async void ReplaceLibraryClicked(object sender, RoutedEventArgs args)
     {
-        if (libraryBusy || !ready || closeRequested ||
+        if (libraryBusy || !ready || closeRequested || activeRemoveDialog is not null || DialogOpen() ||
             stagedBackup is not LibraryRestoreStage stage || restorer is not LibraryRestorer active)
         {
             return;
         }
+        // A second click while the counts load or the dialog opens would
+        // open another ContentDialog, which throws.
+        ReplaceLibraryButton.IsEnabled = false;
+        DiscardStageButton.IsEnabled = false;
         (int games, int guides) = await CurrentCountsAsync();
-        ContentDialog dialog = ReplaceLibraryDialog.Create(games, guides, stage, Navigation.XamlRoot);
-        DialogSurface.Apply(dialog, EffectiveMaterial, DialogTheme);
-        activeRemoveDialog = dialog;
-        ContentDialogResult result;
-        try
+        ContentDialogResult result = ContentDialogResult.None;
+        if (!closeRequested && !libraryBusy)
         {
-            result = await dialog.ShowAsync();
-        }
-        finally
-        {
-            activeRemoveDialog = null;
+            ContentDialog dialog = ReplaceLibraryDialog.Create(games, guides, stage, Navigation.XamlRoot);
+            DialogSurface.Apply(dialog, EffectiveMaterial, DialogTheme);
+            activeRemoveDialog = dialog;
+            try
+            {
+                result = await dialog.ShowAsync();
+            }
+            catch (Exception)
+            {
+                // Another dialog opened first; treat it as Cancel.
+            }
+            finally
+            {
+                activeRemoveDialog = null;
+            }
         }
         if (result != ContentDialogResult.Primary || closeRequested || libraryBusy)
         {
-            if (!closeRequested)
+            if (!closeRequested && ReferenceEquals(stagedBackup, stage))
             {
+                ReplaceLibraryButton.IsEnabled = true;
+                DiscardStageButton.IsEnabled = true;
                 ReplaceLibraryButton.Focus(FocusState.Programmatic);
             }
             return;
@@ -561,24 +574,36 @@ public sealed partial class ShellWindow
             {
                 // A cancelled refresh; nothing to report during a restore.
             }
-            await CloseReaderSessionAsync();
-            await DisposeProgressTrackingAsync();
-            if (repository is not null)
-            {
-                await repository.DisposeAsync();
-                repository = null;
-            }
             stagedBackup = null;
             DiscardStagedDetails();
             navigator.ResetToLibrary();
+            // The next render loads the restored rows, not the old ones.
+            librarySummaries = null;
+            libraryFocusPending = true;
             try
             {
+                await CloseReaderSessionAsync();
+                await DisposeProgressTrackingAsync();
+                // Cleared first, so startup doesn't dispose it again after a failure.
+                SqliteLibraryRepository? closing = repository;
+                repository = null;
+                if (closing is not null)
+                {
+                    await closing.DisposeAsync();
+                }
                 await active.ReplaceAsync(stage, CancellationToken.None);
                 pendingRestore = stage;
             }
             catch (LibraryRestoreException error)
             {
                 pendingRestoreError = LibraryBackupMessages.RestoreFailed(error.Issue, error.Titles, error.BytesNeeded);
+                active.DiscardStage(stage);
+            }
+            catch (Exception)
+            {
+                // The swap didn't start or didn't finish; startup puts back
+                // whatever a marker names, so reopen either way.
+                pendingRestoreError = LibraryBackupMessages.RestoreFailed(LibraryRestoreIssue.SwapFailed, [], null);
                 active.DiscardStage(stage);
             }
             initializationTask = InitializeCoreAsync(verifyRestore: pendingRestore is not null);

@@ -414,7 +414,9 @@ public sealed partial class ShellWindow : Window
             // The library lease is held, so no live session owns a profile here.
             string sweptRoot = cacheRoot;
             await Task.Run(() => WebView2ProfileSweeper.Sweep(sweptRoot));
-            providers = new ProviderServices(dataRoot);
+            // Kept across Retry and a restore: its credentials sit outside
+            // the library, and the settings card may still be using it.
+            providers ??= new ProviderServices(dataRoot);
             await ProviderSettings.InitializeAsync(providers);
             importer = providers.CreateImporter(repository, artwork);
             AppSettings? settings = null;
