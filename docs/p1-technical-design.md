@@ -73,9 +73,9 @@ app and `%LOCALAPPDATA%\DesktopGuides` for the portable build. It holds:
 - `library/`;
 - `.recovery/`, the pre-migration database copies and, during a restore, the
   parked prior library (`restore-<stage-id>/library`);
-- `.restore-staging/`, one folder per restore stage: a copy of the chosen backup file,
-  the extracted and checked library, and, after a failed swap, the unverified
-  promoted copy;
+- `.restore-staging/`, one folder per restore stage: a copy of the chosen
+  backup file, the extracted and checked library, and, after a failed
+  verification, the unverified promoted copy;
 - `restore.marker`, the phase of an in-flight restore swap;
 - `library.session.lock`;
 - the DPAPI-protected `providers.bin`.
@@ -93,8 +93,9 @@ Provider metadata lives in `Games` columns (`ProviderName`, `ProviderGameId`,
 `MetadataJson` and `MetadataRetrievedUtcMs`); the artwork file is referenced
 by `Games.ArtworkRelativePath`, a path under `artwork/<game-id>/` relative to
 `library/`. The restore marker and staging sit beside `library/`, so a restore
-can replace the whole library without renaming a directory into itself. Transient WebView2 profiles and diagnostics go under
-the cache root, outside backup scope: `LocalCacheFolder`, or
+can replace the whole library without renaming a directory into itself.
+Transient WebView2 profiles and diagnostics go under the cache root, outside
+backup scope: `LocalCacheFolder`, or
 `%LOCALAPPDATA%\DesktopGuides\Cache` for the portable build. Tests inject a
 temporary parent.
 Only a generated `Guid` in `"N"` form names a guide directory. Database paths

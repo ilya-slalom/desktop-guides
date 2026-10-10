@@ -629,14 +629,23 @@ its PR. PR a's PR includes a screenshot of the Export card and the reminder.
     were skipped, as in every run of this workflow.
   - Pull request: [38065733809](https://github.com/ilya-slalom/desktop-guides/actions/runs/38065733809)
     (#80, head `e7dc49a`) passed every job; the `dev-*` jobs were skipped.
-- **Screenshots** (from run 38063139795):
+  - Final review fixes: the `restore-replace` smoke now waits for the
+    dialog title, the populated `ReplaceLibraryMessage` and focus on Cancel
+    before its capture (`c7ee5ba`, `f9754cd`), and an export disables
+    Choose, Replace and Discard (`e4331c7`). Run 38069108771 failed on the
+    smoke's first version (it called `Wait-VisibleName`, which is local to
+    the `game-actions` branch). `backup` group:
+    [38070448704](https://github.com/ilya-slalom/desktop-guides/actions/runs/38070448704)
+    (head `f9754cd`) passed with no application events, with the phases
+    above.
+- **Screenshots** (from run 38063139795, except the Replace confirmation,
+  from run 38070448704):
   - [Staged summary](evidence/t20-2-export-restore/restore-staged.png)
     (`restore-clean`): backup holds 2 games, 2 guides; this library has 0.
   - [Replace confirmation](evidence/t20-2-export-restore/restore-confirm.png)
-    (`restore-replace`): taken after UI Automation found
-    `ReplaceLibraryDialog`, but the screen capture does not show the dialog
-    (the capture is the shell window's bounds); it shows the populated
-    library's staged summary behind it (1 game, 2 guides).
+    (`restore-replace`): "Replace your library?" over the populated
+    library (1 game, 2 guides) and the backup (2 games, 2 guides), with
+    Cancel as the default button.
   - [Restored library](evidence/t20-2-export-restore/restore-done.png):
     "Library restored: 2 games, 2 guides."
   - [Kept library](evidence/t20-2-export-restore/restore-kept.png)
@@ -665,7 +674,13 @@ its PR. PR a's PR includes a screenshot of the Export card and the reminder.
   - RED is run 38054743459 (the crash), weaker than planned: the swap path
     never failed at the `Library restored` wait, so a RED for it was not
     observed.
-- **Not run.** High contrast, 200% scaling and Narrator are T16.2's. The
+- **Not run.** High contrast, 200% scaling and Narrator are T16.2's. No
+  installed run reaches the shell's rollback branch when a restored library
+  won't open, or the `SwapFailed` UI path. No run swaps after reading an HTML
+  or PDF guide in the same session, so WebView2 and file handles under
+  `content/` are not exercised against the swap. `restore-cancel` cancels at
+  the `Backup` gate, before `StageAsync` starts, so cancelling mid-staging is
+  not run. The
   deferred minors (reveal depends on Low-priority dispatch; the reveal can
   push a focused Replace button off screen at small heights;
   `RestoreStatus` stays visible with the expander collapsed; the
