@@ -93,10 +93,16 @@ public sealed partial class ShellWindow
             return;
         }
         ShowStatus(HtmlGuideLoadMessages.RuntimeMissingAtStartup, InfoBarSeverity.Warning, true, false);
-        ShellStatusAction.Content = HtmlGuideLoadMessages.ActionLabel(GuideLoadAction.GetRuntime);
-        ShellStatusAction.Visibility = Visibility.Visible;
+        ShowStatusAction(
+            HtmlGuideLoadMessages.ActionLabel(GuideLoadAction.GetRuntime),
+            () => LaunchExternalAsync(new Uri(HtmlGuideLoadMessages.RuntimeDownloadUrl)));
     }
 
-    private async void ShellStatusActionClicked(object sender, RoutedEventArgs args) =>
-        await LaunchExternalAsync(new Uri(HtmlGuideLoadMessages.RuntimeDownloadUrl));
+    private async void ShellStatusActionClicked(object sender, RoutedEventArgs args)
+    {
+        if (statusAction is { } action)
+        {
+            await action();
+        }
+    }
 }

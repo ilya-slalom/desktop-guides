@@ -60,6 +60,7 @@ public sealed partial class ShellWindow : Window
     private readonly GuideFileHealth guideHealth = new();
     private long gameGuideIntentVersion;
     private long statusSequence;
+    private Func<Task>? statusAction;
     private bool readerNarrow;
     private bool settingGuideSelection;
     private bool ready;
@@ -291,6 +292,7 @@ public sealed partial class ShellWindow : Window
     {
         statusDismissTimer.Stop();
         ShellStatusAction.Visibility = Visibility.Collapsed;
+        statusAction = null;
         ShellStatusInfoBar.Message = message;
         AutomationProperties.SetName(ShellStatusInfoBar, message);
         AutomationProperties.SetItemStatus(
@@ -350,6 +352,7 @@ public sealed partial class ShellWindow : Window
     {
         try
         {
+            ExportBackupButton.IsEnabled = false;
             string dataRoot = AppDataRoot.Resolve(
                 AppDataRoot.HasPackageIdentity(),
                 () => ApplicationData.Current.LocalFolder.Path,
@@ -362,6 +365,7 @@ public sealed partial class ShellWindow : Window
             }
             ShowRouteProgress("Loading library…");
             ManagedPathResolver paths = new(dataRoot);
+            libraryPaths = paths;
             if (repository is not null)
             {
                 await repository.DisposeAsync();
@@ -378,6 +382,7 @@ public sealed partial class ShellWindow : Window
             guideRemover = new GuideRemover(repository, paths);
             completion = new GuideCompletionService(repository, TimeProvider.System);
             gameRemover = new GameRemover(repository, paths, artwork);
+            exporter = CreateExporter(repository, paths, AppDataRoot.HasPackageIdentity());
             textLoader = new ManagedTextGuideLoader(paths);
             htmlLoader = new ManagedHtmlGuideLoader(repository, paths);
             pdfLoader = new ManagedPdfGuideLoader(paths);
@@ -408,6 +413,7 @@ public sealed partial class ShellWindow : Window
             WindowMaterialSelector.IsEnabled = true;
             AppThemeSelector.IsEnabled = true;
             ready = true;
+            ExportBackupButton.IsEnabled = true;
             // Queued like every other render, so a quick first click can't be overwritten.
             await RunNavigationAsync(() => RenderCurrentAsync());
             if (EffectiveMaterial != requestedMaterial)
@@ -457,6 +463,7 @@ public sealed partial class ShellWindow : Window
         activeImportDialog?.Hide();
         activeRemoveDialog?.Hide();
         refreshCancel?.Cancel();
+        backupCancel?.Cancel();
         ProviderSettings.Cancel();
         leaseWait.Cancel();
         CancelReaderLoad();
@@ -471,7 +478,7 @@ public sealed partial class ShellWindow : Window
         await Task.Yield();
         try
         {
-            await Task.WhenAll(initializationTask, pendingNavigation, refreshTask);
+            await Task.WhenAll(initializationTask, pendingNavigation, refreshTask, backupTask);
         }
         finally
         {
@@ -513,6 +520,10 @@ public sealed partial class ShellWindow : Window
     private async void NavigationInvoked(
         NavigationView sender, NavigationViewItemInvokedEventArgs args)
     {
+        if (libraryBusy)
+        {
+            return;
+        }
         bool openSettings = args.IsSettingsInvoked;
         CancelReaderLoad();
         await RunNavigationAsync(async () =>

@@ -709,18 +709,35 @@
                                    Style="{StaticResource DesktopGuidesSettingsSectionStyle}"
                                    AutomationProperties.AutomationId="SettingsLibraryHeading" />
                         <toolkit:SettingsCard
-                            x:Name="LibraryStorageSettingsCard"
-                            Header="Library storage"
-                            Description="Your library is stored on this device."
+                            x:Name="ExportSettingsCard"
+                            Header="Back up library"
+                            Description="Save your games, guides and reading progress to a .zip file. Uninstalling the app removes your library, so keep the backup outside app data."
                             HorizontalAlignment="Stretch"
-                            VerticalAlignment="Top"
-                            IsClickEnabled="False"
-                            AutomationProperties.AutomationId="LibraryStorageSettingsCard"
-                            AutomationProperties.Name="Library storage. Your library is stored on this device.">
+                            AutomationProperties.AutomationId="ExportSettingsCard"
+                            AutomationProperties.Name="Back up library. Save your games, guides and reading progress to a .zip file. Uninstalling the app removes your library, so keep the backup outside app data.">
                             <toolkit:SettingsCard.HeaderIcon>
-                                <FontIcon Glyph="&#xE8F1;"
+                                <FontIcon Glyph="&#xE896;"
                                           AutomationProperties.AccessibilityView="Raw" />
                             </toolkit:SettingsCard.HeaderIcon>
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="{StaticResource DesktopGuidesSpacing8}">
+                                <ProgressBar x:Name="ExportProgress"
+                                             Width="160"
+                                             VerticalAlignment="Center"
+                                             Visibility="Collapsed"
+                                             AutomationProperties.AutomationId="ExportProgress"
+                                             AutomationProperties.Name="Preparing backup…" />
+                                <Button x:Name="ExportCancelButton"
+                                        Content="Cancel"
+                                        Visibility="Collapsed"
+                                        Click="ExportCancelClicked"
+                                        AutomationProperties.AutomationId="ExportCancelButton" />
+                                <Button x:Name="ExportBackupButton"
+                                        Content="Export…"
+                                        IsEnabled="False"
+                                        Click="ExportBackupClicked"
+                                        AutomationProperties.AutomationId="ExportBackupButton" />
+                            </StackPanel>
                         </toolkit:SettingsCard>
                         <TextBlock x:Name="SettingsGameDataHeading"
                                    Text="Game data"
