@@ -6312,6 +6312,14 @@ try {
                 if ($Mode -eq 'restore-replace') {
                     Invoke-Element (Wait-EnabledById 'ReplaceLibraryButton')
                     [void](Wait-VisibleById 'ReplaceLibraryDialog')
+                    # Wait for the populated dialog and its default focus, so the capture
+                    # is taken after the dialog has faded in. The seeded library holds
+                    # 1 game and 2 guides; the source backup 2 games and 2 guides.
+                    [void](Wait-VisibleName 'Replace your library?')
+                    [void](Wait-Name 'ReplaceLibraryMessage' ('Your 1 game and 2 guides, with their reading ' +
+                        "progress, will be replaced by the backup's 2 games and 2 guides. This can't be " +
+                        'undone. To keep the current library, export it first.'))
+                    Wait-FocusedId 'CloseButton'
                     $report.restoreConfirmScreenshot = Save-WindowScreenshot 'restore-confirm'
                     Invoke-Element (Wait-EnabledById 'CloseButton')
                     [void](Wait-HiddenById 'ReplaceLibraryDialog')
