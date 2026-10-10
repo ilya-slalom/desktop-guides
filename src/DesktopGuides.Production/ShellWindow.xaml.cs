@@ -1,3 +1,4 @@
+using DesktopGuides.Core.Backup;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
@@ -353,6 +354,7 @@ public sealed partial class ShellWindow : Window
         try
         {
             ExportBackupButton.IsEnabled = false;
+            ChooseBackupButton.IsEnabled = false;
             string dataRoot = AppDataRoot.Resolve(
                 AppDataRoot.HasPackageIdentity(),
                 () => ApplicationData.Current.LocalFolder.Path,
@@ -366,6 +368,7 @@ public sealed partial class ShellWindow : Window
             ShowRouteProgress("Loading library…");
             ManagedPathResolver paths = new(dataRoot);
             libraryPaths = paths;
+            restorer = new LibraryRestorer(paths);
             if (repository is not null)
             {
                 await repository.DisposeAsync();
@@ -413,6 +416,7 @@ public sealed partial class ShellWindow : Window
             AppThemeSelector.IsEnabled = true;
             ready = true;
             ExportBackupButton.IsEnabled = true;
+            ChooseBackupButton.IsEnabled = true;
             // Queued like every other render, so a quick first click can't be overwritten.
             await RunNavigationAsync(() => RenderCurrentAsync());
             if (EffectiveMaterial != requestedMaterial)
@@ -490,6 +494,11 @@ public sealed partial class ShellWindow : Window
                 try
                 {
                     await DisposeProgressTrackingAsync();
+                    // A stage the user didn't replace with; startup would delete it anyway.
+                    if (stagedBackup is LibraryRestoreStage stage && restorer is LibraryRestorer active)
+                    {
+                        active.DiscardStage(stage);
+                    }
                     if (repository is not null)
                     {
                         await repository.DisposeAsync();

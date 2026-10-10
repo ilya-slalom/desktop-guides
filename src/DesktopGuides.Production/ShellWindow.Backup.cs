@@ -1,3 +1,4 @@
+using CommunityToolkit.WinUI.Controls;
 using DesktopGuides.Core.Backup;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Navigation;
@@ -284,5 +285,198 @@ public sealed partial class ShellWindow
         ShellStatusAction.Content = label;
         statusAction = action;
         ShellStatusAction.Visibility = Visibility.Visible;
+    }
+
+    private LibraryRestorer? restorer;
+    private LibraryRestoreStage? stagedBackup;
+
+    private async void ChooseBackupClicked(object sender, RoutedEventArgs args)
+    {
+        if (libraryBusy || !ready || closeRequested || restorer is not LibraryRestorer active)
+        {
+            return;
+        }
+        string? path;
+        try
+        {
+            FileOpenPicker picker = new(AppWindow.Id);
+            picker.FileTypeFilter.Add(".zip");
+            path = (await picker.PickSingleFileAsync())?.Path;
+        }
+        catch (Exception)
+        {
+            ShowWarningStatus(LibraryBackupMessages.PickerFailed);
+            return;
+        }
+        if (path is null || closeRequested || libraryBusy)
+        {
+            return;
+        }
+        backupTask = StageBackupAsync(active, path);
+        await backupTask;
+    }
+
+    private async Task StageBackupAsync(LibraryRestorer active, string path)
+    {
+        DiscardStagedBackup();
+        using CancellationTokenSource cancel = new();
+        backupCancel = cancel;
+        SetLibraryBusy(true);
+        ChooseBackupButton.IsEnabled = false;
+        ExportBackupButton.IsEnabled = false;
+        RestoreStatus.IsOpen = false;
+        RestoreSettingsExpander.IsExpanded = true;
+        RestoreCancelButton.IsEnabled = true;
+        ShowRestoreProgress(new LibraryRestoreProgress(LibraryRestorePhase.Copying, 0, 0));
+        RestoreCancelButton.Focus(FocusState.Programmatic);
+        try
+        {
+            await PauseForTestAsync("Backup", cancel.Token);
+            Progress<LibraryRestoreProgress> progress = new(report =>
+            {
+                if (ReferenceEquals(backupCancel, cancel) && !closeRequested)
+                {
+                    ShowRestoreProgress(report);
+                }
+            });
+            LibraryRestoreStage stage = await active.StageAsync(path, progress, cancel.Token);
+            if (closeRequested)
+            {
+                active.DiscardStage(stage);
+                return;
+            }
+            stagedBackup = stage;
+            await ShowStagedBackupAsync(stage);
+        }
+        catch (OperationCanceledException) when (cancel.IsCancellationRequested)
+        {
+            if (!closeRequested)
+            {
+                ShowRestoreStatus(LibraryBackupMessages.RestoreCanceled, InfoBarSeverity.Informational);
+            }
+        }
+        catch (LibraryRestoreException error)
+        {
+            if (!closeRequested)
+            {
+                ShowRestoreStatus(
+                    LibraryBackupMessages.RestoreFailed(error.Issue, error.Titles, error.BytesNeeded),
+                    InfoBarSeverity.Error);
+            }
+        }
+        catch (Exception)
+        {
+            if (!closeRequested)
+            {
+                ShowRestoreStatus(
+                    LibraryBackupMessages.RestoreFailed(LibraryRestoreIssue.SourceUnavailable, [], null),
+                    InfoBarSeverity.Error);
+            }
+        }
+        finally
+        {
+            backupCancel = null;
+            RestoreProgressCard.Visibility = Visibility.Collapsed;
+            if (!closeRequested)
+            {
+                SetLibraryBusy(false);
+                ChooseBackupButton.IsEnabled = ready;
+                ExportBackupButton.IsEnabled = ready;
+                (stagedBackup is null ? (Control)ChooseBackupButton : ReplaceLibraryButton)
+                    .Focus(FocusState.Programmatic);
+            }
+        }
+    }
+
+    private void ShowRestoreProgress(LibraryRestoreProgress report)
+    {
+        string label = LibraryBackupMessages.RestorePhase(report.Phase);
+        RestoreProgressCard.Header = label;
+        RestoreProgressCard.Visibility = Visibility.Visible;
+        bool determinate = report.Phase != LibraryRestorePhase.Checking && report.BytesTotal > 0;
+        RestoreProgress.IsIndeterminate = !determinate;
+        RestoreProgress.Value = determinate ? 100.0 * report.BytesDone / report.BytesTotal : 0;
+        AutomationProperties.SetName(RestoreProgress, label);
+    }
+
+    private void ShowRestoreStatus(string message, InfoBarSeverity severity)
+    {
+        RestoreStatus.Message = message;
+        RestoreStatus.Severity = severity;
+        AutomationProperties.SetName(RestoreStatus, message);
+        RestoreStatus.IsOpen = true;
+        AnnounceStatus(message);
+    }
+
+    private async Task ShowStagedBackupAsync(LibraryRestoreStage stage)
+    {
+        (int games, int guides) = await CurrentCountsAsync();
+        ShowDetail(RestoreMadeCard,
+            LibraryBackupMessages.BackupMade(stage.CreatedUtc.ToLocalTime().DateTime, stage.AppVersion));
+        ShowDetail(RestoreHoldsCard, LibraryBackupMessages.BackupHolds(stage.Games, stage.Guides, stage.Bytes));
+        ShowDetail(RestoreCurrentCard, LibraryBackupMessages.LibraryHas(games, guides));
+        RestoreActionsCard.Visibility = Visibility.Visible;
+        DiscardStageButton.IsEnabled = true;
+        ReplaceLibraryButton.IsEnabled = true;
+        AnnounceStatus("Backup checked. Review it, then replace your library or discard the backup.");
+    }
+
+    private static void ShowDetail(SettingsCard card, string text)
+    {
+        card.Header = text;
+        AutomationProperties.SetName(card, text);
+        card.Visibility = Visibility.Visible;
+    }
+
+    private async Task<(int Games, int Guides)> CurrentCountsAsync()
+    {
+        if (repository is not SqliteLibraryRepository library)
+        {
+            return (0, 0);
+        }
+        try
+        {
+            IReadOnlyList<LibraryGameSummary> games = await library.ListGameSummariesAsync();
+            return (games.Count, games.Sum(game => game.GuideCount));
+        }
+        catch (Exception)
+        {
+            return (0, 0);
+        }
+    }
+
+    private void RestoreCancelClicked(object sender, RoutedEventArgs args)
+    {
+        RestoreCancelButton.IsEnabled = false;
+        backupCancel?.Cancel();
+    }
+
+    private void DiscardStageClicked(object sender, RoutedEventArgs args)
+    {
+        if (libraryBusy)
+        {
+            return;
+        }
+        DiscardStagedBackup();
+        ChooseBackupButton.Focus(FocusState.Programmatic);
+        AnnounceStatus("Backup discarded.");
+    }
+
+    // Deletes the staged copy and hides its details.
+    private void DiscardStagedBackup()
+    {
+        if (stagedBackup is LibraryRestoreStage stage && restorer is LibraryRestorer active)
+        {
+            active.DiscardStage(stage);
+        }
+        stagedBackup = null;
+        RestoreMadeCard.Visibility = Visibility.Collapsed;
+        RestoreHoldsCard.Visibility = Visibility.Collapsed;
+        RestoreCurrentCard.Visibility = Visibility.Collapsed;
+        RestoreActionsCard.Visibility = Visibility.Collapsed;
+    }
+
+    private void ReplaceLibraryClicked(object sender, RoutedEventArgs args)
+    {
     }
 }
