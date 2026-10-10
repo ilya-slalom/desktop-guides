@@ -4202,7 +4202,11 @@ try {
         $report.phases += 'retried'
     }
     else {
-        [void](Wait-Status 'Library ready.')
+        # After an interrupted restore, startup reports the kept library
+        # instead; restore-interrupted checks that status below.
+        if ($Mode -ne 'restore-interrupted') {
+            [void](Wait-Status 'Library ready.')
+        }
         [void](Wait-Name 'LibraryHeading' 'Library')
         if (Find-ById 'FixturePicker') {
             throw 'The production shell exposes a P0 fixture picker.'
