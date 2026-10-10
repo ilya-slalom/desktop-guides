@@ -462,6 +462,17 @@ its PR. PR a's PR includes a screenshot of the Export card and the reminder.
   - `export-cancel-no-file` and `export-protected-refused`: Cancel and a
     protected folder leave no file;
   - `describe-backup`: `{"verified":true,"games":1,"guides":2,"files":3,"credentials":false}`.
+- **Final-review fixes.** The `backup` group passed again in
+  [38028956542](https://github.com/ilya-slalom/desktop-guides/actions/runs/38028956542)
+  (head `896a95d`) and
+  [38030077234](https://github.com/ilya-slalom/desktop-guides/actions/runs/38030077234)
+  (head `570e0dd`), with the same phases. The exporter is now built when
+  Export is clicked, so startup no longer resolves Roaming AppData. The
+  packaged `export-protected-refused` now saves to a fresh folder under
+  `%LOCALAPPDATA%`, outside `Packages` and the portable `DesktopGuides`
+  folder (T20.1 already refused the app's own data folder); the portable
+  run keeps the app data path. `export-saved` scrolls Settings to its end
+  so the shot shows the Export card.
 - **Full run.** [38025953925](https://github.com/ilya-slalom/desktop-guides/actions/runs/38025953925)
   (`shell-scope=all`, head `1c9c342`) passed every job; the design shard ran
   `design, catalog, completion, backup`, and `design-light` and
@@ -493,8 +504,10 @@ its PR. PR a's PR includes a screenshot of the Export card and the reminder.
   - `export-reminder-once` is a 3 s polling watch, not the plan's
     pattern-match check, which could pass without reading the UI.
 - **Evidence.**
-  - [Reminder](evidence/t20-2-export-restore/export-reminder.png)
-  - [Backup saved](evidence/t20-2-export-restore/export-saved.png)
+  - [Reminder](evidence/t20-2-export-restore/export-reminder.png), from
+    run 38027063797.
+  - [Backup saved](evidence/t20-2-export-restore/export-saved.png), with the
+    Export card, from run 38030077234.
 - **Not run.** The reminder check has only been seen passing, never failing
   on a build that shows the reminder twice. `export-cancel` and
   `export-protected` don't record whether the picker created the empty

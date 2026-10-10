@@ -992,8 +992,12 @@ A missing WebView2 Runtime is reported once at startup with
 passed the installed runtime-missing run.
 T20.2 is in progress. PR a adds Settings export to a `.zip` outside app data
 (refusing the app's own data folders), with progress and Cancel, and a
-one-time reminder after the first import to export a backup. CI run
-38027063797 passed the installed `backup` group; see the
+one-time reminder after the first import to export a backup. CI runs
+[38027063797](https://github.com/ilya-slalom/desktop-guides/actions/runs/38027063797),
+[38028956542](https://github.com/ilya-slalom/desktop-guides/actions/runs/38028956542)
+and
+[38030077234](https://github.com/ilya-slalom/desktop-guides/actions/runs/38030077234)
+passed the installed `backup` group; see the
 [verification record](t20-2-export-restore-design.md#t202-verification-record).
 Restore follows in PRs b and c.
 
