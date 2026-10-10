@@ -147,6 +147,7 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
 
         Assert.Equal(LibraryRestoreIssue.SwapFailed, error.Issue);
         Assert.Equal(before, fixture.LiveEntries());
+        Assert.False(File.Exists(fixture.MarkerPath));
     }
 
     [Fact]

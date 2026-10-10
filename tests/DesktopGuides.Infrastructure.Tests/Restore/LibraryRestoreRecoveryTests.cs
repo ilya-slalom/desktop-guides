@@ -140,6 +140,7 @@ public sealed class LibraryRestoreRecoveryTests : IAsyncLifetime
         Assert.Equal(RestoreRecoveryOutcome.None, outcome);
         Assert.Equal("2", fixture.Target.Scalar("SELECT COUNT(*) FROM Games"));
         Assert.False(File.Exists(fixture.MarkerPath));
+        fixture.AssertNoStage();
         Assert.Empty(Directory.EnumerateDirectories(Paths.RecoveryRoot, "restore-*"));
     }
 
