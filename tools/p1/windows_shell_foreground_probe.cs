@@ -21,6 +21,12 @@ public static class DesktopGuidesForegroundProbe
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, string lParam);
 
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageW")]
+    private static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, StringBuilder lParam);
+
+    [DllImport("user32.dll", EntryPoint = "SendMessageW")]
+    private static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
 
@@ -122,6 +128,24 @@ public static class DesktopGuidesForegroundProbe
         {
             throw new InvalidOperationException("Could not set the dialog text.");
         }
+    }
+
+    // Types into an edit box with WM_CHAR, as a user would. The Save
+    // dialog tracks its file name from typing and ignores WM_SETTEXT.
+    public static void TypeText(IntPtr window, string text)
+    {
+        SetText(window, string.Empty);
+        foreach (char character in text)
+        {
+            SendMessage(window, 0x0102, new IntPtr(character), IntPtr.Zero);
+        }
+    }
+
+    public static string GetText(IntPtr window)
+    {
+        StringBuilder text = new StringBuilder(1024);
+        SendMessage(window, 0x000D, new IntPtr(text.Capacity), text);
+        return text.ToString();
     }
 
     // Posts WM_COMMAND with BN_CLICKED for a dialog button id such as IDOK
