@@ -5388,13 +5388,20 @@ try {
             Invoke-Element (Wait-EnabledById 'PrimaryButton')
             [void](Wait-HiddenById 'ImportGuideDialog')
             [void](Wait-SelectedGuide ($title + ' copy'))
-            if (Test-QuietStatus $reminder) {
-                throw 'The export reminder showed again after a later import.'
-            }
-            $status = Find-ById 'ShellStatus'
-            if ($status -and -not $status.Current.IsOffscreen -and $status.Current.Name -eq $reminder) {
-                throw 'The export reminder showed again after a later import.'
-            }
+            # The app shows the reminder after it selects the guide, so
+            # watch both the status probe and the bar for a while.
+            $deadline = (Get-Date).AddSeconds(3)
+            do {
+                $probe = Find-RawById 'ShellContent'
+                $item = if ($probe) { $probe.Current.ItemStatus } else { '' }
+                $status = Find-ById 'ShellStatus'
+                if ($item.EndsWith('|' + $reminder) -or
+                    ($status -and -not $status.Current.IsOffscreen -and
+                        $status.Current.Name -eq $reminder)) {
+                    throw 'The export reminder showed again after a later import.'
+                }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
             $report.phases += 'export-reminder-once'
         }
         else {
