@@ -1,8 +1,8 @@
 # P1 implementation plan and exit gates
 
-Status: 46 of the 55 tasks are merged, 10 October 2026. M0, M3 and M4 are
-complete; M1 still needs T17.1 and M2 the optional T11.5. M5 has T20.1, T15.4
-and T15.1 merged, and M6 is planned.
+Status: 47 of the 55 tasks are merged, 11 October 2026. M0, M3 and M4 are
+complete; M1 still needs T17.1 and M2 the optional T11.5. M5 has T20.1, T20.2,
+T15.4 and T15.1 merged, and M6 is planned.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
 This plan orders all **16 P1 stories and 55 tasks** in the
@@ -990,7 +990,7 @@ CI run 37944327625 passed the installed missing-file and removal runs.
 A missing WebView2 Runtime is reported once at startup with
 **Get WebView2 Runtime**, and TXT and PDF guides still open. CI run 37948919282
 passed the installed runtime-missing run.
-T20.2 is in progress. PR a (merged in #78) adds Settings export to a `.zip` outside app data
+T20.2 was merged in #78, #79 and #80 (merge commit `494e9d3`). PR a (#78) adds Settings export to a `.zip` outside app data
 (refusing the app's own data folders), with progress and Cancel, and a
 one-time reminder after the first import to export a backup. CI runs
 [38027063797](https://github.com/ilya-slalom/desktop-guides/actions/runs/38027063797),
@@ -999,8 +999,8 @@ and
 [38030077234](https://github.com/ilya-slalom/desktop-guides/actions/runs/38030077234)
 passed the installed `backup` group; see the
 [verification record](t20-2-export-restore-design.md#t202-verification-record).
-PR b (merged in #79) stages and fully checks a backup, swaps it in behind a
-marker and confirms or rolls it back at startup. PR c (in review) wires it
+PR b (#79) stages and fully checks a backup, swaps it in behind a
+marker and confirms or rolls it back at startup. PR c (#80) wired it
 into Settings: a Restore expander shows a checked backup's counts, a native
 Replace confirmation precedes an in-session swap, and an interrupted restore
 keeps the previous library at the next start. CI runs

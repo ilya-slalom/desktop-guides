@@ -1,6 +1,6 @@
 # T20.2 export and restore design
 
-Status: PRs a and b merged in #78 and #79; PR c in review.
+Status: merged. PR a in #78, PR b in #79 and PR c in #80 (merge commit 494e9d3).
 Prerequisites T14.4 (PR #54), T15.1 (PRs #74–#76), T15.4 (PR #62) and T20.1
 (PR #59) are merged.
 
