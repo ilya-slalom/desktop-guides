@@ -1,7 +1,9 @@
 # P1 MSIX packaging and prerequisite delivery
 
-Status: T17.1 packaging groundwork, 27 September 2026. Public identity and
-signing integration are pending the final publisher certificate subject.
+Status: T17.1 PR a, 11 October 2026. The public identity
+(`IlyaLissoboi.DesktopGuides`, `CN=359962D5-3801-484E-BE5B-39D0D498BEA4`) is
+reserved and built with `-p:PackageLane=Public`. Signing integration and the
+release workflow come in T17.1 PR b.
 This procedure does not establish a clean-install or release-support claim.
 
 ## Identity and version
@@ -12,13 +14,13 @@ This procedure does not establish a clean-install or release-support claim.
 | Public | `IlyaLissoboi.DesktopGuides`, `CN=359962D5-3801-484E-BE5B-39D0D498BEA4` (reserved in Partner Center); build with `-p:PackageLane=Public` | Signed candidates and in-place upgrades. Never use a provisional subject in this lane. |
 
 The public manifest Publisher must exactly match the release signing
-certificate Subject. Select a stable package Name before building the first
-candidate. Both values stay fixed across upgrades. A change from Preview to
+certificate Subject. Both values stay fixed across upgrades. A change from Preview to
 the public identity is a new installation; carrying Preview data across needs
-the explicit export/restore workflow in T20.2. When the public identity is
-chosen, update the production package manifest, the `app.manifest` assembly
-identity, and the production single-instance and event names together. Keep
-the Preview test lane isolated from the public package.
+the explicit export/restore workflow in T20.2. The Public lane builds from
+`Package.Public.appxmanifest` and `app.public.manifest`, and every
+lane-dependent name (single-instance key, events, pipe) comes from
+`AppLaneNames` in Core via `AppLane`, so nothing is edited by hand per
+release. The Preview lane stays isolated from the public package.
 
 Use `major.minor.patch.0` with a nonzero major component, increasing at least
 one of the first three fields for each new public package. Each field must fit
