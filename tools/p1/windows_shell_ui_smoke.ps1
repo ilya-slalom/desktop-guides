@@ -1112,6 +1112,19 @@ try {
         throw "Expected visible '$id'."
     }
 
+    # Show-SettingsCard only scrolls down; this brings Settings back to the top.
+    function Scroll-SettingsToTop {
+        $scrollable = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::IsScrollPatternAvailableProperty, $true)
+        foreach ($viewer in $root.FindAll($scope, $scrollable)) {
+            $pattern = $viewer.GetCurrentPattern([System.Windows.Automation.ScrollPattern]::Pattern)
+            if ($pattern.Current.VerticallyScrollable) {
+                $pattern.SetScrollPercent([System.Windows.Automation.ScrollPattern]::NoScroll, 0)
+            }
+        }
+        [void](Wait-VisibleById 'SettingsHeading')
+    }
+
     # For a screenshot of the last Library card. UI Automation clips bounds
     # to the viewport, so a card cut off at the bottom edge still reads as
     # visible; scroll Settings to its end, where the Export card fits.
@@ -4342,14 +4355,18 @@ try {
         Assert-HeadingLevel 'SettingsHeading' 1
         Assert-HeadingLevel 'SettingsAppearanceHeading' 2
         Assert-HeadingLevel 'SettingsLibraryHeading' 2
-        Assert-HeadingLevel 'SettingsGameDataHeading' 2
         Assert-Below 'AppThemeSettingsCard' 'SettingsAppearanceHeading'
         Assert-Below 'WindowMaterialSettingsCard' 'AppThemeSettingsCard'
         Assert-Below 'ColorfulIconsSettingsCard' 'WindowMaterialSettingsCard'
         Assert-Below 'SettingsLibraryHeading' 'ColorfulIconsSettingsCard'
         Assert-Below 'ExportSettingsCard' 'SettingsLibraryHeading'
+        # T11.5: with the Colorful icons card, Game data starts below the fold
+        # at 720 px, so check it scrolled down and then return to the top.
+        [void](Show-SettingsCard 'ProviderSettingsExpander')
+        Assert-HeadingLevel 'SettingsGameDataHeading' 2
         Assert-Below 'SettingsGameDataHeading' 'ExportSettingsCard'
         Assert-Below 'ProviderSettingsExpander' 'SettingsGameDataHeading'
+        Scroll-SettingsToTop
         Resize-ShellWindow $narrowWidth $windowHeight
         Assert-InsideWindow 'SettingsHeading'
         Assert-InsideWindow 'ExportSettingsCard'
@@ -4754,7 +4771,7 @@ try {
         Assert-NoControlViewImage 'LibraryNavigation'
         [void](Wait-HiddenById 'ShellStatus')
         Assert-ShellForeground
-        [void](Show-SettingsCard 'AppThemeSettingsCard')
+        Scroll-SettingsToTop
         $report.settingsScreenshot = Save-WindowScreenshot "icons-$state-settings"
 
         Select-Element 'Library'
