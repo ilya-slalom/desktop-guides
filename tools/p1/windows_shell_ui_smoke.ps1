@@ -7,7 +7,7 @@ param(
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
         'reader-render-error-observed', 'reader-render-error-result',
-        'late-guide-after-close', 'waiting-handoff', 'material', 'catalog', 'catalog-facts', 'library-search', 'stable-navigation',
+        'late-guide-after-close', 'waiting-handoff', 'material', 'icons', 'catalog', 'catalog-facts', 'library-search', 'stable-navigation',
         'provider-none', 'provider-offline', 'provider-settings',
         'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
@@ -59,6 +59,12 @@ param(
 
     [ValidateSet('', 'Mica', 'Acrylic', 'Solid')]
     [string] $SwitchToMaterial = '',
+
+    [ValidateSet('', 'On', 'Off')]
+    [string] $ExpectedIcons = '',
+    [ValidateSet('', 'On', 'Off')]
+    [string] $SwitchIcons = '',
+    [switch] $EmptyLibrary,
 
     [ValidateSet('System', 'Light', 'Dark')]
     [string] $ExpectedTheme = 'System',
@@ -246,6 +252,7 @@ try {
         ' marked (complete|in progress)\.$',
         '^App theme set to (System|Light|Dark)\.$',
         '^Window background set to (Mica|Acrylic|Solid)\.$',
+        '^Colorful icons turned (on|off)\.$',
         '^(No games match\.|\d+ of \d+ games match\.)$',
         '^Opened near your last place\. The guide changed since you were here\.$')
 
@@ -1104,6 +1111,34 @@ try {
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
         throw "Expected visible '$id'."
+    }
+
+    # Show-SettingsCard only scrolls down; this brings Settings back to the top.
+    # The page's ScrollViewer is found from a card through the raw view, since
+    # a control-view search doesn't reach it.
+    function Scroll-SettingsToTop {
+        $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
+        $node = Find-ById 'AppThemeSettingsCard'
+        $pattern = $null
+        while ($node -and -not $pattern) {
+            $candidate = $null
+            if ($node.TryGetCurrentPattern(
+                    [System.Windows.Automation.ScrollPattern]::Pattern, [ref]$candidate) -and
+                $candidate.Current.VerticallyScrollable) {
+                $pattern = $candidate
+            }
+            else { $node = $walker.GetParent($node) }
+        }
+        if (-not $pattern) { throw 'Found no scrollable parent for the Settings cards.' }
+        $pattern.SetScrollPercent([System.Windows.Automation.ScrollPattern]::NoScroll, 0)
+        $deadline = (Get-Date).AddSeconds(5)
+        while ($pattern.Current.VerticalScrollPercent -gt 0 -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Milliseconds 100
+        }
+        if ($pattern.Current.VerticalScrollPercent -gt 0) {
+            throw "Settings stayed scrolled at $($pattern.Current.VerticalScrollPercent)%."
+        }
+        Start-Sleep -Milliseconds 200
     }
 
     # For a screenshot of the last Library card. UI Automation clips bounds
@@ -4336,13 +4371,18 @@ try {
         Assert-HeadingLevel 'SettingsHeading' 1
         Assert-HeadingLevel 'SettingsAppearanceHeading' 2
         Assert-HeadingLevel 'SettingsLibraryHeading' 2
-        Assert-HeadingLevel 'SettingsGameDataHeading' 2
         Assert-Below 'AppThemeSettingsCard' 'SettingsAppearanceHeading'
         Assert-Below 'WindowMaterialSettingsCard' 'AppThemeSettingsCard'
-        Assert-Below 'SettingsLibraryHeading' 'WindowMaterialSettingsCard'
+        Assert-Below 'ColorfulIconsSettingsCard' 'WindowMaterialSettingsCard'
+        Assert-Below 'SettingsLibraryHeading' 'ColorfulIconsSettingsCard'
         Assert-Below 'ExportSettingsCard' 'SettingsLibraryHeading'
+        # T11.5: with the Colorful icons card, Game data starts below the fold
+        # at 720 px, so check it scrolled down and then return to the top.
+        [void](Show-SettingsCard 'ProviderSettingsExpander')
+        Assert-HeadingLevel 'SettingsGameDataHeading' 2
         Assert-Below 'SettingsGameDataHeading' 'ExportSettingsCard'
         Assert-Below 'ProviderSettingsExpander' 'SettingsGameDataHeading'
+        Scroll-SettingsToTop
         Resize-ShellWindow $narrowWidth $windowHeight
         Assert-InsideWindow 'SettingsHeading'
         Assert-InsideWindow 'ExportSettingsCard'
@@ -4675,6 +4715,147 @@ try {
         $report.readerScreenshot = Save-WindowScreenshot "material-$selected-reader"
         $report.material = $selected
         $report.phases += "material-$selected-captured"
+    }
+    elseif ($Mode -eq 'icons') {
+        # T11.5: the toggle, the icons the app set, and the saved choice.
+        # How WinUI draws the SVGs is reviewed on the screenshots.
+        function Get-IconsToggle {
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $toggle = Show-SettingsCard 'ColorfulIconsToggle'
+                if ($toggle.Current.IsEnabled) { return $toggle }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            throw 'Expected the Colorful icons toggle to be enabled once the settings load.'
+        }
+
+        function Assert-Icons([string] $state) {
+            $toggle = Get-IconsToggle
+            $pattern = $toggle.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
+            $toggleState = $pattern.Current.ToggleState.ToString()
+            if ($toggleState -ne $state) {
+                throw "Expected the Colorful icons toggle $state, found $toggleState."
+            }
+            $expected = if ($state -eq 'On') { 'images:11 glyphs:0' } else { 'images:0 glyphs:11' }
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                $status = (Find-ById 'ColorfulIconsToggle').Current.ItemStatus
+                if ($status -ceq $expected) { return }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            throw "Expected the applied icons '$expected', found '$status'."
+        }
+
+        # Raw icons add no element to the control view.
+        function Assert-NoControlViewImage([string] $id) {
+            $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+            $queue = [System.Collections.Generic.Queue[object]]::new()
+            $queue.Enqueue((Wait-VisibleById $id))
+            while ($queue.Count -gt 0) {
+                $child = $walker.GetFirstChild($queue.Dequeue())
+                while ($child) {
+                    if ($child.Current.ControlType -eq [System.Windows.Automation.ControlType]::Image) {
+                        throw ("Expected no Image element under $id; the icon must stay Raw. " +
+                            "Found $($child.Current.ClassName) '$($child.Current.Name)'.")
+                    }
+                    $queue.Enqueue($child)
+                    $child = $walker.GetNextSibling($child)
+                }
+            }
+        }
+
+        # Every icon on screen, including the empty states and the built-in
+        # Settings item. Game artwork is a real image, so its list is skipped.
+        function Assert-NoImageInWindow([string] $view) {
+            $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+            $queue = [System.Collections.Generic.Queue[object]]::new()
+            $queue.Enqueue($root)
+            while ($queue.Count -gt 0) {
+                $child = $walker.GetFirstChild($queue.Dequeue())
+                while ($child) {
+                    if ($child.Current.AutomationId -ne 'GameList') {
+                        if ($child.Current.ControlType -eq [System.Windows.Automation.ControlType]::Image) {
+                            throw ("Expected no Image element in the $view view; icons must stay Raw. " +
+                                "Found $($child.Current.ClassName) '$($child.Current.Name)'.")
+                        }
+                        $queue.Enqueue($child)
+                    }
+                    $child = $walker.GetNextSibling($child)
+                }
+            }
+        }
+
+        Resize-ShellWindow 1500 720
+        Select-Element 'Settings'
+        [void](Wait-Name 'SettingsHeading' 'Settings')
+        [void](Wait-Name 'ColorfulIconsSettingsCard' (
+            'Colorful icons. Show navigation and Settings icons in color.'))
+        [void](Wait-Name 'ColorfulIconsToggle' 'Colorful icons')
+        Assert-Icons $ExpectedIcons
+        $report.phases += "icons-$ExpectedIcons-restored"
+        $state = $ExpectedIcons
+
+        if ($SwitchIcons) {
+            $toggle = Get-IconsToggle
+            $toggle.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
+            $message = if ($SwitchIcons -eq 'On') { 'Colorful icons turned on.' } else { 'Colorful icons turned off.' }
+            [void](Wait-Status $message)
+            Assert-Icons $SwitchIcons
+            $state = $SwitchIcons
+            $report.phases += "icons-switched-$state"
+        }
+
+        [void](Wait-Name 'LibraryNavigation' 'Library')
+        Assert-NoControlViewImage 'LibraryNavigation'
+        Assert-NoControlViewImage 'AppTitleBar'
+        Assert-NoControlViewImage 'AppThemeSettingsCard'
+        Assert-NoImageInWindow 'Settings'
+        [void](Wait-HiddenById 'ShellStatus')
+        Assert-ShellForeground
+        [void](Show-SettingsCard 'ProviderSettingsExpander')
+        $report.settingsLowerScreenshot = Save-WindowScreenshot "icons-$state-settings-lower"
+        Scroll-SettingsToTop
+        $report.settingsScreenshot = Save-WindowScreenshot "icons-$state-settings"
+
+        Select-Element 'Library'
+        # The empty state's Border has no automation peer; its text does.
+        if ($EmptyLibrary) { [void](Wait-Name 'LibraryEmpty' 'No games in your library.') }
+        else { [void](Wait-VisibleById 'LibraryHeading') }
+        Start-Sleep -Milliseconds 400
+        if ($EmptyLibrary) { Assert-NoImageInWindow 'empty library' }
+        Assert-ShellForeground
+        $report.libraryScreenshot = Save-WindowScreenshot "icons-$state-library"
+        if (-not $EmptyLibrary) {
+            # The empty-search icon shows only for a search with no results.
+            Set-SearchQuery 'zzqx no such game' 'LibrarySearchInput'
+            [void](Wait-Status 'No games match.' -AllowHidden)
+            [void](Wait-VisibleById 'LibraryNoResults')
+            Start-Sleep -Milliseconds 300
+            Assert-NoImageInWindow 'empty search'
+            $report.searchScreenshot = Save-WindowScreenshot "icons-$state-search"
+            Set-SearchQuery '' 'LibrarySearchInput'
+            # Guide rows show their format icons on the Game page. Earlier
+            # design scenarios choose the games, so open the first row.
+            $itemCondition = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::ListItem)
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                $firstRow = (Wait-VisibleById 'GameList').FindFirst($scope, $itemCondition)
+                if ($firstRow) { break }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            if (-not $firstRow) { throw 'Expected a game row after clearing the search.' }
+            $firstGame = $firstRow.Current.Name
+            Select-Element $firstGame
+            [void](Wait-Name 'GameHeading' $firstGame)
+            [void](Wait-Status 'Game ready.')
+            [void](Wait-HiddenById 'ShellStatus')
+            Start-Sleep -Milliseconds 400
+            $report.gameScreenshot = Save-WindowScreenshot "icons-$state-game"
+        }
+        $report.icons = $state
+        $report.phases += "icons-$state-captured"
     }
     elseif ($Mode -eq 'prepare-game-editor-close') {
         Select-Element 'Route Test Game'
@@ -6251,8 +6432,20 @@ try {
         }
         elseif ($Mode -eq 'export-cancel') {
             # The install script holds the export at its Backup test gate.
-            Invoke-Element (Wait-EnabledById 'ExportCancelButton')
+            $cancel = Wait-EnabledById 'ExportCancelButton'
+            # T11.5: a setting that saves can't change while the export holds the library.
+            if ((Find-ById 'ColorfulIconsToggle').Current.IsEnabled) {
+                throw 'The Colorful icons toggle stayed enabled during an export.'
+            }
+            Invoke-Element $cancel
             [void](Wait-Status 'Export canceled.')
+            $deadline = (Get-Date).AddSeconds(10)
+            while (-not (Find-ById 'ColorfulIconsToggle').Current.IsEnabled -and (Get-Date) -lt $deadline) {
+                Start-Sleep -Milliseconds 100
+            }
+            if (-not (Find-ById 'ColorfulIconsToggle').Current.IsEnabled) {
+                throw 'The Colorful icons toggle stayed disabled after the export ended.'
+            }
             [void](Wait-HiddenById 'ExportCancelButton')
             Wait-FocusedId 'ExportBackupButton'
             if (Test-Path -LiteralPath $BackupPath) { throw 'A canceled export left its file.' }

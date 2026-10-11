@@ -721,6 +721,9 @@ function Run-ShellSmoke(
     [int] $ExpectedScalePercent = 0,
     [string] $ExpectedMaterial = '',
     [string] $SwitchToMaterial = '',
+    [string] $ExpectedIcons = '',
+    [string] $SwitchIcons = '',
+    [switch] $EmptyLibrary,
     [string] $ExpectedTheme = '',
     [string] $ExpectedThemeStatus = '',
     [string] $SwitchToTheme = '',
@@ -754,6 +757,9 @@ function Run-ShellSmoke(
     if ($SwitchToMaterial) {
         $arguments += ' -SwitchToMaterial ' + $SwitchToMaterial
     }
+    if ($ExpectedIcons) { $arguments += ' -ExpectedIcons ' + $ExpectedIcons }
+    if ($SwitchIcons) { $arguments += ' -SwitchIcons ' + $SwitchIcons }
+    if ($EmptyLibrary) { $arguments += ' -EmptyLibrary' }
     if ($ExpectedTheme) {
         $arguments += ' -ExpectedTheme ' + $ExpectedTheme
     }
@@ -2227,6 +2233,52 @@ function Run-MaterialScenarios {
     }
 }
 
+function Set-StoredColorfulIcons([bool] $on) {
+    $value = if ($on) { 'true' } else { 'false' }
+    dotnet $seedDll set-colorful-icons $dataRoot $value
+    if ($LASTEXITCODE -ne 0) { throw "Could not store colorful icons $value." }
+}
+
+# T11.5: the toggle, the applied icons and the stored choice are app code.
+# How the SVGs render is reviewed on the screenshots.
+function Run-IconScenarios {
+    $originalTheme = Get-AppThemePreference
+    $report.icons = [ordered]@{}
+    try {
+        Set-AppThemePreference $true
+        Set-StoredColorfulIcons $false
+        Start-InstalledShell
+        $report.icons['light-switch-on'] = Run-ShellSmoke 'icons' `
+            -ResultName 'icons-light-switch-on' -ExpectedIcons 'Off' -SwitchIcons 'On'
+        Close-InstalledShell
+        Start-InstalledShell
+        $report.icons['light-persisted'] = Run-ShellSmoke 'icons' `
+            -ResultName 'icons-light-persisted' -ExpectedIcons 'On' -SwitchIcons 'Off'
+        Close-InstalledShell
+
+        Set-AppThemePreference $false
+        Set-StoredColorfulIcons $true
+        Start-InstalledShell
+        $report.icons['dark-on'] = Run-ShellSmoke 'icons' `
+            -ResultName 'icons-dark-on' -ExpectedIcons 'On'
+        Close-InstalledShell
+
+        # Last in the design group: the empty library needs an empty data root.
+        Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
+        Set-AppThemePreference $true
+        Set-StoredColorfulIcons $true
+        Start-InstalledShell
+        $report.icons['light-empty-on'] = Run-ShellSmoke 'icons' `
+            -ResultName 'icons-light-empty' -ExpectedIcons 'On' -EmptyLibrary
+        Close-InstalledShell
+    }
+    finally {
+        Set-StoredColorfulIcons $false
+        Restore-AppThemePreference $originalTheme
+        $report.restoredAppThemeAfterIcons = Get-AppThemePreference
+    }
+}
+
 function Invoke-ShellSeed([string[]] $SeedArguments) {
     $output = @(dotnet $seedDll @SeedArguments)
     if ($LASTEXITCODE -ne 0) {
@@ -2669,6 +2721,7 @@ try {
         Run-DesignLanguageScenarios
         Run-MaterialScenarios
         Run-ReaderDesignScenarios
+        Run-IconScenarios
     }
 
     if (Enter-ScenarioGroup 'catalog') {

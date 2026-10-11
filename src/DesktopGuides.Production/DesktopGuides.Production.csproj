@@ -63,5 +63,13 @@
     <Manifest Include="$(ApplicationManifest)" />
     <Content Include="../DesktopGuides.App/Assets/*.png"
              Link="Assets/%(Filename)%(Extension)" />
+    <!-- T11.5: colour icons (Fluent UI System Icons, MIT) and their notice.
+         The SDK already packages the icons as content; copying them to the
+         output too lets the portable exe extract them. -->
+    <Content Update="Assets/Icons/Color/*.svg;Assets/Icons/Color/*.png"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../THIRD-PARTY-NOTICES.txt"
+             Link="THIRD-PARTY-NOTICES.txt"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

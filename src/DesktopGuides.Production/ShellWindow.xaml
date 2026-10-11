@@ -26,9 +26,6 @@
                   BackRequested="TitleBarBackRequested"
                   PaneToggleRequested="TitleBarPaneToggleRequested"
                   AutomationProperties.AutomationId="AppTitleBar">
-            <TitleBar.IconSource>
-                <FontIconSource Glyph="&#xE82D;" />
-            </TitleBar.IconSource>
         </TitleBar>
 
         <NavigationView x:Name="Navigation"
@@ -59,7 +56,6 @@
         <NavigationView.MenuItems>
             <NavigationViewItem x:Name="LibraryItem"
                                 Content="Library"
-                                Icon="Home"
                                 AutomationProperties.AutomationId="LibraryNavigation" />
         </NavigationView.MenuItems>
 
@@ -210,11 +206,17 @@
                             Style="{StaticResource DesktopGuidesEmptyStateStyle}"
                             Visibility="Collapsed">
                         <StackPanel Spacing="{StaticResource DesktopGuidesSpacing8}">
-                            <FontIcon Glyph="&#xE721;"
-                                      FontSize="24"
-                                      HorizontalAlignment="Left"
-                                      Foreground="{ThemeResource DesktopGuidesAccentBrush}"
-                                      AutomationProperties.AccessibilityView="Raw" />
+                            <Grid HorizontalAlignment="Left">
+                                <FontIcon x:Name="LibraryNoResultsGlyph"
+                                          FontSize="24"
+                                          Foreground="{ThemeResource DesktopGuidesAccentBrush}"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                                <ImageIcon x:Name="LibraryNoResultsImage"
+                                           Width="24"
+                                           Height="24"
+                                           Visibility="Collapsed"
+                                           AutomationProperties.AccessibilityView="Raw" />
+                            </Grid>
                             <TextBlock x:Name="LibraryNoResults"
                                        Style="{StaticResource DesktopGuidesEmptyTitleStyle}"
                                        TextWrapping="Wrap"
@@ -228,11 +230,17 @@
                             Visibility="Collapsed"
                             AutomationProperties.AutomationId="LibraryEmptyState">
                         <StackPanel Spacing="{StaticResource DesktopGuidesSpacing8}">
-                            <FontIcon Glyph="&#xE82D;"
-                                      FontSize="24"
-                                      HorizontalAlignment="Left"
-                                      Foreground="{ThemeResource DesktopGuidesAccentBrush}"
-                                      AutomationProperties.AccessibilityView="Raw" />
+                            <Grid HorizontalAlignment="Left">
+                                <FontIcon x:Name="LibraryEmptyGlyph"
+                                          FontSize="24"
+                                          Foreground="{ThemeResource DesktopGuidesAccentBrush}"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                                <ImageIcon x:Name="LibraryEmptyImage"
+                                           Width="24"
+                                           Height="24"
+                                           Visibility="Collapsed"
+                                           AutomationProperties.AccessibilityView="Raw" />
+                            </Grid>
                             <TextBlock x:Name="LibraryEmpty"
                                        Text="No games in your library."
                                        Style="{StaticResource DesktopGuidesEmptyTitleStyle}"
@@ -671,10 +679,6 @@
                             HorizontalAlignment="Stretch"
                             AutomationProperties.AutomationId="AppThemeSettingsCard"
                             AutomationProperties.Name="App theme. Choose light or dark, or follow Windows.">
-                            <toolkit:SettingsCard.HeaderIcon>
-                                <FontIcon Glyph="&#xE771;"
-                                          AutomationProperties.AccessibilityView="Raw" />
-                            </toolkit:SettingsCard.HeaderIcon>
                             <ComboBox x:Name="AppThemeSelector"
                                       MinWidth="{StaticResource DesktopGuidesSettingsChoiceMinWidth}"
                                       IsEnabled="False"
@@ -689,10 +693,6 @@
                             HorizontalAlignment="Stretch"
                             AutomationProperties.AutomationId="WindowMaterialSettingsCard"
                             AutomationProperties.Name="Window background. Choose how much of your desktop shows behind the app.">
-                            <toolkit:SettingsCard.HeaderIcon>
-                                <FontIcon Glyph="&#xE790;"
-                                          AutomationProperties.AccessibilityView="Raw" />
-                            </toolkit:SettingsCard.HeaderIcon>
                             <ComboBox x:Name="WindowMaterialSelector"
                                       MinWidth="{StaticResource DesktopGuidesSettingsChoiceMinWidth}"
                                       IsEnabled="False"
@@ -703,6 +703,15 @@
                                 <ComboBoxItem Content="Acrylic" Tag="Acrylic" />
                                 <ComboBoxItem Content="Solid" Tag="Solid" />
                             </ComboBox>
+                        </toolkit:SettingsCard>
+                        <toolkit:SettingsCard
+                            x:Name="ColorfulIconsSettingsCard"
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="ColorfulIconsSettingsCard">
+                            <ToggleSwitch x:Name="ColorfulIconsToggle"
+                                          IsEnabled="False"
+                                          Toggled="ColorfulIconsToggled"
+                                          AutomationProperties.AutomationId="ColorfulIconsToggle" />
                         </toolkit:SettingsCard>
                         <TextBlock x:Name="SettingsLibraryHeading"
                                    Text="Library"
@@ -715,10 +724,6 @@
                             HorizontalAlignment="Stretch"
                             AutomationProperties.AutomationId="ExportSettingsCard"
                             AutomationProperties.Name="Back up library. Save your games, guides and reading progress to a .zip file. Uninstalling the app removes your library, so keep the backup outside app data.">
-                            <toolkit:SettingsCard.HeaderIcon>
-                                <FontIcon Glyph="&#xE896;"
-                                          AutomationProperties.AccessibilityView="Raw" />
-                            </toolkit:SettingsCard.HeaderIcon>
                             <StackPanel Orientation="Horizontal"
                                         Spacing="{StaticResource DesktopGuidesSpacing8}">
                                 <ProgressBar x:Name="ExportProgress"
@@ -746,10 +751,6 @@
                             HorizontalAlignment="Stretch"
                             AutomationProperties.AutomationId="RestoreSettingsExpander"
                             AutomationProperties.Name="Restore from backup. Replace this library with one from a backup file.">
-                            <toolkit:SettingsExpander.HeaderIcon>
-                                <FontIcon Glyph="&#xE777;"
-                                          AutomationProperties.AccessibilityView="Raw" />
-                            </toolkit:SettingsExpander.HeaderIcon>
                             <Button x:Name="ChooseBackupButton"
                                     Content="Choose backup…"
                                     IsEnabled="False"

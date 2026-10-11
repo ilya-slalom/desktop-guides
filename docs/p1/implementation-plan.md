@@ -1,7 +1,7 @@
 # P1 implementation plan and exit gates
 
 Status: 48 of the 56 tasks are merged, 11 October 2026. M0, M1, M3 and M4 are
-complete; M2 still needs the optional T11.5. M5 has T20.1, T20.2,
+complete; T11.5 (colorful icons), the last M2 task, is in review in #85. M5 has T20.1, T20.2,
 T15.4 and T15.1 merged, and M6 is planned.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
@@ -1010,6 +1010,9 @@ keeps the previous library at the next start. CI runs
 (`backup` group) and
 [38064144850](https://github.com/ilya-slalom/desktop-guides/actions/runs/38064144850)
 (full) passed; see the verification record.
+T11.5 (#85, in review) adds an optional Settings "Colorful icons" toggle
+with Fluent UI System Icons colour SVGs, monochrome in high contrast; see
+the [verification record](t11-5-colorful-icons-design.md#t115-verification-record).
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |

@@ -1,4 +1,5 @@
 using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Navigation;
 using DesktopGuides.Core.Reading;
 using Microsoft.UI.System;
 using Microsoft.UI.Windowing;
@@ -36,7 +37,17 @@ public sealed partial class ShellWindow
         // Queued to the UI thread; the event's thread is not documented.
         themeSettings = ThemeSettings.CreateForWindowId(AppWindow.Id);
         themeSettings.Changed += (_, _) =>
-            DispatcherQueue.TryEnqueue(() => ApplyTheme(requestedTheme));
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                ApplyTheme(requestedTheme);
+                // T11.5: high contrast forces glyphs, and turning it off restores the choice.
+                ApplyIcons();
+                if (colorfulIcons && ready && navigator.Current is GameRoute or LibraryRoute)
+                {
+                    // Game and guide rows pick their icon when built.
+                    _ = RunNavigationAsync(() => RenderCurrentAsync());
+                }
+            });
     }
 
     private void ApplyTheme(ThemePreference requested)

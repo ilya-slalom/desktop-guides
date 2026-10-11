@@ -4,8 +4,9 @@ namespace DesktopGuides.Production;
 
 public sealed class LibraryGameItem : CatalogRowItem
 {
-    internal LibraryGameItem(LibrarySearchMatch match, int attentionCount = 0)
-        : base(match.Summary.Game.Title, "\uE7FC",
+    internal LibraryGameItem(
+        LibrarySearchMatch match, int attentionCount = 0, bool colorful = false, bool highContrast = false)
+        : base(match.Summary.Game.Title, AppIconCatalog.ForGame(colorful, highContrast),
             CatalogPresentation.GameFacts(match.Summary, match.MatchedGuideTitle, attentionCount))
     {
         Game = match.Summary.Game;

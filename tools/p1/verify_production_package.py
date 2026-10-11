@@ -12,6 +12,18 @@ PACKAGE_NS = "{http://schemas.microsoft.com/appx/manifest/foundation/windows10}"
 VERSION = re.compile(r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\."
                      r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$")
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ICON_DIR = REPO_ROOT / "src" / "DesktopGuides.Production" / "Assets" / "Icons" / "Color"
+
+
+def required_entries() -> list[str]:
+    """T11.5: every vendored colour icon and the third-party notice."""
+    icons = sorted(
+        path.name for path in ICON_DIR.iterdir() if path.suffix.lower() in (".svg", ".png"))
+    if not icons:
+        raise ValueError(f"No colour icons found in {ICON_DIR}.")
+    return ["third-party-notices.txt"] + [f"assets/icons/color/{name.lower()}" for name in icons]
+
 
 def checked_version(value: str) -> tuple[int, int, int, int]:
     if not VERSION.fullmatch(value):
@@ -37,6 +49,9 @@ def verify(
             raise ValueError("Production shell assembly is missing.")
         if "desktopguides.app.dll" in entries:
             raise ValueError("P0 diagnostic assembly is bundled.")
+        missing = [name for name in required_entries() if name not in entries]
+        if missing:
+            raise ValueError(f"Packaged files are missing: {', '.join(missing)}.")
         if any(
             name.startswith("fixtures/")
             or "/fixtures/" in name

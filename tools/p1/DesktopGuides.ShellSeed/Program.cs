@@ -87,6 +87,21 @@ if (args.Length == 3 && args[0] == "set-material")
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "set-colorful-icons")
+{
+    if (args[2] is not ("true" or "false"))
+    {
+        Console.Error.WriteLine("Colorful icons must be true or false.");
+        return 2;
+    }
+    await using SqliteLibraryRepository iconRepository =
+        new(new ManagedPathResolver(args[1]));
+    await iconRepository.InitializeAsync();
+    await iconRepository.UpdateSettingsAsync(
+        settings => settings with { ColorfulIcons = args[2] == "true" });
+    return 0;
+}
+
 if (args.Length == 2 && args[0] == "describe-theme")
 {
     await using SqliteLibraryRepository themeRepository =

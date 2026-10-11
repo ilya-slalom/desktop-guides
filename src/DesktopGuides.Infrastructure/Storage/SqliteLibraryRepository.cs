@@ -609,6 +609,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         Guid? lastGuide = null;
         WindowMaterial material = WindowMaterial.Mica;
         bool reminderShown = false;
+        bool colorfulIcons = false;
         while (reader.Read())
         {
             string key = reader.GetString(0);
@@ -645,8 +646,13 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                 // Anything but "true", such as a value from a newer build, shows the reminder again.
                 reminderShown = value == "true";
             }
+            else if (key == "ColorfulIcons")
+            {
+                // Anything but "true", such as a value from a newer build, reads as off.
+                colorfulIcons = value == "true";
+            }
         }
-        return new AppSettings(theme, lastGuide, material, reminderShown);
+        return new AppSettings(theme, lastGuide, material, reminderShown, colorfulIcons);
     }
 
     private static void WriteSettings(
@@ -696,6 +702,16 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                 """;
             reminder.Parameters.AddWithValue("$value", settings.ExportReminderShown ? "true" : "false");
             reminder.ExecuteNonQuery();
+        }
+        using (SqliteCommand icons = connection.CreateCommand())
+        {
+            icons.Transaction = transaction;
+            icons.CommandText = """
+                INSERT INTO Settings (Key, Value) VALUES ('ColorfulIcons', $value)
+                ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value
+                """;
+            icons.Parameters.AddWithValue("$value", settings.ColorfulIcons ? "true" : "false");
+            icons.ExecuteNonQuery();
         }
     }
 

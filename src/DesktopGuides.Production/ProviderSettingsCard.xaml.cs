@@ -10,6 +10,9 @@ namespace DesktopGuides.Production;
 
 public sealed partial class ProviderSettingsCard : UserControl
 {
+    // T11.5: the shell sets this card's icon with the others.
+    internal void SetHeaderIcon(IconElement icon) => ProviderSettingsExpander.HeaderIcon = icon;
+
     private ProviderServices? services;
     private ProviderCredentials saved = ProviderCredentials.None;
     private CancellationTokenSource? pending;

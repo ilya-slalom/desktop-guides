@@ -120,6 +120,7 @@ public sealed partial class ShellWindow : Window
         InitializeThemeChoice();
         ApplyWindowMaterial(WindowMaterial.Mica);
         ApplyTheme(ThemePreference.System);
+        InitializeIcons();
         Navigation.SelectedItem = LibraryItem;
         gameArtwork = ArtworkListLoader.Attach(GameList, LoadRowArtworkAsync);
         GameList.AddHandler(
@@ -433,9 +434,11 @@ public sealed partial class ShellWindow : Window
             committedTheme = storedTheme;
             ApplyTheme(storedTheme);
             ApplyWindowMaterial(requestedMaterial);
+            colorfulIcons = committedColorfulIcons = settings?.ColorfulIcons ?? false;
             WindowMaterialSelector.IsEnabled = true;
             AppThemeSelector.IsEnabled = true;
             ready = true;
+            ApplyIcons();
             ExportBackupButton.IsEnabled = true;
             ChooseBackupButton.IsEnabled = true;
             // Queued like every other render, so a quick first click can't be overwritten.
@@ -470,6 +473,7 @@ public sealed partial class ShellWindow : Window
         catch (LibraryOpenException error)
         {
             ready = false;
+            UpdateIconToggleEnabled();
             if (!closeRequested)
             {
                 ShowLibraryUnavailable(error);
@@ -478,6 +482,7 @@ public sealed partial class ShellWindow : Window
         catch (Exception error)
         {
             ready = false;
+            UpdateIconToggleEnabled();
             ShowErrorStatus($"Couldn't open the library: {error.Message}");
         }
     }
@@ -1907,7 +1912,7 @@ public sealed partial class ShellWindow : Window
                         (await library.ListGuideSummariesAsync(gameRoute.GameId))
                         .Select(summary => new GuideRowItem(
                             summary, TimeProvider.System, CultureInfo.CurrentCulture,
-                            guideHealth[summary.Guide.Id]))
+                            guideHealth[summary.Guide.Id], colorfulIcons, themeSettings?.HighContrast == true))
                         .ToList();
                     if (generation != renderGeneration)
                     {
@@ -2176,7 +2181,9 @@ public sealed partial class ShellWindow : Window
         IReadOnlyList<LibrarySearchMatch> matches = LibrarySearch.Filter(librarySummaries, appliedLibraryQuery);
         gameArtwork.CancelAll();
         GameList.ItemsSource = matches
-            .Select(match => new LibraryGameItem(match, guideHealth.CountForGame(match.Summary.Game.Id)))
+            .Select(match => new LibraryGameItem(
+                match, guideHealth.CountForGame(match.Summary.Game.Id),
+                colorfulIcons, themeSettings?.HighContrast == true))
             .ToList();
         LibraryNoResults.Text = $"No games or guides match \"{appliedLibraryQuery}\".";
         ShowLibraryView(
