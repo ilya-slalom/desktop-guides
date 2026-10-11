@@ -739,6 +739,72 @@
                                         AutomationProperties.AutomationId="ExportBackupButton" />
                             </StackPanel>
                         </toolkit:SettingsCard>
+                        <toolkit:SettingsExpander
+                            x:Name="RestoreSettingsExpander"
+                            Header="Restore from backup"
+                            Description="Replace this library with one from a backup file."
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="RestoreSettingsExpander"
+                            AutomationProperties.Name="Restore from backup. Replace this library with one from a backup file.">
+                            <toolkit:SettingsExpander.HeaderIcon>
+                                <FontIcon Glyph="&#xE777;"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                            </toolkit:SettingsExpander.HeaderIcon>
+                            <Button x:Name="ChooseBackupButton"
+                                    Content="Choose backup…"
+                                    IsEnabled="False"
+                                    Click="ChooseBackupClicked"
+                                    AutomationProperties.AutomationId="ChooseBackupButton" />
+                            <toolkit:SettingsExpander.Items>
+                                <toolkit:SettingsCard x:Name="RestoreProgressCard"
+                                                      Header="Copying backup…"
+                                                      Visibility="Collapsed"
+                                                      AutomationProperties.AutomationId="RestoreProgressCard">
+                                    <StackPanel Orientation="Horizontal"
+                                                Spacing="{StaticResource DesktopGuidesSpacing8}">
+                                        <ProgressBar x:Name="RestoreProgress"
+                                                     Width="160"
+                                                     VerticalAlignment="Center"
+                                                     AutomationProperties.AutomationId="RestoreProgress" />
+                                        <Button x:Name="RestoreCancelButton"
+                                                Content="Cancel"
+                                                Click="RestoreCancelClicked"
+                                                AutomationProperties.AutomationId="RestoreCancelButton" />
+                                    </StackPanel>
+                                </toolkit:SettingsCard>
+                                <toolkit:SettingsCard x:Name="RestoreMadeCard"
+                                                      Visibility="Collapsed"
+                                                      AutomationProperties.AutomationId="RestoreMadeCard" />
+                                <toolkit:SettingsCard x:Name="RestoreHoldsCard"
+                                                      Visibility="Collapsed"
+                                                      AutomationProperties.AutomationId="RestoreHoldsCard" />
+                                <toolkit:SettingsCard x:Name="RestoreCurrentCard"
+                                                      Visibility="Collapsed"
+                                                      AutomationProperties.AutomationId="RestoreCurrentCard" />
+                                <toolkit:SettingsCard x:Name="RestoreActionsCard"
+                                                      Visibility="Collapsed"
+                                                      AutomationProperties.AutomationId="RestoreActionsCard">
+                                    <StackPanel Orientation="Horizontal"
+                                                Spacing="{StaticResource DesktopGuidesSpacing8}">
+                                        <Button x:Name="DiscardStageButton"
+                                                Content="Discard"
+                                                Click="DiscardStageClicked"
+                                                AutomationProperties.AutomationId="DiscardStageButton" />
+                                        <Button x:Name="ReplaceLibraryButton"
+                                                Content="Replace library…"
+                                                Style="{ThemeResource AccentButtonStyle}"
+                                                Click="ReplaceLibraryClicked"
+                                                AutomationProperties.AutomationId="ReplaceLibraryButton" />
+                                    </StackPanel>
+                                </toolkit:SettingsCard>
+                            </toolkit:SettingsExpander.Items>
+                        </toolkit:SettingsExpander>
+                        <InfoBar x:Name="RestoreStatus"
+                                 IsOpen="False"
+                                 IsClosable="False"
+                                 Severity="Error"
+                                 AutomationProperties.AutomationId="RestoreStatus"
+                                 AutomationProperties.LiveSetting="Assertive" />
                         <TextBlock x:Name="SettingsGameDataHeading"
                                    Text="Game data"
                                    Style="{StaticResource DesktopGuidesSettingsSectionStyle}"

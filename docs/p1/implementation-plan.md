@@ -999,9 +999,15 @@ and
 [38030077234](https://github.com/ilya-slalom/desktop-guides/actions/runs/38030077234)
 passed the installed `backup` group; see the
 [verification record](t20-2-export-restore-design.md#t202-verification-record).
-PR b (the restore engine, in review) stages and fully checks a backup,
-swaps it in behind a marker and confirms or rolls it back at startup; nothing
-is wired into the app yet. The restore UI follows in PR c.
+PR b (merged in #79) stages and fully checks a backup, swaps it in behind a
+marker and confirms or rolls it back at startup. PR c (in review) wires it
+into Settings: a Restore expander shows a checked backup's counts, a native
+Replace confirmation precedes an in-session swap, and an interrupted restore
+keeps the previous library at the next start. CI runs
+[38063139795](https://github.com/ilya-slalom/desktop-guides/actions/runs/38063139795)
+(`backup` group) and
+[38064144850](https://github.com/ilya-slalom/desktop-guides/actions/runs/38064144850)
+(full) passed; see the verification record.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |

@@ -1,3 +1,4 @@
+using DesktopGuides.Core.Backup;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
@@ -348,11 +349,12 @@ public sealed partial class ShellWindow : Window
 
     internal bool IsClosing => closeRequested;
 
-    private async Task InitializeCoreAsync()
+    private async Task InitializeCoreAsync(bool verifyRestore = false)
     {
         try
         {
             ExportBackupButton.IsEnabled = false;
+            ChooseBackupButton.IsEnabled = false;
             string dataRoot = AppDataRoot.Resolve(
                 AppDataRoot.HasPackageIdentity(),
                 () => ApplicationData.Current.LocalFolder.Path,
@@ -366,14 +368,34 @@ public sealed partial class ShellWindow : Window
             ShowRouteProgress("Loading library…");
             ManagedPathResolver paths = new(dataRoot);
             libraryPaths = paths;
+            restorer = new LibraryRestorer(paths);
             if (repository is not null)
             {
                 await repository.DisposeAsync();
                 repository = null;
             }
+            // T20.2: finish or undo a restore before anything opens the library.
+            RestoreRecoveryOutcome recovery = await Task.Run(
+                () => LibraryRestoreRecovery.Run(paths, verifyRestore));
             repository = new SqliteLibraryRepository(paths);
             artwork = new ManagedArtworkStore(paths);
-            await repository.InitializeAsync();
+            try
+            {
+                await repository.InitializeAsync();
+            }
+            catch (Exception) when (recovery == RestoreRecoveryOutcome.PendingVerify)
+            {
+                // The restored library didn't open: put the previous one back.
+                await repository.DisposeAsync();
+                await Task.Run(() => LibraryRestoreRecovery.RollBack(paths));
+                recovery = RestoreRecoveryOutcome.RolledBack;
+                repository = new SqliteLibraryRepository(paths);
+                await repository.InitializeAsync();
+            }
+            if (recovery == RestoreRecoveryOutcome.PendingVerify)
+            {
+                await Task.Run(() => LibraryRestoreRecovery.Complete(paths));
+            }
             LibraryUnavailablePanel.Visibility = Visibility.Collapsed;
             StartupReconciliationReport? startup = repository.LastStartupReconciliation;
             guideHealth.Reset(startup?.MissingGuides ?? []);
@@ -392,7 +414,9 @@ public sealed partial class ShellWindow : Window
             // The library lease is held, so no live session owns a profile here.
             string sweptRoot = cacheRoot;
             await Task.Run(() => WebView2ProfileSweeper.Sweep(sweptRoot));
-            providers = new ProviderServices(dataRoot);
+            // Kept across Retry and a restore: its credentials sit outside
+            // the library, and the settings card may still be using it.
+            providers ??= new ProviderServices(dataRoot);
             await ProviderSettings.InitializeAsync(providers);
             importer = providers.CreateImporter(repository, artwork);
             AppSettings? settings = null;
@@ -413,6 +437,7 @@ public sealed partial class ShellWindow : Window
             AppThemeSelector.IsEnabled = true;
             ready = true;
             ExportBackupButton.IsEnabled = true;
+            ChooseBackupButton.IsEnabled = true;
             // Queued like every other render, so a quick first click can't be overwritten.
             await RunNavigationAsync(() => RenderCurrentAsync());
             if (EffectiveMaterial != requestedMaterial)
@@ -424,6 +449,19 @@ public sealed partial class ShellWindow : Window
                 ShowWarningStatus(GuideFilePresentation.Unreadable(report.UnreadableGuideCount));
             }
             await WarnIfRuntimeMissingAsync(sweptRoot);
+            if (pendingRestoreError is string swapError)
+            {
+                ShowErrorStatus(swapError);
+            }
+            else if (recovery == RestoreRecoveryOutcome.RolledBack)
+            {
+                ShowWarningStatus(LibraryBackupMessages.RestoreKept);
+            }
+            else if (recovery == RestoreRecoveryOutcome.PendingVerify && pendingRestore is { } restored)
+            {
+                ShowStatus(LibraryBackupMessages.Restored(restored.Games, restored.Guides),
+                    InfoBarSeverity.Success, true, false);
+            }
         }
         catch (OperationCanceledException) when (closeRequested)
         {
@@ -490,6 +528,11 @@ public sealed partial class ShellWindow : Window
                 try
                 {
                     await DisposeProgressTrackingAsync();
+                    // A stage the user didn't replace with; startup would delete it anyway.
+                    if (stagedBackup is LibraryRestoreStage stage && restorer is LibraryRestorer active)
+                    {
+                        active.DiscardStage(stage);
+                    }
                     if (repository is not null)
                     {
                         await repository.DisposeAsync();

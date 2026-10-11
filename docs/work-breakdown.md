@@ -579,7 +579,8 @@ library and points to Export in Settings.
   conflict handling. Place Export and Restore actions in Toolkit
   `SettingsCard` rows and group advanced restore details in
   `SettingsExpander`; destructive replacement still uses a native
-  confirmation dialog.
+  confirmation dialog. Implemented in PRs #78, #79 and #80; see
+  [the design](p1/t20-2-export-restore-design.md).
 - **TR20.1** Restore validates checksums, paths, guide references, and provider
   artwork references in staging before modifying the active library.
 - **TR20.2** The export includes no credentials, transient WebView2 data, or
