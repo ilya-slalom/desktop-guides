@@ -167,6 +167,9 @@ jobs:
       - name: Check release certificate creation
         shell: pwsh
         run: ./tools/p1/test_new_release_certificate.ps1
+      - name: Check the release certificate pin
+        shell: pwsh
+        run: ./tools/p1/test_release_certificate_pin.ps1
       - name: Check provider credential parsing
         shell: pwsh
         run: ./tools/p1/test_windows_provider_credentials.ps1
