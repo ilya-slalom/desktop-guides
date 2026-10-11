@@ -86,7 +86,10 @@ in place.
 
 Release assets: `DesktopGuides-X.Y.Z.0-x64.msix`,
 `DesktopGuides-portable-x64-X.Y.Z.zip`, a `.sha256` for each,
-`desktop-guides-release.cer` and `release-manifest.json`. Keep ARM64 out of
+`desktop-guides-release.cer` and `release-manifest.json`. The run artifact
+also holds `release-notes.md`, the portable build record
+(`DesktopGuides-portable-x64-X.Y.Z.json`) and, when a previous release exists,
+`upgrade.json`; these are not attached to the release. Keep ARM64 out of
 release output until its complete native P1 workflow passes.
 
 Record the commit, the MSIX SHA-256, identity, Windows App Runtime minimum

@@ -157,7 +157,7 @@ jobs:
           ./tools/p1/windows_package_upgrade.ps1 -OldPackage '${{ steps.package.outputs.previous }}' `
             -NewPackage "artifacts/release/DesktopGuides-$env:VERSION-x64.msix" `
             -Certificate docs/p1/release/desktop-guides-release.cer `
-            -SeedTool $seed -ResultPath artifacts/release/upgrade.json
+            -SeedTool $seed -ResultPath artifacts/upgrade.json
       - name: Remove the certificate trust
         if: always()
         shell: pwsh
@@ -176,6 +176,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./tools/p1/package_portable_release.ps1 -Commit $env:COMMIT -Version ($env:VERSION -replace '\.0$', '') `
             -PublishDirectory $publish -OutputDirectory artifacts/release
+          # Its build record names the runner; keep it in the run artifact, not the release.
+          Move-Item "artifacts/release/DesktopGuides-portable-x64-$($env:VERSION -replace '\.0$', '').json" artifacts/
       - name: Write the release manifest and notes
         shell: pwsh
         run: |
@@ -221,6 +223,8 @@ jobs:
           path: |
             artifacts/release/*
             artifacts/release-notes.md
+            artifacts/upgrade.json
+            artifacts/DesktopGuides-portable-x64-*.json
           if-no-files-found: error
           # The repository is public: keep the signed package downloadable only briefly.
           retention-days: 1
