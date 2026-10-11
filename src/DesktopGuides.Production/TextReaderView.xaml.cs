@@ -231,7 +231,7 @@ public sealed partial class TextReaderView : UserControl
         try
         {
             if (!EventWaitHandle.TryOpenExisting(
-                $@"Local\DesktopGuides.Preview.TextRemeasure.{Environment.ProcessId}",
+                AppLane.Current.LocalEvent("TextRemeasure", Environment.ProcessId),
                 out EventWaitHandle? signal))
             {
                 return;

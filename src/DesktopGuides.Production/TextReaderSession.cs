@@ -27,7 +27,7 @@ internal sealed class TextReaderSession : IReaderSession
 
     // Installed tests open the gate to read the view's applied size.
     public static string? DiagnosticsFolderForTest(string cacheRoot) =>
-        TestGate.IsOpen($@"Local\DesktopGuides.Preview.TextDiagnostics.{Environment.ProcessId}")
+        TestGate.IsOpen(AppLane.Current.LocalEvent("TextDiagnostics", Environment.ProcessId))
             ? Path.Combine(cacheRoot, "diagnostics")
             : null;
 

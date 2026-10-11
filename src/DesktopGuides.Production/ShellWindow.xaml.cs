@@ -100,7 +100,7 @@ public sealed partial class ShellWindow : Window
     public ShellWindow()
     {
         InitializeComponent();
-        Title = "Desktop Guides Preview";
+        Title = AppLane.Current.WindowTitle;
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
         statusDismissTimer = DispatcherQueue.CreateTimer();
@@ -1639,7 +1639,7 @@ public sealed partial class ShellWindow : Window
 
     private static async Task PauseReaderMetadataReadForTestAsync()
     {
-        string prefix = $@"Local\DesktopGuides.Preview.ReaderLoad.{Environment.ProcessId}";
+        string prefix = AppLane.Current.LocalEvent("ReaderLoad", Environment.ProcessId);
         try
         {
             if (!EventWaitHandle.TryOpenExisting(
@@ -1674,7 +1674,7 @@ public sealed partial class ShellWindow : Window
     // installed test continues it or the work is cancelled.
     private static async Task PauseForTestAsync(string gate, CancellationToken token)
     {
-        string prefix = $@"Local\DesktopGuides.Preview.{gate}.{Environment.ProcessId}";
+        string prefix = AppLane.Current.LocalEvent(gate, Environment.ProcessId);
         try
         {
             if (!EventWaitHandle.TryOpenExisting(

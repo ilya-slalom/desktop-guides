@@ -318,6 +318,31 @@ jobs:
             packageSha256 = (Get-FileHash $packages[0].FullName -Algorithm SHA256).Hash
           } | ConvertTo-Json | Set-Content artifacts/production-build/manifest.json -Encoding utf8
           Copy-Item $packages[0].FullName artifacts/production-build/
+      - name: Build and verify the public lane
+        if: matrix.architecture == 'x64'
+        shell: pwsh
+        run: |
+          # T17.1: the released identity must pack and verify on every build.
+          # Its own output folder keeps it apart from the Preview package.
+          dotnet build src/DesktopGuides.Production/DesktopGuides.Production.csproj `
+            -c Release --no-restore `
+            -p:Platform=x64 `
+            -p:PackageLane=Public `
+            -p:AppxPackageDir=$PWD/artifacts/public-lane/ `
+            -p:GenerateAppxPackageOnBuild=true `
+            -p:AppxPackageSigningEnabled=false
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $packages = @(Get-ChildItem artifacts/public-lane -Recurse `
+            -Filter 'DesktopGuides.Production_*_x64.msix')
+          if ($packages.Count -ne 1) {
+            throw "Expected one public x64 MSIX, found $($packages.Count)."
+          }
+          python tools/p1/verify_production_package.py $packages[0].FullName `
+            --name IlyaLissoboi.DesktopGuides `
+            --publisher 'CN=359962D5-3801-484E-BE5B-39D0D498BEA4' `
+            --version 1.0.0.0 `
+            --architecture x64
+          exit $LASTEXITCODE
       - name: Upload production package and manifest
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

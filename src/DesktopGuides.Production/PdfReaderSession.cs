@@ -110,7 +110,7 @@ internal sealed class PdfReaderSession : IReaderSession
     public event EventHandler<PdfGuideLoadError>? Failed;
 
     public static bool DiagnosticsEnabledForTest() =>
-        TestGate.IsOpen($@"Local\DesktopGuides.Preview.PdfDiagnostics.{Environment.ProcessId}");
+        TestGate.IsOpen(AppLane.Current.LocalEvent("PdfDiagnostics", Environment.ProcessId));
 
     public Task OpenAsync(ManagedGuideSource source, CancellationToken token) =>
         OpenAsync(source, null, token);
