@@ -3,6 +3,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $Commit,
 
+    # Release version X.Y.Z. Names the files by version instead of commit.
+    [string] $Version,
+
     [string] $PublishDirectory,
 
     [string] $OutputDirectory
@@ -17,6 +20,9 @@ if (-not $PublishDirectory) {
 }
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $repoRoot 'artifacts\portable\release' }
 if ($Commit -notmatch '^[0-9a-f]{7,40}$') { throw "Expected a commit hash, got '$Commit'." }
+if ($Version -and $Version -notmatch '^[1-9][0-9]*\.[0-9]+\.[0-9]+$') {
+    throw "Expected a release version X.Y.Z, got '$Version'."
+}
 
 $exeName = 'DesktopGuides.Production.exe'
 if (-not (Test-Path -LiteralPath $PublishDirectory -PathType Container)) {
@@ -29,7 +35,8 @@ if ($published.Count -ne 1 -or $published[0].Name -ne $exeName -or $published[0]
 }
 $exe = $published[0]
 
-$name = "DesktopGuides-portable-x64-$($Commit.Substring(0, 7))"
+$suffix = if ($Version) { $Version } else { $Commit.Substring(0, 7) }
+$name = "DesktopGuides-portable-x64-$suffix"
 $zipPath = Join-Path $OutputDirectory "$name.zip"
 $manifestPath = Join-Path $OutputDirectory "$name.json"
 $checksumPath = Join-Path $OutputDirectory "$name.zip.sha256"
@@ -89,6 +96,7 @@ $manifest = [ordered]@{
     builtOn = [Environment]::MachineName
     builtAt = (Get-Date).ToUniversalTime().ToString('o')
 }
+if ($Version) { $manifest.Insert(1, 'version', $Version) }
 $utf8 = [Text.UTF8Encoding]::new($false)
 [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json), $utf8)
 [IO.File]::WriteAllText($checksumPath, "$zipHash  $($zip.Name)`n", $utf8)
