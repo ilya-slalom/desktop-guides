@@ -158,6 +158,9 @@ jobs:
       - name: Check public manifest stamping
         shell: pwsh
         run: ./tools/p1/test_stamp_package_version.ps1
+      - name: Check the release CI gate
+        shell: pwsh
+        run: ./tools/p1/test_release_ci_gate.ps1
       - name: Check provider credential parsing
         shell: pwsh
         run: ./tools/p1/test_windows_provider_credentials.ps1
