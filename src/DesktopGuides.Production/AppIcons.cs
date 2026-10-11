@@ -17,21 +17,14 @@ internal static class AppIcons
     public static IconElement Element(AppIconChoice choice)
     {
         IconElement icon = choice.IsAsset
-            ? HideInnerImages(new ImageIcon { Source = Image(choice.AssetFile!) })
+            ? new ImageIcon { Source = Image(choice.AssetFile!) }
             : new FontIcon { Glyph = choice.Glyph! };
         AutomationProperties.SetAccessibilityView(icon, AccessibilityView.Raw);
         return icon;
     }
 
     // ImageIcon draws through an Image child it creates itself, and Raw on
-    // the icon doesn't reach that child, so it is hidden once it exists.
-    public static ImageIcon HideInnerImages(ImageIcon icon)
-    {
-        icon.Loaded += (_, _) => HideImages(icon);
-        return icon;
-    }
-
-    // Returns whether any Image was found under the parent.
+    // the icon doesn't reach that child. Returns whether any Image was found.
     public static bool HideImages(DependencyObject parent)
     {
         bool found = false;

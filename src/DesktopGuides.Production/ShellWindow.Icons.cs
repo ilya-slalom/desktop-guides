@@ -10,23 +10,22 @@ public sealed partial class ShellWindow
     // T11.5: the choice on screen, and the last one storage accepted.
     private bool colorfulIcons;
     private bool committedColorfulIcons;
-    private bool iconsReady;
     private bool applyingIconToggle;
-    // The TitleBar builds its icon from IconSource, so its Image appears on a later layout pass.
-    private bool titleBarImagePending;
+    // A colour icon's Image appears on a later layout pass, and a collapsed
+    // empty state's only once it is shown, so its host waits here until hidden.
+    private readonly HashSet<DependencyObject> iconHostsPending = [];
     private readonly SemaphoreSlim iconSaveGate = new(1, 1);
 
     private void InitializeIcons()
     {
         ColorfulIconsSettingsCard.Header = ColorfulIconsPresentation.Header;
         AutomationProperties.SetName(ColorfulIconsToggle, ColorfulIconsPresentation.ToggleName);
-        AppIcons.HideInnerImages(LibraryEmptyImage);
-        AppIcons.HideInnerImages(LibraryNoResultsImage);
-        AppTitleBar.LayoutUpdated += (_, _) =>
+        ShellRoot.LayoutUpdated += (_, _) =>
         {
-            if (titleBarImagePending && AppIcons.HideImages(AppTitleBar))
+            if (iconHostsPending.Count == 0) return;
+            foreach (DependencyObject host in iconHostsPending.ToArray())
             {
-                titleBarImagePending = false;
+                if (AppIcons.HideImages(host)) iconHostsPending.Remove(host);
             }
         };
         // The built-in Settings item exists only once the template has loaded.
@@ -52,9 +51,7 @@ public sealed partial class ShellWindow
         {
             settingsItem.Icon = AppIcons.Element(Pick(AppIcon.NavSettings));
         }
-        AppIconChoice titleBarIcon = Pick(AppIcon.TitleBar);
-        AppTitleBar.IconSource = AppIcons.Source(titleBarIcon);
-        titleBarImagePending = titleBarIcon.IsAsset;
+        AppTitleBar.IconSource = AppIcons.Source(Pick(AppIcon.TitleBar));
         ShowEmptyStateIcon(LibraryEmptyGlyph, LibraryEmptyImage, Pick(AppIcon.EmptyLibrary));
         ShowEmptyStateIcon(LibraryNoResultsGlyph, LibraryNoResultsImage, Pick(AppIcon.EmptySearch));
         AppThemeSettingsCard.HeaderIcon = AppIcons.Element(Pick(AppIcon.ThemeCard));
@@ -62,11 +59,21 @@ public sealed partial class ShellWindow
         ExportSettingsCard.HeaderIcon = AppIcons.Element(Pick(AppIcon.BackupCard));
         RestoreSettingsExpander.HeaderIcon = AppIcons.Element(Pick(AppIcon.RestoreCard));
         ProviderSettings.SetHeaderIcon(AppIcons.Element(Pick(AppIcon.ProvidersCard)));
+        iconHostsPending.Clear();
+        if (images > 0)
+        {
+            iconHostsPending.UnionWith(new DependencyObject?[]
+            {
+                LibraryItem, Navigation.SettingsItem as DependencyObject, AppTitleBar,
+                LibraryEmptyImage, LibraryNoResultsImage, AppThemeSettingsCard,
+                WindowMaterialSettingsCard, ExportSettingsCard, RestoreSettingsExpander, ProviderSettings
+            }.OfType<DependencyObject>());
+        }
 
         applyingIconToggle = true;
         ColorfulIconsToggle.IsOn = colorfulIcons;
         applyingIconToggle = false;
-        ColorfulIconsToggle.IsEnabled = ColorfulIconsPresentation.ToggleEnabled(iconsReady, highContrast);
+        UpdateIconToggleEnabled();
         ColorfulIconsSettingsCard.Description = ColorfulIconsPresentation.CardDescription(highContrast);
         AutomationProperties.SetName(
             ColorfulIconsSettingsCard, ColorfulIconsPresentation.CardName(highContrast));
@@ -74,6 +81,11 @@ public sealed partial class ShellWindow
         AutomationProperties.SetItemStatus(
             ColorfulIconsToggle, ColorfulIconsPresentation.Status(images, glyphs));
     }
+
+    // Like the theme and material selectors: off until the library is open, and during an export or restore.
+    private void UpdateIconToggleEnabled() =>
+        ColorfulIconsToggle.IsEnabled = ColorfulIconsPresentation.ToggleEnabled(
+            ready && !libraryBusy, themeSettings?.HighContrast == true);
 
     private static void ShowEmptyStateIcon(FontIcon glyph, ImageIcon image, AppIconChoice choice)
     {
@@ -91,8 +103,14 @@ public sealed partial class ShellWindow
 
     private async void ColorfulIconsToggled(object sender, RoutedEventArgs e)
     {
-        if (applyingIconToggle || repository is null)
+        if (applyingIconToggle)
         {
+            return;
+        }
+        if (repository is null || !ready || libraryBusy)
+        {
+            // The library can't save now; put the switch back to the icons on screen.
+            ApplyIcons();
             return;
         }
         bool requested = ColorfulIconsToggle.IsOn;

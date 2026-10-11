@@ -435,11 +435,10 @@ public sealed partial class ShellWindow : Window
             ApplyTheme(storedTheme);
             ApplyWindowMaterial(requestedMaterial);
             colorfulIcons = committedColorfulIcons = settings?.ColorfulIcons ?? false;
-            iconsReady = true;
-            ApplyIcons();
             WindowMaterialSelector.IsEnabled = true;
             AppThemeSelector.IsEnabled = true;
             ready = true;
+            ApplyIcons();
             ExportBackupButton.IsEnabled = true;
             ChooseBackupButton.IsEnabled = true;
             // Queued like every other render, so a quick first click can't be overwritten.
@@ -474,6 +473,7 @@ public sealed partial class ShellWindow : Window
         catch (LibraryOpenException error)
         {
             ready = false;
+            UpdateIconToggleEnabled();
             if (!closeRequested)
             {
                 ShowLibraryUnavailable(error);
@@ -482,6 +482,7 @@ public sealed partial class ShellWindow : Window
         catch (Exception error)
         {
             ready = false;
+            UpdateIconToggleEnabled();
             ShowErrorStatus($"Couldn't open the library: {error.Message}");
         }
     }

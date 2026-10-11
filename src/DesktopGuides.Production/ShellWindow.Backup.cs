@@ -38,6 +38,7 @@ public sealed partial class ShellWindow
         LibraryItem.IsEnabled = !busy;
         AppThemeSelector.IsEnabled = !busy && ready;
         WindowMaterialSelector.IsEnabled = !busy && ready;
+        UpdateIconToggleEnabled();
         AppTitleBar.IsBackButtonEnabled = !busy && navigator.CanGoBack;
     }
 
