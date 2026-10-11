@@ -108,7 +108,7 @@ The app icon (T17.6) is the source for every logo in
 and 14 target sizes (plain, unplated and light-unplated), Square150x150,
 Wide310x150, StoreLogo and SplashScreen at five scales, and `AppIcon.ico`
 (16 to 256 px) for the portable exe and its window. Sizes 16 to 32 px use a
-simplified crop of the icon. `AppxBundle=Never` keeps the scale-qualified
+separate small-size drawing of the icon, with a larger controller. `AppxBundle=Never` keeps the scale-qualified
 logos in one `.msix` rather than a bundle of resource packages.
 To change the icon, replace the two masters in `docs/p1/app-icon/` and run
 `python tools/p1/generate_app_icon_assets.py src/DesktopGuides.Production/Assets`

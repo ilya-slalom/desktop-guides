@@ -2,7 +2,7 @@
 
 Usage: python generate_app_icon_assets.py <output folder>
 Needs Pillow. The masters are docs/p1/app-icon/app-icon-master.png (the full
-icon) and app-icon-small-master.png (the simplified crop for 16 to 32 px).
+icon) and app-icon-small-master.png (the small-size drawing for 16 to 32 px).
 """
 
 import sys
