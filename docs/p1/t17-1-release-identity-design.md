@@ -326,8 +326,9 @@ script), `1138ad4` (pin), `c3f868b`, `38d811c`, `a2c612a` and `8a7e2b4`
 (release workflow).
 
 - **PowerShell tests.** The `core-tests` job runs the script tests under
-  pwsh 7: [run 38113468830](https://github.com/ilya-slalom/desktop-guides/actions/runs/38113468830)
-  passed (it covers the certificate script), and the final `windows-ci` run
+  pwsh 7: [run 38113468830](https://github.com/ilya-slalom/desktop-guides/actions/runs/38113468830):
+  its core-tests job passed (the rest of the run was cancelled; it covers the
+  certificate script), and the final `windows-ci` run
   [38120109659](https://github.com/ilya-slalom/desktop-guides/actions/runs/38120109659)
   on `8a7e2b4` is green, including the certificate pin test. pcsx2-win has only
   Windows PowerShell 5.1; the scripts run in both.

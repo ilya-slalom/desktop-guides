@@ -984,7 +984,7 @@ project uses a provisional package identity until T17.1 sets the public one.
 
 Every P1 task closes with a code or documentation artifact, a named test or
 manual trace, and a reviewable result. The [implementation plan](p1/implementation-plan.md)
-lists dependencies and specific exits for all 55 tasks. Core/Infrastructure
+lists dependencies and specific exits for all 56 tasks. Core/Infrastructure
 tests run on the locked Windows CI toolchain; critical file-boundary and
 symlink tests also run on Windows NTFS. UI Automation, Narrator, high
 contrast, DPI, installed-package, and offline checks run on target Windows
