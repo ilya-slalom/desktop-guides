@@ -350,6 +350,15 @@ script), `1138ad4` (pin), `c3f868b`, `38d811c`, `a2c612a` and `8a7e2b4`
   thumbprint equals the pin, timestamped, `windowsAppRuntimeMinimum` 2.5.1.0,
   `windowsAppSdk` 2.5.1, `previousRelease` false). The checksums match the
   downloaded files.
+- **Final-review fixes** (`6ded73a` to `539b768`): one-day artifact
+  retention, thumbprint check before the import in the notes, build records
+  out of the release assets, `--verify-tag`, the secrets cleared after import,
+  and the notes' limits. Dry run
+  [38122406919](https://github.com/ilya-slalom/desktop-guides/actions/runs/38122406919):
+  gate and build succeeded, publish skipped, artifact expiry one day after
+  creation, notes with the thumbprint check first and no placeholders, no
+  `upgrade.json` or portable `.json` under `release/`. Both dry-run artifacts
+  (this run's and 38120091727's) were deleted.
 - **Host `signtool verify /pa /tw /v`** (pcsx2-win, Windows SDK 10.0.28000.0)
   of the dry-run MSIX: the chain shows the pinned certificate (SHA1
   `BAA638E4...`, expires 2031-10-11) and a DigiCert timestamp. It exits 1,
