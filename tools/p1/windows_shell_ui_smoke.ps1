@@ -1114,16 +1114,31 @@ try {
     }
 
     # Show-SettingsCard only scrolls down; this brings Settings back to the top.
+    # The page's ScrollViewer is found from a card through the raw view, since
+    # a control-view search doesn't reach it.
     function Scroll-SettingsToTop {
-        $scrollable = [System.Windows.Automation.PropertyCondition]::new(
-            [System.Windows.Automation.AutomationElement]::IsScrollPatternAvailableProperty, $true)
-        foreach ($viewer in $root.FindAll($scope, $scrollable)) {
-            $pattern = $viewer.GetCurrentPattern([System.Windows.Automation.ScrollPattern]::Pattern)
-            if ($pattern.Current.VerticallyScrollable) {
-                $pattern.SetScrollPercent([System.Windows.Automation.ScrollPattern]::NoScroll, 0)
+        $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
+        $node = Find-ById 'AppThemeSettingsCard'
+        $pattern = $null
+        while ($node -and -not $pattern) {
+            $candidate = $null
+            if ($node.TryGetCurrentPattern(
+                    [System.Windows.Automation.ScrollPattern]::Pattern, [ref]$candidate) -and
+                $candidate.Current.VerticallyScrollable) {
+                $pattern = $candidate
             }
+            else { $node = $walker.GetParent($node) }
         }
-        [void](Wait-VisibleById 'SettingsHeading')
+        if (-not $pattern) { throw 'Found no scrollable parent for the Settings cards.' }
+        $pattern.SetScrollPercent([System.Windows.Automation.ScrollPattern]::NoScroll, 0)
+        $deadline = (Get-Date).AddSeconds(5)
+        while ($pattern.Current.VerticalScrollPercent -gt 0 -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Milliseconds 100
+        }
+        if ($pattern.Current.VerticalScrollPercent -gt 0) {
+            throw "Settings stayed scrolled at $($pattern.Current.VerticalScrollPercent)%."
+        }
+        Start-Sleep -Milliseconds 200
     }
 
     # For a screenshot of the last Library card. UI Automation clips bounds
