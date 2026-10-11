@@ -68,7 +68,9 @@ With `-p:PackageLane=Public` it:
 - defines `PUBLIC_LANE`.
 
 Any other value fails the build. The portable build (`-p:Portable=true`) has
-no package identity and ignores the lane.
+no package identity, so the lane sets only its application manifest and
+`PUBLIC_LANE`; the release builds it with `-p:PackageLane=Public` for the
+"Desktop Guides" window title.
 
 ### Public manifests
 
