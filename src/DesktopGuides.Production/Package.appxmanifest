@@ -10,7 +10,7 @@
   <Properties>
     <DisplayName>Desktop Guides Preview</DisplayName>
     <PublisherDisplayName>Desktop Guides</PublisherDisplayName>
-    <Logo>Assets\Logo.png</Logo>
+    <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
   <Dependencies>
     <TargetDeviceFamily Name="Windows.Desktop"

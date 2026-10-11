@@ -101,6 +101,11 @@ public sealed partial class ShellWindow : Window
     {
         InitializeComponent();
         Title = AppLane.Current.WindowTitle;
+        if (!AppDataRoot.HasPackageIdentity())
+        {
+            // T17.6: the MSIX shows its manifest logos; the portable window needs its icon set.
+            AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
+        }
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
         statusDismissTimer = DispatcherQueue.CreateTimer();

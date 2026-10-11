@@ -103,6 +103,17 @@ release output until its complete native P1 workflow passes. Both the MSIX
 and the portable exe carry `THIRD-PARTY-NOTICES.txt`, the MIT notice for
 the Fluent UI System Icons used by the optional colorful icons (T11.5).
 
+The app icon (T17.6) is the source for every logo in
+`src/DesktopGuides.Production/Assets`: the Square44x44 logo at five scales
+and 14 target sizes (plain, unplated and light-unplated), Square150x150,
+Wide310x150, StoreLogo and SplashScreen at five scales, and `AppIcon.ico`
+(16 to 256 px) for the portable exe and its window. Sizes 16 to 32 px use a
+simplified crop of the icon. `AppxBundle=Never` keeps the scale-qualified
+logos in one `.msix` rather than a bundle of resource packages.
+To change the icon, replace the two masters in `docs/p1/app-icon/` and run
+`python tools/p1/generate_app_icon_assets.py src/DesktopGuides.Production/Assets`
+(needs Pillow).
+
 Record the commit, the MSIX SHA-256, identity, Windows App Runtime minimum
 and signer thumbprint (all in `release-manifest.json`).
 

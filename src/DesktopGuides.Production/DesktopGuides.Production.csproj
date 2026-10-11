@@ -16,6 +16,10 @@
     <!-- The portable release is one file. Analyze both builds so they restore
          the same packages and share packages.lock.json. -->
     <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <!-- T17.6: scale-qualified logos would otherwise split the package into
+         a bundle with per-scale resource packages; releases ship one .msix. -->
+    <AppxBundle>Never</AppxBundle>
   </PropertyGroup>
   <!-- T17.1: Preview is the development lane; Public is the released
        identity. Only the manifests and the lane names differ. -->
@@ -61,8 +65,6 @@
     <ProjectReference Include="../DesktopGuides.Core/DesktopGuides.Core.csproj" />
     <ProjectReference Include="../DesktopGuides.Infrastructure/DesktopGuides.Infrastructure.csproj" />
     <Manifest Include="$(ApplicationManifest)" />
-    <Content Include="../DesktopGuides.App/Assets/*.png"
-             Link="Assets/%(Filename)%(Extension)" />
     <!-- T11.5: colour icons (Fluent UI System Icons, MIT) and their notice.
          The SDK already packages the icons as content; copying them to the
          output too lets the portable exe extract them. -->
@@ -71,5 +73,9 @@
     <Content Include="../../THIRD-PARTY-NOTICES.txt"
              Link="THIRD-PARTY-NOTICES.txt"
              CopyToOutputDirectory="PreserveNewest" />
+    <!-- T17.6: the app icon. The SDK packages Assets/*.png as content, and
+         MRT picks each logo's scale and target size. -->
+    <Content Remove="Assets/AppIcon.ico" />
+    <Content Include="Assets/AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
