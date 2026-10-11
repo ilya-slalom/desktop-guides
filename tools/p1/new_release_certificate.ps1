@@ -12,7 +12,7 @@ if ((Test-Path -LiteralPath $OutputDirectory) -and
     @(Get-ChildItem -LiteralPath $OutputDirectory -Force).Count -gt 0) {
     throw "Use a new, empty folder: $OutputDirectory"
 }
-New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
+$OutputDirectory = (New-Item -ItemType Directory -Force -Path $OutputDirectory).FullName
 $base = Join-Path $OutputDirectory 'desktop-guides-release'
 $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject $Subject `
     -KeyAlgorithm RSA -KeyLength 3072 -HashAlgorithm SHA256 -KeyExportPolicy Exportable `
@@ -24,7 +24,8 @@ try {
     $rng.Dispose()
     $password = [Convert]::ToBase64String($bytes)
     $secure = ConvertTo-SecureString -String $password -AsPlainText -Force
-    Export-PfxCertificate -Cert $cert -FilePath "$base.pfx" -Password $secure | Out-Null
+    Export-PfxCertificate -Cert $cert -FilePath "$base.pfx" -Password $secure `
+        -CryptoAlgorithmOption AES256_SHA256 | Out-Null
     Export-Certificate -Cert $cert -FilePath "$base.cer" | Out-Null
     $utf8 = [Text.UTF8Encoding]::new($false)
     [IO.File]::WriteAllText("$base.password.txt", $password, $utf8)
@@ -32,13 +33,19 @@ try {
         [Convert]::ToBase64String([IO.File]::ReadAllBytes("$base.pfx")), $utf8)
 }
 finally {
-    Remove-Item -LiteralPath "Cert:\CurrentUser\My\$($cert.Thumbprint)" -ErrorAction SilentlyContinue
+    # -DeleteKey also removes the exportable private key from the user's key store.
+    $storePath = "Cert:\CurrentUser\My\$($cert.Thumbprint)"
+    Remove-Item -LiteralPath $storePath -DeleteKey -ErrorAction SilentlyContinue
 }
+if (Test-Path -LiteralPath $storePath) {
+    throw "The certificate is still in the store: $storePath"
+}
+$quoted = $base.Replace("'", "''")
 [ordered]@{
     subject = $cert.Subject
     thumbprint = $cert.Thumbprint
     notBefore = $cert.NotBefore.ToUniversalTime().ToString('o')
     notAfter = $cert.NotAfter.ToUniversalTime().ToString('o')
 } | ConvertTo-Json -Compress
-"Get-Content -Raw '$base.pfx.base64.txt' | gh secret set RELEASE_SIGNING_PFX --repo ilya-slalom/desktop-guides"
-"Get-Content -Raw '$base.password.txt' | gh secret set RELEASE_SIGNING_PASSWORD --repo ilya-slalom/desktop-guides"
+"Get-Content -Raw '$quoted.pfx.base64.txt' | gh secret set RELEASE_SIGNING_PFX --repo ilya-slalom/desktop-guides"
+"Get-Content -Raw '$quoted.password.txt' | gh secret set RELEASE_SIGNING_PASSWORD --repo ilya-slalom/desktop-guides"
