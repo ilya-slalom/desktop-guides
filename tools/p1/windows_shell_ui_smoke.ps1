@@ -4740,7 +4740,8 @@ try {
                 $child = $walker.GetFirstChild($queue.Dequeue())
                 while ($child) {
                     if ($child.Current.ControlType -eq [System.Windows.Automation.ControlType]::Image) {
-                        throw "Expected no Image element under $id; the icon must stay Raw."
+                        throw ("Expected no Image element under $id; the icon must stay Raw. " +
+                            "Found $($child.Current.ClassName) '$($child.Current.Name)'.")
                     }
                     $queue.Enqueue($child)
                     $child = $walker.GetNextSibling($child)
@@ -4770,6 +4771,8 @@ try {
 
         [void](Wait-Name 'LibraryNavigation' 'Library')
         Assert-NoControlViewImage 'LibraryNavigation'
+        Assert-NoControlViewImage 'AppTitleBar'
+        Assert-NoControlViewImage 'AppThemeSettingsCard'
         [void](Wait-HiddenById 'ShellStatus')
         Assert-ShellForeground
         Scroll-SettingsToTop

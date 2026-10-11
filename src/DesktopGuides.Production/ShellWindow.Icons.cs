@@ -18,6 +18,8 @@ public sealed partial class ShellWindow
     {
         ColorfulIconsSettingsCard.Header = ColorfulIconsPresentation.Header;
         AutomationProperties.SetName(ColorfulIconsToggle, ColorfulIconsPresentation.ToggleName);
+        AppIcons.HideInnerImages(LibraryEmptyImage);
+        AppIcons.HideInnerImages(LibraryNoResultsImage);
         // The built-in Settings item exists only once the template has loaded.
         Navigation.Loaded += (_, _) => ApplyIcons();
         ApplyIcons();

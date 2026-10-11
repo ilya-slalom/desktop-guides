@@ -1,5 +1,6 @@
 using DesktopGuides.Core.Library;
 using DesktopGuides.Infrastructure.Storage;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
@@ -16,10 +17,31 @@ internal static class AppIcons
     public static IconElement Element(AppIconChoice choice)
     {
         IconElement icon = choice.IsAsset
-            ? new ImageIcon { Source = Image(choice.AssetFile!) }
+            ? HideInnerImages(new ImageIcon { Source = Image(choice.AssetFile!) })
             : new FontIcon { Glyph = choice.Glyph! };
         AutomationProperties.SetAccessibilityView(icon, AccessibilityView.Raw);
         return icon;
+    }
+
+    // ImageIcon draws through an Image child it creates itself, and Raw on
+    // the icon doesn't reach that child, so it is hidden once it exists.
+    public static ImageIcon HideInnerImages(ImageIcon icon)
+    {
+        icon.Loaded += (_, _) => HideImages(icon);
+        return icon;
+    }
+
+    private static void HideImages(DependencyObject parent)
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            DependencyObject child = VisualTreeHelper.GetChild(parent, i);
+            if (child is Microsoft.UI.Xaml.Controls.Image)
+            {
+                AutomationProperties.SetAccessibilityView(child, AccessibilityView.Raw);
+            }
+            HideImages(child);
+        }
     }
 
     public static IconSource Source(AppIconChoice choice) => choice.IsAsset
