@@ -4779,7 +4779,8 @@ try {
         $report.settingsScreenshot = Save-WindowScreenshot "icons-$state-settings"
 
         Select-Element 'Library'
-        if ($EmptyLibrary) { [void](Wait-VisibleById 'LibraryEmptyState') }
+        # The empty state's Border has no automation peer; its text does.
+        if ($EmptyLibrary) { [void](Wait-Name 'LibraryEmpty' 'No games in your library.') }
         else { [void](Wait-VisibleById 'LibraryHeading') }
         Start-Sleep -Milliseconds 400
         Assert-ShellForeground
