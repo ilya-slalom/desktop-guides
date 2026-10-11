@@ -1,6 +1,6 @@
 # T11.5 colorful icons design
 
-Status: design approved in brainstorming; spec awaiting review.
+Status: in review in PR #85.
 Prerequisites T11.4 and T14.4 are merged. T11.5 is the last open task in M2,
 and T16.2 depends on it.
 
@@ -167,3 +167,97 @@ the catalog. The glyph each place shows today stays unchanged.
 - Reader toolbar, search box, dialog and taskbar icons.
 - Different colour icons per theme.
 - A user-chosen icon set beyond on and off.
+
+## T11.5 verification record
+
+Implemented from [t11-5-colorful-icons-plan.md](t11-5-colorful-icons-plan.md)
+on `feat/p1-t11-5-colorful-icons`, PR #85.
+
+- **Unit tests** (pcsx2-win, .NET SDK 10.0.401):
+  - Core: 1089 of 1089 pass, including 53 new in `AppIconCatalogTests` and
+    `ColorfulIconsPresentationTests`.
+  - Infrastructure: 773 of 773 pass, including 5 new in
+    `ColorfulIconsSettingTests`.
+- **Package:**
+  - `verify_production_package.py` now requires the nine icons and
+    `THIRD-PARTY-NOTICES.txt`. It failed before the notice was packaged,
+    then passed.
+  - The SDK already packaged the SVGs as content. The project file only
+    adds `CopyToOutputDirectory` for the portable exe.
+- **Assets:** nine SVGs, 20,355 bytes, from
+  `microsoft/fluentui-system-icons` at
+  `a347af95478f989038cccbf085978865264c048a` (`SOURCE.md`). No PNG
+  fallbacks.
+- **Installed MSIX:** CI `dev-fast` `design` run
+  [38136321055](https://github.com/ilya-slalom/desktop-guides/actions/runs/38136321055)
+  passed four icon scenarios:
+  - off, switched on;
+  - on after a restart, switched off;
+  - dark theme with colour on;
+  - the empty library with colour on.
+
+  It also passed `design-language` with the new card's order checks. The
+  full PR run is listed below.
+- **Portable exe:**
+  - The installed `design` group passed on Windows 11 x64 (pcsx2-win)
+    through an interactive scheduled task, using `-PortableExecutable`.
+  - The user's existing portable library at `%LOCALAPPDATA%\DesktopGuides`
+    was renamed aside for each run, with the user's approval, and renamed
+    back with all 301 files after each.
+  - The colour icons load from the single-file exe's extraction folder.
+- **Rendering check:**
+  - All nine SVGs render in colour with their gradients through
+    `SvgImageSource`, in light and dark, with no blank or black boxes.
+  - The colour `settings` icon is a mostly grey gear upstream.
+  - Fluent's 24 px art has built-in padding, so the colour icons look
+    slightly smaller than the glyphs they replace; each mode is
+    consistent.
+- **Accessibility:**
+  - The nav item, title bar and Settings card names are unchanged.
+  - `ImageIcon` draws through an `Image` child that `AccessibilityView=Raw`
+    on the icon doesn't reach, and the `TitleBar` builds its own from
+    `IconSource`. The shell hides both images, and the smoke fails on any
+    `Image` in the control view under `LibraryNavigation`, `AppTitleBar` or
+    `AppThemeSettingsCard`.
+- **Smoke fixes found on the way:**
+  - The new card pushes Game data below the fold at 720 px, so
+    `design-language` checks that section scrolled into view.
+  - `Scroll-SettingsToTop` reaches the page's `ScrollViewer` through the
+    raw view.
+  - The toggle's confirmation is a quiet status.
+- **Not run:** a real system-wide high-contrast switch. It is deferred to
+  T16.2's high-contrast pass, which saves and restores the theme.
+  `AppIconCatalog.For` and `ColorfulIconsPresentation` pin the behaviour.
+- **Full PR CI:** pending.
+
+Rulings against this spec (details in the plan):
+
+1. High contrast comes from the window's `ThemeSettings`, not
+   `AccessibilitySettings`.
+2. Ten places use nine files: `library` serves the Library item and the
+   title bar.
+3. The portable icons load from `AppContext.BaseDirectory`, the
+   single-file extraction folder; the MSIX uses `ms-appx:///`.
+4. High contrast and the failed save are unit-tested in Core, not in the
+   installed smoke.
+5. The rendering check ran in the installed runs, not as a first task.
+6. The empty-state icons stay at 24 px.
+7. The copy uses US spelling: "color", "license".
+8. The credit line always shows; high contrast adds a third line.
+9. The packaging guard has two parts: a Core test of the folder and the
+   package verifier.
+10. The smoke reads the applied icons from the toggle's `ItemStatus`.
+11. The Colorful icons card has its own glyph, `E76E`.
+12. The installed MSIX check is the CI `design` shard, the gate of record
+    in [e2e-testing.md](e2e-testing.md); the user's Preview install on
+    pcsx2-win was not touched.
+
+Evidence (portable exe, pcsx2-win):
+[light on, Settings](evidence/t11-5-colorful-icons/icons-light-on-settings.png),
+[light on, Library](evidence/t11-5-colorful-icons/icons-light-on-library.png),
+[dark on, Settings](evidence/t11-5-colorful-icons/icons-dark-on-settings.png),
+[dark on, Library](evidence/t11-5-colorful-icons/icons-dark-on-library.png),
+[off, Settings](evidence/t11-5-colorful-icons/icons-off-settings.png),
+[empty library](evidence/t11-5-colorful-icons/icons-light-empty-library.png),
+[empty search](evidence/t11-5-colorful-icons/icons-empty-search.png) and
+[Game data](evidence/t11-5-colorful-icons/icons-game-data.png).

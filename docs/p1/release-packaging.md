@@ -99,7 +99,9 @@ Release assets: `DesktopGuides-X.Y.Z.0-x64.msix`,
 also holds `release-notes.md`, the portable build record
 (`DesktopGuides-portable-x64-X.Y.Z.json`) and, when a previous release exists,
 `upgrade.json`; these are not attached to the release. Keep ARM64 out of
-release output until its complete native P1 workflow passes.
+release output until its complete native P1 workflow passes. Both the MSIX
+and the portable exe carry `THIRD-PARTY-NOTICES.txt`, the MIT notice for
+the Fluent UI System Icons used by the optional colorful icons (T11.5).
 
 Record the commit, the MSIX SHA-256, identity, Windows App Runtime minimum
 and signer thumbprint (all in `release-manifest.json`).
