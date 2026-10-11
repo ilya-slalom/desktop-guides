@@ -4,9 +4,9 @@ namespace DesktopGuides.Production;
 
 public sealed class LibraryGameItem : CatalogRowItem
 {
-    internal LibraryGameItem(LibrarySearchMatch match, int attentionCount = 0)
-        // Fluent has no colour game controller, so the placeholder stays a glyph.
-        : base(match.Summary.Game.Title, AppIconChoice.FromGlyph("\uE7FC"),
+    internal LibraryGameItem(
+        LibrarySearchMatch match, int attentionCount = 0, bool colorful = false, bool highContrast = false)
+        : base(match.Summary.Game.Title, AppIconCatalog.ForGame(colorful, highContrast),
             CatalogPresentation.GameFacts(match.Summary, match.MatchedGuideTitle, attentionCount))
     {
         Game = match.Summary.Game;

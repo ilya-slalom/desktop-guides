@@ -2181,7 +2181,9 @@ public sealed partial class ShellWindow : Window
         IReadOnlyList<LibrarySearchMatch> matches = LibrarySearch.Filter(librarySummaries, appliedLibraryQuery);
         gameArtwork.CancelAll();
         GameList.ItemsSource = matches
-            .Select(match => new LibraryGameItem(match, guideHealth.CountForGame(match.Summary.Game.Id)))
+            .Select(match => new LibraryGameItem(
+                match, guideHealth.CountForGame(match.Summary.Game.Id),
+                colorfulIcons, themeSettings?.HighContrast == true))
             .ToList();
         LibraryNoResults.Text = $"No games or guides match \"{appliedLibraryQuery}\".";
         ShowLibraryView(

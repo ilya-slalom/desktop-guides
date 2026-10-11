@@ -38,7 +38,7 @@ public sealed class AppIconCatalogTests
 
         Assert.True(choice.IsAsset);
         Assert.Null(choice.Glyph);
-        Assert.Matches("^ic_fluent_[a-z_]+_24_color\\.(svg|png)$", choice.AssetFile);
+        Assert.Matches("^(ic_fluent_[a-z_]+_24_color\\.(svg|png)|dg_[a-z_]+_color\\.png)$", choice.AssetFile);
     }
 
     [Theory]
@@ -74,7 +74,7 @@ public sealed class AppIconCatalogTests
     [Theory]
     [InlineData(GuideFormat.Txt, false, "\uE8A5", "ic_fluent_document_text_24_color.svg")]
     [InlineData(GuideFormat.Html, false, "\uE774", "ic_fluent_globe_24_color.svg")]
-    [InlineData(GuideFormat.Pdf, false, "\uEA90", "ic_fluent_document_24_color.svg")]
+    [InlineData(GuideFormat.Pdf, false, "\uEA90", "dg_document_pdf_color.png")]
     [InlineData(GuideFormat.Txt, true, "\uE7BA", "ic_fluent_warning_24_color.svg")]
     [InlineData(GuideFormat.Pdf, true, "\uE7BA", "ic_fluent_warning_24_color.svg")]
     public void EachGuideRowKeepsItsGlyphAndGetsItsAsset(
@@ -88,16 +88,26 @@ public sealed class AppIconCatalogTests
     }
 
     [Fact]
-    public void AssetFilesAreTheThirteenDistinctFiles()
+    public void GameRowsGetTheGeneratedControllerOnlyInColor()
+    {
+        Assert.Equal(AppIconChoice.FromGlyph("\uE7FC"), AppIconCatalog.ForGame(colorful: false, highContrast: false));
+        Assert.Equal(AppIconChoice.FromAsset("dg_game_controller_color.png"),
+            AppIconCatalog.ForGame(colorful: true, highContrast: false));
+        Assert.Equal(AppIconChoice.FromGlyph("\uE7FC"), AppIconCatalog.ForGame(colorful: true, highContrast: true));
+    }
+
+    [Fact]
+    public void AssetFilesAreTheFourteenDistinctFiles()
     {
         IEnumerable<string> guideAssets =
             from format in Enum.GetValues<GuideFormat>()
             from missing in new[] { false, true }
             select AppIconCatalog.ForGuide(format, missing, true, false).AssetFile!;
-        Assert.Equal(13, AppIconCatalog.AssetFiles.Count);
+        Assert.Equal(14, AppIconCatalog.AssetFiles.Count);
         Assert.Equal(
             AppIconCatalog.All.Select(icon => AppIconCatalog.For(icon, true, false).AssetFile!)
                 .Concat(guideAssets)
+                .Append(AppIconCatalog.ForGame(true, false).AssetFile!)
                 .Distinct().Order(StringComparer.Ordinal),
             AppIconCatalog.AssetFiles);
     }

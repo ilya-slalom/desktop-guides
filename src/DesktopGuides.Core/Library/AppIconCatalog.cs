@@ -54,16 +54,21 @@ public static class AppIconCatalog
         {
             [GuideFormat.Txt] = ("\uE8A5", "ic_fluent_document_text_24_color.svg"),
             [GuideFormat.Html] = ("\uE774", "ic_fluent_globe_24_color.svg"),
-            [GuideFormat.Pdf] = ("\uEA90", "ic_fluent_document_24_color.svg"),
+            // Fluent has no colour PDF or game controller; the dg_ icons are the
+            // project's own, generated in Fluent's style (see SOURCE.md).
+            [GuideFormat.Pdf] = ("\uEA90", "dg_document_pdf_color.png"),
         };
 
     private static readonly (string Glyph, string Asset) MissingGuide =
         ("\uE7BA", "ic_fluent_warning_24_color.svg");
 
+    private static readonly (string Glyph, string Asset) GamePlaceholder =
+        ("\uE7FC", "dg_game_controller_color.png");
+
     public static IReadOnlyList<AppIcon> All { get; } = Enum.GetValues<AppIcon>();
 
     public static IReadOnlyList<string> AssetFiles { get; } =
-        Table.Values.Concat(GuideTable.Values).Append(MissingGuide)
+        Table.Values.Concat(GuideTable.Values).Append(MissingGuide).Append(GamePlaceholder)
             .Select(entry => entry.Asset).Distinct().Order(StringComparer.Ordinal).ToArray();
 
     // High contrast always wins: its system colours apply only to glyphs.
@@ -74,6 +79,10 @@ public static class AppIconCatalog
 
     public static AppIconChoice ForGuide(GuideFormat format, bool fileMissing, bool colorful, bool highContrast) =>
         Choose(fileMissing ? MissingGuide : GuideTable[format], colorful, highContrast);
+
+    // A library row's tile before its artwork loads.
+    public static AppIconChoice ForGame(bool colorful, bool highContrast) =>
+        Choose(GamePlaceholder, colorful, highContrast);
 
     private static AppIconChoice Choose((string Glyph, string Asset) entry, bool colorful, bool highContrast) =>
         colorful && !highContrast ? AppIconChoice.FromAsset(entry.Asset) : AppIconChoice.FromGlyph(entry.Glyph);

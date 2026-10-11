@@ -42,9 +42,9 @@ public sealed partial class ShellWindow
                 ApplyTheme(requestedTheme);
                 // T11.5: high contrast forces glyphs, and turning it off restores the choice.
                 ApplyIcons();
-                if (colorfulIcons && ready && navigator.Current is GameRoute)
+                if (colorfulIcons && ready && navigator.Current is GameRoute or LibraryRoute)
                 {
-                    // Guide rows pick their icon when built.
+                    // Game and guide rows pick their icon when built.
                     _ = RunNavigationAsync(() => RenderCurrentAsync());
                 }
             });
