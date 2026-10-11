@@ -1,11 +1,11 @@
 # P1 implementation plan and exit gates
 
-Status: 47 of the 55 tasks are merged, 11 October 2026. M0, M3 and M4 are
+Status: 47 of the 56 tasks are merged, 11 October 2026. M0, M3 and M4 are
 complete; M1 still needs T17.1 and M2 the optional T11.5. M5 has T20.1, T20.2,
 T15.4 and T15.1 merged, and M6 is planned.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
-This plan orders all **16 P1 stories and 55 tasks** in the
+This plan orders all **16 P1 stories and 56 tasks** in the
 [work breakdown](../work-breakdown.md). The [technical design](../p1-technical-design.md)
 defines the architecture, data contracts, failure protocols, and reader
 behavior. [Implementation results](results.md) and the
@@ -86,7 +86,7 @@ identity remains T17.1 work.
 | T15.2 | T03.1, T03.2, T03.3 | FileOperations startup reconciler and exact owned-path janitor, installed before mutating file operations. Phase and malformed-path tests retain unknown directories and never follow links. | TR15.1 |
 | T11.1 | T03.2, T11.2 | Library/Game/Reader/Settings route coordinator and separate diagnostic build mode. Launch, Back, stale-ID, duplicate-launch acknowledgment, close/relaunch handoff, and route tests pass on installed WinUI; production package has no fixtures. | TR11.1 |
 | T11.3 | T11.1, T11.2 | Capability-based reader bar, navigation pane, overflow, and status/focus behavior. Keyboard and pointer trace returns Reader → its Game with selection and focus retained. Query retention is verified in T05.3 after search exists. | TR11.1, TR11.2 |
-| T17.1 | T11.1 | Production MSIX identity/version/signing and prerequisite delivery plan, plus tested x64 packaging configuration. Install and upgrade use the same identity; credentials stay outside source/logs. Final signing and architecture claims remain gated by M6. | TR17.2 |
+| T17.1 | T11.1 | Production MSIX identity/version/signing and prerequisite delivery plan, plus tested x64 packaging configuration. Install and upgrade use the same identity; credentials stay outside source/logs. Final signing and architecture claims remain gated by M6. Implemented in two PRs: the Public lane (PR a, merged in #82), then the pinned release certificate, the tag-driven signed release workflow with a portable build, and an installed upgrade gate (PR b). | TR17.2 |
 
 ### T17.1 implementation sequence
 
@@ -98,8 +98,8 @@ Publisher before publishing any release candidate. Do not use a placeholder
 public Publisher or silently rebrand the Preview package.
 The [release procedure](release-packaging.md) records the tested package
 checks. The public identity (`IlyaLissoboi.DesktopGuides`) is reserved, and
-T17.1 PR a adds the Public build lane for it; signing and release follow in
-PR b.
+T17.1 PR a adds the Public build lane for it; PR b adds the pinned release
+certificate, signing and the tag-driven release workflow.
 
 Use a framework-dependent Windows App SDK package with a self-contained .NET
 runtime. A self-contained Windows App SDK package would simplify runtime
@@ -1033,6 +1033,7 @@ only targets with complete target-specific results.
 | T17.2 | T04.3, T06.4, T07.3, T08.3, T09.3, T10.3, T12.3, T13.1, T14.3, T15.4, T16.2, T16.3, T20.2 | Locked Core/Infrastructure and signed installed production UI workflow CI started through an interactive scheduled task, retained P0 regression lane, and reviewable fixture/evidence checklist. Failing storage/security tests stop packaging; failing installed UI blocks release promotion. | TR17.1, TR17.2 |
 | T17.4 | T17.1, T17.2 | Distribution size pass on the final feature set. Both builds exclude the unused Windows App SDK AI, ML, Search, Widgets and DWrite components, and the MSIX keeps its `Microsoft.WindowsAppRuntime.2` dependency. The portable build is trim-safe (C#/WinRT `partial` types and generic-interface code, source-generated JSON, an AngleSharp trim review) and published trimmed and compressed; CI fails on a new trim or C#/WinRT warning. Every scenario group passes on both builds, and the release records exe, extraction and MSIX sizes plus cold and warm launch times. Start from the [size spike](results.md#portable-size-spike--8-october-2026). | TR17.3 |
 | T17.3 | T17.1, T17.2, T17.4 | Interactive-task signed install/upgrade, three-format import after original removal, offline relaunch, independent resume, deletion, and backup restore on each promised target. Record OS/CPU/package/prerequisite versions, hashes, and scanned-PDF limit. A runtime-free Windows 11 x64 VM must prove missing-prerequisite failure and offline-installer recovery before a clean-install claim. | TR17.1, TR17.2 |
+| T17.5 | T17.3 and every P1 feature task | Microsoft Store submission with the reserved identity `IlyaLissoboi.DesktopGuides` once feature development is finished: Store certification passes, the listing is written, and the Store-signed package is confirmed to upgrade sideloaded installs in place. Decide whether sideloaded releases continue. | TR17.1, TR17.2 |
 
 The existing `production-shell-ui` CI job verifies M1 routes in an already
 interactive runner session. It does not execute the complete P1 scenario

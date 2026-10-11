@@ -3,8 +3,8 @@
 Status: P0 merged in [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1)
 on 25 September 2026. The clean-VM prerequisite gate and Windows 10 check
 remain deferred. P1 is designed in the [technical design](p1-technical-design.md)
-and [implementation plan](p1/implementation-plan.md); on 8 October 2026, 44 of
-its 55 tasks are merged, and the plan records each one. Source:
+and [implementation plan](p1/implementation-plan.md); on 11 October 2026, 47 of
+its 56 tasks are merged, and the plan records each one. Source:
 [initial requirements and high-level design](initial-design.md). The backlog
 defines the acceptance gates; [Windows results](p0/results.md) record
 which checks have been performed. Windows 10 is deferred; native ARM64 CI
@@ -551,6 +551,11 @@ machine. Missing WebView2 Runtime produces an actionable setup message.
   8 October 2026 measured the portable exe at 244 MB, 182 MB without the unused
   components, and 94 MB trimmed (42 MB compressed); see
   [P1 results](p1/results.md#portable-size-spike--8-october-2026).
+- **T17.5** Submit to the Microsoft Store with the reserved identity
+  (`IlyaLissoboi.DesktopGuides`) once feature development is finished: pass
+  Store certification, write the listing, and confirm the Store-signed
+  package upgrades sideloaded installs in place. Decide whether sideloaded
+  releases continue.
 - **TR17.1** The final app needs no network access to display an imported TXT,
   HTML, or PDF guide after prerequisites are installed.
 - **TR17.2** No OS or architecture is advertised without a recorded install and
