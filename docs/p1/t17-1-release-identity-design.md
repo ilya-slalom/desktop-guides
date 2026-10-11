@@ -388,8 +388,8 @@ script), `1138ad4` (pin), `c3f868b`, `38d811c`, `a2c612a` and `8a7e2b4`
     opens but fails to load the library passes the launch check (the library
     content check still runs).
   - 5. The release workflow has a dry run (`workflow_dispatch` with `tag`).
-    Cost: a production-signed MSIX is a downloadable artifact for 90 days
-    (retention to be shortened).
+    Cost: a production-signed MSIX is a downloadable artifact for one day
+    (`retention-days: 1`).
   - 6. The v1 install is launched once before seeding so Windows creates
     `LocalState`. Cost: a first-run-only difference from a real install.
   - 7. A dry run skips the CI gate. Cost: a dry run may build an unvetted
