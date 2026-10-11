@@ -16,9 +16,11 @@ Traces: the T11.5 rows in [implementation-plan.md](implementation-plan.md)
 
 Decisions made during brainstorming:
 
-- **Scope:** the navigation items, the title bar, the empty states and the
-  Settings cards. The reader toolbar, search boxes, dialogs and taskbar icon
-  stay monochrome.
+- **Scope:** the navigation items, the title bar, the empty states, the
+  Settings cards (including the Colorful icons card itself) and the Game
+  page's guide rows. The reader toolbar, search boxes, dialogs, taskbar icon
+  and the game rows' controller placeholder stay monochrome. Fluent has no
+  colour game controller; a generated Fluent-style one is a follow-up.
 - **Approach:** a Core catalog maps each place to its glyph and its colour
   asset. The shell sets every icon source from that catalog and applies
   them again when the setting or high contrast changes. This was chosen over
@@ -64,13 +66,29 @@ All assets are `ic_fluent_<name>_24_color.svg`.
 | `EmptyLibrary` | E82D | `book_open` |
 | `EmptySearch` | E721 | `search_sparkle` |
 | `ThemeCard` (App theme) | E771 | `paint_brush` |
-| `MaterialCard` (Window background) | E790 | `image` |
+| `MaterialCard` (Window background) | E8B9 (Picture; was E790, a palette) | `image` |
 | `BackupCard` (Back up) | E896 | `document_folder` |
 | `RestoreCard` (Restore) | E777 | `history` |
 | `ProvidersCard` (Game data) | E721 | `globe` |
+| `ColorfulIconsCard` (Colorful icons) | E80A (GridView) | `apps` |
 
-The plan confirms each current glyph against the XAML before moving it into
-the catalog. The glyph each place shows today stays unchanged.
+Guide rows on the Game page, through `AppIconCatalog.ForGuide`:
+
+| Guide row | Glyph | Colour asset |
+| --- | --- | --- |
+| TXT | E8A5 | `document_text` |
+| HTML | E774 | `globe` |
+| PDF | EA90 | `document` (Fluent has no colour PDF; a generated one is a follow-up) |
+| Missing file (any format) | E7BA | `warning` |
+
+Manual testing changed three entries after the first review:
+
+- The Colorful icons card had a fixed glyph; it now switches like the others.
+- Window background's palette glyph didn't match the colour picture. Fluent
+  has no colour palette, so the glyph became a picture.
+- Guide rows now switch too.
+
+Every other glyph is the one the place showed before T11.5.
 
 ## Assets and licence
 
@@ -165,6 +183,7 @@ the catalog. The glyph each place shows today stays unchanged.
 ## Out of scope
 
 - Reader toolbar, search box, dialog and taskbar icons.
+- The game rows' controller placeholder, until a colour counterpart exists.
 - Different colour icons per theme.
 - A user-chosen icon set beyond on and off.
 
@@ -184,7 +203,7 @@ on `feat/p1-t11-5-colorful-icons`, PR #85.
     then passed.
   - The SDK already packaged the SVGs as content. The project file only
     adds `CopyToOutputDirectory` for the portable exe.
-- **Assets:** nine SVGs, 20,355 bytes, from
+- **Assets:** 13 SVGs, 26,848 bytes (nine at first, 20,355 bytes), from
   `microsoft/fluentui-system-icons` at
   `a347af95478f989038cccbf085978865264c048a` (`SOURCE.md`). No PNG
   fallbacks.
@@ -206,7 +225,7 @@ on `feat/p1-t11-5-colorful-icons`, PR #85.
     back with all 301 files after each.
   - The colour icons load from the single-file exe's extraction folder.
 - **Rendering check:**
-  - All nine SVGs render in colour with their gradients through
+  - All 13 SVGs render in colour with their gradients through
     `SvgImageSource`, in light and dark, with no blank or black boxes.
   - The colour `settings` icon is a mostly grey gear upstream.
   - Fluent's 24 px art has built-in padding, so the colour icons look
@@ -254,7 +273,7 @@ Rulings against this spec (details in the plan):
 
 1. High contrast comes from the window's `ThemeSettings`, not
    `AccessibilitySettings`.
-2. Ten places use nine files: `library` serves the Library item and the
+2. The places share files: `library` serves the Library item and the
    title bar.
 3. The portable icons load from `AppContext.BaseDirectory`, the
    single-file extraction folder; the MSIX uses `ms-appx:///`.
@@ -267,7 +286,8 @@ Rulings against this spec (details in the plan):
 9. The packaging guard has two parts: a Core test of the folder and the
    package verifier.
 10. The smoke reads the applied icons from the toggle's `ItemStatus`.
-11. The Colorful icons card has its own glyph, `E76E`.
+11. The Colorful icons card first had a fixed glyph, `E76E`. After manual
+    testing, it is an 11th place: `apps`, with the GridView glyph `E80A`.
 12. The installed MSIX check is the CI `design` shard, the gate of record
     in [e2e-testing.md](e2e-testing.md); the user's Preview install on
     pcsx2-win was not touched.
