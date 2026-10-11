@@ -404,6 +404,8 @@ jobs:
           try {
             $cer = Join-Path $env:RUNNER_TEMP 'throwaway.cer'
             Export-Certificate -Cert $cert -FilePath $cer | Out-Null
+            # SignTool's verify needs the self-signed chain trusted while signing.
+            Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
             $signed = @{}
             $previous = $null
             foreach ($version in @('1.0.0.0', '1.0.1.0')) {
@@ -428,6 +430,7 @@ jobs:
           }
           finally {
             Remove-Item -LiteralPath "Cert:\CurrentUser\My\$($cert.Thumbprint)" -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath "Cert:\LocalMachine\TrustedPeople\$($cert.Thumbprint)" -ErrorAction SilentlyContinue
           }
       - name: Upload the upgrade result
         if: always()
