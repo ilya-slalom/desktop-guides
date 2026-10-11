@@ -1,6 +1,6 @@
 # T17.1 release identity and signing design
 
-Status: PR a (two lanes) in review; PR b planned.
+Status: PR a merged in #82; PR b in review.
 Prerequisite T11.1 is merged. The groundwork from 27 September (the package
 verifier, the public-mode signer and the release procedure) is merged.
 
@@ -68,7 +68,9 @@ With `-p:PackageLane=Public` it:
 - defines `PUBLIC_LANE`.
 
 Any other value fails the build. The portable build (`-p:Portable=true`) has
-no package identity and ignores the lane.
+no package identity, so the lane sets only its application manifest and
+`PUBLIC_LANE`; the release builds it with `-p:PackageLane=Public` for the
+"Desktop Guides" window title.
 
 ### Public manifests
 
@@ -314,3 +316,92 @@ build), `87db610` and `9231770` (CI step and package description).
     every shard.
 - **Not run.** Signing, the release workflow, the certificate and the
   upgrade gate are PR b's.
+
+### PR b: release
+
+Commits on `feat/p1-t17-1-release`: `19b0e6f` (version scripts), `f8cb201` and
+`5a0c791` (CI gate), `290a5b1` (portable packaging), `8649f31`, `a23481d`,
+`6341c0f` and `798bd74` (upgrade gate), `283f8e8` and `42a1a4b` (certificate
+script), `1138ad4` (pin), `c3f868b`, `38d811c`, `a2c612a` and `8a7e2b4`
+(release workflow).
+
+- **PowerShell tests.** The `core-tests` job runs the script tests under
+  pwsh 7: [run 38113468830](https://github.com/ilya-slalom/desktop-guides/actions/runs/38113468830):
+  its core-tests job passed (the rest of the run was cancelled; it covers the
+  certificate script), and the final `windows-ci` run
+  [38120109659](https://github.com/ilya-slalom/desktop-guides/actions/runs/38120109659)
+  on `8a7e2b4` is green, including the certificate pin test. pcsx2-win has only
+  Windows PowerShell 5.1; the scripts run in both.
+- **Upgrade gate.** `public-upgrade` passed in run
+  [38110708303](https://github.com/ilya-slalom/desktop-guides/actions/runs/38110708303)
+  and, after the fix round, run
+  [38112108659](https://github.com/ilya-slalom/desktop-guides/actions/runs/38112108659).
+  `result.json` of the latter: package family
+  `IlyaLissoboi.DesktopGuides_ybwptzv97781r`, `1.0.0.0` to `1.0.1.0`,
+  `libraryPreserved` true, `oldAppOpenedLibrary` true, `upgradedAppLaunched`
+  true, `cleanupError` null.
+- **Release dry run.** [Run 38120091727](https://github.com/ilya-slalom/desktop-guides/actions/runs/38120091727)
+  (`workflow_dispatch`, tag `v1.0.0`, head `8a7e2b4`): gate and build
+  succeeded, publish skipped. Artifact `release-1.0.0.0`:
+  `DesktopGuides-1.0.0.0-x64.msix` (68,633,653 bytes) and its `.sha256`,
+  `DesktopGuides-portable-x64-1.0.0.zip` (92,160,813 bytes) and its `.sha256`,
+  `DesktopGuides-portable-x64-1.0.0.json`, `desktop-guides-release.cer`
+  (byte-identical to the committed one) and `release-manifest.json` (signer
+  thumbprint equals the pin, timestamped, `windowsAppRuntimeMinimum` 2.5.1.0,
+  `windowsAppSdk` 2.5.1, `previousRelease` false). The checksums match the
+  downloaded files.
+- **Final-review fixes** (`6ded73a` to `539b768`): one-day artifact
+  retention, thumbprint check before the import in the notes, build records
+  out of the release assets, `--verify-tag`, the secrets cleared after import,
+  and the notes' limits. Dry run
+  [38122406919](https://github.com/ilya-slalom/desktop-guides/actions/runs/38122406919):
+  gate and build succeeded, publish skipped, artifact expiry one day after
+  creation, notes with the thumbprint check first and no placeholders, no
+  `upgrade.json` or portable `.json` under `release/`. Both dry-run artifacts
+  (this run's and 38120091727's) were deleted.
+- **Host `signtool verify /pa /tw /v`** (pcsx2-win, Windows SDK 10.0.28000.0)
+  of the dry-run MSIX: the chain shows the pinned certificate (SHA1
+  `BAA638E4...`, expires 2031-10-11) and a DigiCert timestamp. It exits 1,
+  "terminated in a root certificate which is not trusted by the trust
+  provider", because the release certificate is deliberately not trusted on
+  that host. The CI sign step's own `verify /pa /tw` passed with the
+  certificate trusted on the runner.
+- **Pinned certificate.** Thumbprint `BAA638E4DCFA4E1C5A2F65E3DC838BA7B3B59EB6`,
+  Subject `CN=359962D5-3801-484E-BE5B-39D0D498BEA4`, `notAfter`
+  2031-10-11T06:37:44Z. Created by the owner on pcsx2-win on 11 October 2026
+  with `new_release_certificate.ps1`; both secrets are set, and the
+  certificate is not in pcsx2-win's stores.
+- **Flakes.** `production-shell-ui (html)` failed once in
+  [38105036523](https://github.com/ilya-slalom/desktop-guides/actions/runs/38105036523)
+  (attempt 1) and in
+  [38110158929](https://github.com/ilya-slalom/desktop-guides/actions/runs/38110158929)
+  with no related change, and passed on rerun. Worth its own issue.
+- **Rulings** (each with its cost if wrong):
+  - 2. The CI gate accepts a docs-only tagged commit when its nearest
+    ancestor with a green `windows-ci` push run differs only in docs paths.
+    Cost: a docs path that changes behavior would release untested.
+  - 3. The upgrade gate compares library content (`describe-library` and
+    SHA-256 of `library/content` files), not raw database bytes. Cost: a
+    database-only corruption the content check misses.
+  - 4. The upgraded app is judged launched by its main window title
+    "Desktop Guides" within 60 s, not "Library ready." Cost: a window that
+    opens but fails to load the library passes the launch check (the library
+    content check still runs).
+  - 5. The release workflow has a dry run (`workflow_dispatch` with `tag`).
+    Cost: a production-signed MSIX is a downloadable artifact for one day
+    (`retention-days: 1`).
+  - 6. The v1 install is launched once before seeding so Windows creates
+    `LocalState`. Cost: a first-run-only difference from a real install.
+  - 7. A dry run skips the CI gate. Cost: a dry run may build an unvetted
+    commit, but it publishes nothing.
+  - Also accepted: a temporary branch-push trigger (`38d811c`, reverted in
+    `a2c612a`) to register the workflow for dispatch (two noisy commits); the
+    csproj skips the public AppxManifest when `Portable=true` (none); the
+    portable zip is built on the Public lane so its window title is "Desktop
+    Guides" (a Preview title if wrong); the CI throwaway certificate and the
+    release trust are removed only after use, and the signing key is deleted
+    with `-DeleteKey`; repository secrets are readable by any branch workflow
+    (accepted with no Environment).
+- **Not run.** A real tag release (needs the owner's go-ahead after merge);
+  the upgrade from a previous published release (none exists yet); ARM64;
+  clean-machine.

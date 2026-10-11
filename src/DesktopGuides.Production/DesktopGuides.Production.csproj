@@ -28,7 +28,8 @@
   </PropertyGroup>
   <ItemGroup Condition="'$(PackageLane)' == 'Public'">
     <AppxManifest Remove="Package.appxmanifest" />
-    <AppxManifest Include="Package.Public.appxmanifest" />
+    <!-- The portable build has no package, so no AppxManifest. -->
+    <AppxManifest Include="Package.Public.appxmanifest" Condition="'$(Portable)' != 'true'" />
   </ItemGroup>
   <ItemGroup Condition="'$(PackageLane)' != 'Public'">
     <AppxManifest Remove="Package.Public.appxmanifest" />

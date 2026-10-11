@@ -1,9 +1,10 @@
 # P1 MSIX packaging and prerequisite delivery
 
-Status: T17.1 PR a, 11 October 2026. The public identity
-(`IlyaLissoboi.DesktopGuides`, `CN=359962D5-3801-484E-BE5B-39D0D498BEA4`) is
-reserved and built with `-p:PackageLane=Public`. Signing integration and the
-release workflow come in T17.1 PR b.
+Status: T17.1 public identity and signing are implemented (PR b, 11 October
+2026). The public identity (`IlyaLissoboi.DesktopGuides`,
+`CN=359962D5-3801-484E-BE5B-39D0D498BEA4`) is built with
+`-p:PackageLane=Public`, and a `vX.Y.Z` tag produces a signed draft
+pre-release. No tag release has been published yet.
 This procedure does not establish a clean-install or release-support claim.
 
 ## Identity and version
@@ -11,7 +12,7 @@ This procedure does not establish a clean-install or release-support claim.
 | Lane | Package Name and Publisher | Use |
 | --- | --- | --- |
 | Development | `DesktopGuides.Preview`, `CN=DesktopGuides Development` | Installed shell and reader checks. Its package family and local data stay isolated. |
-| Public | `IlyaLissoboi.DesktopGuides`, `CN=359962D5-3801-484E-BE5B-39D0D498BEA4` (reserved in Partner Center); build with `-p:PackageLane=Public` | Signed candidates and in-place upgrades. Never use a provisional subject in this lane. |
+| Public | `IlyaLissoboi.DesktopGuides`, `CN=359962D5-3801-484E-BE5B-39D0D498BEA4` (reserved in Partner Center); build with `-p:PackageLane=Public` | Signed releases and in-place upgrades. Signed with the pinned release certificate below. Never use a provisional subject in this lane. |
 
 The public manifest Publisher must exactly match the release signing
 certificate Subject. Both values stay fixed across upgrades. A change from Preview to
@@ -31,44 +32,114 @@ verifier as `--previous-package` before signing v2. This checks the metadata
 relationship; the interactive install/upgrade check below proves Windows
 deployment and user-data continuity.
 
-## Windows 11 x64 candidate
+## Release certificate
 
-1. Build from a clean, recorded commit on Windows with locked restore. Use
-   `dotnet restore src/DesktopGuides.Production/DesktopGuides.Production.csproj
-   --locked-mode -p:Platform=x64`, followed by `dotnet build` in Release with
-   `--no-restore`, `-p:Platform=x64`,
-   `-p:GenerateAppxPackageOnBuild=true`, and
-   `-p:AppxPackageSigningEnabled=false`. Keep ARM64 out of the public output
-   until its complete native P1 workflow passes.
-2. Read `AppxManifest.xml` from the built MSIX. Run
-   `tools/p1/verify_production_package.py` with `--name`, `--publisher`,
-   `--version`, and `--architecture x64`. For an upgrade candidate, also pass
-   `--previous-package` pointing to the prior signed MSIX. The check rejects
-   a changed identity or architecture, a non-increasing version, a missing
-   Windows App Runtime dependency, and accidental P0 diagnostic content.
-3. On a protected signing runner, provision a trusted code-signing certificate
-   in `Cert:\CurrentUser\My` outside the repository. Select it by thumbprint
-   and run `tools/p1/sign_production_package.ps1` with the package path, a
-   fresh output path, the exact expected identity, version, x64 architecture,
-   and a trusted `-TimestampUrl`. The signer verifies its certificate Subject,
-   private key, validity, code-signing purpose, signed package trust,
-   timestamp presence, and packed identity. The `-DevelopmentTest` switch
-   is only for disposable development certificates and accepts Preview or
-   test identities without a timestamp. A public signing run rejects Preview
-   and test package names and the development Publisher, and requires a
-   timestamp. The final public Name and Publisher still need to be pinned
-   when the signing identity is chosen.
-4. Record commit, source and signed MSIX SHA-256, identity, architecture,
-   Windows App Runtime minimum from the packed manifest, signer thumbprint
-   and validity, and timestamp status. Never export a private key into the
-   checkout or include it in logs or artifacts. Restrict access to signing
-   credentials and signed-candidate promotion.
+The public package is signed with one self-signed code-signing certificate,
+pinned in `docs/p1/release/release-certificate.json`:
 
-The current signer supports an externally provisioned certificate in the
-protected runner's CurrentUser certificate store. Azure Artifact Signing
-requires its own SignTool client and signing arguments; choose and integrate
-that service separately if it is the final signing provider. Never assume the
-certificate-store script signs through Azure Artifact Signing.
+- Subject `CN=359962D5-3801-484E-BE5B-39D0D498BEA4` (equal to the manifest
+  Publisher)
+- Thumbprint `BAA638E4DCFA4E1C5A2F65E3DC838BA7B3B59EB6`
+- Valid until 2031-10-11T06:37:44Z (`notAfter`)
+
+The public half is committed as `docs/p1/release/desktop-guides-release.cer`.
+
+**Creation.** The owner ran `tools/p1/new_release_certificate.ps1` on
+pcsx2-win on 11 October 2026 (RSA 3072, SHA-256, five years, AES256-protected
+PFX). It prints only the thumbprint, the dates and the `gh secret set`
+commands. The certificate is not in pcsx2-win's stores.
+
+**Where the key lives.** The PFX (base64) and its password are the repository
+secrets `RELEASE_SIGNING_PFX` and `RELEASE_SIGNING_PASSWORD`, and the owner
+keeps a copy in a password manager. The release job writes the PFX to a
+temporary file, imports it into `Cert:\CurrentUser\My`, deletes the file, and
+refuses to sign unless the thumbprint, Subject and expiry match the pin
+(`tools/p1/assert_release_certificate.ps1`). It removes the key afterwards.
+Never put the PFX or password in the checkout, logs or artifacts.
+
+**Rotation** (expiry or loss). Create a new certificate with the same Subject
+using `new_release_certificate.ps1`, update both secrets, update
+`release-certificate.json` and the committed `.cer`, and tell users to trust
+the new `.cer`. The package identity is unchanged, so installs still upgrade
+in place.
+
+The release job's previous-release upgrade step trusts only the current
+`.cer`, so it can't install the previous release's package after a rotation.
+For the first release after a rotation, either trust the old `.cer` too in
+that step for that run, or skip the step and run the upgrade check manually.
+
+Only linear releases are supported: the "previous release" is the most
+recently created published release, so don't publish an out-of-order hotfix
+for an older version.
+
+## Releasing
+
+1. Merge to `main` and wait for its `windows-ci` run to pass. Docs-only
+   commits are allowed on top of a green commit.
+2. Optional dry run, which builds and signs but publishes nothing and may use
+   any commit or branch: `gh workflow run release.yml -f tag=vX.Y.Z` (add
+   `--ref <branch>`). Download the `release-X.Y.Z.0` artifact and check
+   `release-manifest.json` against the pin.
+3. Tag the green `main` commit and push the tag:
+   `git tag -a vX.Y.Z -m "Desktop Guides X.Y.Z" <sha> && git push origin vX.Y.Z`.
+   The version is `X.Y.Z.0`; it must be higher than the last release.
+4. The workflow gates the tag (on `main`, `windows-ci` green), builds the
+   x64 Public MSIX, verifies it (with `--previous-package` when a published
+   release exists), signs it with a DigiCert timestamp, runs the
+   previous-release upgrade, builds the portable zip, and writes checksums and
+   `release-manifest.json`. The `publish` job then creates a **draft
+   pre-release** `Desktop Guides X.Y.Z`.
+5. Review the draft and publish it manually. The draft release stays private
+   until it is published, but the run's `release-X.Y.Z.0` artifact (dry runs
+   included) can be downloaded by any signed-in GitHub user for one day.
+
+Release assets: `DesktopGuides-X.Y.Z.0-x64.msix`,
+`DesktopGuides-portable-x64-X.Y.Z.zip`, a `.sha256` for each,
+`desktop-guides-release.cer` and `release-manifest.json`. The run artifact
+also holds `release-notes.md`, the portable build record
+(`DesktopGuides-portable-x64-X.Y.Z.json`) and, when a previous release exists,
+`upgrade.json`; these are not attached to the release. Keep ARM64 out of
+release output until its complete native P1 workflow passes.
+
+Record the commit, the MSIX SHA-256, identity, Windows App Runtime minimum
+and signer thumbprint (all in `release-manifest.json`).
+
+## User install steps
+
+These are the steps in the release notes template
+(`docs/p1/release/release-notes-template.md`):
+
+1. Install the Windows App Runtime and the WebView2 Runtime if missing.
+2. Download `desktop-guides-release.cer` and **compare its thumbprint before
+   trusting it**. In PowerShell, in the folder with the file:
+
+   ```powershell
+   (Get-PfxCertificate .\desktop-guides-release.cer).Thumbprint
+   ```
+
+   The output must equal `BAA638E4DCFA4E1C5A2F65E3DC838BA7B3B59EB6`. If it
+   differs, do not continue.
+3. In an administrator PowerShell, trust it once:
+
+   ```powershell
+   Import-Certificate -FilePath .\desktop-guides-release.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+   ```
+
+4. Open the MSIX and choose **Install**. Later releases upgrade it in place
+   and keep the library.
+
+The portable zip holds one `DesktopGuides.Production.exe` that needs no
+installation and keeps its library in `%LOCALAPPDATA%\DesktopGuides`.
+
+The release notes list the same limits:
+
+- Uninstalling the app deletes its library; back it up first from
+  **Settings → Back up library**.
+- The portable exe is unsigned, so Windows SmartScreen may warn.
+- Trusting the `.cer` trusts anything signed with this key. Remove that trust
+  later in an administrator PowerShell with
+  `Remove-Item Cert:\LocalMachine\TrustedPeople\BAA638E4DCFA4E1C5A2F65E3DC838BA7B3B59EB6`.
+- After a certificate rotation, users trust the new `.cer` once.
 
 The current x64 production MSIX declares
 `Microsoft.WindowsAppRuntime.2` at minimum version `2.5.1.0`. The project
@@ -98,7 +169,18 @@ until that gate passes.
 
 ## Installed upgrade gate
 
-Use a disposable logged-in Windows 11 x64 profile and the
+Two automated checks run `tools/p1/windows_package_upgrade.ps1`, which
+installs an old package, seeds a library, installs the new package over it
+without uninstalling, and checks the family, the higher version, the library
+content and that the upgraded app opens its window:
+
+- the `public-upgrade` job in `windows-ci` builds `1.0.0.0` and `1.0.1.0` from
+  one commit, signs both with a throwaway certificate with the public Subject
+  and runs on every main build;
+- the release job runs the same gate from the previous published release's
+  MSIX to the newly signed one (skipped when no release exists yet).
+
+For a manual run, use a disposable logged-in Windows 11 x64 profile and the
 [interactive scheduled-task procedure](e2e-testing.md). Sign both versions
 with certificates whose Subjects match the same manifest Publisher. Install
 v1, create a game and guide state, and record package family, version,

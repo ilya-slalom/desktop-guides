@@ -1,0 +1,53 @@
+$ErrorActionPreference = 'Stop'
+$script = Join-Path $PSScriptRoot 'new_release_certificate.ps1'
+
+function Assert-True([bool] $Condition, [string] $Message) {
+    if (-not $Condition) { throw $Message }
+}
+
+$subject = "CN=DesktopGuides CertScript Test $([Guid]::NewGuid().ToString('N'))"
+$pfx = $null
+$out = Join-Path ([IO.Path]::GetTempPath()) "desktop-guides-cert-$([Guid]::NewGuid().ToString('N'))"
+try {
+    $lines = @(& $script -OutputDirectory $out -Subject $subject -Years 1)
+    $info = ($lines | Where-Object { $_ -like '{*' } | Select-Object -First 1) | ConvertFrom-Json
+    Assert-True ($info.subject -eq $subject) 'The certificate Subject is wrong.'
+    Assert-True ($info.thumbprint -match '^[0-9A-F]{40}$') 'The thumbprint is missing.'
+    foreach ($file in @('pfx', 'pfx.base64.txt', 'password.txt', 'cer')) {
+        Assert-True (Test-Path -LiteralPath (Join-Path $out "desktop-guides-release.$file")) "The $file file is missing."
+    }
+    Assert-True (-not (Test-Path "Cert:\CurrentUser\My\$($info.thumbprint)")) `
+        'The certificate must be removed from the store.'
+    Assert-True (@($lines | Where-Object { $_ -like '*gh secret set RELEASE_SIGNING_PFX*' }).Count -eq 1) `
+        'The PFX secret command is missing.'
+    $password = [IO.File]::ReadAllText((Join-Path $out 'desktop-guides-release.password.txt'))
+    Assert-True (@($lines | Where-Object { $_.Contains($password) }).Count -eq 0) 'The password was printed.'
+    $pfx = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+        (Join-Path $out 'desktop-guides-release.pfx'), $password)
+    Assert-True ($pfx.Subject -eq $subject -and $pfx.HasPrivateKey) 'The PFX does not open with its password.'
+    $eku = $pfx.Extensions | Where-Object { $_ -is [Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension] }
+    Assert-True (@($eku.EnhancedKeyUsages | Where-Object Value -eq '1.3.6.1.5.5.7.3.3').Count -eq 1) `
+        'The certificate is not for code signing.'
+    Assert-True ([Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPublicKey($pfx).KeySize -eq 3072) 'The key is not RSA 3072.'
+    Assert-True ($pfx.SignatureAlgorithm.Value -eq '1.2.840.113549.1.1.11') 'The certificate is not SHA-256 with RSA.'
+    $cer = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+        (Join-Path $out 'desktop-guides-release.cer'))
+    Assert-True ($cer.Thumbprint -eq $info.thumbprint) 'The .cer thumbprint differs from the printed one.'
+    $cer.Dispose()
+    $base64 = [IO.File]::ReadAllText((Join-Path $out 'desktop-guides-release.pfx.base64.txt'))
+    Assert-True (@($lines | Where-Object { $_.Contains($base64) }).Count -eq 0) 'The PFX was printed.'
+    $pfx.Dispose()
+    $pfx = $null
+    $refused = $false
+    try { & $script -OutputDirectory $out -Subject $subject | Out-Null } catch { $refused = $true }
+    Assert-True $refused 'A second run into a used folder must refuse.'
+    Write-Output 'new_release_certificate: all cases passed.'
+}
+finally {
+    if ($pfx) { $pfx.Dispose() }
+    Remove-Item -LiteralPath $out -Recurse -Force -ErrorAction SilentlyContinue
+    # Leave no test certificate behind, even when an assertion failed.
+    Get-ChildItem Cert:\CurrentUser\My |
+        Where-Object { $_.Subject -eq $subject } |
+        ForEach-Object { Remove-Item -LiteralPath "Cert:\CurrentUser\My\$($_.Thumbprint)" -DeleteKey -ErrorAction SilentlyContinue }
+}

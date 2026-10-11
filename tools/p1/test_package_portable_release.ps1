@@ -89,6 +89,25 @@ try {
         & $packager -PublishDirectory $publish -OutputDirectory (Join-Path $scratch 'r') -Commit 'main'
     } 'A commit that is not a hash was accepted.'
 
+    # T17.1: a release names the zip by its version.
+    $versioned = Join-Path $scratch 'versioned'
+    & $packager -PublishDirectory $publish -OutputDirectory $versioned -Commit $commit -Version '1.2.3' | Out-Null
+    $versionedName = 'DesktopGuides-portable-x64-1.2.3'
+    $versionedOutputs = Get-Outputs $versioned | Sort-Object
+    Assert-True (($versionedOutputs -join ',') -eq "$versionedName.json,$versionedName.zip,$versionedName.zip.sha256") `
+        "Unexpected versioned release files: $($versionedOutputs -join ', ')"
+    $versionedManifest = Get-Content -LiteralPath (Join-Path $versioned "$versionedName.json") -Raw | ConvertFrom-Json
+    Assert-True ($versionedManifest.version -eq '1.2.3') 'The manifest should record the version.'
+    Assert-True ($versionedManifest.commit -eq $commit) 'The versioned manifest should keep the commit.'
+    Assert-True ($null -eq $manifest.version) 'An unversioned manifest should have no version.'
+
+    foreach ($badVersion in @('1.2', '1.2.3.0', 'v1.2.3', '0.1.0', '1.2.x')) {
+        Assert-Rejected {
+            & $packager -PublishDirectory $publish -OutputDirectory (Join-Path $scratch "v-$badVersion") `
+                -Commit $commit -Version $badVersion
+        } "The version '$badVersion' should be rejected."
+    }
+
     Write-Output 'Portable release packaging checks passed.'
 }
 finally {
