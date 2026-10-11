@@ -9,15 +9,21 @@ A pre-release for testing. Built from {{COMMIT}}.
 1. Install the prerequisites, if you don't have them:
    - [Windows App Runtime {{RUNTIME}} or later](https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads)
    - [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (for web page guides; most Windows 11 PCs already have it)
-2. Trust the release certificate once. In an administrator PowerShell, in
-   the folder where you downloaded `desktop-guides-release.cer`:
+2. Download `desktop-guides-release.cer` and **compare its thumbprint before
+   trusting it**. In PowerShell, in the folder with the file:
+
+   ```powershell
+   (Get-PfxCertificate .\desktop-guides-release.cer).Thumbprint
+   ```
+
+   The output must equal `{{THUMBPRINT}}`. If it differs, do not continue.
+3. In an administrator PowerShell, trust it once:
 
    ```powershell
    Import-Certificate -FilePath .\desktop-guides-release.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
    ```
 
-   The certificate's thumbprint is `{{THUMBPRINT}}`.
-3. Open `{{MSIX}}` and choose **Install**. Later releases upgrade it in
+4. Open `{{MSIX}}` and choose **Install**. Later releases upgrade it in
    place and keep your library.
 
 ## Portable build
