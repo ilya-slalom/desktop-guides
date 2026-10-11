@@ -1,11 +1,11 @@
 # P1 implementation plan and exit gates
 
-Status: 48 of the 56 tasks are merged, 11 October 2026. M0, M1, M3 and M4 are
+Status: 48 of the 57 tasks are merged, 11 October 2026. M0, M1, M3 and M4 are
 complete; T11.5 (colorful icons), the last M2 task, is in review in #85. M5 has T20.1, T20.2,
 T15.4 and T15.1 merged, and M6 is planned.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
-This plan orders all **16 P1 stories and 56 tasks** in the
+This plan orders all **16 P1 stories and 57 tasks** in the
 [work breakdown](../work-breakdown.md). The [technical design](../p1-technical-design.md)
 defines the architecture, data contracts, failure protocols, and reader
 behavior. [Implementation results](results.md) and the
@@ -1037,6 +1037,7 @@ only targets with complete target-specific results.
 | T17.4 | T17.1, T17.2 | Distribution size pass on the final feature set. Both builds exclude the unused Windows App SDK AI, ML, Search, Widgets and DWrite components, and the MSIX keeps its `Microsoft.WindowsAppRuntime.2` dependency. The portable build is trim-safe (C#/WinRT `partial` types and generic-interface code, source-generated JSON, an AngleSharp trim review) and published trimmed and compressed; CI fails on a new trim or C#/WinRT warning. Every scenario group passes on both builds, and the release records exe, extraction and MSIX sizes plus cold and warm launch times. Start from the [size spike](results.md#portable-size-spike--8-october-2026). | TR17.3 |
 | T17.3 | T17.1, T17.2, T17.4 | Interactive-task signed install/upgrade, three-format import after original removal, offline relaunch, independent resume, deletion, and backup restore on each promised target. Record OS/CPU/package/prerequisite versions, hashes, and scanned-PDF limit. A runtime-free Windows 11 x64 VM must prove missing-prerequisite failure and offline-installer recovery before a clean-install claim. | TR17.1, TR17.2 |
 | T17.5 | T17.3 and every P1 feature task | Microsoft Store submission with the reserved identity `IlyaLissoboi.DesktopGuides` once feature development is finished: Store certification passes, the listing is written, and the Store-signed package is confirmed to upgrade sideloaded installs in place. Decide whether sideloaded releases continue. | TR17.1, TR17.2 |
+| T17.6 | T17.1 | The app's own icon replaces the P0 placeholder logos: MSIX logos at every scale and target size in both lanes, and a multi-size `.ico` for the portable exe and its window, with a simplified variant at 16 to 32 px. The package stays one `.msix` (`AppxBundle=Never`), and `verify_production_package.py` requires the new logos. Runs before T17.3 so the candidate runs ship the final icon. | TR17.2 |
 
 The existing `production-shell-ui` CI job verifies M1 routes in an already
 interactive runner session. It does not execute the complete P1 scenario

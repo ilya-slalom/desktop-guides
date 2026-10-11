@@ -103,6 +103,22 @@ def verify(
                 if marker.encode("utf-8") in payload or marker.encode("utf-16le") in payload:
                     raise ValueError(f"P0 fixture control found in {file_name}.")
 
+    # T17.6: the app icon's own logos, not the P0 placeholders.
+    logo_names = (
+        "assets/square44x44logo.targetsize-16.png",
+        "assets/square44x44logo.targetsize-24_altform-unplated.png",
+        "assets/square44x44logo.scale-200.png",
+        "assets/square150x150logo.scale-200.png",
+        "assets/wide310x150logo.scale-200.png",
+        "assets/storelogo.scale-100.png",
+        "assets/splashscreen.scale-200.png",
+    )
+    with ZipFile(package_path) as package:
+        packed = {name.lower() for name in package.namelist()}
+    missing_logos = [name for name in logo_names if name not in packed]
+    if missing_logos:
+        raise ValueError(f"App icon logos are missing: {', '.join(missing_logos)}.")
+
     if previous_package_path is not None:
         with ZipFile(previous_package_path) as previous_package:
             previous_manifest = ElementTree.fromstring(

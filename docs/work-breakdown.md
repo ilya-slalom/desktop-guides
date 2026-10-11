@@ -4,7 +4,7 @@ Status: P0 merged in [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/
 on 25 September 2026. The clean-VM prerequisite gate and Windows 10 check
 remain deferred. P1 is designed in the [technical design](p1-technical-design.md)
 and [implementation plan](p1/implementation-plan.md); on 11 October 2026, 48 of
-its 56 tasks are merged, and the plan records each one. Source:
+its 57 tasks are merged, and the plan records each one. Source:
 [initial requirements and high-level design](initial-design.md). The backlog
 defines the acceptance gates; [Windows results](p0/results.md) record
 which checks have been performed. Windows 10 is deferred; native ARM64 CI
@@ -557,6 +557,12 @@ machine. Missing WebView2 Runtime produces an actionable setup message.
   Store certification, write the listing, and confirm the Store-signed
   package upgrades sideloaded installs in place. Decide whether sideloaded
   releases continue.
+- **T17.6** Give the app its own icon: the MSIX logos (Square44x44 with
+  target sizes and unplated forms, Square150x150, Wide310x150, StoreLogo
+  and SplashScreen at every scale) in both lanes, and an `.ico` for the
+  portable exe and its window. Sizes 16 to 32 px use a separate small-size
+  drawing with a larger controller. The package stays a single `.msix`, and
+  the verifier rejects the P0 placeholder logos.
 - **TR17.1** The final app needs no network access to display an imported TXT,
   HTML, or PDF guide after prerequisites are installed.
 - **TR17.2** No OS or architecture is advertised without a recorded install and
