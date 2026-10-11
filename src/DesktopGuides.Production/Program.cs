@@ -1,3 +1,4 @@
+using DesktopGuides.Core.Packaging;
 using DesktopGuides.Infrastructure.Activation;
 using DesktopGuides.Infrastructure.Storage;
 using Microsoft.UI.Dispatching;
@@ -11,22 +12,22 @@ internal static class Program
     // The MSIX and portable builds keep separate libraries, so each is its own
     // single instance.
     private static readonly string InstanceKey = AppDataRoot.HasPackageIdentity()
-        ? "DesktopGuides.Preview.Main"
-        : "DesktopGuides.Portable.Main";
-    private const string ActivationProbeName =
-        @"Local\DesktopGuides.Preview.RedirectedActivation";
-    private const string RedirectSelectedProbeName =
-        @"Local\DesktopGuides.Preview.RedirectSelected";
-    private const string RedirectContinueProbeName =
-        @"Local\DesktopGuides.Preview.RedirectContinue";
-    private const string ActivationQueuedProbeName =
-        @"Local\DesktopGuides.Preview.ActivationQueued";
-    private const string ActivationContinueProbeName =
-        @"Local\DesktopGuides.Preview.ActivationContinue";
-    private const string AcceptanceReceivedProbeName =
-        @"Local\DesktopGuides.Preview.AcceptanceReceived";
-    private const string AcceptanceContinueProbeName =
-        @"Local\DesktopGuides.Preview.AcceptanceContinue";
+        ? AppLane.Current.InstanceKey
+        : AppLaneNames.PortableInstanceKey;
+    private static readonly string ActivationProbeName =
+        AppLane.Current.LocalEvent("RedirectedActivation");
+    private static readonly string RedirectSelectedProbeName =
+        AppLane.Current.LocalEvent("RedirectSelected");
+    private static readonly string RedirectContinueProbeName =
+        AppLane.Current.LocalEvent("RedirectContinue");
+    private static readonly string ActivationQueuedProbeName =
+        AppLane.Current.LocalEvent("ActivationQueued");
+    private static readonly string ActivationContinueProbeName =
+        AppLane.Current.LocalEvent("ActivationContinue");
+    private static readonly string AcceptanceReceivedProbeName =
+        AppLane.Current.LocalEvent("AcceptanceReceived");
+    private static readonly string AcceptanceContinueProbeName =
+        AppLane.Current.LocalEvent("AcceptanceContinue");
     private static AppInstance? primaryInstance;
     private static EventWaitHandle? closingSignal;
     private static LaunchActivationPipe? activationPipe;
@@ -138,10 +139,10 @@ internal static class Program
     }
 
     private static string ClosingSignalName(int processId) =>
-        $@"Local\DesktopGuides.Preview.Closing.{processId}";
+        AppLane.Current.LocalEvent("Closing", processId);
 
     private static string ActivationPipeName(int processId) =>
-        $"DesktopGuides.Preview.Activation.{processId}";
+        AppLane.Current.PipeName("Activation", processId);
 
     private static void PauseAfterSelectingTargetForTest()
     {

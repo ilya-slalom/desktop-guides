@@ -11,7 +11,7 @@ internal static class ExternalLinkLaunchers
 {
     // Installed tests record the URL instead of opening a browser on the runner.
     public static IExternalLinkLauncher Create(string cacheRoot) =>
-        TestGate.IsOpen($@"Local\DesktopGuides.Preview.ExternalLaunch.{Environment.ProcessId}")
+        TestGate.IsOpen(AppLane.Current.LocalEvent("ExternalLaunch", Environment.ProcessId))
             ? new RecordingExternalLinkLauncher(Path.Combine(cacheRoot, "diagnostics", "external-launches.json"))
             : new SystemExternalLinkLauncher();
 }

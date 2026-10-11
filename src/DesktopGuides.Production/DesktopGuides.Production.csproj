@@ -17,6 +17,28 @@
          the same packages and share packages.lock.json. -->
     <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
   </PropertyGroup>
+  <!-- T17.1: Preview is the development lane; Public is the released
+       identity. Only the manifests and the lane names differ. -->
+  <PropertyGroup>
+    <PackageLane Condition="'$(PackageLane)' == ''">Preview</PackageLane>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(PackageLane)' == 'Public'">
+    <ApplicationManifest>app.public.manifest</ApplicationManifest>
+    <DefineConstants>$(DefineConstants);PUBLIC_LANE</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(PackageLane)' == 'Public'">
+    <AppxManifest Remove="Package.appxmanifest" />
+    <AppxManifest Include="Package.Public.appxmanifest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(PackageLane)' != 'Public'">
+    <AppxManifest Remove="Package.Public.appxmanifest" />
+    <None Remove="Package.Public.appxmanifest" />
+    <None Remove="app.public.manifest" />
+  </ItemGroup>
+  <Target Name="RequireKnownPackageLane" BeforeTargets="BeforeBuild">
+    <Error Condition="'$(PackageLane)' != 'Preview' and '$(PackageLane)' != 'Public'"
+           Text="PackageLane must be Preview or Public, got '$(PackageLane)'." />
+  </Target>
   <!-- Portable release: one exe with no package identity, Windows App SDK and
        .NET bundled. The Windows App SDK's DLL redirection needs every bundled
        file on disk, so each version extracts once to %TEMP%\.net. -->

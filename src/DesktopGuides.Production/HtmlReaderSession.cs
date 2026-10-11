@@ -83,8 +83,8 @@ internal sealed class HtmlReaderSession : IReaderSession
         profile = Path.Combine(cacheRoot, "WebView2", Guid.NewGuid().ToString("N"));
         View = new WebView2();
         defaultPageColor = View.DefaultBackgroundColor;
-        positionForTest = TestGate.IsOpen($@"Local\DesktopGuides.Preview.HtmlPosition.{Environment.ProcessId}");
-        delayImagesForTest = TestGate.IsOpen($@"Local\DesktopGuides.Preview.HtmlAssetDelay.{Environment.ProcessId}");
+        positionForTest = TestGate.IsOpen(AppLane.Current.LocalEvent("HtmlPosition", Environment.ProcessId));
+        delayImagesForTest = TestGate.IsOpen(AppLane.Current.LocalEvent("HtmlAssetDelay", Environment.ProcessId));
         tracker = View.DispatcherQueue.CreateTimer();
         tracker.Interval = TimeSpan.FromMilliseconds(500);
         tracker.IsRepeating = true;
@@ -110,14 +110,14 @@ internal sealed class HtmlReaderSession : IReaderSession
     public event EventHandler<HtmlGuideLoadError>? Failed;
 
     public static HtmlSessionDiagnostics? DiagnosticsForTest() =>
-        TestGate.IsOpen($@"Local\DesktopGuides.Preview.HtmlDiagnostics.{Environment.ProcessId}")
+        TestGate.IsOpen(AppLane.Current.LocalEvent("HtmlDiagnostics", Environment.ProcessId))
             ? new HtmlSessionDiagnostics()
             : null;
 
     // The installed smoke points the probe at an empty folder, so it fails
     // the way it does on a PC without WebView2.
     private static string? MissingRuntimeFolderForTest(string cacheRoot) =>
-        TestGate.IsOpen($@"Local\DesktopGuides.Preview.WebView2Missing.{Environment.ProcessId}")
+        TestGate.IsOpen(AppLane.Current.LocalEvent("WebView2Missing", Environment.ProcessId))
             ? Path.Combine(cacheRoot, "missing-runtime-test")
             : null;
 

@@ -33,7 +33,7 @@ public sealed partial class ShellWindow
     private void WriteProgressCountsForTest(ProgressCounts counts, ProgressFailure? lastFailure)
     {
         if (cacheRoot is null ||
-            !TestGate.IsOpen($@"Local\DesktopGuides.Preview.ProgressDiagnostics.{Environment.ProcessId}"))
+            !TestGate.IsOpen(AppLane.Current.LocalEvent("ProgressDiagnostics", Environment.ProcessId)))
         {
             return;
         }
@@ -213,7 +213,7 @@ public sealed partial class ShellWindow
     private string? RestoreLocatorForTest()
     {
         if (dataRoot is null ||
-            !TestGate.IsOpen($@"Local\DesktopGuides.Preview.ProgressOverride.{Environment.ProcessId}"))
+            !TestGate.IsOpen(AppLane.Current.LocalEvent("ProgressOverride", Environment.ProcessId)))
         {
             return null;
         }
