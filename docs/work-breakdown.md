@@ -560,9 +560,9 @@ machine. Missing WebView2 Runtime produces an actionable setup message.
 - **T17.6** Give the app its own icon: the MSIX logos (Square44x44 with
   target sizes and unplated forms, Square150x150, Wide310x150, StoreLogo
   and SplashScreen at every scale) in both lanes, and an `.ico` for the
-  portable exe and its window. Sizes 16 to 32 px use a separate small-size drawing with a larger controller. The
-  package stays a single `.msix`, and the verifier rejects the P0
-  placeholder logos.
+  portable exe and its window. Sizes 16 to 32 px use a separate small-size
+  drawing with a larger controller. The package stays a single `.msix`, and
+  the verifier rejects the P0 placeholder logos.
 - **TR17.1** The final app needs no network access to display an imported TXT,
   HTML, or PDF guide after prerequisites are installed.
 - **TR17.2** No OS or architecture is advertised without a recorded install and
