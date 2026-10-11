@@ -50,8 +50,9 @@ foreach ($candidate in $candidates) {
     if ($conclusion -ne 'success') {
         throw "windows-ci's push run for $candidate concluded '$conclusion'."
     }
-    $changed = @(Invoke-Git diff --name-only $candidate $sha | Where-Object { $_ })
-    $code = @($changed | Where-Object { $_ -notlike 'docs/*' -and $_ -notlike '*.md' })
+    $changed = @(Invoke-Git diff --no-renames --name-only $candidate $sha | Where-Object { $_ })
+    if ($LASTEXITCODE -ne 0) { throw "git diff $candidate $sha failed." }
+    $code = @($changed | Where-Object { $_ -cnotlike 'docs/*' -and $_ -cnotlike '*.md' })
     if ($code.Count -gt 0) {
         throw "Files changed since the last green run ($candidate) need their own run: $($code -join ', ')"
     }

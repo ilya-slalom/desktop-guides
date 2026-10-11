@@ -36,6 +36,9 @@ try {
     RepoGit @('checkout', '-q', '-b', 'side') | Out-Null
     $side = Commit 'src/b.cs' 'side'
     RepoGit @('checkout', '-q', 'main') | Out-Null
+    RepoGit @('mv', 'src/a.cs', 'docs/a.cs') | Out-Null
+    RepoGit @('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'move code into docs') | Out-Null
+    $moved = (RepoGit @('rev-parse', 'HEAD')).Trim()
 
     $green = { param($sha) if ($sha -eq $code) { 'success' } else { $null } }
     $red = { param($sha) if ($sha -eq $code) { 'failure' } else { $null } }
@@ -49,6 +52,9 @@ try {
 
         Assert-Rejected { & $gate -Commit $later -MainRef main -RunConclusion $green } `
             'A code change without its own green run must be rejected.' 'src/a.cs'
+        $greenLater = { param($sha) if ($sha -eq $later) { 'success' } else { $null } }
+        Assert-Rejected { & $gate -Commit $moved -MainRef main -RunConclusion $greenLater } `
+            'Moving code into docs after a green run must be rejected.' 'need their own run'
         Assert-Rejected { & $gate -Commit $docs -MainRef main -RunConclusion $red } `
             'A failed run must be rejected even for a docs-only tag.' "concluded 'failure'"
         Assert-Rejected { & $gate -Commit $side -MainRef main -RunConclusion { param($sha) 'success' } } `
