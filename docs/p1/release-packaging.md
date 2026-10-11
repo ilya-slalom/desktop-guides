@@ -122,6 +122,16 @@ These are the steps in the release notes template
 The portable zip holds one `DesktopGuides.Production.exe` that needs no
 installation and keeps its library in `%LOCALAPPDATA%\DesktopGuides`.
 
+The release notes list the same limits:
+
+- Uninstalling the app deletes its library; back it up first from
+  **Settings → Back up library**.
+- The portable exe is unsigned, so Windows SmartScreen may warn.
+- Trusting the `.cer` trusts anything signed with this key. Remove that trust
+  later in an administrator PowerShell with
+  `Remove-Item Cert:\LocalMachine\TrustedPeople\BAA638E4DCFA4E1C5A2F65E3DC838BA7B3B59EB6`.
+- After a certificate rotation, users trust the new `.cer` once.
+
 The current x64 production MSIX declares
 `Microsoft.WindowsAppRuntime.2` at minimum version `2.5.1.0`. The project
 publishes its .NET runtime self-contained and uses the Windows App SDK as a

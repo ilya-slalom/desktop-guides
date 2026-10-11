@@ -37,7 +37,16 @@ page guides.
 
 - x64 only.
 - Tested on Windows 11. Clean-machine and Windows 10 support aren't claimed yet.
-- Back up your library from **Settings → Back up library** before testing a
-  pre-release.
+- Uninstalling the app deletes its library. Back it up from
+  **Settings → Back up library** before uninstalling or testing a pre-release.
+- The portable exe is unsigned, so Windows SmartScreen may warn when you run it.
+- Trusting the `.cer` trusts anything signed with this key. To remove that
+  trust later, in an administrator PowerShell:
+
+  ```powershell
+  Remove-Item Cert:\LocalMachine\TrustedPeople\{{THUMBPRINT}}
+  ```
+
+- After a release certificate change, trust the new `.cer` once, the same way.
 
 Check each download against its `.sha256` file and `release-manifest.json`.
