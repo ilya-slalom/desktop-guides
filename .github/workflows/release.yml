@@ -126,6 +126,8 @@ jobs:
           }
           finally {
             Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+            # Keep the secrets out of the environment of the tools that run next.
+            Remove-Item Env:RELEASE_SIGNING_PFX, Env:RELEASE_SIGNING_PASSWORD -ErrorAction SilentlyContinue
           }
           "thumbprint=$($cert.Thumbprint)" >> $env:GITHUB_OUTPUT
           ./tools/p1/assert_release_certificate.ps1 -Thumbprint $cert.Thumbprint
