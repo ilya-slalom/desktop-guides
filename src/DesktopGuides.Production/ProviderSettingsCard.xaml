@@ -9,9 +9,6 @@
         Description="Add your IGDB credentials to search for games."
         HorizontalAlignment="Stretch"
         AutomationProperties.AutomationId="ProviderSettingsExpander">
-        <toolkit:SettingsExpander.HeaderIcon>
-            <FontIcon Glyph="&#xE721;" AutomationProperties.AccessibilityView="Raw" />
-        </toolkit:SettingsExpander.HeaderIcon>
         <toolkit:SettingsExpander.Items>
             <toolkit:SettingsCard Header="IGDB client ID"
                                   Description="From your Twitch developer application.">

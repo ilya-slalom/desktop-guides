@@ -36,7 +36,12 @@ public sealed partial class ShellWindow
         // Queued to the UI thread; the event's thread is not documented.
         themeSettings = ThemeSettings.CreateForWindowId(AppWindow.Id);
         themeSettings.Changed += (_, _) =>
-            DispatcherQueue.TryEnqueue(() => ApplyTheme(requestedTheme));
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                ApplyTheme(requestedTheme);
+                // T11.5: high contrast forces glyphs, and turning it off restores the choice.
+                ApplyIcons();
+            });
     }
 
     private void ApplyTheme(ThemePreference requested)

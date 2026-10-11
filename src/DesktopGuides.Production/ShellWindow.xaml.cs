@@ -120,6 +120,7 @@ public sealed partial class ShellWindow : Window
         InitializeThemeChoice();
         ApplyWindowMaterial(WindowMaterial.Mica);
         ApplyTheme(ThemePreference.System);
+        InitializeIcons();
         Navigation.SelectedItem = LibraryItem;
         gameArtwork = ArtworkListLoader.Attach(GameList, LoadRowArtworkAsync);
         GameList.AddHandler(
@@ -433,6 +434,9 @@ public sealed partial class ShellWindow : Window
             committedTheme = storedTheme;
             ApplyTheme(storedTheme);
             ApplyWindowMaterial(requestedMaterial);
+            colorfulIcons = committedColorfulIcons = settings?.ColorfulIcons ?? false;
+            iconsReady = true;
+            ApplyIcons();
             WindowMaterialSelector.IsEnabled = true;
             AppThemeSelector.IsEnabled = true;
             ready = true;
