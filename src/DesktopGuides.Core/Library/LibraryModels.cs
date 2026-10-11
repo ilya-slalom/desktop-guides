@@ -61,7 +61,8 @@ public sealed record AppSettings(
     ThemePreference Theme,
     Guid? LastActiveGuideId,
     WindowMaterial WindowMaterial = WindowMaterial.Mica,
-    bool ExportReminderShown = false);
+    bool ExportReminderShown = false,
+    bool ColorfulIcons = false);
 
 // MissingGuides compares by value, so reports stay comparable in tests.
 public sealed record StartupReconciliationReport(
