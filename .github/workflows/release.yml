@@ -3,9 +3,6 @@ name: Release
 on:
   push:
     tags: ['v*.*.*']
-    # TEMPORARY: registers the workflow so it can be dispatched; the gate rejects a branch.
-    branches: [feat/p1-t17-1-release]
-    paths: ['.github/workflows/release.yml']
   workflow_dispatch:
     inputs:
       tag:
