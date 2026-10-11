@@ -228,7 +228,27 @@ on `feat/p1-t11-5-colorful-icons`, PR #85.
 - **Not run:** a real system-wide high-contrast switch. It is deferred to
   T16.2's high-contrast pass, which saves and restores the theme.
   `AppIconCatalog.For` and `ColorfulIconsPresentation` pin the behaviour.
-- **Full PR CI:** pending.
+- **Final review:** a fresh reviewer found two Important issues. Each was
+  fixed after a check failed first:
+  - The empty-state colour icons still leaked an `Image`. A whole-window
+    check failed on the empty search. Now every colour-icon host waits on
+    one layout handler until its inner image exists.
+  - The toggle stayed enabled during an export. `export-cancel` failed in
+    CI run
+    [38137886129](https://github.com/ilya-slalom/desktop-guides/actions/runs/38137886129).
+    The toggle now follows `ready` and the export/restore busy state, like
+    the theme and material selectors.
+- **Deferred minors:**
+  - No automated check that the portable exe contains the icons.
+  - The MIT notice sits only inside the portable exe.
+  - `e2e-testing.md` doesn't list the icon scenarios.
+  - The icon scenarios' cleanup resets the setting before restoring the
+    Windows theme, as the material scenarios do.
+- **Full PR CI:** run
+  [38138192255](https://github.com/ilya-slalom/desktop-guides/actions/runs/38138192255)
+  passed on `e1d1548`: all four installed shell shards, x64 and ARM64
+  packages, the toolbar and native ARM64. The portable `design` group
+  passed again with both fixes.
 
 Rulings against this spec (details in the plan):
 
