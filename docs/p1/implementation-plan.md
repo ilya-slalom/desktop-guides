@@ -97,7 +97,9 @@ for installed shell checks. Set a separate, stable public Name and certificate
 Publisher before publishing any release candidate. Do not use a placeholder
 public Publisher or silently rebrand the Preview package.
 The [release procedure](release-packaging.md) records the tested package
-checks and the remaining public identity decision.
+checks. The public identity (`IlyaLissoboi.DesktopGuides`) is reserved, and
+T17.1 PR a adds the Public build lane for it; signing and release follow in
+PR b.
 
 Use a framework-dependent Windows App SDK package with a self-contained .NET
 runtime. A self-contained Windows App SDK package would simplify runtime

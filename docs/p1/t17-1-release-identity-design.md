@@ -1,6 +1,6 @@
 # T17.1 release identity and signing design
 
-Status: design approved, 11 October 2026; not yet implemented.
+Status: PR a (two lanes) in review; PR b planned.
 Prerequisite T11.1 is merged. The groundwork from 27 September (the package
 verifier, the public-mode signer and the release procedure) is merged.
 
@@ -280,4 +280,37 @@ to `implementation-plan.md` and `work-breakdown.md` with the task count at 56.
 
 ## T17.1 verification record
 
-Not yet run.
+### PR a: two lanes
+
+Commits `db7b6db` (lane names), `374b19b` (the Public lane in the shell
+build), `87db610` and `9231770` (CI step and package description).
+
+- **Core tests.** 1036 passed on pcsx2-win.
+- **Host builds and verifier** (x64; the only warning is the pre-existing
+  `mspdbcmf.exe` symbols-package warning):
+  - Preview: `DesktopGuides.Preview`, `CN=DesktopGuides Development`,
+    version 0.1.0.0.
+  - `-p:PackageLane=Public`: `IlyaLissoboi.DesktopGuides`,
+    `CN=359962D5-3801-484E-BE5B-39D0D498BEA4`, version 1.0.0.0.
+  - `-p:PackageLane=Store` fails with "PackageLane must be Preview or
+    Public, got 'Store'."
+- **CI.** [Run 38105036523](https://github.com/ilya-slalom/desktop-guides/actions/runs/38105036523)
+  (head `9231770`) is green. The new "Build and verify the public lane" step
+  printed `{"architecture": "x64", "name": "IlyaLissoboi.DesktopGuides",
+  "publisher": "CN=359962D5-3801-484E-BE5B-39D0D498BEA4", "version":
+  "1.0.0.0", "windowsAppRuntimeMinimum": "2.5.1.0"}`. This step is the
+  standing check that the Public package verifies on every build.
+- **Rulings.**
+  - Plan ruling 1: lane names take three forms (`Local\<prefix>.<name>`,
+    `Local\<prefix>.<name>.<pid>`, and the pipe name `<prefix>.<name>.<pid>`),
+    so `AppLaneNames` exposes `LocalEvent(name)`, `LocalEvent(name, pid)` and
+    `PipeName(name, pid)` instead of a single `TestGate`.
+  - The Public manifest Description no longer says "preview" (user-visible;
+    the spec was silent).
+  - Test gates stay reachable in the public build, as the spec's ruling
+    accepts: they are session-local named events only.
+  - `production-shell-ui (html)` failed once in this run and passed on
+    rerun of the same code. Treated as a flake: a name regression would fail
+    every shard.
+- **Not run.** Signing, the release workflow, the certificate and the
+  upgrade gate are PR b's.

@@ -9,7 +9,7 @@ This procedure does not establish a clean-install or release-support claim.
 | Lane | Package Name and Publisher | Use |
 | --- | --- | --- |
 | Development | `DesktopGuides.Preview`, `CN=DesktopGuides Development` | Installed shell and reader checks. Its package family and local data stay isolated. |
-| Public | Set once from the release signing identity | Signed candidates and in-place upgrades. Never use a provisional subject in this lane. |
+| Public | `IlyaLissoboi.DesktopGuides`, `CN=359962D5-3801-484E-BE5B-39D0D498BEA4` (reserved in Partner Center); build with `-p:PackageLane=Public` | Signed candidates and in-place upgrades. Never use a provisional subject in this lane. |
 
 The public manifest Publisher must exactly match the release signing
 certificate Subject. Select a stable package Name before building the first
