@@ -4764,6 +4764,27 @@ try {
             }
         }
 
+        # Every icon on screen, including the empty states and the built-in
+        # Settings item. Game artwork is a real image, so its list is skipped.
+        function Assert-NoImageInWindow([string] $view) {
+            $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+            $queue = [System.Collections.Generic.Queue[object]]::new()
+            $queue.Enqueue($root)
+            while ($queue.Count -gt 0) {
+                $child = $walker.GetFirstChild($queue.Dequeue())
+                while ($child) {
+                    if ($child.Current.AutomationId -ne 'GameList') {
+                        if ($child.Current.ControlType -eq [System.Windows.Automation.ControlType]::Image) {
+                            throw ("Expected no Image element in the $view view; icons must stay Raw. " +
+                                "Found $($child.Current.ClassName) '$($child.Current.Name)'.")
+                        }
+                        $queue.Enqueue($child)
+                    }
+                    $child = $walker.GetNextSibling($child)
+                }
+            }
+        }
+
         Resize-ShellWindow 1500 720
         Select-Element 'Settings'
         [void](Wait-Name 'SettingsHeading' 'Settings')
@@ -4788,6 +4809,7 @@ try {
         Assert-NoControlViewImage 'LibraryNavigation'
         Assert-NoControlViewImage 'AppTitleBar'
         Assert-NoControlViewImage 'AppThemeSettingsCard'
+        Assert-NoImageInWindow 'Settings'
         [void](Wait-HiddenById 'ShellStatus')
         Assert-ShellForeground
         [void](Show-SettingsCard 'ProviderSettingsExpander')
@@ -4800,6 +4822,7 @@ try {
         if ($EmptyLibrary) { [void](Wait-Name 'LibraryEmpty' 'No games in your library.') }
         else { [void](Wait-VisibleById 'LibraryHeading') }
         Start-Sleep -Milliseconds 400
+        if ($EmptyLibrary) { Assert-NoImageInWindow 'empty library' }
         Assert-ShellForeground
         $report.libraryScreenshot = Save-WindowScreenshot "icons-$state-library"
         if (-not $EmptyLibrary) {
@@ -4808,6 +4831,7 @@ try {
             [void](Wait-Status 'No games match.' -AllowHidden)
             [void](Wait-VisibleById 'LibraryNoResults')
             Start-Sleep -Milliseconds 300
+            Assert-NoImageInWindow 'empty search'
             $report.searchScreenshot = Save-WindowScreenshot "icons-$state-search"
         }
         $report.icons = $state
@@ -6388,8 +6412,20 @@ try {
         }
         elseif ($Mode -eq 'export-cancel') {
             # The install script holds the export at its Backup test gate.
-            Invoke-Element (Wait-EnabledById 'ExportCancelButton')
+            $cancel = Wait-EnabledById 'ExportCancelButton'
+            # T11.5: a setting that saves can't change while the export holds the library.
+            if ((Find-ById 'ColorfulIconsToggle').Current.IsEnabled) {
+                throw 'The Colorful icons toggle stayed enabled during an export.'
+            }
+            Invoke-Element $cancel
             [void](Wait-Status 'Export canceled.')
+            $deadline = (Get-Date).AddSeconds(10)
+            while (-not (Find-ById 'ColorfulIconsToggle').Current.IsEnabled -and (Get-Date) -lt $deadline) {
+                Start-Sleep -Milliseconds 100
+            }
+            if (-not (Find-ById 'ColorfulIconsToggle').Current.IsEnabled) {
+                throw 'The Colorful icons toggle stayed disabled after the export ended.'
+            }
             [void](Wait-HiddenById 'ExportCancelButton')
             Wait-FocusedId 'ExportBackupButton'
             if (Test-Path -LiteralPath $BackupPath) { throw 'A canceled export left its file.' }
