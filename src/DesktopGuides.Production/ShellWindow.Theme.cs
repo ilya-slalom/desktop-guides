@@ -1,4 +1,5 @@
 using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Navigation;
 using DesktopGuides.Core.Reading;
 using Microsoft.UI.System;
 using Microsoft.UI.Windowing;
@@ -41,6 +42,11 @@ public sealed partial class ShellWindow
                 ApplyTheme(requestedTheme);
                 // T11.5: high contrast forces glyphs, and turning it off restores the choice.
                 ApplyIcons();
+                if (colorfulIcons && ready && navigator.Current is GameRoute)
+                {
+                    // Guide rows pick their icon when built.
+                    _ = RunNavigationAsync(() => RenderCurrentAsync());
+                }
             });
     }
 

@@ -4736,7 +4736,7 @@ try {
             if ($toggleState -ne $state) {
                 throw "Expected the Colorful icons toggle $state, found $toggleState."
             }
-            $expected = if ($state -eq 'On') { 'images:10 glyphs:0' } else { 'images:0 glyphs:10' }
+            $expected = if ($state -eq 'On') { 'images:11 glyphs:0' } else { 'images:0 glyphs:11' }
             $deadline = (Get-Date).AddSeconds(10)
             do {
                 $status = (Find-ById 'ColorfulIconsToggle').Current.ItemStatus
@@ -4833,6 +4833,15 @@ try {
             Start-Sleep -Milliseconds 300
             Assert-NoImageInWindow 'empty search'
             $report.searchScreenshot = Save-WindowScreenshot "icons-$state-search"
+            Set-SearchQuery '' 'LibrarySearchInput'
+            [void](Wait-GameRow 'The Legend of Zelda: Tears of the Kingdom')
+            # Guide rows show their format icons on the Game page.
+            Select-Element 'The Legend of Zelda: Tears of the Kingdom'
+            [void](Wait-Name 'GameHeading' 'The Legend of Zelda: Tears of the Kingdom')
+            [void](Wait-Status 'Game ready.')
+            [void](Wait-HiddenById 'ShellStatus')
+            Start-Sleep -Milliseconds 400
+            $report.gameScreenshot = Save-WindowScreenshot "icons-$state-game"
         }
         $report.icons = $state
         $report.phases += "icons-$state-captured"

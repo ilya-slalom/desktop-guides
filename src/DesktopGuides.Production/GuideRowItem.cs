@@ -9,10 +9,10 @@ public sealed class GuideRowItem : CatalogRowItem
 {
     internal GuideRowItem(
         GuideSummary summary, TimeProvider clock, CultureInfo culture,
-        GuideFileStatus fileStatus = GuideFileStatus.Ok)
+        GuideFileStatus fileStatus = GuideFileStatus.Ok, bool colorful = false, bool highContrast = false)
         : base(
             summary.Guide.Title,
-            fileStatus == GuideFileStatus.Ok ? FormatGlyph(summary.Guide.Format) : "\uE7BA", // Warning
+            AppIconCatalog.ForGuide(summary.Guide.Format, fileStatus != GuideFileStatus.Ok, colorful, highContrast),
             CatalogPresentation.GuideFacts(summary, clock, culture, fileStatus))
     {
         Guide = summary.Guide;
@@ -22,11 +22,4 @@ public sealed class GuideRowItem : CatalogRowItem
     internal Guide Guide { get; }
 
     internal DateTimeOffset? CompletedUtc { get; }
-
-    private static string FormatGlyph(GuideFormat format) => format switch
-    {
-        GuideFormat.Html => "\uE774", // Globe
-        GuideFormat.Pdf => "\uEA90",  // PDF
-        _ => "\uE8A5"                 // Document
-    };
 }

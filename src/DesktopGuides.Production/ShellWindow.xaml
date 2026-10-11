@@ -708,11 +708,6 @@
                             x:Name="ColorfulIconsSettingsCard"
                             HorizontalAlignment="Stretch"
                             AutomationProperties.AutomationId="ColorfulIconsSettingsCard">
-                            <toolkit:SettingsCard.HeaderIcon>
-                                <!-- Ruling 11: this card's own icon is always a glyph. -->
-                                <FontIcon Glyph="&#xE76E;"
-                                          AutomationProperties.AccessibilityView="Raw" />
-                            </toolkit:SettingsCard.HeaderIcon>
                             <ToggleSwitch x:Name="ColorfulIconsToggle"
                                           IsEnabled="False"
                                           Toggled="ColorfulIconsToggled"

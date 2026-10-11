@@ -59,6 +59,7 @@ public sealed partial class ShellWindow
         ExportSettingsCard.HeaderIcon = AppIcons.Element(Pick(AppIcon.BackupCard));
         RestoreSettingsExpander.HeaderIcon = AppIcons.Element(Pick(AppIcon.RestoreCard));
         ProviderSettings.SetHeaderIcon(AppIcons.Element(Pick(AppIcon.ProvidersCard)));
+        ColorfulIconsSettingsCard.HeaderIcon = AppIcons.Element(Pick(AppIcon.ColorfulIconsCard));
         iconHostsPending.Clear();
         if (images > 0)
         {
@@ -66,7 +67,8 @@ public sealed partial class ShellWindow
             {
                 LibraryItem, Navigation.SettingsItem as DependencyObject, AppTitleBar,
                 LibraryEmptyImage, LibraryNoResultsImage, AppThemeSettingsCard,
-                WindowMaterialSettingsCard, ExportSettingsCard, RestoreSettingsExpander, ProviderSettings
+                WindowMaterialSettingsCard, ExportSettingsCard, RestoreSettingsExpander, ProviderSettings,
+                ColorfulIconsSettingsCard
             }.OfType<DependencyObject>());
         }
 

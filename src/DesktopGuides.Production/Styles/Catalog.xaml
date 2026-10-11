@@ -95,8 +95,15 @@
                 <Grid>
                     <FontIcon Glyph="{x:Bind Glyph}"
                               FontSize="16"
+                              Visibility="{x:Bind GlyphVisibility}"
                               Foreground="{ThemeResource DesktopGuidesSecondaryTextBrush}"
                               AutomationProperties.AccessibilityView="Raw" />
+                    <!-- T11.5: a plain Image, so Raw covers it; ImageIcon would add a child. -->
+                    <Image Source="{x:Bind IconImage}"
+                           Width="20"
+                           Height="20"
+                           Visibility="{x:Bind IconImageVisibility}"
+                           AutomationProperties.AccessibilityView="Raw" />
                     <Image Source="{x:Bind Thumbnail, Mode=OneWay}"
                            Stretch="UniformToFill"
                            AutomationProperties.AccessibilityView="Raw" />

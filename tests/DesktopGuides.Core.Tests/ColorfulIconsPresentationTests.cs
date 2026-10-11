@@ -54,7 +54,7 @@ public sealed class ColorfulIconsPresentationTests
     [Fact]
     public void TheStatusCountsImagesAndGlyphs()
     {
-        Assert.Equal("images:10 glyphs:0", ColorfulIconsPresentation.Status(10, 0));
-        Assert.Equal("images:0 glyphs:10", ColorfulIconsPresentation.Status(0, 10));
+        Assert.Equal("images:11 glyphs:0", ColorfulIconsPresentation.Status(11, 0));
+        Assert.Equal("images:0 glyphs:11", ColorfulIconsPresentation.Status(0, 11));
     }
 }

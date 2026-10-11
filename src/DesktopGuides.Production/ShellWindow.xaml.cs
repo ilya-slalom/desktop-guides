@@ -1912,7 +1912,7 @@ public sealed partial class ShellWindow : Window
                         (await library.ListGuideSummariesAsync(gameRoute.GameId))
                         .Select(summary => new GuideRowItem(
                             summary, TimeProvider.System, CultureInfo.CurrentCulture,
-                            guideHealth[summary.Guide.Id]))
+                            guideHealth[summary.Guide.Id], colorfulIcons, themeSettings?.HighContrast == true))
                         .ToList();
                     if (generation != renderGeneration)
                     {
