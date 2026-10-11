@@ -12,6 +12,8 @@ public sealed partial class ShellWindow
     private bool committedColorfulIcons;
     private bool iconsReady;
     private bool applyingIconToggle;
+    // The TitleBar builds its icon from IconSource, so its Image appears on a later layout pass.
+    private bool titleBarImagePending;
     private readonly SemaphoreSlim iconSaveGate = new(1, 1);
 
     private void InitializeIcons()
@@ -20,6 +22,13 @@ public sealed partial class ShellWindow
         AutomationProperties.SetName(ColorfulIconsToggle, ColorfulIconsPresentation.ToggleName);
         AppIcons.HideInnerImages(LibraryEmptyImage);
         AppIcons.HideInnerImages(LibraryNoResultsImage);
+        AppTitleBar.LayoutUpdated += (_, _) =>
+        {
+            if (titleBarImagePending && AppIcons.HideImages(AppTitleBar))
+            {
+                titleBarImagePending = false;
+            }
+        };
         // The built-in Settings item exists only once the template has loaded.
         Navigation.Loaded += (_, _) => ApplyIcons();
         ApplyIcons();
@@ -43,7 +52,9 @@ public sealed partial class ShellWindow
         {
             settingsItem.Icon = AppIcons.Element(Pick(AppIcon.NavSettings));
         }
-        AppTitleBar.IconSource = AppIcons.Source(Pick(AppIcon.TitleBar));
+        AppIconChoice titleBarIcon = Pick(AppIcon.TitleBar);
+        AppTitleBar.IconSource = AppIcons.Source(titleBarIcon);
+        titleBarImagePending = titleBarIcon.IsAsset;
         ShowEmptyStateIcon(LibraryEmptyGlyph, LibraryEmptyImage, Pick(AppIcon.EmptyLibrary));
         ShowEmptyStateIcon(LibraryNoResultsGlyph, LibraryNoResultsImage, Pick(AppIcon.EmptySearch));
         AppThemeSettingsCard.HeaderIcon = AppIcons.Element(Pick(AppIcon.ThemeCard));

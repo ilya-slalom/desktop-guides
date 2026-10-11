@@ -31,17 +31,21 @@ internal static class AppIcons
         return icon;
     }
 
-    private static void HideImages(DependencyObject parent)
+    // Returns whether any Image was found under the parent.
+    public static bool HideImages(DependencyObject parent)
     {
+        bool found = false;
         for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
         {
             DependencyObject child = VisualTreeHelper.GetChild(parent, i);
             if (child is Microsoft.UI.Xaml.Controls.Image)
             {
                 AutomationProperties.SetAccessibilityView(child, AccessibilityView.Raw);
+                found = true;
             }
-            HideImages(child);
+            found |= HideImages(child);
         }
+        return found;
     }
 
     public static IconSource Source(AppIconChoice choice) => choice.IsAsset
