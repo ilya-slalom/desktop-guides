@@ -4775,6 +4775,8 @@ try {
         Assert-NoControlViewImage 'AppThemeSettingsCard'
         [void](Wait-HiddenById 'ShellStatus')
         Assert-ShellForeground
+        [void](Show-SettingsCard 'ProviderSettingsExpander')
+        $report.settingsLowerScreenshot = Save-WindowScreenshot "icons-$state-settings-lower"
         Scroll-SettingsToTop
         $report.settingsScreenshot = Save-WindowScreenshot "icons-$state-settings"
 
@@ -4785,6 +4787,14 @@ try {
         Start-Sleep -Milliseconds 400
         Assert-ShellForeground
         $report.libraryScreenshot = Save-WindowScreenshot "icons-$state-library"
+        if (-not $EmptyLibrary) {
+            # The empty-search icon shows only for a search with no results.
+            Set-SearchQuery 'zzqx no such game' 'LibrarySearchInput'
+            [void](Wait-Status 'No games match.' -AllowHidden)
+            [void](Wait-VisibleById 'LibraryNoResults')
+            Start-Sleep -Milliseconds 300
+            $report.searchScreenshot = Save-WindowScreenshot "icons-$state-search"
+        }
         $report.icons = $state
         $report.phases += "icons-$state-captured"
     }
