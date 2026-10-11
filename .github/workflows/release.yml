@@ -250,6 +250,6 @@ jobs:
             echo "A release for $TAG already exists." >&2; exit 1
           fi
           version="${TAG#v}"
-          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --prerelease \
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --prerelease --verify-tag \
             --title "Desktop Guides $version" --notes-file release/release-notes.md \
             release/release/*
