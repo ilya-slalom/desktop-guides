@@ -252,6 +252,7 @@ try {
         ' marked (complete|in progress)\.$',
         '^App theme set to (System|Light|Dark)\.$',
         '^Window background set to (Mica|Acrylic|Solid)\.$',
+        '^Colorful icons turned (on|off)\.$',
         '^(No games match\.|\d+ of \d+ games match\.)$',
         '^Opened near your last place\. The guide changed since you were here\.$')
 
