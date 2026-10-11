@@ -152,6 +152,12 @@ jobs:
       - name: Check portable release packaging
         shell: pwsh
         run: ./tools/p1/test_package_portable_release.ps1
+      - name: Check release version parsing
+        shell: pwsh
+        run: ./tools/p1/test_release_version.ps1
+      - name: Check public manifest stamping
+        shell: pwsh
+        run: ./tools/p1/test_stamp_package_version.ps1
       - name: Check provider credential parsing
         shell: pwsh
         run: ./tools/p1/test_windows_provider_credentials.ps1
