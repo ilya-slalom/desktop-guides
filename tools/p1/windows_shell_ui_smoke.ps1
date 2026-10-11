@@ -4834,10 +4834,21 @@ try {
             Assert-NoImageInWindow 'empty search'
             $report.searchScreenshot = Save-WindowScreenshot "icons-$state-search"
             Set-SearchQuery '' 'LibrarySearchInput'
-            [void](Wait-GameRow 'The Legend of Zelda: Tears of the Kingdom')
-            # Guide rows show their format icons on the Game page.
-            Select-Element 'The Legend of Zelda: Tears of the Kingdom'
-            [void](Wait-Name 'GameHeading' 'The Legend of Zelda: Tears of the Kingdom')
+            # Guide rows show their format icons on the Game page. Earlier
+            # design scenarios choose the games, so open the first row.
+            $itemCondition = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::ListItem)
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                $firstRow = (Wait-VisibleById 'GameList').FindFirst($scope, $itemCondition)
+                if ($firstRow) { break }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            if (-not $firstRow) { throw 'Expected a game row after clearing the search.' }
+            $firstGame = $firstRow.Current.Name
+            Select-Element $firstGame
+            [void](Wait-Name 'GameHeading' $firstGame)
             [void](Wait-Status 'Game ready.')
             [void](Wait-HiddenById 'ShellStatus')
             Start-Sleep -Milliseconds 400

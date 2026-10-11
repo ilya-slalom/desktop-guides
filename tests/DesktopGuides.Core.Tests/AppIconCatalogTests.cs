@@ -64,7 +64,7 @@ public sealed class AppIconCatalogTests
     [InlineData(AppIcon.BackupCard, "\uE896", "ic_fluent_document_folder_24_color.svg")]
     [InlineData(AppIcon.RestoreCard, "\uE777", "ic_fluent_history_24_color.svg")]
     [InlineData(AppIcon.ProvidersCard, "\uE721", "ic_fluent_globe_24_color.svg")]
-    [InlineData(AppIcon.ColorfulIconsCard, "\uE71D", "ic_fluent_apps_24_color.svg")]
+    [InlineData(AppIcon.ColorfulIconsCard, "\uE80A", "ic_fluent_apps_24_color.svg")]
     public void EachPlaceKeepsItsGlyphAndGetsItsAsset(AppIcon icon, string glyph, string asset)
     {
         Assert.Equal(glyph, AppIconCatalog.For(icon, false, false).Glyph);

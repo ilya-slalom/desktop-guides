@@ -45,7 +45,7 @@ public static class AppIconCatalog
             [AppIcon.BackupCard] = ("\uE896", "ic_fluent_document_folder_24_color.svg"),
             [AppIcon.RestoreCard] = ("\uE777", "ic_fluent_history_24_color.svg"),
             [AppIcon.ProvidersCard] = ("\uE721", "ic_fluent_globe_24_color.svg"),
-            [AppIcon.ColorfulIconsCard] = ("\uE71D", "ic_fluent_apps_24_color.svg"),
+            [AppIcon.ColorfulIconsCard] = ("\uE80A", "ic_fluent_apps_24_color.svg"),
         };
 
     // Game-page guide rows: a missing file wins over the format.
