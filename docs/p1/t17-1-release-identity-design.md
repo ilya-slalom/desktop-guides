@@ -1,6 +1,6 @@
 # T17.1 release identity and signing design
 
-Status: PR a merged in #82; PR b in review.
+Status: merged. PR a in #82 and PR b in #83 (merge commit 1640576); the first draft release v1.0.0 was built by release run 38127264654.
 Prerequisite T11.1 is merged. The groundwork from 27 September (the package
 verifier, the public-mode signer and the release procedure) is merged.
 

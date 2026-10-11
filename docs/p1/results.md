@@ -1,8 +1,8 @@
 # P1 implementation results
 
 Status: P1 work is merged into `main` through
-[PR #80](https://github.com/ilya-slalom/desktop-guides/pull/80) (T20.2 PR c, merge
-commit `494e9d3`) on 11 October 2026. The [merged PR summary](#merged-pr-summary)
+[PR #83](https://github.com/ilya-slalom/desktop-guides/pull/83) (T17.1 PR b, merge
+commit `1640576`) on 11 October 2026. The [merged PR summary](#merged-pr-summary)
 lists every PR since M0 with its CI run and test counts. The P1 first usable
 release remains in progress: the [dependency plan](implementation-plan.md)
 defines all task exit gates, and this file records only checks actually run.
@@ -24,7 +24,7 @@ PR #16. T14.4 merged in PR #54.
 
 ## Merged PR summary
 
-One row per PR merged into `main` after M0, through PR #80. The *Record* column
+One row per PR merged into `main` after M0, through PR #83. The *Record* column
 links the task's own verification section, which has the full evidence.
 
 - *Final CI run* is the run the PR cites as decisive. Where no CI run is
@@ -36,7 +36,7 @@ links the task's own verification section, which has the full evidence.
 - PRs record `shell-scope` only from #38 onward, when the input was added.
   From #47 a full run splits `production-shell-ui` into four shards.
 - Tasks for #33 (a T08.3 harness follow-up) and #37 are inferred from the PR
-  titles. #15, #21, #38, #43, #47, #53, #55, #56, #58, #60, #63–#66, #68–#73 and #77
+  titles. #15, #21, #38, #43, #47, #53, #55, #56, #58, #60, #63–#66, #68–#73, #77 and #81
   aren't task PRs. #61 is an issue, not a PR.
 
 | PR | Merged | Commit | Task | Final CI run | Core | Infra | Record | Caveats |
@@ -103,6 +103,9 @@ links the task's own verification section, which has the full evidence.
 | [#78](https://github.com/ilya-slalom/desktop-guides/pull/78) | 2026-10-10 | `a50c490` | T20.2 (PR a) | [38030840036](https://github.com/ilya-slalom/desktop-guides/actions/runs/38030840036) | 1018 (host) | 694 (host) | [t20-2-export-restore-design](t20-2-export-restore-design.md#t202-verification-record) | One fix round on the reminder-once check; final review fixed startup's dependence on Roaming AppData, the protected-folder smoke and the Export-card screenshot. |
 | [#79](https://github.com/ilya-slalom/desktop-guides/pull/79) | 2026-10-10 | `3867bf5` | T20.2 (PR b) | [38050868989](https://github.com/ilya-slalom/desktop-guides/actions/runs/38050868989) | 1027 (host) | 768 (host) | [t20-2-export-restore-design](t20-2-export-restore-design.md#t202-verification-record) | Headless only. Final review added phase/disk-state guards to Complete/RollBack/PendingVerify and made DiscardStage keep a marker-named stage. |
 | [#80](https://github.com/ilya-slalom/desktop-guides/pull/80) | 2026-10-11 | `494e9d3` | T20.2 (PR c) | [38071422270](https://github.com/ilya-slalom/desktop-guides/actions/runs/38071422270); backup group [38070448704](https://github.com/ilya-slalom/desktop-guides/actions/runs/38070448704) | 1027 | 768 | [t20-2-export-restore-design](t20-2-export-restore-design.md#t202-verification-record) | The first restore smoke crashed because an InfoBar sat in SettingsExpander.Items (diagnosed from run [38056080139](https://github.com/ilya-slalom/desktop-guides/actions/runs/38056080139)); RED was that crash run. Core and Infra unchanged from #79. |
+| [#81](https://github.com/ilya-slalom/desktop-guides/pull/81) | 2026-10-11 | `fdf1de6` | Docs | — | — | — | — | Docs only: records the T20.2 merge (#78–#80). No CI run started: #47's docs-only skip held. |
+| [#82](https://github.com/ilya-slalom/desktop-guides/pull/82) | 2026-10-11 | `74aa28a` | T17.1 (PR a) | [38107005528](https://github.com/ilya-slalom/desktop-guides/actions/runs/38107005528) | 1036 (host) | 768 | [t17-1-release-identity-design](t17-1-release-identity-design.md#t171-verification-record) | The Public lane builds and verifies in CI. `production-shell-ui` (html) failed once in [38105036523](https://github.com/ilya-slalom/desktop-guides/actions/runs/38105036523) and passed on rerun (a pre-existing flake). Infra unchanged from #80. |
+| [#83](https://github.com/ilya-slalom/desktop-guides/pull/83) | 2026-10-11 | `1640576` | T17.1 (PR b) | [38124175200](https://github.com/ilya-slalom/desktop-guides/actions/runs/38124175200) | 1036 | 768 | [t17-1-release-identity-design](t17-1-release-identity-design.md#t171-verification-record) | The first tag release v1.0.0 ran in release run [38127264654](https://github.com/ilya-slalom/desktop-guides/actions/runs/38127264654) (gate, build and publish succeeded) and produced a draft pre-release. Main's push run [38126011544](https://github.com/ilya-slalom/desktop-guides/actions/runs/38126011544), with `public-upgrade`, passed. The html flake recurred ([38110158929](https://github.com/ilya-slalom/desktop-guides/actions/runs/38110158929), [38122684183](https://github.com/ilya-slalom/desktop-guides/actions/runs/38122684183) attempt 1). Core and Infra unchanged from #82. |
 
 ## M2 T04.1 game editor — implementation check, 27 September 2026
 

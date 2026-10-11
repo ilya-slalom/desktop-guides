@@ -1,7 +1,7 @@
 # P1 implementation plan and exit gates
 
-Status: 47 of the 56 tasks are merged, 11 October 2026. M0, M3 and M4 are
-complete; M1 still needs T17.1 and M2 the optional T11.5. M5 has T20.1, T20.2,
+Status: 48 of the 56 tasks are merged, 11 October 2026. M0, M1, M3 and M4 are
+complete; M2 still needs the optional T11.5. M5 has T20.1, T20.2,
 T15.4 and T15.1 merged, and M6 is planned.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
@@ -86,7 +86,7 @@ identity remains T17.1 work.
 | T15.2 | T03.1, T03.2, T03.3 | FileOperations startup reconciler and exact owned-path janitor, installed before mutating file operations. Phase and malformed-path tests retain unknown directories and never follow links. | TR15.1 |
 | T11.1 | T03.2, T11.2 | Library/Game/Reader/Settings route coordinator and separate diagnostic build mode. Launch, Back, stale-ID, duplicate-launch acknowledgment, close/relaunch handoff, and route tests pass on installed WinUI; production package has no fixtures. | TR11.1 |
 | T11.3 | T11.1, T11.2 | Capability-based reader bar, navigation pane, overflow, and status/focus behavior. Keyboard and pointer trace returns Reader → its Game with selection and focus retained. Query retention is verified in T05.3 after search exists. | TR11.1, TR11.2 |
-| T17.1 | T11.1 | Production MSIX identity/version/signing and prerequisite delivery plan, plus tested x64 packaging configuration. Install and upgrade use the same identity; credentials stay outside source/logs. Final signing and architecture claims remain gated by M6. Implemented in two PRs: the Public lane (PR a, merged in #82), then the pinned release certificate, the tag-driven signed release workflow with a portable build, and an installed upgrade gate (PR b). | TR17.2 |
+| T17.1 | T11.1 | Production MSIX identity/version/signing and prerequisite delivery plan, plus tested x64 packaging configuration. Install and upgrade use the same identity; credentials stay outside source/logs. Final signing and architecture claims remain gated by M6. Merged in #82 and #83 (merge commit `1640576`): the Public lane (PR a), then the pinned release certificate, the tag-driven signed release workflow with a portable build, and an installed upgrade gate (PR b). The first draft release, v1.0.0, was built by release run 38127264654. | TR17.2 |
 
 ### T17.1 implementation sequence
 
