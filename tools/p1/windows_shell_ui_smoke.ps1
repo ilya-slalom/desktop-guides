@@ -7,7 +7,7 @@ param(
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
         'reader-render-error-observed', 'reader-render-error-result',
-        'late-guide-after-close', 'waiting-handoff', 'material', 'catalog', 'catalog-facts', 'library-search', 'stable-navigation',
+        'late-guide-after-close', 'waiting-handoff', 'material', 'icons', 'catalog', 'catalog-facts', 'library-search', 'stable-navigation',
         'provider-none', 'provider-offline', 'provider-settings',
         'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
@@ -59,6 +59,12 @@ param(
 
     [ValidateSet('', 'Mica', 'Acrylic', 'Solid')]
     [string] $SwitchToMaterial = '',
+
+    [ValidateSet('', 'On', 'Off')]
+    [string] $ExpectedIcons = '',
+    [ValidateSet('', 'On', 'Off')]
+    [string] $SwitchIcons = '',
+    [switch] $EmptyLibrary,
 
     [ValidateSet('System', 'Light', 'Dark')]
     [string] $ExpectedTheme = 'System',
@@ -4339,7 +4345,8 @@ try {
         Assert-HeadingLevel 'SettingsGameDataHeading' 2
         Assert-Below 'AppThemeSettingsCard' 'SettingsAppearanceHeading'
         Assert-Below 'WindowMaterialSettingsCard' 'AppThemeSettingsCard'
-        Assert-Below 'SettingsLibraryHeading' 'WindowMaterialSettingsCard'
+        Assert-Below 'ColorfulIconsSettingsCard' 'WindowMaterialSettingsCard'
+        Assert-Below 'SettingsLibraryHeading' 'ColorfulIconsSettingsCard'
         Assert-Below 'ExportSettingsCard' 'SettingsLibraryHeading'
         Assert-Below 'SettingsGameDataHeading' 'ExportSettingsCard'
         Assert-Below 'ProviderSettingsExpander' 'SettingsGameDataHeading'
@@ -4675,6 +4682,89 @@ try {
         $report.readerScreenshot = Save-WindowScreenshot "material-$selected-reader"
         $report.material = $selected
         $report.phases += "material-$selected-captured"
+    }
+    elseif ($Mode -eq 'icons') {
+        # T11.5: the toggle, the icons the app set, and the saved choice.
+        # How WinUI draws the SVGs is reviewed on the screenshots.
+        function Get-IconsToggle {
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $toggle = Show-SettingsCard 'ColorfulIconsToggle'
+                if ($toggle.Current.IsEnabled) { return $toggle }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            throw 'Expected the Colorful icons toggle to be enabled once the settings load.'
+        }
+
+        function Assert-Icons([string] $state) {
+            $toggle = Get-IconsToggle
+            $pattern = $toggle.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
+            $toggleState = $pattern.Current.ToggleState.ToString()
+            if ($toggleState -ne $state) {
+                throw "Expected the Colorful icons toggle $state, found $toggleState."
+            }
+            $expected = if ($state -eq 'On') { 'images:10 glyphs:0' } else { 'images:0 glyphs:10' }
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                $status = (Find-ById 'ColorfulIconsToggle').Current.ItemStatus
+                if ($status -ceq $expected) { return }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
+            throw "Expected the applied icons '$expected', found '$status'."
+        }
+
+        # Raw icons add no element to the control view.
+        function Assert-NoControlViewImage([string] $id) {
+            $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+            $queue = [System.Collections.Generic.Queue[object]]::new()
+            $queue.Enqueue((Wait-VisibleById $id))
+            while ($queue.Count -gt 0) {
+                $child = $walker.GetFirstChild($queue.Dequeue())
+                while ($child) {
+                    if ($child.Current.ControlType -eq [System.Windows.Automation.ControlType]::Image) {
+                        throw "Expected no Image element under $id; the icon must stay Raw."
+                    }
+                    $queue.Enqueue($child)
+                    $child = $walker.GetNextSibling($child)
+                }
+            }
+        }
+
+        Resize-ShellWindow 1500 720
+        Select-Element 'Settings'
+        [void](Wait-Name 'SettingsHeading' 'Settings')
+        [void](Wait-Name 'ColorfulIconsSettingsCard' (
+            'Colorful icons. Show navigation and Settings icons in color.'))
+        [void](Wait-Name 'ColorfulIconsToggle' 'Colorful icons')
+        Assert-Icons $ExpectedIcons
+        $report.phases += "icons-$ExpectedIcons-restored"
+        $state = $ExpectedIcons
+
+        if ($SwitchIcons) {
+            $toggle = Get-IconsToggle
+            $toggle.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
+            $message = if ($SwitchIcons -eq 'On') { 'Colorful icons turned on.' } else { 'Colorful icons turned off.' }
+            [void](Wait-Status $message)
+            Assert-Icons $SwitchIcons
+            $state = $SwitchIcons
+            $report.phases += "icons-switched-$state"
+        }
+
+        [void](Wait-Name 'LibraryNavigation' 'Library')
+        Assert-NoControlViewImage 'LibraryNavigation'
+        [void](Wait-HiddenById 'ShellStatus')
+        Assert-ShellForeground
+        [void](Show-SettingsCard 'AppThemeSettingsCard')
+        $report.settingsScreenshot = Save-WindowScreenshot "icons-$state-settings"
+
+        Select-Element 'Library'
+        if ($EmptyLibrary) { [void](Wait-VisibleById 'LibraryEmptyState') }
+        else { [void](Wait-VisibleById 'LibraryHeading') }
+        Start-Sleep -Milliseconds 400
+        Assert-ShellForeground
+        $report.libraryScreenshot = Save-WindowScreenshot "icons-$state-library"
+        $report.icons = $state
+        $report.phases += "icons-$state-captured"
     }
     elseif ($Mode -eq 'prepare-game-editor-close') {
         Select-Element 'Route Test Game'
