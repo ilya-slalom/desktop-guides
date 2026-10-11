@@ -60,17 +60,29 @@ if ($PreflightOnly) { return }
 $runId = [Guid]::NewGuid().ToString('N')
 $taskName = "DesktopGuides-T17-1-Upgrade-$runId"
 $launchResult = Join-Path ([IO.Path]::GetTempPath()) "desktop-guides-upgrade-launch-$runId.json"
-$trusted = $null
 $sessionId = [Diagnostics.Process]::GetCurrentProcess().SessionId
 if ($sessionId -eq 0 -or -not @(Get-Process explorer -ErrorAction SilentlyContinue |
         Where-Object { $_.SessionId -eq $sessionId })) {
     throw 'The upgrade gate needs an interactive desktop session.'
 }
+# Trust only what this run adds: a machine (or workflow) that already trusts
+# the certificate keeps that trust.
+$thumbprint = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+    (Resolve-Path -LiteralPath $Certificate).Path).Thumbprint
+$trustPath = "Cert:\LocalMachine\TrustedPeople\$thumbprint"
+$trustAdded = $false
+$appProcess = $null
+$failed = $false
 $report = [ordered]@{
     oldVersion = "$($old.Version)"
     newVersion = "$($new.Version)"
     libraryPreserved = $false
+    oldAppOpenedLibrary = $false
     upgradedAppLaunched = $false
+    trustAdded = $false
+    packageStillInstalled = $null
+    certificateStillTrusted = $null
+    cleanupError = $null
 }
 
 function Invoke-Seed([string[]] $Arguments) {
@@ -79,7 +91,26 @@ function Invoke-Seed([string[]] $Arguments) {
     $output | Select-Object -Last 1
 }
 
-function Start-PublicApp([string] $Executable) {
+# The app holds library.session.lock with FileShare.None from before it opens
+# the library until it has disposed it; the window title appears earlier.
+function Test-LibraryLeaseHeld([string] $DataRoot) {
+    $lease = Join-Path $DataRoot 'library.session.lock'
+    if (-not (Test-Path -LiteralPath $lease -PathType Leaf)) { return $false }
+    try {
+        [IO.File]::Open($lease, 'Open', 'Read', 'None').Dispose()
+        return $false
+    }
+    catch {
+        $failure = $_.Exception
+        if ($failure.InnerException) { $failure = $failure.InnerException }
+        if ($failure -is [IO.FileNotFoundException]) { return $false }
+        # ERROR_SHARING_VIOLATION or ERROR_LOCK_VIOLATION: another process holds it.
+        if ($failure -is [IO.IOException] -and ($failure.HResult -band 0xffff) -in @(32, 33)) { return $true }
+        throw
+    }
+}
+
+function Start-PublicApp([string] $Executable, [string] $DataRoot) {
     Remove-Item -LiteralPath $launchResult, "$launchResult.tmp", "$launchResult.ack", "$launchResult.ack.tmp" `
         -ErrorAction SilentlyContinue
     $script = Join-Path $PSScriptRoot 'windows_shell_launch.ps1'
@@ -107,6 +138,7 @@ function Start-PublicApp([string] $Executable) {
     if ([math]::Abs(($process.StartTime.ToUniversalTime() - ([datetime] $launch.startedAt).ToUniversalTime()).TotalSeconds) -gt 1) {
         throw "Process $($launch.processId) is not the one the launcher started."
     }
+    $script:appProcess = $process
     # windows_shell_launch.ps1 waits for this before it lets the app go.
     @{ handoffToken = $token.ToString('N') } | ConvertTo-Json -Compress |
         Set-Content -LiteralPath "$launchResult.ack.tmp" -Encoding UTF8
@@ -126,8 +158,16 @@ function Start-PublicApp([string] $Executable) {
     if ($process.MainWindowTitle -ne $windowTitle) {
         throw "The app didn't show a '$windowTitle' window (title '$($process.MainWindowTitle)')."
     }
+    $deadline = (Get-Date).AddSeconds(60)
+    while (-not (Test-LibraryLeaseHeld $DataRoot) -and -not $process.HasExited -and (Get-Date) -lt $deadline) {
+        Start-Sleep -Milliseconds 250
+    }
+    if ($process.HasExited -or -not (Test-LibraryLeaseHeld $DataRoot)) {
+        throw 'The app showed its window but never took the library session lease.'
+    }
     [void] $process.CloseMainWindow()
     if (-not $process.WaitForExit(30000)) { throw 'The app did not close.' }
+    $script:appProcess = $null
 }
 
 function Get-LibraryState([string] $DataRoot) {
@@ -140,13 +180,20 @@ function Get-LibraryState([string] $DataRoot) {
 }
 
 try {
-    $trusted = Import-Certificate -FilePath $Certificate -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+    if (-not (Test-Path -LiteralPath $trustPath)) {
+        Import-Certificate -FilePath $Certificate -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
+        $trustAdded = $true
+        $report.trustAdded = $true
+    }
     Add-AppxPackage -Path $OldPackage
     $installed = Get-AppxPackage -Name $publicName
     $report.family = $installed.PackageFamilyName
-    $executable = Join-Path $installed.InstallLocation 'DesktopGuides.Production.exe'
-    Start-PublicApp $executable
     $dataRoot = Join-Path $env:LOCALAPPDATA "Packages\$($installed.PackageFamilyName)\LocalState"
+    Start-PublicApp (Join-Path $installed.InstallLocation 'DesktopGuides.Production.exe') $dataRoot
+    if (-not (Test-Path -LiteralPath (Join-Path $dataRoot 'library\library.sqlite') -PathType Leaf)) {
+        throw 'The old app took the library lease but created no library.'
+    }
+    $report.oldAppOpenedLibrary = $true
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
     Invoke-Seed @('seed', $dataRoot) | Out-Null
     $report.libraryBefore = Get-LibraryState $dataRoot
@@ -159,20 +206,54 @@ try {
     if ([Version] $upgraded.Version -ne $new.Version) {
         throw "Expected version $($new.Version) after the upgrade, got $($upgraded.Version)."
     }
-    Start-PublicApp (Join-Path $upgraded.InstallLocation 'DesktopGuides.Production.exe')
+    Start-PublicApp (Join-Path $upgraded.InstallLocation 'DesktopGuides.Production.exe') $dataRoot
     $report.upgradedAppLaunched = $true
     $report.libraryAfter = Get-LibraryState $dataRoot
     $report.libraryPreserved =
         ($report.libraryBefore | ConvertTo-Json -Depth 4) -eq ($report.libraryAfter | ConvertTo-Json -Depth 4)
     if (-not $report.libraryPreserved) { throw 'The library changed across the upgrade.' }
 }
+catch {
+    $failed = $true
+    throw
+}
 finally {
-    Get-AppxPackage -Name $publicName | Remove-AppxPackage -ErrorAction SilentlyContinue
-    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath $launchResult, "$launchResult.tmp", "$launchResult.ack", "$launchResult.ack.tmp" `
-        -ErrorAction SilentlyContinue
-    if ($trusted) {
-        Remove-Item -LiteralPath "Cert:\LocalMachine\TrustedPeople\$($trusted.Thumbprint)" -ErrorAction SilentlyContinue
+    # Each step runs on its own so one failure can't skip the rest, and the
+    # result is checked rather than assumed.
+    $cleanupErrors = [Collections.Generic.List[string]]::new()
+    try {
+        if ($appProcess -and -not $appProcess.HasExited) {
+            $appProcess.Kill()
+            if (-not $appProcess.WaitForExit(20000)) { throw "App process $($appProcess.Id) did not stop." }
+        }
     }
-    $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $ResultPath -Encoding UTF8
+    catch { $cleanupErrors.Add("Stopping the app: $($_.Exception.Message)") }
+    try {
+        if (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue) {
+            Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+        }
+    }
+    catch { $cleanupErrors.Add("Removing the launch task: $($_.Exception.Message)") }
+    # The preflight refused a machine with the public app, so any copy is ours.
+    foreach ($package in @(Get-AppxPackage -Name $publicName)) {
+        try { Remove-AppxPackage -Package $package.PackageFullName -ErrorAction Stop }
+        catch { $cleanupErrors.Add("Removing $($package.PackageFullName): $($_.Exception.Message)") }
+    }
+    try {
+        Remove-Item -LiteralPath $launchResult, "$launchResult.tmp", "$launchResult.ack", "$launchResult.ack.tmp" `
+            -ErrorAction SilentlyContinue
+    }
+    catch { $cleanupErrors.Add("Removing launch files: $($_.Exception.Message)") }
+    if ($trustAdded) {
+        try { Remove-Item -LiteralPath $trustPath -ErrorAction Stop }
+        catch { $cleanupErrors.Add("Removing the certificate trust: $($_.Exception.Message)") }
+    }
+    $report.packageStillInstalled = @(Get-AppxPackage -Name $publicName).Count -gt 0
+    $report.certificateStillTrusted = $trustAdded -and (Test-Path -LiteralPath $trustPath)
+    if ($report.packageStillInstalled) { $cleanupErrors.Add("$publicName is still installed.") }
+    if ($report.certificateStillTrusted) { $cleanupErrors.Add('The certificate this run trusted is still trusted.') }
+    if ($cleanupErrors.Count -gt 0) { $report.cleanupError = $cleanupErrors -join ' ' }
+    try { $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $ResultPath -Encoding UTF8 }
+    catch { if (-not $failed) { throw } }
+    if ($report.cleanupError -and -not $failed) { throw "Cleanup failed: $($report.cleanupError)" }
 }
