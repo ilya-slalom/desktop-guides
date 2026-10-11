@@ -63,6 +63,15 @@ using `new_release_certificate.ps1`, update both secrets, update
 the new `.cer`. The package identity is unchanged, so installs still upgrade
 in place.
 
+The release job's previous-release upgrade step trusts only the current
+`.cer`, so it can't install the previous release's package after a rotation.
+For the first release after a rotation, either trust the old `.cer` too in
+that step for that run, or skip the step and run the upgrade check manually.
+
+Only linear releases are supported: the "previous release" is the most
+recently created published release, so don't publish an out-of-order hotfix
+for an older version.
+
 ## Releasing
 
 1. Merge to `main` and wait for its `windows-ci` run to pass. Docs-only
