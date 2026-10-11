@@ -222,6 +222,8 @@ jobs:
             artifacts/release/*
             artifacts/release-notes.md
           if-no-files-found: error
+          # The repository is public: keep the signed package downloadable only briefly.
+          retention-days: 1
 
   publish:
     needs: [gate, build]

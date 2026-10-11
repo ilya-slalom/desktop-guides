@@ -80,7 +80,9 @@ in place.
    previous-release upgrade, builds the portable zip, and writes checksums and
    `release-manifest.json`. The `publish` job then creates a **draft
    pre-release** `Desktop Guides X.Y.Z`.
-5. Review the draft and publish it manually. Nothing is public until then.
+5. Review the draft and publish it manually. The draft release stays private
+   until it is published, but the run's `release-X.Y.Z.0` artifact (dry runs
+   included) can be downloaded by any signed-in GitHub user for one day.
 
 Release assets: `DesktopGuides-X.Y.Z.0-x64.msix`,
 `DesktopGuides-portable-x64-X.Y.Z.zip`, a `.sha256` for each,
