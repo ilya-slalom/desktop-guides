@@ -67,6 +67,9 @@ try {
     finally {
         Pop-Location
     }
+    # The rejected cases leave git's expected failure in $LASTEXITCODE, which
+    # the CI pwsh wrapper would report as the step's exit code.
+    $global:LASTEXITCODE = 0
     Write-Output 'release_ci_gate: all cases passed.'
 }
 finally {
