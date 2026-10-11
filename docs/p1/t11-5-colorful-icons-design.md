@@ -18,9 +18,8 @@ Decisions made during brainstorming:
 
 - **Scope:** the navigation items, the title bar, the empty states, the
   Settings cards (including the Colorful icons card itself) and the Game
-  page's guide rows. The reader toolbar, search boxes, dialogs, taskbar icon
-  and the game rows' controller placeholder stay monochrome. Fluent has no
-  colour game controller; a generated Fluent-style one is a follow-up.
+  page's guide rows and the Library's game placeholder. The reader toolbar,
+  search boxes, dialogs and taskbar icon stay monochrome.
 - **Approach:** a Core catalog maps each place to its glyph and its colour
   asset. The shell sets every icon source from that catalog and applies
   them again when the setting or high contrast changes. This was chosen over
@@ -78,15 +77,19 @@ Guide rows on the Game page, through `AppIconCatalog.ForGuide`:
 | --- | --- | --- |
 | TXT | E8A5 | `document_text` |
 | HTML | E774 | `globe` |
-| PDF | EA90 | `document` (Fluent has no colour PDF; a generated one is a follow-up) |
+| PDF | EA90 | `dg_document_pdf_color.png` (generated; Fluent has no colour PDF) |
 | Missing file (any format) | E7BA | `warning` |
+| Library game row, before its artwork loads | E7FC | `dg_game_controller_color.png` (generated; Fluent has no colour controller) |
+
+The two `dg_` icons are the project's own. They were generated in Fluent's
+colour style and cleaned up, as `SOURCE.md` records.
 
 Manual testing changed three entries after the first review:
 
 - The Colorful icons card had a fixed glyph; it now switches like the others.
 - Window background's palette glyph didn't match the colour picture. Fluent
   has no colour palette, so the glyph became a picture.
-- Guide rows now switch too.
+- Guide rows and the game placeholder now switch too.
 
 Every other glyph is the one the place showed before T11.5.
 
@@ -183,7 +186,6 @@ Every other glyph is the one the place showed before T11.5.
 ## Out of scope
 
 - Reader toolbar, search box, dialog and taskbar icons.
-- The game rows' controller placeholder, until a colour counterpart exists.
 - Different colour icons per theme.
 - A user-chosen icon set beyond on and off.
 
@@ -203,7 +205,8 @@ on `feat/p1-t11-5-colorful-icons`, PR #85.
     then passed.
   - The SDK already packaged the SVGs as content. The project file only
     adds `CopyToOutputDirectory` for the portable exe.
-- **Assets:** 13 SVGs, 26,848 bytes (nine at first, 20,355 bytes), from
+- **Assets:** 12 Fluent SVGs (25,568 bytes; nine at first, 20,355 bytes) and
+  two generated 96 px PNGs, recorded in `SOURCE.md`. The SVGs come from
   `microsoft/fluentui-system-icons` at
   `a347af95478f989038cccbf085978865264c048a` (`SOURCE.md`). No PNG
   fallbacks.
@@ -225,7 +228,7 @@ on `feat/p1-t11-5-colorful-icons`, PR #85.
     back with all 301 files after each.
   - The colour icons load from the single-file exe's extraction folder.
 - **Rendering check:**
-  - All 13 SVGs render in colour with their gradients through
+  - All 12 SVGs render in colour with their gradients through
     `SvgImageSource`, in light and dark, with no blank or black boxes.
   - The colour `settings` icon is a mostly grey gear upstream.
   - Fluent's 24 px art has built-in padding, so the colour icons look

@@ -31,13 +31,13 @@ PNG fallbacks: none.
 Fluent's colour set has no PDF document or game controller. These two were
 generated in Fluent's colour style with an image model, outside the repo, on
 11 October 2026. They were then cleaned up: background specks removed, edges
-un-premultiplied, cropped, padded to a 9% margin and scaled to 96x96. They
+un-premultiplied, cropped, and scaled to 96x96. The controller has a 3% margin. The PDF has a 5% margin and a thin grey page edge, so the white page shows on light surfaces. They
 belong to this project and fall under its licence, not Fluent's MIT licence.
 
 | File | Use | Bytes |
 | --- | --- | --- |
-| `dg_document_pdf_color.png` | PDF guide rows | 7855 |
-| `dg_game_controller_color.png` | Library game rows before artwork loads | 9131 |
+| `dg_document_pdf_color.png` | PDF guide rows | 8522 |
+| `dg_game_controller_color.png` | Library game rows before artwork loads | 10881 |
 
 To update, change the commit, download the same paths, and update the
 table. `AppIconCatalogTests` checks that the folder matches the catalog.
