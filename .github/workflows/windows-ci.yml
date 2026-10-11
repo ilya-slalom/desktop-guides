@@ -164,6 +164,9 @@ jobs:
       - name: Check the upgrade gate preflight
         shell: pwsh
         run: ./tools/p1/test_windows_package_upgrade.ps1
+      - name: Check release certificate creation
+        shell: pwsh
+        run: ./tools/p1/test_new_release_certificate.ps1
       - name: Check provider credential parsing
         shell: pwsh
         run: ./tools/p1/test_windows_provider_credentials.ps1
