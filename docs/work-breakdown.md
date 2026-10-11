@@ -3,7 +3,7 @@
 Status: P0 merged in [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1)
 on 25 September 2026. The clean-VM prerequisite gate and Windows 10 check
 remain deferred. P1 is designed in the [technical design](p1-technical-design.md)
-and [implementation plan](p1/implementation-plan.md); on 11 October 2026, 47 of
+and [implementation plan](p1/implementation-plan.md); on 11 October 2026, 48 of
 its 56 tasks are merged, and the plan records each one. Source:
 [initial requirements and high-level design](initial-design.md). The backlog
 defines the acceptance gates; [Windows results](p0/results.md) record
@@ -532,6 +532,7 @@ machine. Missing WebView2 Runtime produces an actionable setup message.
 - **T17.1** Set MSIX identity, versioning, signing, and release output for
   tested CPU targets. Release output also includes the portable,
   self-contained build (`-p:Portable=true`) for the same targets.
+  Merged in PRs #82 and #83; see the [design](p1/t17-1-release-identity-design.md).
 - **T17.2** Add automated unit/integration coverage for storage, import,
   locators, and security rules plus signed, installed Windows UI workflows.
   Start full P1 E2E runs through an interactive scheduled task when controlled
