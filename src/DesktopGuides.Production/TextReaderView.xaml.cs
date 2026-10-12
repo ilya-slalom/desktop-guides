@@ -108,8 +108,10 @@ public sealed partial class TextReaderView : UserControl
             ItemsControl.ItemsControlFromItemContainer(item) == Lines;
         ScrollToLine(line);
         if (!focusInList) return;
+        // The target line, not FirstVisibleIndex: the panel reports the new
+        // top only after layout, so reading it here would focus the old top.
         dispatcher?.TryEnqueue(DispatcherQueuePriority.Low, () =>
-            (Lines.ContainerFromIndex(Math.Max(FirstVisibleIndex, 0)) as Control)?.Focus(FocusState.Keyboard));
+            (Lines.ContainerFromIndex(anchorLine) as Control)?.Focus(FocusState.Keyboard));
     }
 
     public int FirstVisibleIndex =>

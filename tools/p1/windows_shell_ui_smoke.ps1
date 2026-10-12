@@ -1141,6 +1141,31 @@ try {
         Start-Sleep -Milliseconds 200
     }
 
+    # Scrolls Settings in steps until the element is on screen; the Help
+    # section (T16.1) means the end of the page no longer shows Export.
+    function Scroll-SettingsUntilVisible([string] $id) {
+        $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
+        $node = Find-ById 'AppThemeSettingsCard'
+        $pattern = $null
+        while ($node -and -not $pattern) {
+            $candidate = $null
+            if ($node.TryGetCurrentPattern(
+                    [System.Windows.Automation.ScrollPattern]::Pattern, [ref]$candidate) -and
+                $candidate.Current.VerticallyScrollable) {
+                $pattern = $candidate
+            }
+            else { $node = $walker.GetParent($node) }
+        }
+        if (-not $pattern) { throw 'Found no scrollable parent for the Settings cards.' }
+        foreach ($percent in 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100) {
+            $pattern.SetScrollPercent([System.Windows.Automation.ScrollPattern]::NoScroll, $percent)
+            Start-Sleep -Milliseconds 200
+            $element = Find-ById $id
+            if ($element -and -not $element.Current.IsOffscreen) { return $element }
+        }
+        throw "Expected visible '$id' at some Settings scroll position."
+    }
+
     # For a screenshot of the last Library card. UI Automation clips bounds
     # to the viewport, so a card cut off at the bottom edge still reads as
     # visible; scroll Settings to its end, where the Export card fits.
@@ -6671,7 +6696,7 @@ try {
             [void](Wait-Status ('Backup saved: ' + (Split-Path -Leaf $BackupPath) + ' (') -Prefix -Seconds 120)
             Wait-FocusedId 'ExportBackupButton'
             # The status bar above Settings pushes the card toward the bottom edge.
-            Scroll-SettingsToEnd
+            [void](Scroll-SettingsUntilVisible 'ExportBackupButton')
             [void](Wait-VisibleById 'ExportBackupButton')
             $report.exportSavedScreenshot = Save-WindowScreenshot 'export-saved'
             $report.phases += 'export-saved'
