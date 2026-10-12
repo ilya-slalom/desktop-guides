@@ -3202,24 +3202,40 @@ try {
             Open-GuideFromGame 'Long Text Guide'
             Wait-FirstTextRow
             [void](Wait-Status 'Guide ready.')
-            # Page Down must land where Next page does: one page, not two.
+            # Page Down must land where Next page does: one page, not two. Row
+            # names are compared, since the guide starts with a title row.
+            function Wait-TopRowName([string] $expected, [string] $step) {
+                $deadline = (Get-Date).AddSeconds(10)
+                do {
+                    $name = Get-TopRowName
+                    if ($name -eq $expected) { return }
+                    Start-Sleep -Milliseconds 150
+                } while ((Get-Date) -lt $deadline)
+                throw "${step}: expected top row '$expected', found '$name'."
+            }
+            function Wait-TopRowLeaves([string] $from, [string] $step) {
+                $deadline = (Get-Date).AddSeconds(10)
+                do {
+                    $name = Get-TopRowName
+                    if ($name -ne $from) { return $name }
+                    Start-Sleep -Milliseconds 150
+                } while ((Get-Date) -lt $deadline)
+                throw "${step}: the top row stayed '$from'."
+            }
             (Get-TopRow).SetFocus()
             [System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
-            Wait-TopLine 1 'Ctrl+Home'
+            Start-Sleep -Milliseconds 500
+            $homeName = Get-TopRowName
             Invoke-Element (Find-ByName 'Next page')
-            $deadline = (Get-Date).AddSeconds(10)
-            while ((Get-TopLine) -eq 1 -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
-            $afterNext = Get-TopLine
-            if ($afterNext -eq 1) { throw 'Next page did not move the TXT reader.' }
+            $afterNext = Wait-TopRowLeaves $homeName 'Next page'
             (Get-TopRow).SetFocus()
             [System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
-            Wait-TopLine 1 'Ctrl+Home after Next page'
+            Wait-TopRowName $homeName 'Ctrl+Home'
             [System.Windows.Forms.SendKeys]::SendWait('{PGDN}')
-            Wait-TopLine $afterNext 'Page Down'
+            Wait-TopRowName $afterNext 'Page Down'
             [System.Windows.Forms.SendKeys]::SendWait('^{END}')
-            $deadline = (Get-Date).AddSeconds(10)
-            while ((Get-TopLine) -le $afterNext -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
-            if ((Get-TopLine) -le $afterNext) { throw 'Ctrl+End did not move the TXT reader.' }
+            [void](Wait-TopRowLeaves $afterNext 'Ctrl+End')
+            $report.pageTop = [ordered]@{ home = $homeName; afterNext = $afterNext }
             $size = (Wait-VisibleById 'TextSizeValue').Current.Name
             [System.Windows.Forms.SendKeys]::SendWait('^{ADD}')
             $deadline = (Get-Date).AddSeconds(5)
@@ -3228,7 +3244,6 @@ try {
             [System.Windows.Forms.SendKeys]::SendWait('^0')
             [System.Windows.Forms.SendKeys]::SendWait('%{LEFT}')
             [void](Wait-Name 'GameHeading' $textGame)
-            $report.pageStep = $afterNext - 1
             $report.phases += 'keyboard-txt'
         }
         elseif ($Mode -like 'progress-*') {
@@ -5011,6 +5026,14 @@ try {
         while ((Find-ById 'TextSizeValue').Current.Name -eq $size -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
         if ((Find-ById 'TextSizeValue').Current.Name -eq $size) { throw 'Ctrl+Plus on the HTML toolbar did not change the text size.' }
         Send-Keys '^0'
+        # T16.2 evidence: does a text-size change pull focus into the page?
+        $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+        $report.htmlFocusAfterTextSize = "$($focused.Current.Name) ($($focused.Current.ClassName))"
+        if ((Get-FocusedName) -ne 'Larger text') {
+            $report.phases += 'keyboard-html-focus-left-toolbar'
+            (Find-ByName 'Larger text').SetFocus()
+            Wait-FocusedName 'Larger text' 'HTML toolbar again'
+        }
         Send-Keys '%{LEFT}'
         [void](Wait-Name 'GameHeading' $game)
         $report.phases += 'keyboard-html'
