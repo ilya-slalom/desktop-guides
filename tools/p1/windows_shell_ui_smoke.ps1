@@ -5010,7 +5010,14 @@ try {
             $condition = [System.Windows.Automation.PropertyCondition]::new(
                 [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
                 [System.Windows.Automation.ControlType]::ListItem)
-            return (Wait-VisibleById $listId).FindFirst($scope, $condition)
+            # The list can show before its first row is realized.
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $item = (Wait-VisibleById $listId).FindFirst($scope, $condition)
+                if ($item) { return $item }
+                Start-Sleep -Milliseconds 150
+            } while ((Get-Date) -lt $deadline)
+            throw "The list '$listId' showed no rows."
         }
         function Click-Page {
             $rect = (Wait-VisibleById 'ReaderCommands').Current.BoundingRectangle
