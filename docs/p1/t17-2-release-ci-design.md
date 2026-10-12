@@ -1,7 +1,8 @@
 # T17.2 release CI: evidence checklist and workflow lane design
 
-Status: approved. PR a (the evidence checklist) merged in #90; PR b (the
-workflow lane) is in review.
+Status: pieces A and B merged: PR a (the evidence checklist) in #90, merge
+commit `60ef03b`; PR b (the workflow lane) in #91, merge commit `9ba1fd4`.
+Pieces E, C and D follow, each with its own design.
 Prerequisites in the plan's T17.2 row are merged, including T16.1 (#88).
 T16.2 and T16.3 left T17.2's prerequisites when the accessibility audit moved
 to the final milestone after P3 (#89).
@@ -276,6 +277,7 @@ From the [implementation plan](t17-2-release-ci-plan.md):
   the close after `workflow-read`, though every stage passed: Back had
   already saved the places. That close-time crash is an app defect outside
   T17.2.
+- PR b merged in #91 (merge commit `9ba1fd4`).
 
 ## Out of scope
 
