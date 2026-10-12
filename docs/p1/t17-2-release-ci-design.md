@@ -214,6 +214,18 @@ From the [implementation plan](t17-2-release-ci-plan.md):
   shard passed on a rerun of its failed job: the first attempt failed
   `progress-changed` with a `TaskCanceledException` on a save, as the
   `main` push run 38218463295 did before this change.
+- A fresh review of PR a found two defects, now fixed. The Windows App
+  Runtime line failed on every green run, because the installer queried
+  the runtime before installing; it now records the installed package's
+  runtime dependency. A cut-off report failed the evidence step; it now
+  becomes a ✗ line. The next run, 38234742989, failed `keyboard` on a race
+  in the T16.1 smoke: it looked for the first game row before the row
+  existed. That lookup now waits for the row.
+- Final PR a run: [38236612519](https://github.com/ilya-slalom/desktop-guides/actions/runs/38236612519)
+  passed on the first attempt. Every shard's evidence shows the runtime
+  (`Microsoft.WindowsAppRuntime.2 2.5.1.0`). The only ✗ is the `pdf`
+  shard's 9 event-log entries; that group kills the app on purpose, and a
+  passing `main` run recorded 6.
 
 ## Out of scope
 
