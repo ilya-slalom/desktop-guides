@@ -1,7 +1,7 @@
 # T17.2 release CI: evidence checklist and workflow lane design
 
-Status: approved. PR a (the evidence checklist) is in review; PR b (the
-workflow lane) follows it.
+Status: approved. PR a (the evidence checklist) merged in #90; PR b (the
+workflow lane) is in review.
 Prerequisites in the plan's T17.2 row are merged, including T16.1 (#88).
 T16.2 and T16.3 left T17.2's prerequisites when the accessibility audit moved
 to the final milestone after P3 (#89).
@@ -45,7 +45,7 @@ Already in place, and recorded rather than rebuilt:
 - A new `workflow` scenario group runs on a fresh data root.
 - Before it starts, the installer copies four fixtures to a scratch
   "originals" folder outside the repo:
-  - `p0/generated/txt-long.txt`;
+  - `p1/txt-numbered.txt` (ruling 8);
   - `p1/html-long/`;
   - `p0/generated/pdf-long.pdf`;
   - `p0/pdf-access.pdf` (the tagged PDF).
@@ -64,7 +64,8 @@ step uses the keyboard and visible controls, never seeds.
    and folders. Nothing inside the app changes.
 3. **`workflow-read`:**
    - Open each guide and move it to a distinct place: TXT a few pages down,
-     the PDF to page 3, and HTML scrolled about halfway.
+     the PDF to page 3, and HTML at `MARK-0420` through the page's own
+     link (ruling 9).
    - Then close the app.
 4. **`workflow-resume`:**
    - After a restart, open each guide in a different order.
@@ -204,6 +205,35 @@ From the [implementation plan](t17-2-release-ci-plan.md):
 3. **Scratch folders.** The existing groups leave no scratch folders, so
    the evidence prints the "scratch folders removed" line only when the
    report has `scratchFoldersRemaining` (workflow lane).
+4. **The workflow modes live in the shared reader block** (the
+   `elseif ($Mode -in @('txt-reader', 'keyboard-txt', ...))` block), as
+   `keyboard-txt` does. That gives them `Get-TopRow`, `Wait-PdfPage`,
+   `Get-PageTopLine`, `Wait-TopMark`, `Open-GuideFromGame` and
+   `Invoke-ReaderCommand` without moving code. The branch sits before the
+   block's final `else`, the `txt-reader` default.
+5. **Imports use the shared `Choose-OpenPath`** with absolute paths. The
+   `import-*` branch's `Choose-PickerFile` is limited to `tests/fixtures/p0`,
+   and the lane picks from a scratch folder.
+6. **State between stages.** Each stage runs in its own smoke process. The
+   places recorded in `workflow-read` reach `workflow-resume` and
+   `workflow-restore` through a JSON state file the installer passes as
+   `-WorkflowStatePath`.
+7. **Restoring into an empty library.** The lane removes the game before
+   restoring, so it restores into an empty library. `restore-clean` and
+   `restore-replace` always start from a seeded library and always confirm
+   the Replace dialog, so no existing mode showed whether an empty library
+   asks. The mode waits up to 5 s for `ReplaceLibraryDialog` and confirms
+   it only if it appears. On CI it does appear (`workflowRestoreAsked:
+   true`).
+8. **The TXT fixture is `p1/txt-numbered.txt`, not `p0/generated/txt-long.txt`.**
+   Every row of `txt-long` reads `Area 001  |  Proceed north...`, so the
+   place a resumed guide opens at can't be told apart by row.
+   `txt-numbered` names each row `Line NNNN`, which `Get-TopLine` reads.
+9. **The HTML place is `MARK-0420`, through the page's own "Jump to
+   MARK-0420" link,** not "about halfway". `html-long` has no other link,
+   and T16.1 found that keys sent to the page don't reach it reliably. The
+   fragment link is a visible control, and `Wait-TopMark` already checks
+   that place in the progress smoke.
 
 ## T17.2 verification record
 
@@ -225,7 +255,27 @@ From the [implementation plan](t17-2-release-ci-plan.md):
   passed on the first attempt. Every shard's evidence shows the runtime
   (`Microsoft.WindowsAppRuntime.2 2.5.1.0`). The only ✗ is the `pdf`
   shard's 9 event-log entries; that group kills the app on purpose, and a
-  passing `main` run recorded 6.
+  passing `main` run recorded 6. PR a merged in #90 (merge commit `60ef03b`).
+- PR b's first `workflow` dispatch, 38241682435, failed `workflow-build`:
+  the branch sat after the reader block's final `else`, so PowerShell read
+  its `elseif` as a command and every workflow mode ran the `txt-reader`
+  default. The branch moved before the `else`, and
+  `test_windows_scripts_parse.ps1` now fails on that pattern.
+- PR b dispatch (`shell-scope=workflow`, `dev-fast`):
+  [38242760966](https://github.com/ilya-slalom/desktop-guides/actions/runs/38242760966)
+  passed. The evidence lists the five stages in journey order (10.1, 20.7,
+  14.1, 4.5 and 18.3 s), the four fixtures, and "Scratch folders
+  removed". The recorded places were TXT line 76, PDF page 3 and
+  `MARK-0420`; the resume and restore stages both found them.
+- PR b run: [38243680186](https://github.com/ilya-slalom/desktop-guides/actions/runs/38243680186)
+  passed, with all five shards and the `workflow` stages in order. The
+  `design` shard passed on a rerun of its failed job. On the first attempt
+  the app crashed while closing after `completion-last-page` and didn't
+  exit within 20 s: an unhandled `0xc000000d` in `ntdll.dll` at offset
+  `0x6f82f`. The `workflow` shard's evidence shows the same crash during
+  the close after `workflow-read`, though every stage passed: Back had
+  already saved the places. That close-time crash is an app defect outside
+  T17.2.
 
 ## Out of scope
 

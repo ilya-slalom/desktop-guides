@@ -248,9 +248,10 @@ former 30-second cutoff.
 
 CI `production-shell-ui` runs the full installed harness on every PR and is the
 gate of record for the shell, design-language, material and catalog scenarios.
-It runs as four parallel shards, each a fresh install on its own runner:
-`core` (core, txt, game-actions), `design` (design, catalog, completion), `pdf`
-(pdf, progress, theme, text-size) and `html` (html, import, provider). Each shard
+It runs as five parallel shards, each a fresh install on its own runner:
+`core` (core, txt, game-actions), `design` (design, catalog, completion,
+backup), `pdf` (pdf, progress, theme, text-size), `html` (html, import,
+provider) and `workflow` (the whole journey). Each shard
 uploads its JSON results and screenshots as `production-shell-ui-<shard>`,
 and PRs link to those artifacts. A shard failing doesn't cancel the others.
 
@@ -274,12 +275,31 @@ checklist holds no machine or user name. Both package jobs depend on
 packaging. The P0 `packages` and native ARM64 jobs still run as the P0
 regression lane.
 
+The `workflow` shard runs the whole journey on the signed install. It uses
+visible controls and the keyboard only, never seeds, and restarts the app
+between stages:
+
+1. Add a game, and import a TXT, an HTML and a PDF guide from copies in a
+   scratch folder.
+2. Delete those copies.
+3. Read each guide to a place.
+4. After a restart, check each place, and mark the PDF complete.
+5. Export a backup.
+6. Remove the game, restore the backup, and check the guides, places and
+   completion again.
+
+Its evidence lists the five stages in that order. A failing stage fails
+the `windows-ci` run, and `release_ci_gate.ps1` then refuses the release.
+`tools/p1/test_windows_scripts_parse.ps1`, in `core-tests`, fails on any
+`tools/p1` script that doesn't parse, or whose if-chain has a branch after
+its `else`, which PowerShell would otherwise run as a command.
+
 Provider live scenarios skip on CI, because the runner has no credential files.
 Run them on the Windows host with `-ProviderOnly`, using the user's keys and
 normal provider requests. Use the host for other scenarios only to debug a CI
 failure. One `*Only` switch runs a single scenario group against a fresh
 install: `-CoreOnly`, `-DesignOnly`, `-CatalogOnly`, `-TxtOnly`, `-HtmlOnly`,
-`-PdfOnly`, `-ProgressOnly`, `-CompletionOnly`, `-ThemeOnly`, `-TextSizeOnly`, `-ImportOnly`, `-GameActionsOnly` or `-ProviderOnly`. With none,
+`-PdfOnly`, `-ProgressOnly`, `-CompletionOnly`, `-ThemeOnly`, `-TextSizeOnly`, `-ImportOnly`, `-GameActionsOnly`, `-ProviderOnly`, `-BackupOnly` or `-WorkflowOnly`. With none,
 all groups run in that order. `-Groups core,txt` names several groups instead;
 they still run in that order, each from an empty data root. With the `pdf`
 group alone, `-PassFilter` runs only the PDF passes whose names match one of

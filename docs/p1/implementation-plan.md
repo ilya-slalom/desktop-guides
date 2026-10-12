@@ -1029,8 +1029,9 @@ the Library search, Ctrl+O on Game pages, the reader keys for TXT and HTML
 Help → Keyboard shortcuts list. CI run
 [38215923133](https://github.com/ilya-slalom/desktop-guides/actions/runs/38215923133)
 passed; see the [verification record](t16-1-keyboard-shortcuts-design.md#t161-verification-record).
-T17.2 is in progress. PR a adds an evidence checklist to every installed
-shard; PR b adds the workflow lane. A CI scheduled-task entry point, a
+T17.2 is in progress. PR a (#90, merge commit `60ef03b`) added an
+evidence checklist to every installed shard; PR b adds the `workflow`
+shard, the whole journey on the signed install. A CI scheduled-task entry point, a
 portable CI job and a fake-provider lane follow, each with its own design;
 see the [T17.2 design](t17-2-release-ci-design.md).
 

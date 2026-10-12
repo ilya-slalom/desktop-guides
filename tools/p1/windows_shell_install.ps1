@@ -24,6 +24,7 @@ param(
     [switch] $GameActionsOnly,
     [switch] $ProviderOnly,
     [switch] $BackupOnly,
+    [switch] $WorkflowOnly,
 
     # Or name several groups, as CI shards do. They still run in the order
     # listed below. Don't combine with an *Only switch.
@@ -62,6 +63,7 @@ $scenarioGroups = [ordered]@{
     'game-actions' = $GameActionsOnly.IsPresent
     'provider' = $ProviderOnly.IsPresent
     'backup' = $BackupOnly.IsPresent
+    'workflow' = $WorkflowOnly.IsPresent
 }
 $selectedGroups = @($scenarioGroups.Keys | Where-Object { $scenarioGroups[$_] })
 if ($selectedGroups.Count -gt 1) {
@@ -738,7 +740,9 @@ function Run-ShellSmoke(
     [int] $ExpectedTopLine = 0,
     [string] $AppDataRoot = '',
     [string] $AppCacheRoot = '',
-    [string] $BackupPath = '') {
+    [string] $BackupPath = '',
+    [string] $WorkflowRoot = '',
+    [string] $WorkflowStatePath = '') {
     return Measure-SmokeRun $report.smokeRuns $ResultName $mode {
         $resultPath = Join-Path $ResultDirectory "$ResultName.json"
         Clear-ShellSmokeResult $resultPath
@@ -795,12 +799,14 @@ function Run-ShellSmoke(
             $arguments += ' -AppCacheRoot "' + $AppCacheRoot + '"'
         }
         if ($BackupPath) { $arguments += ' -BackupPath "' + $BackupPath + '"' }
+        if ($WorkflowRoot) { $arguments += ' -WorkflowRoot "' + $WorkflowRoot + '"' }
+        if ($WorkflowStatePath) { $arguments += ' -WorkflowStatePath "' + $WorkflowStatePath + '"' }
         $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
             -Argument $arguments -WorkingDirectory $PSScriptRoot
         Register-ScheduledTask -TaskName $smokeTask -Action $action `
             -Principal $principal -Force | Out-Null
         Start-ScheduledTask -TaskName $smokeTask
-        $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*' -or $mode -like 'completion-*' -or $mode -like 'export-*' -or $mode -like 'restore-*' -or $mode -eq 'html-position') { 240 }
+        $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*' -or $mode -like 'completion-*' -or $mode -like 'export-*' -or $mode -like 'restore-*' -or $mode -like 'workflow-*' -or $mode -eq 'html-position') { 240 }
             elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*' -or $mode -like 'theme-*' -or $mode -like 'text-size-*') { 120 }
             else { 60 }
         $deadline = (Get-Date).AddSeconds($timeoutSeconds)
@@ -2350,6 +2356,73 @@ function Run-BlockedNetworkScenario {
     }
 }
 
+function Run-WorkflowScenarios {
+    # T17.2 A: the whole journey through visible controls, from an empty
+    # library, with the app restarted between stages. The originals are
+    # copies in a scratch folder, deleted once imported.
+    $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
+    $fixtures = @('p1/txt-numbered.txt', 'p1/html-long', 'p0/generated/pdf-long.pdf', 'p0/pdf-access.pdf')
+    $report.fixtures = $fixtures
+    $scratch = Join-Path ([Environment]::GetFolderPath('MyDocuments')) (
+        'desktop-guides-workflow-' + [Guid]::NewGuid().ToString('N'))
+    $originals = Join-Path $scratch 'originals'
+    $state = Join-Path $ResultDirectory 'workflow-state.json'
+    Remove-Item -LiteralPath $state -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Path $originals | Out-Null
+    try {
+        foreach ($fixture in $fixtures) {
+            $source = Join-Path $fixtureRoot ($fixture -replace '/', '\')
+            if (-not (Test-Path -LiteralPath $source)) {
+                throw "The workflow fixture $fixture is missing; run tools/p0/make_fixtures.py first."
+            }
+            Copy-Item -LiteralPath $source -Destination $originals -Recurse
+        }
+        $hashOriginals = {
+            @(Get-ChildItem -LiteralPath $originals -Recurse -File | Sort-Object FullName | ForEach-Object {
+                $_.FullName.Substring($originals.Length) + '=' +
+                    (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+            }) -join ';'
+        }
+        $copied = & $hashOriginals
+
+        Start-InstalledShell
+        $report.workflowBuild = Run-ShellSmoke 'workflow-build' -WorkflowRoot $originals
+        Close-InstalledShell
+        if ((& $hashOriginals) -ne $copied) { throw 'Importing changed an original file.' }
+
+        # The app must read its managed copies from here on.
+        Remove-Item -LiteralPath (Join-Path $originals 'txt-numbered.txt'), (Join-Path $originals 'pdf-long.pdf') -Force
+        Remove-Item -LiteralPath (Join-Path $originals 'html-long') -Recurse -Force
+
+        Start-InstalledShell
+        $report.workflowRead = Run-ShellSmoke 'workflow-read' -WorkflowStatePath $state
+        Close-InstalledShell
+        Start-InstalledShell
+        $report.workflowResume = Run-ShellSmoke 'workflow-resume' -WorkflowStatePath $state
+        Close-InstalledShell
+
+        $backup = Join-Path $scratch 'workflow-backup.zip'
+        Start-InstalledShell
+        $report.workflowExport = Run-ShellSmoke 'workflow-export' -BackupPath $backup
+        Close-InstalledShell
+        if (-not (Test-Path -LiteralPath $backup)) { throw 'workflow-export saved no backup.' }
+
+        Start-InstalledShell
+        $report.workflowRestore = Run-ShellSmoke 'workflow-restore' -BackupPath $backup -WorkflowStatePath $state
+        Close-InstalledShell
+
+        # The control was never imported; nothing may have touched it.
+        $control = (Get-FileHash -LiteralPath (Join-Path $originals 'pdf-access.pdf') -Algorithm SHA256).Hash
+        if ($control -ne (Get-FileHash -LiteralPath (Join-Path $fixtureRoot 'p0\pdf-access.pdf') -Algorithm SHA256).Hash) {
+            throw 'The untouched control original changed.'
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
+        $report.scratchFoldersRemaining = @(if (Test-Path -LiteralPath $scratch) { $scratch })
+    }
+}
+
 function Run-BackupScenarios {
     # T20.2 PR a: the first-import reminder, export, cancel and a refused folder.
     Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
@@ -2779,6 +2852,7 @@ try {
 
     if (Enter-ScenarioGroup 'provider') { Run-ProviderScenarios }
     if (Enter-ScenarioGroup 'backup') { Run-BackupScenarios }
+    if (Enter-ScenarioGroup 'workflow') { Run-WorkflowScenarios }
 
     $report.success = $true
 }

@@ -24,7 +24,8 @@ param(
         'library-damaged', 'library-missing', 'library-retry',
         'import-reminder', 'export-backup', 'export-cancel', 'export-protected',
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
-        'restore-cancel', 'restore-interrupted')]
+        'restore-cancel', 'restore-interrupted',
+        'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-export', 'workflow-restore')]
     [string] $Mode,
 
     [Parameter(Mandatory = $true)]
@@ -96,7 +97,13 @@ param(
 
     [string] $AppCacheRoot = '',
 
-    [string] $BackupPath = ''
+    [string] $BackupPath = '',
+
+    # T17.2: the scratch folder holding the workflow lane's originals, and
+    # the file that carries recorded places from one stage to the next.
+    [string] $WorkflowRoot = '',
+
+    [string] $WorkflowStatePath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -1518,13 +1525,15 @@ try {
         'progress-timer', 'progress-restored', 'progress-two-guides', 'progress-row', 'progress-changed',
         'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry',
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
-        'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry')) {
+        'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
+        'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-export', 'workflow-restore')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
             elseif ($Mode -like 'html-theme-*') { 'Web Theme Game' }
             elseif ($Mode -like 'pdf-*') { 'PDF Reader Game' }
             elseif ($Mode -like 'progress-*' -or $Mode -like 'completion-*') { 'Progress Game' }
             elseif ($Mode -like 'text-size-*') { 'Text Size Game' }
+            elseif ($Mode -like 'workflow-*') { 'Workflow Game' }
             else { 'Text Reader Game' }
         $missingMessage = "This guide's file is missing from the library. Remove it, then import the original again."
         $listItem = New-Object System.Windows.Automation.PropertyCondition(
@@ -4023,6 +4032,214 @@ try {
                 Wait-TextSize '150%'
                 [void](Wait-Status 'Text size 150%.')
                 $report.phases += 'text-size-error-retry'
+            }
+        }
+        elseif ($Mode -like 'workflow-*') {
+            # T17.2 A: one journey through visible controls, a stage per app
+            # run. workflow-read records each guide's place in
+            # -WorkflowStatePath for the later stages.
+            $workflowGuides = [ordered]@{
+                txt = @{ title = 'Workflow Text Guide'; file = 'txt-numbered.txt'; format = 'Text (TXT)' }
+                html = @{ title = 'Workflow Web Guide'; file = 'html-long\guide.html'; format = 'Web page (HTML)' }
+                pdf = @{ title = 'Workflow PDF Guide'; file = 'pdf-long.pdf'; format = 'PDF' }
+            }
+
+            function Enter-WorkflowGame {
+                [void](Wait-Name 'LibraryHeading' 'Library')
+                Resize-ShellWindow 1500 720
+                Select-Element $textGame
+                [void](Wait-Name 'GameHeading' $textGame)
+                [void](Wait-Status 'Game ready.')
+            }
+
+            function Read-WorkflowState {
+                if (-not $WorkflowStatePath -or -not (Test-Path -LiteralPath $WorkflowStatePath)) {
+                    throw "$Mode needs the places workflow-read recorded (-WorkflowStatePath)."
+                }
+                return Get-Content -LiteralPath $WorkflowStatePath -Raw | ConvertFrom-Json
+            }
+
+            # The lane's files need no answers: plain ASCII text and an
+            # unlocked PDF. A question fails at once instead of timing out on
+            # a disabled Import; the dialog offers no UTF-8 choice to pick.
+            function Import-WorkflowGuide($guide) {
+                Click-Element (Wait-EnabledById 'ImportGuideButton')
+                Choose-OpenPath (Join-Path $WorkflowRoot $guide.file)
+                [void](Wait-VisibleById 'ImportGuideDialog')
+                [void](Wait-Name 'ImportFormat' $guide.format)
+                $deadline = (Get-Date).AddSeconds(30)
+                $ready = $false
+                do {
+                    foreach ($question in @(@('ImportEncodingCp437', 'an encoding'), @('ImportPdfPasswordInput', 'a password'))) {
+                        if (Find-ById $question[0]) {
+                            [void](Save-WindowScreenshot 'workflow-import-question')
+                            throw "Importing $($guide.file) asked for $($question[1])."
+                        }
+                    }
+                    $primary = Find-ById 'PrimaryButton'
+                    $ready = $primary -and $primary.Current.IsEnabled
+                    if (-not $ready) { Start-Sleep -Milliseconds 200 }
+                } while (-not $ready -and (Get-Date) -lt $deadline)
+                if (-not $ready) { throw "Import stayed disabled for $($guide.file)." }
+                Set-Text 'GuideTitleInput' $guide.title
+                Invoke-Element (Wait-EnabledById 'PrimaryButton')
+                [void](Wait-HiddenById 'ImportGuideDialog')
+                [void](Wait-SelectedGuide $guide.title)
+            }
+
+            # A different order from workflow-read's, ending on the PDF so
+            # it is the Game page's selected guide afterwards.
+            function Assert-WorkflowPlaces($state, [string] $when) {
+                Open-TextGuide $workflowGuides.html.title
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-PageName 'Long Web Guide')
+                [void](Wait-TopMark ([int] $state.htmlMark) "$when (HTML)")
+                Back-ToTextGame
+                Open-TextGuide $workflowGuides.txt.title
+                [void](Wait-Status 'Guide ready.')
+                Wait-FirstTextRow
+                Wait-TopLine ([int] $state.txtTopLine) "$when (TXT)"
+                Back-ToTextGame
+                Open-TextGuide $workflowGuides.pdf.title
+                [void](Wait-Status 'Guide ready.')
+                $page = [int] $state.pdfPage
+                [void](Wait-PdfPage $page 200 "page $page of 200" 30)
+                Back-ToTextGame
+            }
+
+            if ($Mode -eq 'workflow-build') {
+                if (-not $WorkflowRoot) { throw 'workflow-build needs -WorkflowRoot.' }
+                [void](Wait-Name 'LibraryEmpty' 'No games in your library.')
+                Resize-ShellWindow 1500 720
+                Invoke-Element (Wait-EnabledById 'AddGameButton')
+                Set-Text 'GameTitleInput' $textGame
+                Press-Enter (Wait-VisibleById 'GameTitleInput')
+                [void](Wait-Name 'GameHeading' $textGame)
+                $report.phases += 'workflow-game-added'
+
+                foreach ($guide in $workflowGuides.Values) { Import-WorkflowGuide $guide }
+                foreach ($guide in $workflowGuides.Values) {
+                    [void](Assert-RowHelp 'GuideList' $guide.title "$($guide.format), Not started")
+                }
+                $report.workflowBuildScreenshot = Save-WindowScreenshot 'workflow-build'
+                $report.phases += 'workflow-imported'
+            }
+            elseif ($Mode -eq 'workflow-read') {
+                # The originals are deleted by now; the managed copies open.
+                if (-not $WorkflowStatePath) { throw 'workflow-read needs -WorkflowStatePath.' }
+                Enter-WorkflowGame
+                Open-TextGuide $workflowGuides.txt.title
+                [void](Wait-Status 'Guide ready.')
+                Wait-FirstTextRow
+                Wait-TopLine 1 'A first TXT open'
+                $top = 1
+                for ($i = 0; $i -lt 3; $i++) {
+                    Invoke-ReaderCommand 'Next page'
+                    $top = Wait-TopLineChange $top 'Next page'
+                }
+                Back-ToTextGame
+
+                Open-TextGuide $workflowGuides.pdf.title
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-PdfPage 1 200 'page 1 of 200')
+                Invoke-NextPages 2
+                [void](Wait-PdfPage 3 200 'page 3 of 200' 30)
+                Back-ToTextGame
+
+                # Plan ruling 9: the page's own link is the HTML place.
+                Open-TextGuide $workflowGuides.html.title
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-PageName 'Long Web Guide')
+                Click-Element (Wait-PageVisible 'Jump to MARK-0420')
+                $mark = Wait-TopMark 420 'the fragment link'
+                # Back saves at once; the installer then closes the app.
+                Back-ToTextGame
+
+                $state = [ordered]@{ txtTopLine = $top; pdfPage = 3; htmlMark = $mark }
+                $state | ConvertTo-Json | Set-Content -LiteralPath $WorkflowStatePath -Encoding UTF8
+                $report.workflowPlaces = $state
+                $report.phases += 'workflow-read'
+            }
+            elseif ($Mode -eq 'workflow-resume') {
+                $state = Read-WorkflowState
+                Enter-WorkflowGame
+                Assert-WorkflowPlaces $state 'Reopening after a restart'
+                $report.phases += 'workflow-resumed'
+
+                # Mark the PDF complete from the Game page.
+                $pdf = $workflowGuides.pdf.title
+                $choice = Wait-VisibleById 'CompletionChoice'
+                if ($choice.Current.Name -ne "Completion for $pdf") {
+                    throw "The completion choice is '$($choice.Current.Name)'; expected the PDF's."
+                }
+                (Wait-VisibleById 'CompletionInProgress').SetFocus()
+                Wait-FocusedId 'CompletionInProgress'
+                [System.Windows.Forms.SendKeys]::SendWait('{RIGHT}')
+                [void](Wait-Status "$pdf marked complete.")
+                [void](Assert-RowHelp 'GuideList' $pdf '*Completed*')
+                $report.workflowCompletedScreenshot = Save-WindowScreenshot 'workflow-completed'
+                $report.phases += 'workflow-pdf-completed'
+            }
+            elseif ($Mode -eq 'workflow-export') {
+                if (-not $BackupPath) { throw 'workflow-export needs -BackupPath.' }
+                [void](Wait-Name 'LibraryHeading' 'Library')
+                Select-Element 'Settings'
+                [void](Wait-Status 'Settings ready.')
+                [void](Show-SettingsCard 'ExportSettingsCard')
+                Invoke-Element (Wait-EnabledById 'ExportBackupButton')
+                Choose-SavePath $BackupPath
+                [void](Wait-Status ('Backup saved: ' + (Split-Path -Leaf $BackupPath) + ' (') -Prefix -Seconds 120)
+                $report.phases += 'workflow-exported'
+            }
+            elseif ($Mode -eq 'workflow-restore') {
+                if (-not $BackupPath) { throw 'workflow-restore needs -BackupPath.' }
+                $state = Read-WorkflowState
+                Enter-WorkflowGame
+                [void](Wait-GuideRowCount 3)
+                Invoke-Element (Wait-EnabledById 'RemoveGameButton')
+                [void](Wait-VisibleById 'RemoveGameDialog')
+                Invoke-Element (Wait-EnabledById 'PrimaryButton')
+                [void](Wait-HiddenById 'RemoveGameDialog')
+                [void](Wait-Name 'LibraryHeading' 'Library')
+                [void](Wait-Status "Removed $textGame.")
+                [void](Wait-Name 'LibraryEmpty' 'No games in your library.')
+                $report.phases += 'workflow-game-removed'
+
+                Select-Element 'Settings'
+                [void](Wait-Status 'Settings ready.')
+                [void](Show-SettingsCard 'RestoreSettingsExpander')
+                Invoke-Element (Wait-EnabledById 'ChooseBackupButton')
+                Choose-OpenPath $BackupPath
+                Wait-FocusedId 'ReplaceLibraryButton'
+                $holds = (Wait-VisibleById 'RestoreHoldsCard').Current.Name
+                if ($holds -notlike 'Backup holds: 1 game, 3 guides*') {
+                    throw "The backup summary was '$holds'; expected 1 game and 3 guides."
+                }
+                Invoke-Element (Wait-EnabledById 'ReplaceLibraryButton')
+                # Plan ruling 7: an empty library may not ask; confirm only if
+                # it does. A finished restore also ends the wait.
+                $asked = $false
+                $deadline = (Get-Date).AddSeconds(5)
+                do {
+                    $dialog = Find-ById 'ReplaceLibraryDialog'
+                    if ($dialog -and -not $dialog.Current.IsOffscreen) { $asked = $true; break }
+                    $probe = Find-RawById 'ShellContent'
+                    if ($probe -and $probe.Current.ItemStatus -like '*|Library restored: *') { break }
+                    Start-Sleep -Milliseconds 200
+                } while ((Get-Date) -lt $deadline)
+                $report.workflowRestoreAsked = $asked
+                if ($asked) { Invoke-Element (Wait-EnabledById 'PrimaryButton') }
+                [void](Wait-Status 'Library restored: ' -Prefix -Seconds 60)
+                [void](Wait-Name 'LibraryHeading' 'Library')
+                [void](Wait-GameRow $textGame)
+                $report.phases += 'workflow-restored'
+
+                Enter-WorkflowGame
+                [void](Wait-GuideRowCount 3)
+                Assert-WorkflowPlaces $state 'Reopening after the restore'
+                [void](Assert-RowHelp 'GuideList' $workflowGuides.pdf.title '*Completed*')
+                $report.workflowRestoredScreenshot = Save-WindowScreenshot 'workflow-restored'
+                $report.phases += 'workflow-restored-places'
             }
         }
         else {
