@@ -4891,16 +4891,28 @@ try {
                 [System.Windows.Automation.ControlType]::ListItem)
             return (Wait-VisibleById $listId).FindFirst($scope, $condition)
         }
+        # As the txt modes' Get-TopRow: the first row whose middle is inside
+        # the list, retried while the rows are still being realized.
         function Get-TopTextLine {
-            $list = Wait-VisibleById 'ReaderTextLines'
-            $top = $list.Current.BoundingRectangle.Top
             $condition = [System.Windows.Automation.PropertyCondition]::new(
                 [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
                 [System.Windows.Automation.ControlType]::ListItem)
-            foreach ($row in $list.FindAll($scope, $condition)) {
-                if (-not $row.Current.IsOffscreen -and $row.Current.BoundingRectangle.Top -ge $top -1 -and
-                    $row.Current.Name -match '^Line (\d{4}) ') { return [int]$Matches[1] }
-            }
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                try {
+                    $list = Wait-VisibleById 'ReaderTextLines'
+                    $top = $list.Current.BoundingRectangle.Top
+                    $rows = @($list.FindAll($scope, $condition) | Where-Object { -not $_.Current.IsOffscreen } |
+                        Sort-Object { $_.Current.BoundingRectangle.Top })
+                    foreach ($row in $rows) {
+                        $bounds = $row.Current.BoundingRectangle
+                        if ($bounds.Top + $bounds.Height / 2 -ge $top -and
+                            $row.Current.Name -match '^Line (\d{4}) ') { return [int]$Matches[1] }
+                    }
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] { }
+                Start-Sleep -Milliseconds 200
+            } while ((Get-Date) -lt $deadline)
             throw 'No visible TXT line.'
         }
         function Wait-TopTextLine([int] $expected, [string] $step) {
