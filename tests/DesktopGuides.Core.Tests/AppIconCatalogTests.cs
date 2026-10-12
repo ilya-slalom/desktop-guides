@@ -13,9 +13,9 @@ public sealed class AppIconCatalogTests
     }
 
     [Fact]
-    public void TheCatalogListsElevenPlaces()
+    public void TheCatalogListsTwelvePlaces()
     {
-        Assert.Equal(11, AppIconCatalog.All.Count);
+        Assert.Equal(12, AppIconCatalog.All.Count);
         Assert.Equal(Enum.GetValues<AppIcon>(), AppIconCatalog.All);
     }
 
@@ -65,6 +65,7 @@ public sealed class AppIconCatalogTests
     [InlineData(AppIcon.RestoreCard, "\uE777", "ic_fluent_history_24_color.svg")]
     [InlineData(AppIcon.ProvidersCard, "\uE721", "ic_fluent_globe_24_color.svg")]
     [InlineData(AppIcon.ColorfulIconsCard, "\uE80A", "ic_fluent_apps_24_color.svg")]
+    [InlineData(AppIcon.ShortcutsCard, "\uE9CE", "ic_fluent_question_circle_24_color.svg")]
     public void EachPlaceKeepsItsGlyphAndGetsItsAsset(AppIcon icon, string glyph, string asset)
     {
         Assert.Equal(glyph, AppIconCatalog.For(icon, false, false).Glyph);
@@ -97,13 +98,13 @@ public sealed class AppIconCatalogTests
     }
 
     [Fact]
-    public void AssetFilesAreTheFourteenDistinctFiles()
+    public void AssetFilesAreTheFifteenDistinctFiles()
     {
         IEnumerable<string> guideAssets =
             from format in Enum.GetValues<GuideFormat>()
             from missing in new[] { false, true }
             select AppIconCatalog.ForGuide(format, missing, true, false).AssetFile!;
-        Assert.Equal(14, AppIconCatalog.AssetFiles.Count);
+        Assert.Equal(15, AppIconCatalog.AssetFiles.Count);
         Assert.Equal(
             AppIconCatalog.All.Select(icon => AppIconCatalog.For(icon, true, false).AssetFile!)
                 .Concat(guideAssets)

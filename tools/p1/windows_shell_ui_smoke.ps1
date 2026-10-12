@@ -4382,6 +4382,10 @@ try {
         Assert-HeadingLevel 'SettingsGameDataHeading' 2
         Assert-Below 'SettingsGameDataHeading' 'ExportSettingsCard'
         Assert-Below 'ProviderSettingsExpander' 'SettingsGameDataHeading'
+        [void](Show-SettingsCard 'KeyboardShortcutsExpander')
+        Assert-HeadingLevel 'SettingsHelpHeading' 2
+        Assert-Below 'SettingsHelpHeading' 'ProviderSettingsExpander'
+        Assert-Below 'KeyboardShortcutsExpander' 'SettingsHelpHeading'
         Scroll-SettingsToTop
         Resize-ShellWindow $narrowWidth $windowHeight
         Assert-InsideWindow 'SettingsHeading'
@@ -4736,7 +4740,7 @@ try {
             if ($toggleState -ne $state) {
                 throw "Expected the Colorful icons toggle $state, found $toggleState."
             }
-            $expected = if ($state -eq 'On') { 'images:11 glyphs:0' } else { 'images:0 glyphs:11' }
+            $expected = if ($state -eq 'On') { 'images:12 glyphs:0' } else { 'images:0 glyphs:12' }
             $deadline = (Get-Date).AddSeconds(10)
             do {
                 $status = (Find-ById 'ColorfulIconsToggle').Current.ItemStatus

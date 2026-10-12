@@ -13,7 +13,8 @@ public enum AppIcon
     BackupCard,
     RestoreCard,
     ProvidersCard,
-    ColorfulIconsCard
+    ColorfulIconsCard,
+    ShortcutsCard
 }
 
 /// <summary>A Segoe Fluent glyph, or a colour asset file under <see cref="AppIconCatalog.AssetFolder"/>.</summary>
@@ -46,6 +47,8 @@ public static class AppIconCatalog
             [AppIcon.RestoreCard] = ("\uE777", "ic_fluent_history_24_color.svg"),
             [AppIcon.ProvidersCard] = ("\uE721", "ic_fluent_globe_24_color.svg"),
             [AppIcon.ColorfulIconsCard] = ("\uE80A", "ic_fluent_apps_24_color.svg"),
+            // Fluent has no colour keyboard; Help's question mark suits the section.
+            [AppIcon.ShortcutsCard] = ("\uE9CE", "ic_fluent_question_circle_24_color.svg"),
         };
 
     // Game-page guide rows: a missing file wins over the format.

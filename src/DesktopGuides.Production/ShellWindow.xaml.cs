@@ -160,6 +160,7 @@ public sealed partial class ShellWindow : Window
         ShellRoot.KeyboardAccelerators.Add(back);
         ShellRoot.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
         InitializeKeyboard();
+        InitializeShortcutList();
     }
 
     private void UpdatePaneStatus() =>
