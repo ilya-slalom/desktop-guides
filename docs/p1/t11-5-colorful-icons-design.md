@@ -1,6 +1,6 @@
 # T11.5 colorful icons design
 
-Status: in review in PR #85.
+Status: merged in #85 (merge commit `20302b9`), 12 October 2026.
 Prerequisites T11.4 and T14.4 are merged. T11.5 is the last open task in M2,
 and T16.2 depends on it.
 
@@ -270,7 +270,9 @@ on `feat/p1-t11-5-colorful-icons`, PR #85.
   [38138192255](https://github.com/ilya-slalom/desktop-guides/actions/runs/38138192255)
   passed on `e1d1548`: all four installed shell shards, x64 and ARM64
   packages, the toolbar and native ARM64. The portable `design` group
-  passed again with both fixes.
+  passed again with both fixes. After the manual-testing changes, run
+  [38145638926](https://github.com/ilya-slalom/desktop-guides/actions/runs/38145638926)
+  passed on `b23a496`, the commit that merged.
 
 Rulings against this spec (details in the plan):
 

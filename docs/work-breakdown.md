@@ -3,7 +3,7 @@
 Status: P0 merged in [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1)
 on 25 September 2026. The clean-VM prerequisite gate and Windows 10 check
 remain deferred. P1 is designed in the [technical design](p1-technical-design.md)
-and [implementation plan](p1/implementation-plan.md); on 11 October 2026, 48 of
+and [implementation plan](p1/implementation-plan.md); on 12 October 2026, 50 of
 its 57 tasks are merged, and the plan records each one. Source:
 [initial requirements and high-level design](initial-design.md). The backlog
 defines the acceptance gates; [Windows results](p0/results.md) record
