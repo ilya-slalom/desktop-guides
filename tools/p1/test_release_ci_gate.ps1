@@ -63,10 +63,20 @@ try {
             'No completed run at all must be rejected.' 'No completed windows-ci'
         Assert-Rejected { & $gate -Commit ('0' * 40) -MainRef main -RunConclusion $green } `
             'An unknown commit must be rejected.' 'Unknown commit'
+        # T17.2: a run whose only failure is the workflow shard concludes
+        # 'failure', and that blocks the commit it ran on.
+        Assert-Rejected { & $gate -Commit $code -MainRef main -RunConclusion $red } `
+            'A run that failed only its workflow shard must be rejected.' "concluded 'failure'"
     }
     finally {
         Pop-Location
     }
+    # The gate reads the run's conclusion, so the workflow shard counts only
+    # if push runs include it and no job may fail without failing the run.
+    $ci = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot '..\..\.github\workflows\windows-ci.yml')
+    Assert-True ($ci.Contains('{"shard":"workflow","groups":"workflow"}')) `
+        'The workflow shard is missing from the push and pull_request matrix.'
+    Assert-True (-not $ci.Contains('continue-on-error')) 'A windows-ci job may fail without failing the run.'
     # The rejected cases leave git's expected failure in $LASTEXITCODE, which
     # the CI pwsh wrapper would report as the step's exit code.
     $global:LASTEXITCODE = 0
