@@ -168,6 +168,9 @@ jobs:
       - name: Check the installed-shell run record
         shell: pwsh
         run: ./tools/p1/test_windows_shell_run_record.ps1
+      - name: Check the Windows test scripts parse
+        shell: pwsh
+        run: ./tools/p1/test_windows_scripts_parse.ps1
       - name: Check the upgrade gate preflight
         shell: pwsh
         run: ./tools/p1/test_windows_package_upgrade.ps1
