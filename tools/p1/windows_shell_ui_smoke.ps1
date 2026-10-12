@@ -3233,6 +3233,17 @@ try {
             Wait-TopRowName $homeName 'Ctrl+Home'
             [System.Windows.Forms.SendKeys]::SendWait('{PGDN}')
             Wait-TopRowName $afterNext 'Page Down'
+            # Focus follows the page: Down after Page Down must not jump back.
+            $scrollAfterPage = (Find-ById 'ReaderTextLines').GetCurrentPattern(
+                [System.Windows.Automation.ScrollPattern]::Pattern).Current.VerticalScrollPercent
+            [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
+            Start-Sleep -Milliseconds 700
+            $scrollAfterDown = (Find-ById 'ReaderTextLines').GetCurrentPattern(
+                [System.Windows.Automation.ScrollPattern]::Pattern).Current.VerticalScrollPercent
+            if ($scrollAfterDown -lt $scrollAfterPage - 0.01) {
+                throw "Down after Page Down jumped back: $scrollAfterPage% to $scrollAfterDown%."
+            }
+            $report.downAfterPage = [ordered]@{ page = $scrollAfterPage; down = $scrollAfterDown }
             # Ctrl+Home and Ctrl+End are read from the list's scroll position;
             # this guide's rows repeat their text.
             $scroll = (Find-ById 'ReaderTextLines').GetCurrentPattern(
