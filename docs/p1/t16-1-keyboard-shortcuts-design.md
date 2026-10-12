@@ -9,7 +9,9 @@ on this task.
 Every command a keyboard user needs has a shortcut that works in the right
 place and nowhere else, never takes keys away from typing, and matches a
 visible control. One list in Settings documents them. Reader shortcuts work
-in HTML guides even while focus is inside the page.
+in HTML guides from the reader controls. The design aimed for keys inside the
+page too; that proved unreliable and moved to T16.2 (see the verification
+record).
 
 Traces: T16.1 in [implementation-plan.md](implementation-plan.md) (TR16.1,
 TR16.2), [work-breakdown.md](../work-breakdown.md) T16.1 and

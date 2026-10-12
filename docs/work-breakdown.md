@@ -511,7 +511,8 @@ reader, and the UI remains usable with Windows scaling and high contrast.
 - **T16.1** Map and document `Ctrl+O`, library `Ctrl+F`, `Esc`, and page
   navigation; keep every shortcut action in the visible UI.
 - **T16.2** Audit keyboard order, focus restoration, AutomationProperties,
-  touch target size, DPI scaling, and high contrast, after T11.5. Run the
+  touch target size, DPI scaling, and high contrast, after T11.5. Decide the
+  keys while focus is inside an HTML guide page, a gap T16.1 recorded. Run the
   high-contrast pass deferred from T11.4: before enabling high contrast, save
   the active `.theme` path and wallpaper, and restore them exactly afterward,
   or run in a disposable Windows profile or VM.
