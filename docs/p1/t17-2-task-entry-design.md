@@ -244,6 +244,9 @@ One PR:
   shard failed, and failed again on a rerun of the job, each time on a
   different focus-dependent scenario. Cause: the task's visible console
   window (ruling 8).
-- PR run after ruling 8: pending.
+- PR run after ruling 8:
+  [38264219275](https://github.com/ilya-slalom/desktop-guides/actions/runs/38264219275)
+  passed on the first attempt, with `core-tests` and all five installed
+  shards started through the entry point.
 - In every run, the `workflow` shard's evidence lists the #93 crash on
   close after `workflow-read`; the stages still pass.
