@@ -1,6 +1,6 @@
 # T16.1 keyboard shortcuts design
 
-Status: in review in PR #88.
+Status: merged in #88 (merge commit `67bce84`), 12 October 2026.
 Prerequisites T05.2, T06.1, T08.3, T10.2 and T11.3 are merged. T16.2 depends
 on this task.
 
