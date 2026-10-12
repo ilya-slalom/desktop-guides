@@ -718,6 +718,20 @@ function Assert-AcceptedThenClose {
     }
 }
 
+# The app's crash and error-report entries in the Application log since $Since.
+function Get-AppCrashEvents([datetime] $Since) {
+    return @(
+        Get-WinEvent -FilterHashtable @{
+            LogName = 'Application'
+            StartTime = $Since
+        } -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Message -match 'DesktopGuides\.Production' -and
+            $_.ProviderName -in @('.NET Runtime', 'Application Error',
+                'Windows Error Reporting')
+        })
+}
+
 function Run-ShellSmoke(
     [string] $mode,
     [string] $expectedResumeGuide = 'Route Test Guide',
@@ -2368,6 +2382,8 @@ function Run-WorkflowScenarios {
     $originals = Join-Path $scratch 'originals'
     $state = Join-Path $ResultDirectory 'workflow-state.json'
     Remove-Item -LiteralPath $state -Force -ErrorAction SilentlyContinue
+    # #93: the lane never kills the app, so any crash entry is a real crash.
+    $crashWatchStart = Get-Date
     New-Item -ItemType Directory -Path $originals | Out-Null
     try {
         foreach ($fixture in $fixtures) {
@@ -2415,6 +2431,23 @@ function Run-WorkflowScenarios {
         $control = (Get-FileHash -LiteralPath (Join-Path $originals 'pdf-access.pdf') -Algorithm SHA256).Hash
         if ($control -ne (Get-FileHash -LiteralPath (Join-Path $fixtureRoot 'p0\pdf-access.pdf') -Algorithm SHA256).Hash) {
             throw 'The untouched control original changed.'
+        }
+
+        # #93: Windows.Data.Pdf crashed the app at exit after a PDF session,
+        # about half the time, so the lane closes after one five times.
+        $report.workflowPdfExits = @()
+        for ($round = 1; $round -le 5; $round++) {
+            Start-InstalledShell
+            $report.workflowPdfExits += Run-ShellSmoke 'workflow-pdf-exit' -ResultName "workflow-pdf-exit-$round"
+            Close-InstalledShell
+        }
+        # A crash entry can land a moment after the process has gone.
+        Start-Sleep -Seconds 5
+        $crashes = @(Get-AppCrashEvents $crashWatchStart)
+        $report.workflowCrashEntries = $crashes.Count
+        if ($crashes.Count -gt 0) {
+            $first = ("$($crashes[-1].Message)" -split "`r?`n" | Select-Object -First 4) -join ' | '
+            throw "The app wrote $($crashes.Count) crash entries during the workflow lane (#93); the first: $first"
         }
     }
     finally {
@@ -2988,16 +3021,7 @@ finally {
     # Crash events are kept on passing runs too: an app that crashes as it
     # closes still passes its checks, and only the event log shows it.
     try {
-        $events = @(
-            Get-WinEvent -FilterHashtable @{
-                LogName = 'Application'
-                StartTime = [datetime]$report.observedAt
-            } -ErrorAction SilentlyContinue |
-            Where-Object {
-                $_.Message -match 'DesktopGuides\.Production' -and
-                $_.ProviderName -in @('.NET Runtime', 'Application Error',
-                    'Windows Error Reporting')
-            })
+        $events = @(Get-AppCrashEvents ([datetime]$report.observedAt))
         $report.applicationEventCount = $events.Count
         $report.applicationEvents = @(
             $events |
