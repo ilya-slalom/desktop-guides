@@ -4913,7 +4913,9 @@ try {
                 catch [System.Windows.Automation.ElementNotAvailableException] { }
                 Start-Sleep -Milliseconds 200
             } while ((Get-Date) -lt $deadline)
-            throw 'No visible TXT line.'
+            $seen = @($rows | Select-Object -First 3 | ForEach-Object {
+                "'$($_.Current.Name)' top $($_.Current.BoundingRectangle.Top)" }) -join '; '
+            throw "No visible TXT line: $($rows.Count) rows, list top $top; first: $seen."
         }
         function Wait-TopTextLine([int] $expected, [string] $step) {
             $deadline = (Get-Date).AddSeconds(10)
