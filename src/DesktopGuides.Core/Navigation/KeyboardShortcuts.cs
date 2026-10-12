@@ -5,7 +5,7 @@ public enum ShortcutContext { Everywhere, Library, LibrarySearch, Game, Reader, 
 public enum ShortcutCommand
 {
     Back, FocusLibrarySearch, ClearLibrarySearch, ImportGuide, PreviousPage, NextPage,
-    PageStart, PageEnd, GoToPage, ZoomIn, ZoomOut, ZoomReset, CloseDialog, LeaveGuidePage
+    PageStart, PageEnd, GoToPage, ZoomIn, ZoomOut, ZoomReset, CloseDialog
 }
 
 public sealed record KeyboardShortcut(
@@ -32,8 +32,6 @@ public static class KeyboardShortcuts
         new(ShortcutContext.Reader, "Ctrl+Plus", ShortcutCommand.ZoomIn, "Zoom in (PDF) or larger text"),
         new(ShortcutContext.Reader, "Ctrl+Minus", ShortcutCommand.ZoomOut, "Zoom out (PDF) or smaller text"),
         new(ShortcutContext.Reader, "Ctrl+0", ShortcutCommand.ZoomReset, "Fit to width (PDF) or reset text size"),
-        // Chromium keeps Alt+Left for itself inside a page; Esc reaches the toolbar first.
-        new(ShortcutContext.Reader, "Esc", ShortcutCommand.LeaveGuidePage, "Leave the guide page (HTML)"),
         new(ShortcutContext.Dialog, "Esc", ShortcutCommand.CloseDialog, "Close the dialog"),
     ];
 

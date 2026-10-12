@@ -155,9 +155,6 @@ public sealed partial class ReaderToolbar : UserControl
     private static Visibility Show(bool visible) =>
         visible ? Visibility.Visible : Visibility.Collapsed;
 
-    // T16.1: Esc inside an HTML page lands here, on the first command.
-    public bool FocusCommands() => Commands.Focus(FocusState.Keyboard);
-
     // P4 and P14: the accelerators and the PDF preview both come here.
     public bool TryRunKey(
         VirtualKey key, VirtualKeyModifiers modifiers, bool fromContent = false)
