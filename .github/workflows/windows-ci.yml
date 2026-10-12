@@ -171,6 +171,9 @@ jobs:
       - name: Check the Windows test scripts parse
         shell: pwsh
         run: ./tools/p1/test_windows_scripts_parse.ps1
+      - name: Check the scheduled-task entry point
+        shell: pwsh
+        run: ./tools/p1/test_start_installed_task.ps1
       - name: Check the upgrade gate preflight
         shell: pwsh
         run: ./tools/p1/test_windows_package_upgrade.ps1
@@ -536,10 +539,11 @@ jobs:
             $filter.PassFilter = @($env:SHELL_PASS -split ',' | ForEach-Object { $_.Trim() })
           }
           Write-Output "Scenario groups: $env:SHELL_GROUPS; passes: $(if ($env:SHELL_PASS) { $env:SHELL_PASS } else { 'all' })"
-          & ./tools/p1/windows_shell_install.ps1 `
+          & ./tools/p1/start_installed_task.ps1 `
             -PackagePath $package.FullName `
             -ResultDirectory artifacts/production-shell/installed `
             -Groups @($env:SHELL_GROUPS -split ',') `
+            -TimeoutMinutes 45 `
             @filter
           exit $LASTEXITCODE
       - name: Write installed shell evidence
