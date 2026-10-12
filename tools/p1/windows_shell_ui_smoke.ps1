@@ -4381,6 +4381,26 @@ try {
                 [void](Wait-SelectedGuide $guide.title)
             }
 
+            # A different order from workflow-read's, ending on the PDF so
+            # it is the Game page's selected guide afterwards.
+            function Assert-WorkflowPlaces($state, [string] $when) {
+                Open-TextGuide $workflowGuides.html.title
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-PageName 'Long Web Guide')
+                [void](Wait-TopMark ([int] $state.htmlMark) "$when (HTML)")
+                Back-ToTextGame
+                Open-TextGuide $workflowGuides.txt.title
+                [void](Wait-Status 'Guide ready.')
+                Wait-FirstTextRow
+                Wait-TopLine ([int] $state.txtTopLine) "$when (TXT)"
+                Back-ToTextGame
+                Open-TextGuide $workflowGuides.pdf.title
+                [void](Wait-Status 'Guide ready.')
+                $page = [int] $state.pdfPage
+                [void](Wait-PdfPage $page 200 "page $page of 200" 30)
+                Back-ToTextGame
+            }
+
             if ($Mode -eq 'workflow-build') {
                 if (-not $WorkflowRoot) { throw 'workflow-build needs -WorkflowRoot.' }
                 [void](Wait-Name 'LibraryEmpty' 'No games in your library.')
@@ -4397,6 +4417,62 @@ try {
                 }
                 $report.workflowBuildScreenshot = Save-WindowScreenshot 'workflow-build'
                 $report.phases += 'workflow-imported'
+            }
+            elseif ($Mode -eq 'workflow-read') {
+                # The originals are deleted by now; the managed copies open.
+                if (-not $WorkflowStatePath) { throw 'workflow-read needs -WorkflowStatePath.' }
+                Enter-WorkflowGame
+                Open-TextGuide $workflowGuides.txt.title
+                [void](Wait-Status 'Guide ready.')
+                Wait-FirstTextRow
+                Wait-TopLine 1 'A first TXT open'
+                $top = 1
+                for ($i = 0; $i -lt 3; $i++) {
+                    Invoke-ReaderCommand 'Next page'
+                    $top = Wait-TopLineChange $top 'Next page'
+                }
+                Back-ToTextGame
+
+                Open-TextGuide $workflowGuides.pdf.title
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-PdfPage 1 200 'page 1 of 200')
+                Invoke-NextPages 2
+                [void](Wait-PdfPage 3 200 'page 3 of 200' 30)
+                Back-ToTextGame
+
+                # Plan ruling 9: the page's own link is the HTML place.
+                Open-TextGuide $workflowGuides.html.title
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-PageName 'Long Web Guide')
+                Click-Element (Wait-PageVisible 'Jump to MARK-0420')
+                $mark = Wait-TopMark 420 'the fragment link'
+                # Back saves at once; the installer then closes the app.
+                Back-ToTextGame
+
+                $state = [ordered]@{ txtTopLine = $top; pdfPage = 3; htmlMark = $mark }
+                $state | ConvertTo-Json | Set-Content -LiteralPath $WorkflowStatePath -Encoding UTF8
+                $report.workflowPlaces = $state
+                $report.phases += 'workflow-read'
+            }
+            elseif ($Mode -eq 'workflow-resume') {
+                $state = Read-WorkflowState
+                Enter-WorkflowGame
+                Assert-WorkflowPlaces $state 'Reopening after a restart'
+                $report.phases += 'workflow-resumed'
+
+                # Mark the PDF complete from the Game page.
+                $pdf = $workflowGuides.pdf.title
+                $choice = Wait-VisibleById 'CompletionChoice'
+                if ($choice.Current.Name -ne "Completion for $pdf") {
+                    throw "The completion choice is '$($choice.Current.Name)'; expected the PDF's."
+                }
+                (Wait-VisibleById 'CompletionInProgress').SetFocus()
+                Wait-FocusedId 'CompletionInProgress'
+                [System.Windows.Forms.SendKeys]::SendWait('{RIGHT}')
+                [void](Wait-Status "$pdf marked complete.")
+                [void](Assert-RowHelp 'GuideList' $pdf '*Completed*')
+                $report.workflowCompletedScreenshot = Save-WindowScreenshot 'workflow-completed'
+                $report.phases += 'workflow-pdf-completed'
             }
         }
     }
