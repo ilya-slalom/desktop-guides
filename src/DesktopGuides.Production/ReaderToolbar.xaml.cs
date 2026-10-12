@@ -58,7 +58,7 @@ public sealed partial class ReaderToolbar : UserControl
     // The open document's page count; 0 means the dialog has no range.
     public int PageCount { get; set; }
 
-    // The shell turns keys on for PDF only; TXT and HTML get them in T16.1.
+    // Each session's shell code turns keys on after SetSession resets them.
     public bool KeysEnabled { get; set; }
 
     // Raised after a dialog that a key opened closes, for the shell to focus content.
@@ -160,7 +160,7 @@ public sealed partial class ReaderToolbar : UserControl
         VirtualKey key, VirtualKeyModifiers modifiers, bool fromContent = false)
     {
         AppBarButton? command = CommandFor(key, modifiers);
-        // Ruling 1: the text size keys run before T16.1 turns the other keys on.
+        // T14.1 Ruling 1: the text size keys run even with KeysEnabled off.
         bool textKey = command == SmallerText || command == LargerText || command == ResetTextSize;
         if (command is null || !(KeysEnabled || textKey) || promptOpen || session is null ||
             XamlRoot is null || Commands.Visibility != Visibility.Visible ||

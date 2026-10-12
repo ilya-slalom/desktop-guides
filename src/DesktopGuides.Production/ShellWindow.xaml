@@ -811,6 +811,13 @@
                                    Style="{StaticResource DesktopGuidesSettingsSectionStyle}"
                                    AutomationProperties.AutomationId="SettingsGameDataHeading" />
                         <local:ProviderSettingsCard x:Name="ProviderSettings" />
+                        <TextBlock x:Name="SettingsHelpHeading"
+                                   Style="{StaticResource DesktopGuidesSettingsSectionStyle}"
+                                   AutomationProperties.AutomationId="SettingsHelpHeading" />
+                        <toolkit:SettingsExpander
+                            x:Name="KeyboardShortcutsExpander"
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="KeyboardShortcutsExpander" />
                     </StackPanel>
                 </ScrollViewer>
             </Grid>

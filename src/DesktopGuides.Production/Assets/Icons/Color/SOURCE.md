@@ -18,11 +18,12 @@ The files keep their upstream names. Each comes from
 | `ic_fluent_image_24_color.svg` | Image | 1473 |
 | `ic_fluent_library_24_color.svg` | Library | 2328 |
 | `ic_fluent_paint_brush_24_color.svg` | Paint Brush | 2078 |
+| `ic_fluent_question_circle_24_color.svg` | Question Circle | 1395 |
 | `ic_fluent_search_sparkle_24_color.svg` | Search Sparkle | 4413 |
 | `ic_fluent_settings_24_color.svg` | Settings | 2232 |
 | `ic_fluent_warning_24_color.svg` | Warning | 1306 |
 
-Total: 25,568 bytes.
+Total: 26,963 bytes.
 
 PNG fallbacks: none.
 

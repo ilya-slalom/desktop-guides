@@ -60,6 +60,7 @@ public sealed partial class ShellWindow
         RestoreSettingsExpander.HeaderIcon = AppIcons.Element(Pick(AppIcon.RestoreCard));
         ProviderSettings.SetHeaderIcon(AppIcons.Element(Pick(AppIcon.ProvidersCard)));
         ColorfulIconsSettingsCard.HeaderIcon = AppIcons.Element(Pick(AppIcon.ColorfulIconsCard));
+        KeyboardShortcutsExpander.HeaderIcon = AppIcons.Element(Pick(AppIcon.ShortcutsCard));
         iconHostsPending.Clear();
         if (images > 0)
         {
@@ -68,7 +69,7 @@ public sealed partial class ShellWindow
                 LibraryItem, Navigation.SettingsItem as DependencyObject, AppTitleBar,
                 LibraryEmptyImage, LibraryNoResultsImage, AppThemeSettingsCard,
                 WindowMaterialSettingsCard, ExportSettingsCard, RestoreSettingsExpander, ProviderSettings,
-                ColorfulIconsSettingsCard
+                ColorfulIconsSettingsCard, KeyboardShortcutsExpander
             }.OfType<DependencyObject>());
         }
 

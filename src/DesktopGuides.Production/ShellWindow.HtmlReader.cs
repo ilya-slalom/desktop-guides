@@ -79,6 +79,8 @@ public sealed partial class ShellWindow
             return false;
         }
         ReaderActions.SetSession(session);
+        // T16.1: HTML gets the reader keys; only text size applies there.
+        ReaderActions.KeysEnabled = true;
         BeginTextSize(guide.Id, textScale);
         return await OpenAtSavedPlaceAsync(
             guide, session, generation, guide.ContentSha256.ToLowerInvariant(),

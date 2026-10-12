@@ -7,7 +7,7 @@ param(
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
         'reader-render-error-observed', 'reader-render-error-result',
-        'late-guide-after-close', 'waiting-handoff', 'material', 'icons', 'catalog', 'catalog-facts', 'library-search', 'stable-navigation',
+        'late-guide-after-close', 'waiting-handoff', 'material', 'icons', 'keyboard', 'keyboard-txt', 'catalog', 'catalog-facts', 'library-search', 'stable-navigation',
         'provider-none', 'provider-offline', 'provider-settings',
         'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
@@ -1141,6 +1141,31 @@ try {
         Start-Sleep -Milliseconds 200
     }
 
+    # Scrolls Settings in steps until the element is on screen; the Help
+    # section (T16.1) means the end of the page no longer shows Export.
+    function Scroll-SettingsUntilVisible([string] $id) {
+        $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
+        $node = Find-ById 'AppThemeSettingsCard'
+        $pattern = $null
+        while ($node -and -not $pattern) {
+            $candidate = $null
+            if ($node.TryGetCurrentPattern(
+                    [System.Windows.Automation.ScrollPattern]::Pattern, [ref]$candidate) -and
+                $candidate.Current.VerticallyScrollable) {
+                $pattern = $candidate
+            }
+            else { $node = $walker.GetParent($node) }
+        }
+        if (-not $pattern) { throw 'Found no scrollable parent for the Settings cards.' }
+        foreach ($percent in 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100) {
+            $pattern.SetScrollPercent([System.Windows.Automation.ScrollPattern]::NoScroll, $percent)
+            Start-Sleep -Milliseconds 200
+            $element = Find-ById $id
+            if ($element -and -not $element.Current.IsOffscreen) { return $element }
+        }
+        throw "Expected visible '$id' at some Settings scroll position."
+    }
+
     # For a screenshot of the last Library card. UI Automation clips bounds
     # to the viewport, so a card cut off at the bottom edge still reads as
     # visible; scroll Settings to its end, where the Export card fits.
@@ -1486,7 +1511,7 @@ try {
         'switch-game-loading', 'switch-game', 'theme-error', 'theme-error-retry')) {
         # These modes continue a shell left on Reader, Game, Library, or Settings.
     }
-    elseif ($Mode -in @('txt-reader', 'txt-load-paused', 'txt-back-during-load',
+    elseif ($Mode -in @('txt-reader', 'keyboard-txt', 'txt-load-paused', 'txt-back-during-load',
         'txt-load-released', 'html-reader', 'html-runtime-missing', 'pdf-reader', 'pdf-jump', 'pdf-zoom', 'pdf-keys', 'pdf-locked', 'pdf-offline',
         'html-position',
         'html-theme-open', 'html-theme-light', 'html-theme-switch',
@@ -3192,6 +3217,101 @@ try {
                 Back-ToTextGame
             }
         }
+        elseif ($Mode -eq 'keyboard-txt') {
+            # T16.1: the TXT reader keys, on the long guide whose rows name their lines.
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            Select-Element $textGame
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+            Show-TextGuide 'Long Text Guide'
+            Open-GuideFromGame 'Long Text Guide'
+            Wait-FirstTextRow
+            [void](Wait-Status 'Guide ready.')
+            # Page Down must land where Next page does: one page, not two. Row
+            # names are compared, since the guide starts with a title row.
+            function Wait-TopRowName([string] $expected, [string] $step) {
+                $deadline = (Get-Date).AddSeconds(10)
+                do {
+                    $name = Get-TopRowName
+                    if ($name -eq $expected) { return }
+                    Start-Sleep -Milliseconds 150
+                } while ((Get-Date) -lt $deadline)
+                throw "${step}: expected top row '$expected', found '$name'."
+            }
+            function Wait-TopRowLeaves([string] $from, [string] $step) {
+                $deadline = (Get-Date).AddSeconds(10)
+                do {
+                    $name = Get-TopRowName
+                    if ($name -ne $from) { return $name }
+                    Start-Sleep -Milliseconds 150
+                } while ((Get-Date) -lt $deadline)
+                throw "${step}: the top row stayed '$from'."
+            }
+            (Get-TopRow).SetFocus()
+            [System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
+            Start-Sleep -Milliseconds 500
+            $homeName = Get-TopRowName
+            Invoke-Element (Find-ByName 'Next page')
+            $afterNext = Wait-TopRowLeaves $homeName 'Next page'
+            (Get-TopRow).SetFocus()
+            [System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
+            Wait-TopRowName $homeName 'Ctrl+Home'
+            [System.Windows.Forms.SendKeys]::SendWait('{PGDN}')
+            Wait-TopRowName $afterNext 'Page Down'
+            # Focus follows the page: the focused row must be on screen, so Tab
+            # or an arrow key doesn't pull the view back to the old page.
+            $listBounds = (Find-ById 'ReaderTextLines').Current.BoundingRectangle
+            $deadline = (Get-Date).AddSeconds(3)
+            do {
+                $focusedRow = [System.Windows.Automation.AutomationElement]::FocusedElement
+                $rowBounds = $focusedRow.Current.BoundingRectangle
+                $onScreen = $focusedRow.Current.ControlType -eq [System.Windows.Automation.ControlType]::ListItem -and
+                    -not $focusedRow.Current.IsOffscreen -and
+                    $rowBounds.Top -ge $listBounds.Top - 1 -and $rowBounds.Bottom -le $listBounds.Bottom + 1
+                if ($onScreen) { break }
+                Start-Sleep -Milliseconds 150
+            } while ((Get-Date) -lt $deadline)
+            if (-not $onScreen) {
+                throw "After Page Down, focus stayed off the page: '$($focusedRow.Current.Name)' at $($rowBounds.Top) (list $($listBounds.Top)-$($listBounds.Bottom))."
+            }
+            $scrollAfterPage = (Find-ById 'ReaderTextLines').GetCurrentPattern(
+                [System.Windows.Automation.ScrollPattern]::Pattern).Current.VerticalScrollPercent
+            [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
+            Start-Sleep -Milliseconds 700
+            $scrollAfterDown = (Find-ById 'ReaderTextLines').GetCurrentPattern(
+                [System.Windows.Automation.ScrollPattern]::Pattern).Current.VerticalScrollPercent
+            # A one-line nudge is a T16.2 note; a jump back to the old page fails.
+            if ($scrollAfterDown -lt $scrollAfterPage * 0.5) {
+                throw "Down after Page Down jumped back: $scrollAfterPage% to $scrollAfterDown%."
+            }
+            $report.downAfterPage = [ordered]@{ page = $scrollAfterPage; down = $scrollAfterDown }
+            # Ctrl+Home and Ctrl+End are read from the list's scroll position;
+            # this guide's rows repeat their text.
+            $scroll = (Find-ById 'ReaderTextLines').GetCurrentPattern(
+                [System.Windows.Automation.ScrollPattern]::Pattern)
+            [System.Windows.Forms.SendKeys]::SendWait('^{END}')
+            $deadline = (Get-Date).AddSeconds(10)
+            while ($scroll.Current.VerticalScrollPercent -lt 99 -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
+            if ($scroll.Current.VerticalScrollPercent -lt 99) {
+                throw "Ctrl+End left the TXT reader at $($scroll.Current.VerticalScrollPercent)%."
+            }
+            [System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
+            $deadline = (Get-Date).AddSeconds(10)
+            while ($scroll.Current.VerticalScrollPercent -gt 0.5 -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
+            if ($scroll.Current.VerticalScrollPercent -gt 0.5) {
+                throw "Ctrl+Home left the TXT reader at $($scroll.Current.VerticalScrollPercent)%."
+            }
+            $report.pageTop = [ordered]@{ home = $homeName; afterNext = $afterNext }
+            $size = (Wait-VisibleById 'TextSizeValue').Current.Name
+            [System.Windows.Forms.SendKeys]::SendWait('^{ADD}')
+            $deadline = (Get-Date).AddSeconds(5)
+            while ((Find-ById 'TextSizeValue').Current.Name -eq $size -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
+            if ((Find-ById 'TextSizeValue').Current.Name -eq $size) { throw 'Ctrl+Plus did not change the TXT text size.' }
+            [System.Windows.Forms.SendKeys]::SendWait('^0')
+            [System.Windows.Forms.SendKeys]::SendWait('%{LEFT}')
+            [void](Wait-Name 'GameHeading' $textGame)
+            $report.phases += 'keyboard-txt'
+        }
         elseif ($Mode -like 'progress-*') {
             $saveFailed = "Couldn't save your place in this guide."
 
@@ -4382,6 +4502,10 @@ try {
         Assert-HeadingLevel 'SettingsGameDataHeading' 2
         Assert-Below 'SettingsGameDataHeading' 'ExportSettingsCard'
         Assert-Below 'ProviderSettingsExpander' 'SettingsGameDataHeading'
+        [void](Show-SettingsCard 'KeyboardShortcutsExpander')
+        Assert-HeadingLevel 'SettingsHelpHeading' 2
+        Assert-Below 'SettingsHelpHeading' 'ProviderSettingsExpander'
+        Assert-Below 'KeyboardShortcutsExpander' 'SettingsHelpHeading'
         Scroll-SettingsToTop
         Resize-ShellWindow $narrowWidth $windowHeight
         Assert-InsideWindow 'SettingsHeading'
@@ -4736,7 +4860,7 @@ try {
             if ($toggleState -ne $state) {
                 throw "Expected the Colorful icons toggle $state, found $toggleState."
             }
-            $expected = if ($state -eq 'On') { 'images:11 glyphs:0' } else { 'images:0 glyphs:11' }
+            $expected = if ($state -eq 'On') { 'images:12 glyphs:0' } else { 'images:0 glyphs:12' }
             $deadline = (Get-Date).AddSeconds(10)
             do {
                 $status = (Find-ById 'ColorfulIconsToggle').Current.ItemStatus
@@ -4812,7 +4936,8 @@ try {
         Assert-NoImageInWindow 'Settings'
         [void](Wait-HiddenById 'ShellStatus')
         Assert-ShellForeground
-        [void](Show-SettingsCard 'ProviderSettingsExpander')
+        # The bottom of Settings: Game data and the Help card (T16.1).
+        [void](Show-SettingsCard 'KeyboardShortcutsExpander')
         $report.settingsLowerScreenshot = Save-WindowScreenshot "icons-$state-settings-lower"
         Scroll-SettingsToTop
         $report.settingsScreenshot = Save-WindowScreenshot "icons-$state-settings"
@@ -4856,6 +4981,166 @@ try {
         }
         $report.icons = $state
         $report.phases += "icons-$state-captured"
+    }
+    elseif ($Mode -eq 'keyboard') {
+        # T16.1: a keyboard-only trace. Each check reads app-owned state:
+        # focus, automation ids and names, item status and the status sequence.
+        function Send-Keys([string] $keys) {
+            [System.Windows.Forms.SendKeys]::SendWait($keys)
+            Start-Sleep -Milliseconds 300
+        }
+        function Get-StatusSequence {
+            $status = (Find-RawById 'ShellContent').Current.ItemStatus
+            if ($status -match '^(\d+)\|') { return [long]$Matches[1] }
+            return 0
+        }
+        function Get-FocusedName {
+            $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+            if ($focused) { return $focused.Current.Name } else { return '' }
+        }
+        function Wait-FocusedName([string] $expected, [string] $step) {
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                if ((Get-FocusedName) -eq $expected) { return }
+                Start-Sleep -Milliseconds 150
+            } while ((Get-Date) -lt $deadline)
+            throw "${step}: expected focus on '$expected', found '$(Get-FocusedName)'."
+        }
+        function Get-FirstListItem([string] $listId) {
+            $condition = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::ListItem)
+            return (Wait-VisibleById $listId).FindFirst($scope, $condition)
+        }
+        function Click-Page {
+            $rect = (Wait-VisibleById 'ReaderCommands').Current.BoundingRectangle
+            [DesktopGuidesForegroundProbe]::Click([int]($rect.Left + $rect.Width / 2), [int]($rect.Bottom + 150))
+            Start-Sleep -Milliseconds 500
+        }
+
+        Resize-ShellWindow 1500 720
+        Select-Element 'Library'
+        [void](Wait-VisibleById 'LibraryHeading')
+
+        # Library: Ctrl+F from a game row, then Esc clears and Esc leaves.
+        $firstGame = Get-FirstListItem 'GameList'
+        $firstGameName = $firstGame.Current.Name
+        $firstGame.SetFocus()
+        Wait-FocusedName $firstGameName 'first game row'
+        Send-Keys '^f'
+        Wait-FocusWithin 'LibrarySearchInput'
+        Send-Keys 'zzqx'
+        [void](Wait-Status 'No games match.' -AllowHidden)
+        Send-Keys '{ESC}'
+        $deadline = (Get-Date).AddSeconds(10)
+        while ((Get-SearchText 'LibrarySearchInput') -ne '' -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
+        if ((Get-SearchText 'LibrarySearchInput') -ne '') { throw 'Esc did not clear the Library search.' }
+        Wait-FocusWithin 'LibrarySearchInput'
+        Send-Keys '{ESC}'
+        Wait-FocusedName $firstGameName 'Esc in an empty search'
+        $report.phases += 'keyboard-library-search'
+
+        # Wrong context: Ctrl+O on the Library does nothing.
+        $sequence = Get-StatusSequence
+        Send-Keys '^o'
+        Start-Sleep -Milliseconds 800
+        Wait-FocusedName $firstGameName 'Ctrl+O on the Library'
+        if ((Get-StatusSequence) -ne $sequence) { throw 'Ctrl+O on the Library changed the status.' }
+        $report.phases += 'keyboard-wrong-context'
+
+        # Game page: Enter opens it; Ctrl+O opens the picker; Esc returns focus.
+        $game = 'Text Size Game'
+        $row = Find-ByName $game
+        $row.SetFocus()
+        Wait-FocusedName $game 'Text Size Game row'
+        Send-Keys '{ENTER}'
+        [void](Wait-Name 'GameHeading' $game)
+        [void](Wait-Status 'Game ready.')
+        $firstGuide = Get-FirstListItem 'GuideList'
+        $firstGuideName = $firstGuide.Current.Name
+        $firstGuide.SetFocus()
+        Wait-FocusedName $firstGuideName 'first guide row'
+        Send-Keys '^o'
+        $picker = Wait-FilePicker
+        Send-Keys '{ESC}'
+        Wait-PickerClosed $picker
+        # The spec: focus returns to Import guide, which the import flow restores.
+        Wait-FocusedName 'Import guide' 'after the import picker closed'
+        $report.phases += 'keyboard-import-picker'
+
+        # A confirmation dialog: Esc cancels it, and focus returns to its button.
+        $remove = Find-ByName 'Remove game'
+        $remove.SetFocus()
+        Wait-FocusedName 'Remove game' 'Remove game button'
+        Send-Keys '{ENTER}'
+        [void](Wait-VisibleById 'PrimaryButton')
+        Send-Keys '{ESC}'
+        [void](Wait-HiddenById 'PrimaryButton')
+        Wait-FocusedName 'Remove game' 'after Esc cancelled the removal'
+        [void](Wait-Name 'GameHeading' $game)
+        $report.phases += 'keyboard-confirm-dialog'
+
+        # HTML: the reader keys work from the reader toolbar. Keys while the
+        # page itself has focus are a T16.2 gap (T16.1 Task 3 fallback).
+        Open-GuideFromGame 'Static Web Guide'
+        [void](Wait-Status 'Guide ready.')
+        $size = (Wait-VisibleById 'TextSizeValue').Current.Name
+        $larger = Find-ByName 'Larger text'
+        $larger.SetFocus()
+        Wait-FocusedName 'Larger text' 'HTML toolbar'
+        Send-Keys '^{ADD}'
+        $deadline = (Get-Date).AddSeconds(5)
+        while ((Find-ById 'TextSizeValue').Current.Name -eq $size -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
+        if ((Find-ById 'TextSizeValue').Current.Name -eq $size) { throw 'Ctrl+Plus on the HTML toolbar did not change the text size.' }
+        Send-Keys '^0'
+        # T16.2 evidence: does a text-size change pull focus into the page?
+        $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+        $report.htmlFocusAfterTextSize = "$($focused.Current.Name) ($($focused.Current.ClassName))"
+        if ((Get-FocusedName) -ne 'Larger text') {
+            $report.phases += 'keyboard-html-focus-left-toolbar'
+            (Find-ByName 'Larger text').SetFocus()
+            Wait-FocusedName 'Larger text' 'HTML toolbar again'
+        }
+        Send-Keys '%{LEFT}'
+        [void](Wait-Name 'GameHeading' $game)
+        $report.phases += 'keyboard-html'
+
+        # Settings: the list shows every shortcut.
+        Select-Element 'Settings'
+        [void](Wait-Name 'SettingsHeading' 'Settings')
+        $expander = Show-SettingsCard 'KeyboardShortcutsExpander'
+        $report.helpScreenshot = Save-WindowScreenshot 'settings-help'
+        $pattern = $null
+        if ($expander.TryGetCurrentPattern(
+                [System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$pattern)) {
+            if ($pattern.Current.ExpandCollapseState -ne
+                [System.Windows.Automation.ExpandCollapseState]::Expanded) { $pattern.Expand() }
+        }
+        else {
+            Click-Element $expander
+        }
+        $expected = [ordered]@{
+            ShortcutBack = 'Go back, Alt+Left'
+            ShortcutFocusLibrarySearch = 'Search the library, Ctrl+F'
+            ShortcutClearLibrarySearch = 'Clear the search, Esc'
+            ShortcutImportGuide = 'Import a guide, Ctrl+O'
+            ShortcutPreviousPage = 'Previous page (TXT, PDF), Page Up'
+            ShortcutNextPage = 'Next page (TXT, PDF), Page Down'
+            ShortcutPageStart = 'Go to start (TXT, PDF), Ctrl+Home'
+            ShortcutPageEnd = 'Go to end (TXT, PDF), Ctrl+End'
+            ShortcutGoToPage = 'Go to page (PDF), Ctrl+G'
+            ShortcutZoomIn = 'Zoom in (PDF) or larger text, Ctrl+Plus'
+            ShortcutZoomOut = 'Zoom out (PDF) or smaller text, Ctrl+Minus'
+            ShortcutZoomReset = 'Fit to width (PDF) or reset text size, Ctrl+0'
+            ShortcutCloseDialog = 'Close the dialog, Esc'
+        }
+        foreach ($id in $expected.Keys) {
+            [void](Show-SettingsCard $id)
+            [void](Wait-Name $id $expected[$id])
+        }
+        [void](Show-SettingsCard 'ShortcutImportGuide')
+        $report.settingsScreenshot = Save-WindowScreenshot 'settings-shortcuts'
+        $report.phases += 'keyboard-settings'
     }
     elseif ($Mode -eq 'prepare-game-editor-close') {
         Select-Element 'Route Test Game'
@@ -6425,7 +6710,7 @@ try {
             [void](Wait-Status ('Backup saved: ' + (Split-Path -Leaf $BackupPath) + ' (') -Prefix -Seconds 120)
             Wait-FocusedId 'ExportBackupButton'
             # The status bar above Settings pushes the card toward the bottom edge.
-            Scroll-SettingsToEnd
+            [void](Scroll-SettingsUntilVisible 'ExportBackupButton')
             [void](Wait-VisibleById 'ExportBackupButton')
             $report.exportSavedScreenshot = Save-WindowScreenshot 'export-saved'
             $report.phases += 'export-saved'

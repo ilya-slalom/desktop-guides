@@ -3,7 +3,8 @@
 Status: 50 of the 57 tasks are merged, 12 October 2026. M0 to M4 are
 complete; T11.5 (colorful icons), the last M2 task, merged in #85. M5 has
 T20.1, T20.2, T15.4 and T15.1 merged, and M6 is planned. T17.6 (app icon)
-merged in #86.
+merged in #86. T16.1 (keyboard shortcuts) is in review in #88; see the
+[verification record](t16-1-keyboard-shortcuts-design.md#t161-verification-record).
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
 This plan orders all **16 P1 stories and 57 tasks** in the
@@ -1028,7 +1029,7 @@ passed. See the [release procedure](release-packaging.md).
 | T20.1 | T03.2, T04.4, T06.3, T15.2 | Versioned ZIP manifest and consistent SQLite/files snapshot under one write gate, including provider snapshots and managed game artwork. Export is canceled cleanly, verified by checksums, and excludes source paths, credentials, remote caches, and transient profiles. | TR20.2 |
 | T20.2 | T14.4, T15.1, T15.4, T20.1 | Toolkit `SettingsCard` Export/Restore rows and `SettingsExpander` advanced restore details, out-of-app-data destination check, first-import export reminder, full staged archive validation of guide and provider-artwork references, native Cancel/Replace confirmation, and rollback marker. Clean and populated restore, missing artwork, corrupt/unsafe ZIP, cancel, and interrupted swap tests pass. | TR20.1, TR20.2 |
 | T16.1 | T05.2, T06.1, T08.3, T10.2, T11.3 | Visible menu/toolbar parity and documented shortcuts. Keyboard trace checks context, text-field handling, dialogs, page movement, and Escape behavior. | TR16.1, TR16.2 |
-| T16.2 | T07.3, T08.3, T09.3, T10.2, T11.5, T13.1, T14.4, T16.1, T20.2 | Real WinUI and design-language audit of hierarchy, copy, tab/focus, touch, overflow/localization, high contrast, DPI, AutomationProperties, and Narrator through Add game → Import → Read → Complete → Export. TXT/HTML document text is read, overlays return focus, and final screenshots are reviewed together. Run the high-contrast pass deferred from T11.4. Before enabling high contrast, save the active `.theme` path and wallpaper, and restore them exactly afterward. Alternatively, run in a disposable Windows profile or VM. | TR11.3, TR14.3, TR16.1, TR16.2 |
+| T16.2 | T07.3, T08.3, T09.3, T10.2, T11.5, T13.1, T14.4, T16.1, T20.2 | Real WinUI and design-language audit of hierarchy, copy, tab/focus, touch, overflow/localization, high contrast, DPI, AutomationProperties, and Narrator through Add game → Import → Read → Complete → Export. TXT/HTML document text is read, overlays return focus, and final screenshots are reviewed together. Decide the keys while focus is inside an HTML guide page, which T16.1 left as a gap: WebView2 passes no keys to the app there, and Chromium keeps Alt+Left. Run the high-contrast pass deferred from T11.4. Before enabling high contrast, save the active `.theme` path and wallpaper, and restore them exactly afterward. Alternatively, run in a disposable Windows profile or VM. | TR11.3, TR14.3, TR16.1, TR16.2 |
 | T16.3 | T10.0, T10.2, T10.3 | Tagged/scanned/locked PDF UIA, selection, keyboard, and Narrator record for the selected production engine. Tagged document text passes; scanned image-only limitation is stated accurately. | TR10.3, TR16.1 |
 
 ## M6 — release evidence and tested support matrix

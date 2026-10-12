@@ -159,6 +159,8 @@ public sealed partial class ShellWindow : Window
         back.Invoked += BackAcceleratorInvoked;
         ShellRoot.KeyboardAccelerators.Add(back);
         ShellRoot.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
+        InitializeKeyboard();
+        InitializeShortcutList();
     }
 
     private void UpdatePaneStatus() =>
@@ -608,9 +610,17 @@ public sealed partial class ShellWindow : Window
     private async void BackAcceleratorInvoked(
         KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
-        // An open ContentDialog owns the keyboard, as in ReaderToolbar.
-        if (!AppTitleBar.IsBackButtonEnabled || DialogOpen()) return;
+        if (!CanGoBackFromKeyboard()) return;
         args.Handled = true;
+        await GoBackFromKeyboardAsync();
+    }
+
+    // Alt+Left, from the accelerator or the shell's preview handler. An open
+    // ContentDialog owns the keyboard, as in ReaderToolbar.
+    private bool CanGoBackFromKeyboard() => AppTitleBar.IsBackButtonEnabled && !DialogOpen();
+
+    private async Task GoBackFromKeyboardAsync()
+    {
         CancelReaderLoad();
         await RunNavigationAsync(GoBackAsync);
     }
@@ -2111,6 +2121,8 @@ public sealed partial class ShellWindow : Window
                     MarkReaderGuide(GuideFileStatus.Ok);
                     ShowReaderSurface(loading: false, view: session.View);
                     ReaderActions.SetSession(session);
+                    // T16.1: TXT gets the reader keys PDF already had.
+                    ReaderActions.KeysEnabled = true;
                     BeginTextSize(guide.Id, textScale);
                     if (!await OpenAtSavedPlaceAsync(
                         guide, session, generation, document.ContentSha256.ToLowerInvariant(),
