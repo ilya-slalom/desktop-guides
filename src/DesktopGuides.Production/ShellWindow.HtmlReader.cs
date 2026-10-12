@@ -50,6 +50,13 @@ public sealed partial class ShellWindow
         readerSession = session;
         session.ForwardedCommand += command =>
             DispatcherQueue.TryEnqueue(() => RunForwardedKey(session, command));
+        session.ListenerReported += () => DispatcherQueue.TryEnqueue(() =>
+        {
+            if (ReferenceEquals(readerSession, session))
+            {
+                AutomationProperties.SetItemStatus(ReaderHeading, $"Page keys {session.ForwardedKeysReceived}");
+            }
+        });
         session.ExternalLinkRequested += OnExternalLinkRequested;
         session.UnavailableLinkRequested += OnUnavailableLinkRequested;
         session.Failed += OnReaderSessionFailed;
@@ -237,7 +244,6 @@ public sealed partial class ShellWindow
     private void RunForwardedKey(HtmlReaderSession source, ShortcutCommand command)
     {
         if (!ReferenceEquals(readerSession, source)) return;
-        AutomationProperties.SetItemStatus(ReaderHeading, $"Page keys {source.ForwardedKeysReceived}");
         if (command == ShortcutCommand.LeaveGuidePage)
         {
             // Alt+Left and the reader keys work from the toolbar.

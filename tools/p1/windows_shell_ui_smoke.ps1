@@ -4868,14 +4868,31 @@ try {
         [void](Wait-Status 'Game ready.')
         Open-GuideFromGame 'Static Web Guide'
         [void](Wait-Status 'Guide ready.')
-        $rect = (Wait-VisibleById 'ReaderCommands').Current.BoundingRectangle
-        $pageX = [int]($rect.Left + $rect.Width / 2)
-        $pageY = [int]($rect.Bottom + 150)
         function Get-PageKeys { (Find-ById 'ReaderHeading').Current.ItemStatus }
+        # The page is WebView2's Chromium render window, read from its own tree.
+        function Get-PageWindow {
+            $browsers = @(Get-CimInstance Win32_Process -Filter (
+                "ParentProcessId = $ProcessId AND Name = 'msedgewebview2.exe'") |
+                ForEach-Object { [uint32] $_.ProcessId })
+            foreach ($window in [DesktopGuidesForegroundProbe]::FindWindows(
+                'Chrome_RenderWidgetHostHWND', [uint32[]] $browsers)) {
+                try { return [System.Windows.Automation.AutomationElement]::FromHandle($window) }
+                catch [System.Windows.Automation.ElementNotAvailableException] { }
+            }
+            return $null
+        }
+        $deadline = (Get-Date).AddSeconds(15)
+        do { $page = Get-PageWindow; if ($page) { break }; Start-Sleep -Milliseconds 250 } while ((Get-Date) -lt $deadline)
+        if (-not $page) { throw 'No WebView2 render window for the guide.' }
+        $rect = $page.Current.BoundingRectangle
+        $pageX = [int]($rect.Left + $rect.Width / 2)
+        $pageY = [int]($rect.Top + $rect.Height / 2)
+        $report.readyStatus = Get-PageKeys
         $report.textSizeTries = @()
         foreach ($try in 1..3) {
             $before = (Wait-VisibleById 'TextSizeValue').Current.Name
             [DesktopGuidesForegroundProbe]::Click($pageX, $pageY)
+            try { $page.SetFocus() } catch { }
             Start-Sleep -Milliseconds 700
             $focus = [System.Windows.Automation.AutomationElement]::FocusedElement
             [System.Windows.Forms.SendKeys]::SendWait('^{ADD}')
@@ -4894,6 +4911,7 @@ try {
         $report.escTries = @()
         foreach ($try in 1..3) {
             [DesktopGuidesForegroundProbe]::Click($pageX, $pageY)
+            try { $page.SetFocus() } catch { }
             Start-Sleep -Milliseconds 700
             [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
             Start-Sleep -Milliseconds 1000

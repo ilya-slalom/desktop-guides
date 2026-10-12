@@ -31,6 +31,7 @@ public sealed class HtmlKeyForwardingTests
     [InlineData("Control+KeyG")]
     [InlineData("Alt+ArrowRight")]
     [InlineData("alt+arrowleft")]
+    [InlineData("Ready")]
     public void EverythingElseIsRefused(string payload)
     {
         Assert.False(HtmlKeyForwarding.TryParse(payload, out _));
@@ -42,6 +43,8 @@ public sealed class HtmlKeyForwardingTests
         string script = HtmlKeyForwarding.Script("desktopGuidesKey");
 
         Assert.Contains("desktopGuidesKey(", script);
+        // The listener announces itself once installed, so a run can tell it's there.
+        Assert.Contains("desktopGuidesKey('Ready')", script);
         Assert.Contains("'keydown'", script);
         foreach (string key in HtmlKeyForwarding.Payloads)
         {

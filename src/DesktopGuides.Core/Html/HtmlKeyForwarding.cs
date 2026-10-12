@@ -37,6 +37,6 @@ public static class HtmlKeyForwarding
             "const k = (e.ctrlKey ? 'Control+' : '') + (e.shiftKey ? 'Shift+' : '') + " +
             "(e.altKey ? 'Alt+' : '') + e.code; " +
             "if (keys.has(k)) { e.preventDefault(); e.stopImmediatePropagation(); " +
-            binding + "(k); } }, true); })();";
+            binding + "(k); } }, true); " + binding + "('Ready'); })();";
     }
 }
