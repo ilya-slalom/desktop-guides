@@ -209,7 +209,11 @@ From the [implementation plan](t17-2-release-ci-plan.md):
 
 - PR a dispatch (`shell-scope=design`, `dev-fast`):
   [38229333554](https://github.com/ilya-slalom/desktop-guides/actions/runs/38229333554).
-- PR a run: pending.
+- PR a run: [38230667053](https://github.com/ilya-slalom/desktop-guides/actions/runs/38230667053)
+  passed. All four installed shards published their evidence. The `pdf`
+  shard passed on a rerun of its failed job: the first attempt failed
+  `progress-changed` with a `TaskCanceledException` on a save, as the
+  `main` push run 38218463295 did before this change.
 
 ## Out of scope
 
