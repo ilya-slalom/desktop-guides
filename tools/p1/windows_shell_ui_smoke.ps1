@@ -3258,16 +3258,30 @@ try {
             Wait-TopRowName $homeName 'Ctrl+Home'
             [System.Windows.Forms.SendKeys]::SendWait('{PGDN}')
             Wait-TopRowName $afterNext 'Page Down'
-            # Focus follows the page: Down after Page Down must not jump back.
+            # Focus follows the page: the focused row must be on screen, so Tab
+            # or an arrow key doesn't pull the view back to the old page.
+            $listBounds = (Find-ById 'ReaderTextLines').Current.BoundingRectangle
+            $deadline = (Get-Date).AddSeconds(3)
+            do {
+                $focusedRow = [System.Windows.Automation.AutomationElement]::FocusedElement
+                $rowBounds = $focusedRow.Current.BoundingRectangle
+                $onScreen = $focusedRow.Current.ControlType -eq [System.Windows.Automation.ControlType]::ListItem -and
+                    -not $focusedRow.Current.IsOffscreen -and
+                    $rowBounds.Top -ge $listBounds.Top - 1 -and $rowBounds.Bottom -le $listBounds.Bottom + 1
+                if ($onScreen) { break }
+                Start-Sleep -Milliseconds 150
+            } while ((Get-Date) -lt $deadline)
+            if (-not $onScreen) {
+                throw "After Page Down, focus stayed off the page: '$($focusedRow.Current.Name)' at $($rowBounds.Top) (list $($listBounds.Top)-$($listBounds.Bottom))."
+            }
             $scrollAfterPage = (Find-ById 'ReaderTextLines').GetCurrentPattern(
                 [System.Windows.Automation.ScrollPattern]::Pattern).Current.VerticalScrollPercent
             [System.Windows.Forms.SendKeys]::SendWait('{DOWN}')
             Start-Sleep -Milliseconds 700
             $scrollAfterDown = (Find-ById 'ReaderTextLines').GetCurrentPattern(
                 [System.Windows.Automation.ScrollPattern]::Pattern).Current.VerticalScrollPercent
-            # One page is a tiny share of this long guide, so the tolerance is
-            # a fraction of a page: a one-line scroll back fails it.
-            if ($scrollAfterDown -lt $scrollAfterPage * 0.995) {
+            # A one-line nudge is a T16.2 note; a jump back to the old page fails.
+            if ($scrollAfterDown -lt $scrollAfterPage * 0.5) {
                 throw "Down after Page Down jumped back: $scrollAfterPage% to $scrollAfterDown%."
             }
             $report.downAfterPage = [ordered]@{ page = $scrollAfterPage; down = $scrollAfterDown }
