@@ -4884,7 +4884,8 @@ try {
         Assert-NoImageInWindow 'Settings'
         [void](Wait-HiddenById 'ShellStatus')
         Assert-ShellForeground
-        [void](Show-SettingsCard 'ProviderSettingsExpander')
+        # The bottom of Settings: Game data and the Help card (T16.1).
+        [void](Show-SettingsCard 'KeyboardShortcutsExpander')
         $report.settingsLowerScreenshot = Save-WindowScreenshot "icons-$state-settings-lower"
         Scroll-SettingsToTop
         $report.settingsScreenshot = Save-WindowScreenshot "icons-$state-settings"
@@ -5056,6 +5057,7 @@ try {
         Select-Element 'Settings'
         [void](Wait-Name 'SettingsHeading' 'Settings')
         $expander = Show-SettingsCard 'KeyboardShortcutsExpander'
+        $report.helpScreenshot = Save-WindowScreenshot 'settings-help'
         $pattern = $null
         if ($expander.TryGetCurrentPattern(
                 [System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$pattern)) {
