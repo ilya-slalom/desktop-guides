@@ -1,6 +1,6 @@
 # T17.2 piece E: the scheduled-task entry point design
 
-Status: approved; implemented on `feat/p1-t17-2-task-entry`.
+Status: merged in #95 (merge commit `b3786ac`), 12 October 2026.
 Pieces A (the workflow lane) and B (the evidence checklist) merged in #90
 and #91; see the [T17.2 design](t17-2-release-ci-design.md).
 
@@ -247,6 +247,7 @@ One PR:
 - PR run after ruling 8:
   [38264219275](https://github.com/ilya-slalom/desktop-guides/actions/runs/38264219275)
   passed on the first attempt, with `core-tests` and all five installed
-  shards started through the entry point.
+  shards started through the entry point. Merged in #95 (merge commit
+  `b3786ac`).
 - In every run, the `workflow` shard's evidence lists the #93 crash on
   close after `workflow-read`; the stages still pass.
