@@ -2721,6 +2721,9 @@ try {
         Run-DesignLanguageScenarios
         Run-MaterialScenarios
         Run-ReaderDesignScenarios
+        Start-InstalledShell
+        $report.keyboardHtmlProbe = Run-ShellSmoke 'keyboard-html-probe'
+        Close-InstalledShell
         Run-IconScenarios
     }
 

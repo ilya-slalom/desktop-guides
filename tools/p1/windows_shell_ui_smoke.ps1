@@ -7,7 +7,7 @@ param(
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
         'reader-render-error-observed', 'reader-render-error-result',
-        'late-guide-after-close', 'waiting-handoff', 'material', 'icons', 'catalog', 'catalog-facts', 'library-search', 'stable-navigation',
+        'late-guide-after-close', 'waiting-handoff', 'material', 'icons', 'keyboard-html-probe', 'catalog', 'catalog-facts', 'library-search', 'stable-navigation',
         'provider-none', 'provider-offline', 'provider-settings',
         'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
@@ -4856,6 +4856,34 @@ try {
         }
         $report.icons = $state
         $report.phases += "icons-$state-captured"
+    }
+    elseif ($Mode -eq 'keyboard-html-probe') {
+        # T16.1 Task 3: do the app's keys reach it from inside an HTML page?
+        Select-Element 'Text Size Game'
+        [void](Wait-Status 'Game ready.')
+        Open-GuideFromGame 'Static Web Guide'
+        [void](Wait-Status 'Guide ready.')
+        $before = (Wait-VisibleById 'TextSizeValue').Current.Name
+        # Focus the page itself: a click 150 px below the reader toolbar,
+        # which is always inside the guide page.
+        $rect = (Wait-VisibleById 'ReaderCommands').Current.BoundingRectangle
+        $pageX = [int]($rect.Left + $rect.Width / 2)
+        $pageY = [int]($rect.Bottom + 150)
+        [DesktopGuidesForegroundProbe]::Click($pageX, $pageY)
+        Start-Sleep -Milliseconds 500
+        [System.Windows.Forms.SendKeys]::SendWait('^{ADD}')
+        Start-Sleep -Milliseconds 800
+        $after = (Find-ById 'TextSizeValue').Current.Name
+        $report.nativeTextSize = ($after -ne $before)
+        [System.Windows.Forms.SendKeys]::SendWait('^0')
+        Start-Sleep -Milliseconds 500
+        [DesktopGuidesForegroundProbe]::Click($pageX, $pageY)
+        Start-Sleep -Milliseconds 500
+        [System.Windows.Forms.SendKeys]::SendWait('%{LEFT}')
+        Start-Sleep -Milliseconds 1500
+        $heading = Find-ById 'GameHeading'
+        $report.nativeBack = [bool]($heading -and -not $heading.Current.IsOffscreen)
+        $report.phases += "probe-textsize-$($report.nativeTextSize)-back-$($report.nativeBack)"
     }
     elseif ($Mode -eq 'prepare-game-editor-close') {
         Select-Element 'Route Test Game'
