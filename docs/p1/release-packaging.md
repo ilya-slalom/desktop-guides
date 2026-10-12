@@ -1,10 +1,11 @@
 # P1 MSIX packaging and prerequisite delivery
 
-Status: T17.1 is merged (#82, #83); the first release, v1.0.0, was drafted
-11 October 2026. The public identity (`IlyaLissoboi.DesktopGuides`,
+Status: T17.1 is merged (#82, #83); the first release, v1.0.0, was published
+as a pre-release on 11 October 2026. T17.6 (#86) added the app icon, which
+v1.0.0 predates. The public identity (`IlyaLissoboi.DesktopGuides`,
 `CN=359962D5-3801-484E-BE5B-39D0D498BEA4`) is built with
 `-p:PackageLane=Public`, and a `vX.Y.Z` tag produces a signed draft
-pre-release. The v1.0.0 draft is not published.
+pre-release.
 This procedure does not establish a clean-install or release-support claim.
 
 ## Identity and version

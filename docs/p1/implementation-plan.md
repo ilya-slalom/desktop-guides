@@ -1,8 +1,9 @@
 # P1 implementation plan and exit gates
 
-Status: 48 of the 57 tasks are merged, 11 October 2026. M0, M1, M3 and M4 are
-complete; T11.5 (colorful icons), the last M2 task, is in review in #85. M5 has T20.1, T20.2,
-T15.4 and T15.1 merged, and M6 is planned.
+Status: 50 of the 57 tasks are merged, 12 October 2026. M0 to M4 are
+complete; T11.5 (colorful icons), the last M2 task, merged in #85. M5 has
+T20.1, T20.2, T15.4 and T15.1 merged, and M6 is planned. T17.6 (app icon)
+merged in #86.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
 This plan orders all **16 P1 stories and 57 tasks** in the
@@ -1010,9 +1011,15 @@ keeps the previous library at the next start. CI runs
 (`backup` group) and
 [38064144850](https://github.com/ilya-slalom/desktop-guides/actions/runs/38064144850)
 (full) passed; see the verification record.
-T11.5 (#85, in review) adds an optional Settings "Colorful icons" toggle
-with Fluent UI System Icons colour SVGs, monochrome in high contrast; see
-the [verification record](t11-5-colorful-icons-design.md#t115-verification-record).
+T11.5 was merged in #85 (merge commit `20302b9`). It adds an optional
+Settings "Colorful icons" toggle with Fluent UI System Icons colour SVGs and
+two generated icons, monochrome in high contrast. CI run
+[38145638926](https://github.com/ilya-slalom/desktop-guides/actions/runs/38145638926)
+passed; see the [verification record](t11-5-colorful-icons-design.md#t115-verification-record).
+T17.6 was merged in #86 (merge commit `9ee71e9`). The app's own icon
+replaces the P0 placeholder logos in both MSIX lanes and the portable exe;
+CI run [38153549552](https://github.com/ilya-slalom/desktop-guides/actions/runs/38153549552)
+passed. See the [release procedure](release-packaging.md).
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
