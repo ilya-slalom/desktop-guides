@@ -207,7 +207,28 @@ on `feat/p1-t16-1-keyboard-shortcuts`, PR #88.
   - `pdf` run
     [38205679965](https://github.com/ilya-slalom/desktop-guides/actions/runs/38205679965):
     the existing PDF key smoke passes with the shell's new key handling.
-- **Full PR CI:** pending.
+- **Full PR CI:** run
+  [38215923133](https://github.com/ilya-slalom/desktop-guides/actions/runs/38215923133)
+  passed on `65e0e1f`.
+- **Final review:** a fresh reviewer found 0 Critical, 1 Important and 6
+  Minor.
+  - **The Important did not reproduce.** It predicted that TXT page keys
+    leave list focus behind. Runs with and without a focus-follow change
+    (38215013702, 38215023721) both showed the focused row on screen after
+    Page Down, so the change was reverted. The trace keeps both checks.
+  - **A regression the full run caught:** `export-backup` scrolled Settings
+    to the end, where the new Help section hides Export. The test now
+    scrolls until Export is visible.
+  - **Doc gap fixed:** the spec's intent no longer promises keys inside HTML
+    pages, and the T16.2 rows carry that gap.
+  - **Deferred minors:**
+    - Esc in a just-emptied search acts on the stale filtered list for
+      200 ms.
+    - Esc with no text does nothing when the first game row isn't realized.
+    - An unused `Click-Page` smoke helper.
+    - Ctrl+0 is sent but not checked.
+    - Keyboard Back from the preview handler drops exceptions.
+    - Down after Page Down nudges the TXT view back one line.
 - **Help card icon:** with Colorful icons on, it shows Fluent's
   `question_circle` in light and dark. Off, it shows the circled question
   mark `E9CE`. See the screenshots below.
