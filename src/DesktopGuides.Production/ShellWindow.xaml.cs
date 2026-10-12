@@ -610,9 +610,17 @@ public sealed partial class ShellWindow : Window
     private async void BackAcceleratorInvoked(
         KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
-        // An open ContentDialog owns the keyboard, as in ReaderToolbar.
-        if (!AppTitleBar.IsBackButtonEnabled || DialogOpen()) return;
+        if (!CanGoBackFromKeyboard()) return;
         args.Handled = true;
+        await GoBackFromKeyboardAsync();
+    }
+
+    // Alt+Left, from the accelerator or the shell's preview handler. An open
+    // ContentDialog owns the keyboard, as in ReaderToolbar.
+    private bool CanGoBackFromKeyboard() => AppTitleBar.IsBackButtonEnabled && !DialogOpen();
+
+    private async Task GoBackFromKeyboardAsync()
+    {
         CancelReaderLoad();
         await RunNavigationAsync(GoBackAsync);
     }

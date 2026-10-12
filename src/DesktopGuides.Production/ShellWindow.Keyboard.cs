@@ -20,6 +20,26 @@ public sealed partial class ShellWindow
         LibrarySearchInput.PreviewKeyDown += LibrarySearchKeyDown;
         ShowShortcut(ImportGuideButton, "Import guide", ShortcutCommand.ImportGuide);
         ShowShortcut(LibrarySearchInput, "Search", ShortcutCommand.FocusLibrarySearch);
+        ShellRoot.PreviewKeyDown += ShellPreviewKeyDown;
+    }
+
+    // The focused control handles a key before accelerators run, so the
+    // toolbar would keep Alt+Left and the text list Ctrl+End. These keys are
+    // taken on the way down instead; the accelerators stay as the fallback.
+    private void ShellPreviewKeyDown(object sender, KeyRoutedEventArgs args)
+    {
+        VirtualKeyModifiers modifiers = CurrentModifiers();
+        if (args.Key == VirtualKey.Left && modifiers == VirtualKeyModifiers.Menu)
+        {
+            if (!CanGoBackFromKeyboard()) return;
+            args.Handled = true;
+            _ = GoBackFromKeyboardAsync();
+            return;
+        }
+        if (navigator.Current is ReaderRoute && args.OriginalSource is not (TextBox or PasswordBox))
+        {
+            args.Handled = ReaderActions.TryRunKey(args.Key, modifiers);
+        }
     }
 
     private static void ShowShortcut(FrameworkElement control, string label, ShortcutCommand command)
