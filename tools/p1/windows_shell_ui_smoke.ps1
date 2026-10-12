@@ -3233,8 +3233,22 @@ try {
             Wait-TopRowName $homeName 'Ctrl+Home'
             [System.Windows.Forms.SendKeys]::SendWait('{PGDN}')
             Wait-TopRowName $afterNext 'Page Down'
+            # Ctrl+Home and Ctrl+End are read from the list's scroll position;
+            # this guide's rows repeat their text.
+            $scroll = (Find-ById 'ReaderTextLines').GetCurrentPattern(
+                [System.Windows.Automation.ScrollPattern]::Pattern)
             [System.Windows.Forms.SendKeys]::SendWait('^{END}')
-            [void](Wait-TopRowLeaves $afterNext 'Ctrl+End')
+            $deadline = (Get-Date).AddSeconds(10)
+            while ($scroll.Current.VerticalScrollPercent -lt 99 -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
+            if ($scroll.Current.VerticalScrollPercent -lt 99) {
+                throw "Ctrl+End left the TXT reader at $($scroll.Current.VerticalScrollPercent)%."
+            }
+            [System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
+            $deadline = (Get-Date).AddSeconds(10)
+            while ($scroll.Current.VerticalScrollPercent -gt 0.5 -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
+            if ($scroll.Current.VerticalScrollPercent -gt 0.5) {
+                throw "Ctrl+Home left the TXT reader at $($scroll.Current.VerticalScrollPercent)%."
+            }
             $report.pageTop = [ordered]@{ home = $homeName; afterNext = $afterNext }
             $size = (Wait-VisibleById 'TextSizeValue').Current.Name
             [System.Windows.Forms.SendKeys]::SendWait('^{ADD}')
@@ -5042,8 +5056,15 @@ try {
         Select-Element 'Settings'
         [void](Wait-Name 'SettingsHeading' 'Settings')
         $expander = Show-SettingsCard 'KeyboardShortcutsExpander'
-        $pattern = $expander.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern)
-        if ($pattern.Current.ExpandCollapseState -ne 'Expanded') { $pattern.Expand() }
+        $pattern = $null
+        if ($expander.TryGetCurrentPattern(
+                [System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$pattern)) {
+            if ($pattern.Current.ExpandCollapseState -ne
+                [System.Windows.Automation.ExpandCollapseState]::Expanded) { $pattern.Expand() }
+        }
+        else {
+            Click-Element $expander
+        }
         $expected = [ordered]@{
             ShortcutBack = 'Go back, Alt+Left'
             ShortcutFocusLibrarySearch = 'Search the library, Ctrl+F'
@@ -5059,7 +5080,10 @@ try {
             ShortcutZoomReset = 'Fit to width (PDF) or reset text size, Ctrl+0'
             ShortcutCloseDialog = 'Close the dialog, Esc'
         }
-        foreach ($id in $expected.Keys) { [void](Wait-Name $id $expected[$id]) }
+        foreach ($id in $expected.Keys) {
+            [void](Show-SettingsCard $id)
+            [void](Wait-Name $id $expected[$id])
+        }
         [void](Show-SettingsCard 'ShortcutImportGuide')
         $report.settingsScreenshot = Save-WindowScreenshot 'settings-shortcuts'
         $report.phases += 'keyboard-settings'
