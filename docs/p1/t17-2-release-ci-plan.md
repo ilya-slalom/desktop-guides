@@ -849,9 +849,10 @@ check, the ASCII check, and a read-through against the helpers it calls.
   - the `-Mode` ValidateSet (lines 3–34);
   - the parameter block's end (after `$BackupPath`, line 99);
   - the shared reader block's mode list and `$textGame` (lines 1514–1528);
-  - a new last branch of the reader block's inner chain, after
-    `elseif ($Mode -like 'text-size-*') { ... }` (it ends at line 4320,
-    just before the `    }` that closes the reader block).
+  - a new branch of the reader block's inner chain, after
+    `elseif ($Mode -like 'text-size-*') { ... }` and before the chain's
+    final `else {` (the `txt-reader` default). An `elseif` after that
+    `else` parses as a command, and the modes would run the default.
 
 **Interfaces:**
 - Consumes:
