@@ -92,13 +92,19 @@ exit 3
     Assert-NoEntryTask 'The silent run'
 
     # 6 and Review Focus 5: a timeout stops the run and lists leftovers.
-    $sleep = New-Fake 'fake-sleep.ps1' "Write-Output 'sleeping'`r`nStart-Sleep -Seconds 300`r`nexit 0"
+    $sleep = New-Fake 'fake-sleep.ps1' ("Set-Content -LiteralPath (Join-Path `$ResultDirectory 'fake-pid.txt') -Value `$PID`r`n" +
+        "Write-Output 'sleeping'`r`nStart-Sleep -Seconds 300`r`nexit 0")
     $run = Invoke-Entry $sleep @{ PackagePath = $package; ResultDirectory = (Join-Path $root 'out sleep'); TimeoutMinutes = 0.25 }
     Assert-True ($run.code -eq 124) "A timed-out run exited $($run.code), not 124."
     Assert-True ((@($run.output) -join "`n").Contains("the installer's cleanup did not run")) 'The leftover report is missing.'
     Assert-NoEntryTask 'The timed-out run'
     $innerPid = (Get-Content -LiteralPath (Join-Path $root 'out sleep\task-started.json') -Raw | ConvertFrom-Json).processId
     Assert-True (-not (Get-Process -Id $innerPid -ErrorAction SilentlyContinue)) "The inner process $innerPid kept running."
+    # The installer runs in a child of the inner script; it must end too.
+    $fakePid = [int] (Get-Content -LiteralPath (Join-Path $root 'out sleep\fake-pid.txt') -Raw)
+    $survivor = Get-Process -Id $fakePid -ErrorAction SilentlyContinue
+    if ($survivor) { Stop-Process -Id $fakePid -Force -ErrorAction SilentlyContinue }
+    Assert-True (-not $survivor) "The installer's process $fakePid kept running after the timeout."
 
     # 8: a stale task refuses the run and is left alone.
     $stale = "${prefix}stale-$([Guid]::NewGuid().ToString('N'))"
