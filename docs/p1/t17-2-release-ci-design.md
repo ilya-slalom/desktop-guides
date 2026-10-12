@@ -1,6 +1,7 @@
 # T17.2 release CI: evidence checklist and workflow lane design
 
-Status: design approved in brainstorming; spec awaiting review.
+Status: approved. PR a (the evidence checklist) is in review; PR b (the
+workflow lane) follows it.
 Prerequisites in the plan's T17.2 row are merged, including T16.1 (#88).
 T16.2 and T16.3 left T17.2's prerequisites when the accessibility audit moved
 to the final milestone after P3 (#89).
@@ -183,6 +184,32 @@ Two PRs on this design:
   ([e2e-testing.md](e2e-testing.md)).
 - **Status pages:** `implementation-plan.md` and `progress.md` record T17.2
   as partly done until E, C and D merge.
+
+## Rulings
+
+From the [implementation plan](t17-2-release-ci-plan.md):
+
+1. **Fixtures per shard.** The existing groups pass the whole
+   `tests/fixtures` folder to the seed tool, which picks files itself, so
+   the installer can't name the files a shard used without rewriting every
+   group.
+   - The evidence lists the full fixture set available to the run, hashed:
+     every entry in `p0/manifest.json` and every top-level item under
+     `tests/fixtures/p1`.
+   - The workflow group records exactly the four fixtures it copies, in
+     `$report.fixtures`. The writer prefers that list when present.
+2. **WebView2 version.** The installer report doesn't record it today.
+   PR a adds `$report.webView2Version`, read from the EdgeUpdate client
+   key that WebView2 registers.
+3. **Scratch folders.** The existing groups leave no scratch folders, so
+   the evidence prints the "scratch folders removed" line only when the
+   report has `scratchFoldersRemaining` (workflow lane).
+
+## T17.2 verification record
+
+- PR a dispatch (`shell-scope=design`, `dev-fast`):
+  [38229333554](https://github.com/ilya-slalom/desktop-guides/actions/runs/38229333554).
+- PR a run: pending.
 
 ## Out of scope
 

@@ -253,6 +253,27 @@ It runs as four parallel shards, each a fresh install on its own runner:
 (pdf, progress, theme, text-size) and `html` (html, import, provider). Each shard
 uploads its JSON results and screenshots as `production-shell-ui-<shard>`,
 and PRs link to those artifacts. A shard failing doesn't cancel the others.
+
+After the run, each shard writes an evidence checklist with
+`tools/p1/write_shell_evidence.ps1`, even when its scenarios failed. The
+checklist covers:
+
+- the run: commit, run ID and groups;
+- the target: OS build, CPU, .NET SDK, Windows App Runtime and WebView2;
+- the package: name, source and signed MSIX SHA-256, and certificate
+  thumbprint;
+- the fixtures, hashed from the files;
+- each scenario with its duration;
+- cleanup.
+
+The checklist is appended to the job's step summary, and uploaded as
+`evidence.md` and `evidence.json` in the shard's artifact. Paths are
+rewritten to `%USERPROFILE%`, `%LOCALAPPDATA%` and `%TEMP%` forms, and the
+checklist holds no machine or user name. Both package jobs depend on
+`core-tests`, so a failing storage, security or script test stops
+packaging. The P0 `packages` and native ARM64 jobs still run as the P0
+regression lane.
+
 Provider live scenarios skip on CI, because the runner has no credential files.
 Run them on the Windows host with `-ProviderOnly`, using the user's keys and
 normal provider requests. Use the host for other scenarios only to debug a CI
