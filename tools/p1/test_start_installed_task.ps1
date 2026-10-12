@@ -36,7 +36,7 @@ try {
 [ordered]@{
     packagePath = $PackagePath; resultDirectory = $ResultDirectory
     groups = @($Groups); designOnly = [bool] $DesignOnly
-    path = $env:PATH; dotnetRoot = $env:DOTNET_ROOT
+    path = $env:PATH; dotnetRoot = $env:DOTNET_ROOT; psHome = $PSHOME
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ResultDirectory 'fake-received.json') -Encoding UTF8
 Write-Output 'fake line one'
 # The installer sends dotnet build to Out-Host, which skips the streams.
@@ -59,7 +59,11 @@ exit 3
     Assert-True ($received.resultDirectory -eq $out) "The result folder arrived as '$($received.resultDirectory)'."
     Assert-True ((@($received.groups) -join ',') -eq 'core,txt') "Groups arrived as '$(@($received.groups) -join ',')'."
     Assert-True ($received.designOnly) 'The switch did not arrive.'
-    Assert-True ($received.path.StartsWith("$marker;")) "PATH arrived as '$($received.path.Substring(0, 80))...'."
+    # pwsh puts its own folder first when it starts; 5.1 doesn't. Nothing
+    # else may come before the caller's whole PATH.
+    $carried = "$marker;$savedPath"
+    Assert-True ($received.path -eq $carried -or $received.path -eq "$($received.psHome);$carried") `
+        "PATH arrived as '$($received.path.Substring(0, 80))...'."
     Assert-True ($received.dotnetRoot -eq 'C:\dg-fake-dotnet-root') "DOTNET_ROOT arrived as '$($received.dotnetRoot)'."
     Assert-True ($run.output -contains 'fake line one') 'The first line did not reach the output.'
     Assert-True ($run.output -contains 'fake line last') 'The last line did not reach the output.'
