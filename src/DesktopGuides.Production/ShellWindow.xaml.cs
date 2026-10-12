@@ -159,6 +159,7 @@ public sealed partial class ShellWindow : Window
         back.Invoked += BackAcceleratorInvoked;
         ShellRoot.KeyboardAccelerators.Add(back);
         ShellRoot.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
+        InitializeKeyboard();
     }
 
     private void UpdatePaneStatus() =>
@@ -2111,6 +2112,8 @@ public sealed partial class ShellWindow : Window
                     MarkReaderGuide(GuideFileStatus.Ok);
                     ShowReaderSurface(loading: false, view: session.View);
                     ReaderActions.SetSession(session);
+                    // T16.1: TXT gets the reader keys PDF already had.
+                    ReaderActions.KeysEnabled = true;
                     BeginTextSize(guide.Id, textScale);
                     if (!await OpenAtSavedPlaceAsync(
                         guide, session, generation, document.ContentSha256.ToLowerInvariant(),
