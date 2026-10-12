@@ -21,13 +21,28 @@ debug a reader, but it cannot satisfy the signed install, identity, upgrade,
 or package-data gates. Loose-file registration is not a substitute for the
 signed MSIX scenario.
 
-The existing
-[`production-shell-ui` CI job](../../.github/workflows/windows-ci.yml)
-runs the M1 route smoke in an already interactive runner session. It is
-partial T11.1 evidence. New full P1 installed E2E lanes use the scheduled
-task entry point on both the local host and CI so their session and result
-checks match. The task runner and full scenario suite still need
-implementation under T17.2.
+`tools/p1/start_installed_task.ps1` is the scheduled-task entry point for
+installed shell runs, on CI and on the host. It takes the installer's
+parameters, plus `-TimeoutMinutes` (default 45), and runs
+`windows_shell_install.ps1` in an elevated interactive task for the
+logged-in user:
+
+- The parameters cross into the task in `task-input.json`, with the
+  caller's `PATH` and `DOTNET_ROOT`. The file holds paths and switches,
+  never credential values.
+- The installer runs in a child of the task's PowerShell, so everything it
+  prints, including `dotnet build` output, is printed as it runs and kept
+  as `installer.log` in the result folder.
+- The entry point exits with the installer's exit code. Its own codes are
+  98 (the installer threw), 97 (the task ended without a result), 124
+  (timeout) and 2 (refused: no logged-in desktop, or an earlier
+  `DesktopGuides-P1-Installed-*` task still registered).
+- On a timeout it stops the run and lists what may be left, such as the
+  installed package, but removes nothing.
+
+Every `production-shell-ui` shard starts through it. The task runs the
+same PowerShell as the caller: `pwsh` on CI, Windows PowerShell 5.1 on the
+host.
 
 For focused design-language iteration, pass `-DesignOnly` to
 `tools/p1/windows_shell_install.ps1`. It still signs and installs the
@@ -53,8 +68,10 @@ with saved credentials runs. The rule blocks only the test executable, lasts
 at most 10 minutes, and requires the user's explicit authorization each time.
 The elevated controller removes the rule and reports its removal. Without the
 switch, the blocked-network scenario is recorded as not run. On the host, start the
-installer from an interactive task with `-RunLevel Highest` (it trusts its
-temporary certificate in `LocalMachine`), restore
+run over SSH with `powershell -NoProfile -ExecutionPolicy Bypass -File
+tools\p1\start_installed_task.ps1 <installer parameters>`. The task is
+elevated, because the installer trusts its temporary certificate in
+`LocalMachine`. Restore
 `tools/p1/DesktopGuides.ShellSeed` first (the installer builds it with
 `--no-restore`), and build the MSIX on the host from the same staged sources:
 a CI-built package compiled from a CRLF checkout embeds different schema text

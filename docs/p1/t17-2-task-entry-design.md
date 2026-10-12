@@ -1,6 +1,6 @@
 # T17.2 piece E: the scheduled-task entry point design
 
-Status: design approved in brainstorming; spec awaiting review.
+Status: approved; implemented on `feat/p1-t17-2-task-entry`.
 Pieces A (the workflow lane) and B (the evidence checklist) merged in #90
 and #91; see the [T17.2 design](t17-2-release-ci-design.md).
 
@@ -172,6 +172,45 @@ desktop, as `test_windows_shell_task_cleanup.ps1` already relies on.
 The "no logged-in desktop" refusal can't be simulated on a runner that has
 a desktop, so a reviewer checks that branch by reading.
 
+## Rulings
+
+From the [implementation plan](t17-2-task-entry-plan.md), and from the
+first dispatches:
+
+1. **The task runs the caller's PowerShell.** CI runs the installer under
+   `pwsh` today, and the host under `powershell.exe` 5.1. The task action
+   uses the entry point's own executable (`(Get-Process -Id $PID).Path`),
+   so each keeps the shell it is tested with. Running every CI shard under
+   5.1 would change what CI tests.
+2. **The entry point mirrors the installer's parameters explicitly** and
+   forwards only the ones the caller bound, so the installer's own
+   defaults, such as the credential-file paths, still apply. A test
+   compares the two parameter lists, so a new installer switch can't be
+   forgotten here.
+3. **Relative paths are resolved before the hand-over.** The task starts
+   in `tools\p1`, not in the caller's folder, and CI passes
+   `artifacts/production-shell/installed`. The entry point turns
+   `-ResultDirectory`, `-PackagePath`, `-PortableExecutable` and the
+   credential-file paths into absolute paths.
+4. **`-TimeoutMinutes` is a `[double]`**, so the timeout test can use 0.25
+   minutes instead of a full minute.
+5. **On timeout the entry point also ends the inner process tree.** The
+   inner script records its process ID in `task-started.json`. After
+   `Stop-ScheduledTask`, the entry point runs `taskkill /PID <id> /T /F`, so
+   no test-owned `powershell` or `dotnet` child keeps running. The app
+   itself is started through the installer's own launch task, not as a
+   child; it is reported as a leftover, not killed.
+6. **The installer runs in a child PowerShell, not in the inner script's
+   process.** The first dispatch kept only 10 lines in `installer.log`:
+   `Out-Host`, which the installer uses for `dotnet build`, bypasses the
+   output streams that in-process capture reads. A child with redirected
+   output prints `Out-Host` and `Write-Host` to stdout. A transcript would
+   also capture them, but on Windows PowerShell 5.1 it writes a header
+   naming the machine and user into an uploaded file.
+7. **`pwsh` puts its own folder first in `PATH` when it starts**, so under
+   PowerShell 7 the installer's `PATH` is `$PSHOME` followed by the
+   caller's whole `PATH`. The test allows exactly that and nothing else.
+
 ## Delivery and verification
 
 One PR:
@@ -183,3 +222,18 @@ One PR:
 - **Full run:** the PR run passes, with all five shards.
 - **Status pages:** `implementation-plan.md` and `progress.md` record
   piece E; T17.2 stays open until C and D merge.
+
+## T17.2 piece E verification record
+
+- First `workflow` dispatch through the entry point:
+  [38254964955](https://github.com/ilya-slalom/desktop-guides/actions/runs/38254964955)
+  passed. The task ran the installer with SDK 10.0.401 from the CI job and
+  exit code 0, but `installer.log` lacked the `Out-Host` output (ruling 6).
+- After ruling 6:
+  [38256243225](https://github.com/ilya-slalom/desktop-guides/actions/runs/38256243225).
+  The `workflow` shard passed, with the `dotnet build` output in
+  `installer.log`. `core-tests` failed on the `PATH` assertion under
+  PowerShell 7 (ruling 7).
+- PR run: pending.
+- In every run, the `workflow` shard's evidence lists the #93 crash on
+  close after `workflow-read`; the stages still pass.
