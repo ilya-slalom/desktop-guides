@@ -1,6 +1,6 @@
 # T16.1 keyboard shortcuts design
 
-Status: design approved in brainstorming; spec awaiting review.
+Status: in review in PR #88.
 Prerequisites T05.2, T06.1, T08.3, T10.2 and T11.3 are merged. T16.2 depends
 on this task.
 
@@ -179,3 +179,92 @@ anything else.
 - New commands, shortcut rebinding and find-in-guide.
 - The full tab-order, focus-visual and Narrator audit (T16.2).
 - PDF document-text accessibility (T16.3).
+
+## T16.1 verification record
+
+Implemented from [t16-1-keyboard-shortcuts-plan.md](t16-1-keyboard-shortcuts-plan.md)
+on `feat/p1-t16-1-keyboard-shortcuts`, PR #88.
+
+- **Core** (pcsx2-win, .NET SDK 10.0.401): 1165 of 1165 pass, including:
+  - 51 in `KeyboardShortcutsTests` and `ShortcutRoutingTests`;
+  - 11 in `ReaderToolbarTooltipTests`. Removing a key from a tooltip made
+    the matching test fail.
+- **Installed keyboard-only trace** (CI, `dev-fast` dispatches):
+  - `design` run
+    [38207134518](https://github.com/ilya-slalom/desktop-guides/actions/runs/38207134518):
+    - Library search: Ctrl+F, Esc clears, Esc again leaves the box;
+    - wrong context: Ctrl+O on the Library does nothing;
+    - import picker: Ctrl+O opens it, and focus returns to Import guide;
+    - Remove game: Esc cancels, and focus returns to its button;
+    - HTML from the toolbar: Ctrl+Plus and Alt+Left;
+    - Settings: all 13 rows with their automation names.
+  - `txt` run
+    [38206362577](https://github.com/ilya-slalom/desktop-guides/actions/runs/38206362577),
+    on the long guide: Ctrl+Home, Page Down landing on the same row as
+    Next page, Ctrl+End (100% scroll), Ctrl+Plus and Alt+Left.
+  - `pdf` run
+    [38205679965](https://github.com/ilya-slalom/desktop-guides/actions/runs/38205679965):
+    the existing PDF key smoke passes with the shell's new key handling.
+- **Full PR CI:** pending.
+- **Help card icon:** with Colorful icons on, it shows Fluent's
+  `question_circle` in light and dark. Off, it shows the circled question
+  mark `E9CE`. See the screenshots below.
+
+Findings the trace surfaced, all fixed:
+
+1. **Esc in the Library search:** it didn't clear, because the
+   AutoSuggestBox's inner text box marks Esc handled. Esc is now taken in
+   `PreviewKeyDown`, and skipped while the suggestion list is open.
+2. **Keys swallowed by the focused control:** with focus on a reader
+   toolbar button, Alt+Left didn't go back, and with focus in the TXT list,
+   Ctrl+End didn't move. In WinUI the focused control handles a key before
+   accelerators run. The shell root's `PreviewKeyDown` now takes Alt+Left,
+   and the reader keys on the Reader route outside text fields. The
+   accelerators stay as the fallback.
+
+**HTML guides.** The probe (plan Task 3) found that WinUI's WebView2 doesn't
+pass keys to the app's accelerators while the page has focus (run
+[38195881210](https://github.com/ilya-slalom/desktop-guides/actions/runs/38195881210)).
+
+A DevTools-protocol listener in an isolated script world was then built:
+- It installed even with page scripts off. It sent its Ready signal in run
+  [38199274878](https://github.com/ilya-slalom/desktop-guides/actions/runs/38199274878).
+- Keys sent while the page had focus reached it once in four runs.
+- Alt+Left never did. Chromium keeps it for itself.
+
+With the user's agreement, the listener and an Esc-leaves-the-page key were
+reverted. HTML guides get the reader keys from the reader toolbar.
+
+Rulings (details in the plan and the ledger):
+
+1. TXT and HTML reader keys were off; T16.1 turned them on.
+2. Shortcuts follow each format: Ctrl+G is PDF-only, and HTML has only the
+   text-size keys.
+3. The PDF password prompt is inline, not a dialog.
+4. Focus return: Go to page returns focus as T10.2 does. After the Ctrl+O
+   picker, focus returns to Import guide, as the spec says. The plan's
+   "where it was" was reversed.
+5. PDF keys keep their existing `pdf` smoke.
+6. No completion shortcut.
+7. The toolbar tooltips stay in XAML, checked by `ReaderToolbarTooltipTests`.
+8. The trace runs in `design`, and the TXT part in a `keyboard-txt` mode in
+   the `txt` group. The design library's only TXT guide is 7 lines long,
+   and its rows are named by their text.
+9. The Help card's icon joined the T11.5 catalog (`question_circle`,
+   `E9CE`).
+10. Task 4 ran while Task 3's probe was in CI.
+11. Key forwarding from inside HTML pages was reverted, as above.
+12. Alt+Left and the reader keys are taken in the shell root's
+    `PreviewKeyDown`.
+
+**Gaps for T16.2:**
+- Keys while focus is inside an HTML guide page: the reader keys and
+  Alt+Left. Tab and Shift+Tab out of the page are not verified either.
+- The Settings shortcut rows have a wide empty icon column; T16.2's visual
+  audit should decide whether that's acceptable.
+
+Evidence:
+[Settings list](evidence/t16-1-keyboard-shortcuts/settings-shortcuts.png),
+[Help card, colour off](evidence/t16-1-keyboard-shortcuts/settings-help-off.png),
+[Help card, colour on, light](evidence/t16-1-keyboard-shortcuts/settings-help-on-light.png) and
+[dark](evidence/t16-1-keyboard-shortcuts/settings-help-on-dark.png).

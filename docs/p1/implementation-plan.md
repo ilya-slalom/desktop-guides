@@ -3,7 +3,8 @@
 Status: 50 of the 57 tasks are merged, 12 October 2026. M0 to M4 are
 complete; T11.5 (colorful icons), the last M2 task, merged in #85. M5 has
 T20.1, T20.2, T15.4 and T15.1 merged, and M6 is planned. T17.6 (app icon)
-merged in #86.
+merged in #86. T16.1 (keyboard shortcuts) is in review in #88; see the
+[verification record](t16-1-keyboard-shortcuts-design.md#t161-verification-record).
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
 This plan orders all **16 P1 stories and 57 tasks** in the
