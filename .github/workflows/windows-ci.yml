@@ -161,6 +161,12 @@ jobs:
       - name: Check the release CI gate
         shell: pwsh
         run: ./tools/p1/test_release_ci_gate.ps1
+      - name: Check the installed-shell evidence writer
+        shell: pwsh
+        run: ./tools/p1/test_write_shell_evidence.ps1
+      - name: Check the installed-shell run record
+        shell: pwsh
+        run: ./tools/p1/test_windows_shell_run_record.ps1
       - name: Check the upgrade gate preflight
         shell: pwsh
         run: ./tools/p1/test_windows_package_upgrade.ps1
@@ -532,6 +538,20 @@ jobs:
             -Groups @($env:SHELL_GROUPS -split ',') `
             @filter
           exit $LASTEXITCODE
+      - name: Write installed shell evidence
+        if: always()
+        shell: pwsh
+        env:
+          SHARD: ${{ matrix.shard }}
+          # A PR run's GITHUB_SHA is the merge commit; name the PR's head.
+          SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          $installed = 'artifacts/production-shell/installed'
+          $markdown = & ./tools/p1/write_shell_evidence.ps1 `
+            -ReportPath (Join-Path $installed 'signed-install.json') `
+            -FixtureRoot tests/fixtures -OutDirectory $installed `
+            -Commit $env:SOURCE_COMMIT -RunId $env:GITHUB_RUN_ID -Shard $env:SHARD
+          Get-Content -LiteralPath $markdown -Raw | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
       - name: Upload installed shell evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -539,6 +559,7 @@ jobs:
           name: production-shell-ui-${{ matrix.shard }}
           path: |
             artifacts/production-shell/installed/*.json
+            artifacts/production-shell/installed/*.md
             artifacts/production-shell/installed/*.png
             artifacts/production-shell/installed/*.log
           if-no-files-found: warn

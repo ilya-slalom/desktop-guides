@@ -141,6 +141,8 @@ $report = [ordered]@{
     mode = if ($portable) { 'portable' } else { 'signed-msix' }
     scenarioScope = $scenarioScope
     scenarioGroupsRun = [System.Collections.Generic.List[string]]::new()
+    # T17.2: each Run-ShellSmoke call's timing, for the evidence checklist.
+    smokeRuns = [System.Collections.Generic.List[object]]::new()
     success = $false
 }
 $certificate = $null
@@ -148,6 +150,7 @@ $installed = $null
 $expectedExecutablePath = $null
 $imported = $false
 . (Join-Path $PSScriptRoot 'windows_shell_process.ps1')
+. (Join-Path $PSScriptRoot 'windows_shell_run_record.ps1')
 $ownedProcesses = [System.Collections.Generic.Dictionary[int,DesktopGuidesOwnedProcess]]::new()
 $cleanupErrors = [System.Collections.Generic.List[string]]::new()
 $launchTask = "DesktopGuides-P1-ShellLaunch-$runId"
@@ -736,85 +739,87 @@ function Run-ShellSmoke(
     [string] $AppDataRoot = '',
     [string] $AppCacheRoot = '',
     [string] $BackupPath = '') {
-    $resultPath = Join-Path $ResultDirectory "$ResultName.json"
-    Clear-ShellSmokeResult $resultPath
-    $invocationId = [Guid]::NewGuid().ToString('N')
-    $script = Join-Path $PSScriptRoot 'windows_shell_ui_smoke.ps1'
-    $arguments = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass ' +
-        '-File "' + $script + '" -Mode ' + $mode +
-        ' -ResultPath "' + $resultPath + '"' +
-        ' -InvocationId ' + $invocationId +
-        ' -ProcessId ' + $report.launchedProcessId +
-        ' -SessionId ' + $targetSessionId +
-        ' -ExecutablePath "' + $expectedExecutablePath + '"' +
-        ' -ExpectedResumeGuide "' + $expectedResumeGuide + '"' +
-        ' -ExitDelayMilliseconds ' + $ExitDelayMilliseconds +
-        ' -ExpectedScalePercent ' + $ExpectedScalePercent +
-        ' -ExpectedTopLine ' + $ExpectedTopLine
-    if ($ExpectedMaterial) {
-        $arguments += ' -ExpectedMaterial ' + $ExpectedMaterial
+    return Measure-SmokeRun $report.smokeRuns $ResultName $mode {
+        $resultPath = Join-Path $ResultDirectory "$ResultName.json"
+        Clear-ShellSmokeResult $resultPath
+        $invocationId = [Guid]::NewGuid().ToString('N')
+        $script = Join-Path $PSScriptRoot 'windows_shell_ui_smoke.ps1'
+        $arguments = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass ' +
+            '-File "' + $script + '" -Mode ' + $mode +
+            ' -ResultPath "' + $resultPath + '"' +
+            ' -InvocationId ' + $invocationId +
+            ' -ProcessId ' + $report.launchedProcessId +
+            ' -SessionId ' + $targetSessionId +
+            ' -ExecutablePath "' + $expectedExecutablePath + '"' +
+            ' -ExpectedResumeGuide "' + $expectedResumeGuide + '"' +
+            ' -ExitDelayMilliseconds ' + $ExitDelayMilliseconds +
+            ' -ExpectedScalePercent ' + $ExpectedScalePercent +
+            ' -ExpectedTopLine ' + $ExpectedTopLine
+        if ($ExpectedMaterial) {
+            $arguments += ' -ExpectedMaterial ' + $ExpectedMaterial
+        }
+        if ($SwitchToMaterial) {
+            $arguments += ' -SwitchToMaterial ' + $SwitchToMaterial
+        }
+        if ($ExpectedIcons) { $arguments += ' -ExpectedIcons ' + $ExpectedIcons }
+        if ($SwitchIcons) { $arguments += ' -SwitchIcons ' + $SwitchIcons }
+        if ($EmptyLibrary) { $arguments += ' -EmptyLibrary' }
+        if ($ExpectedTheme) {
+            $arguments += ' -ExpectedTheme ' + $ExpectedTheme
+        }
+        if ($ExpectedThemeStatus) {
+            $arguments += ' -ExpectedThemeStatus "' + $ExpectedThemeStatus + '"'
+        }
+        if ($SwitchToTheme) {
+            $arguments += ' -SwitchToTheme ' + $SwitchToTheme
+        }
+        if ($WindowsTheme) {
+            $arguments += ' -WindowsTheme ' + $WindowsTheme
+        }
+        if ($IgdbCredentialFile) {
+            $arguments += ' -IgdbCredentialFile "' + $IgdbCredentialFile + '"'
+        }
+        if ($SteamGridDbCredentialFile) {
+            $arguments += ' -SteamGridDbCredentialFile "' + $SteamGridDbCredentialFile + '"'
+        }
+        if ($ExpectedProviderFailure) {
+            $arguments += ' -ExpectedProviderFailure ' + $ExpectedProviderFailure
+        }
+        if ($ExpectedGuideTitle) {
+            $arguments += ' -ExpectedGuideTitle "' + $ExpectedGuideTitle + '"'
+        }
+        if ($AppDataRoot) {
+            $arguments += ' -AppDataRoot "' + $AppDataRoot + '"'
+        }
+        if ($AppCacheRoot) {
+            $arguments += ' -AppCacheRoot "' + $AppCacheRoot + '"'
+        }
+        if ($BackupPath) { $arguments += ' -BackupPath "' + $BackupPath + '"' }
+        $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
+            -Argument $arguments -WorkingDirectory $PSScriptRoot
+        Register-ScheduledTask -TaskName $smokeTask -Action $action `
+            -Principal $principal -Force | Out-Null
+        Start-ScheduledTask -TaskName $smokeTask
+        $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*' -or $mode -like 'completion-*' -or $mode -like 'export-*' -or $mode -like 'restore-*' -or $mode -eq 'html-position') { 240 }
+            elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*' -or $mode -like 'theme-*' -or $mode -like 'text-size-*') { 120 }
+            else { 60 }
+        $deadline = (Get-Date).AddSeconds($timeoutSeconds)
+        do {
+            Start-Sleep -Milliseconds 500
+        } while (-not (Test-Path $resultPath) -and (Get-Date) -lt $deadline)
+        if (-not (Test-Path $resultPath)) {
+            throw "Installed $mode shell smoke timed out."
+        }
+        if (-not (Wait-ScheduledTaskIdle $smokeTask 10 -RequireRegistered)) {
+            throw "Installed $mode shell smoke task did not finish after writing its result."
+        }
+        $result = Read-ShellSmokeResult $resultPath $invocationId $mode `
+            $report.launchedProcessId $targetSessionId
+        if (-not $result.success) {
+            throw "Installed $mode shell smoke failed: $($result.error)"
+        }
+        return $result
     }
-    if ($SwitchToMaterial) {
-        $arguments += ' -SwitchToMaterial ' + $SwitchToMaterial
-    }
-    if ($ExpectedIcons) { $arguments += ' -ExpectedIcons ' + $ExpectedIcons }
-    if ($SwitchIcons) { $arguments += ' -SwitchIcons ' + $SwitchIcons }
-    if ($EmptyLibrary) { $arguments += ' -EmptyLibrary' }
-    if ($ExpectedTheme) {
-        $arguments += ' -ExpectedTheme ' + $ExpectedTheme
-    }
-    if ($ExpectedThemeStatus) {
-        $arguments += ' -ExpectedThemeStatus "' + $ExpectedThemeStatus + '"'
-    }
-    if ($SwitchToTheme) {
-        $arguments += ' -SwitchToTheme ' + $SwitchToTheme
-    }
-    if ($WindowsTheme) {
-        $arguments += ' -WindowsTheme ' + $WindowsTheme
-    }
-    if ($IgdbCredentialFile) {
-        $arguments += ' -IgdbCredentialFile "' + $IgdbCredentialFile + '"'
-    }
-    if ($SteamGridDbCredentialFile) {
-        $arguments += ' -SteamGridDbCredentialFile "' + $SteamGridDbCredentialFile + '"'
-    }
-    if ($ExpectedProviderFailure) {
-        $arguments += ' -ExpectedProviderFailure ' + $ExpectedProviderFailure
-    }
-    if ($ExpectedGuideTitle) {
-        $arguments += ' -ExpectedGuideTitle "' + $ExpectedGuideTitle + '"'
-    }
-    if ($AppDataRoot) {
-        $arguments += ' -AppDataRoot "' + $AppDataRoot + '"'
-    }
-    if ($AppCacheRoot) {
-        $arguments += ' -AppCacheRoot "' + $AppCacheRoot + '"'
-    }
-    if ($BackupPath) { $arguments += ' -BackupPath "' + $BackupPath + '"' }
-    $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
-        -Argument $arguments -WorkingDirectory $PSScriptRoot
-    Register-ScheduledTask -TaskName $smokeTask -Action $action `
-        -Principal $principal -Force | Out-Null
-    Start-ScheduledTask -TaskName $smokeTask
-    $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*' -or $mode -like 'completion-*' -or $mode -like 'export-*' -or $mode -like 'restore-*' -or $mode -eq 'html-position') { 240 }
-        elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*' -or $mode -like 'theme-*' -or $mode -like 'text-size-*') { 120 }
-        else { 60 }
-    $deadline = (Get-Date).AddSeconds($timeoutSeconds)
-    do {
-        Start-Sleep -Milliseconds 500
-    } while (-not (Test-Path $resultPath) -and (Get-Date) -lt $deadline)
-    if (-not (Test-Path $resultPath)) {
-        throw "Installed $mode shell smoke timed out."
-    }
-    if (-not (Wait-ScheduledTaskIdle $smokeTask 10 -RequireRegistered)) {
-        throw "Installed $mode shell smoke task did not finish after writing its result."
-    }
-    $result = Read-ShellSmokeResult $resultPath $invocationId $mode `
-        $report.launchedProcessId $targetSessionId
-    if (-not $result.success) {
-        throw "Installed $mode shell smoke failed: $($result.error)"
-    }
-    return $result
 }
 
 function Run-DesignLanguageScenarios {
@@ -2591,6 +2596,7 @@ try {
             ForEach-Object { $_.ToString() }
     )
     $report.dotnetSdk = (dotnet --version)
+    $report.webView2Version = Get-WebView2RuntimeVersion
     if ($portable) {
         $report.portableExecutable = $PortableExecutable
         $report.portableExecutableSha256 =
@@ -2931,6 +2937,7 @@ finally {
         $report.success = $false
         $report.processCleanupErrors = @($cleanupErrors)
     }
+    $report.finishedAt = (Get-Date).ToUniversalTime().ToString('o')
     $report | ConvertTo-Json -Depth 8 |
         Set-Content (Join-Path $ResultDirectory $(
             if ($portable) { 'portable-run.json' } else { 'signed-install.json' })) `
