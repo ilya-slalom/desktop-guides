@@ -30,7 +30,7 @@ try {
         ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $fixtures 'p0\manifest.json') -Encoding UTF8
 
     $report = [ordered]@{
-        runId = 'r1'; observedAt = '2026-10-12T00:00:00Z'; osBuild = '10.0.26100.0'
+        runId = 'r1'; observedAt = '2026-10-12T00:00:00.5000000Z'; osBuild = '10.0.26100.0'
         cpuArchitecture = 'AMD64'; mode = 'signed-msix'; scenarioScope = 'design'
         scenarioGroupsRun = @('design'); success = $true; dotnetSdk = '10.0.401'
         windowsAppRuntime = @('Microsoft.WindowsAppRuntime.2 2.5.1.0'); webView2Version = '141.0.1'
@@ -41,9 +41,10 @@ try {
             [ordered]@{ name = 'keyboard'; mode = 'keyboard'; startedAt = '2026-10-12T00:00:20Z'; seconds = 30.0; passed = $false
                 error = "Expected focus. At C:\Users\someone\AppData\Local\Temp\x.ps1 and $($env:LOCALAPPDATA)\Packages\y" })
         packageStillInstalled = $false; certificateStillTrusted = $false
-        processCleanupErrors = @(); finishedAt = '2026-10-12T00:05:00Z'
+        # No processCleanupErrors: the installer sets it only after a cleanup error.
+        finishedAt = '2026-10-12T00:05:00.2500000Z'
         applicationEventCount = 1
-        applicationEvents = @([ordered]@{ observedAt = '2026-10-12T00:04:00Z'; provider = '.NET Runtime'; eventId = 1026
+        applicationEvents = @([ordered]@{ observedAt = '2026-10-12T00:04:00.1000000Z'; provider = '.NET Runtime'; eventId = 1026
             message = "Application: DesktopGuides.Production.exe`nat C:\Users\someone\x" })
     }
     $reportPath = Join-Path $root 'signed-install.json'
@@ -61,6 +62,7 @@ try {
     Assert-True ($text.Contains("- $pass design-system (12.5 s)")) 'The passing scenario line is missing.'
     Assert-True ($text.Contains("- $fail keyboard (30 s)")) 'The failing scenario line is missing.'
     Assert-True ($text.Contains("- $pass Package removed")) 'The cleanup line is missing.'
+    Assert-True ($text.Contains("- $pass No test-owned scheduled task or process left")) 'A report without cleanup errors showed one.'
     Assert-True ($text.Contains('Started 2026-10-12T00:00:00Z, finished 2026-10-12T00:05:00Z')) 'The run times are missing.'
     Assert-True ($text.Contains("- $fail Application event log entries: 1")) 'The event count is missing.'
     Assert-True ($text.Contains('  - 2026-10-12T00:04:00Z .NET Runtime 1026: Application: DesktopGuides.Production.exe')) 'The event was not listed.'
@@ -76,6 +78,7 @@ try {
     Assert-True ($json.Contains('"seconds":  12.5') -or $json.Contains('"seconds": 12.5')) 'A number did not survive anonymisation.'
     Assert-True ($json.Contains('%USERPROFILE%') -and $json.Contains('%LOCALAPPDATA%')) 'Paths were not rewritten.'
     Assert-True (-not $text.Contains('someone')) 'A user name leaked into evidence.md.'
+    Assert-True ($json -match '"observedAt":\s*"2026-10-12T00:00:00\.5') 'evidence.json lost the ISO start time.'
 
     # A named fixture that is missing is a failed line, not skipped.
     $report.fixtures = @('p1/html-long', 'p0/missing.txt')
@@ -88,6 +91,7 @@ try {
     $none = Join-Path $root 'none.json'
     $text = Get-Content -LiteralPath (& $writer -ReportPath $none -FixtureRoot $fixtures -OutDirectory (Join-Path $root 'out2') -Shard 'pdf') -Raw -Encoding UTF8
     Assert-True ($text.Contains("- $fail No installer report (none.json)")) 'A missing report was not reported.'
+    Assert-True ($text.Contains("- $fail No scenario timings recorded")) 'A missing report printed a blank scenario.'
 }
 finally {
     Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue

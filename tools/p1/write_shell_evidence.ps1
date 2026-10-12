@@ -30,6 +30,8 @@ function Hide-Paths([string] $text) {
 # Every string inside a parsed JSON value, rewritten.
 function Hide-Value($value) {
     if ($value -is [string]) { return Hide-Paths $value }
+    # PowerShell 7's ConvertFrom-Json turns ISO times into DateTime values.
+    if ($value -is [datetime]) { return $value.ToUniversalTime().ToString('o') }
     if ($value -is [System.Management.Automation.PSCustomObject]) {
         $copy = [ordered]@{}
         foreach ($property in $value.PSObject.Properties) { $copy[$property.Name] = Hide-Value $property.Value }
@@ -86,6 +88,21 @@ function Field($report, [string] $name) {
     if ($report -and $report.PSObject.Properties[$name]) { return $report.$name } else { return $null }
 }
 
+# A list field the report may leave out; missing reads as empty, not one null.
+function Items($report, [string] $name) {
+    return @(Field $report $name | Where-Object { $null -ne $_ })
+}
+
+# One form for times on both shells, to the second.
+function Format-Time($value) {
+    if ($null -eq $value -or '' -eq "$value") { return '' }
+    $time = if ($value -is [datetime]) { $value } else {
+        [DateTime]::Parse("$value", [Globalization.CultureInfo]::InvariantCulture,
+            [Globalization.DateTimeStyles]::RoundtripKind)
+    }
+    return $time.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+}
+
 New-Item -ItemType Directory -Force $OutDirectory | Out-Null
 $reportName = Split-Path -Leaf $ReportPath
 $report = $null
@@ -104,7 +121,7 @@ if (-not $report) {
 }
 else {
     $lines.Add((Line $true "Groups ``$((@(Field $report 'scenarioGroupsRun')) -join ', ')`` (scope ``$(Field $report 'scenarioScope')``)"))
-    $lines.Add((Line ([bool] (Field $report 'finishedAt')) "Started $(Field $report 'observedAt'), finished $(Field $report 'finishedAt')"))
+    $lines.Add((Line ([bool] (Field $report 'finishedAt')) "Started $(Format-Time (Field $report 'observedAt')), finished $(Format-Time (Field $report 'finishedAt'))"))
     $lines.Add((Line ([bool] (Field $report 'success')) "Run result: $(if (Field $report 'success') { 'passed' } else { 'failed' })"))
     if (Field $report 'error') { $lines.Add((Line $false ("Error: " + (Hide-Paths ("$(Field $report 'error')" -split "`n")[0])))) }
 
@@ -134,7 +151,7 @@ foreach ($fixture in $fixtures) {
     else { $lines.Add((Line $false "``$($fixture.path)`` not found")) }
 }
 
-$runs = @(Field $report 'smokeRuns')
+$runs = Items $report 'smokeRuns'
 $lines.Add(''); $lines.Add('### Scenarios')
 if ($runs.Count -eq 0) { $lines.Add((Line $false 'No scenario timings recorded')) }
 foreach ($run in $runs) {
@@ -152,18 +169,18 @@ if ($report) {
         $lines.Add((Line (-not (Field $report 'packageStillInstalled')) 'Package removed'))
         $lines.Add((Line (-not (Field $report 'certificateStillTrusted')) 'Test certificate no longer trusted'))
     }
-    $processErrors = @(Field $report 'processCleanupErrors')
+    $processErrors = Items $report 'processCleanupErrors'
     $lines.Add((Line ($processErrors.Count -eq 0) "No test-owned scheduled task or process left$(if ($processErrors.Count) { ': ' + (Hide-Paths ($processErrors -join '; ')) })"))
     if ($report.PSObject.Properties['scratchFoldersRemaining']) {
-        $left = @(Field $report 'scratchFoldersRemaining')
+        $left = Items $report 'scratchFoldersRemaining'
         $lines.Add((Line ($left.Count -eq 0) "Scratch folders removed$(if ($left.Count) { ': ' + (Hide-Paths ($left -join '; ')) })"))
     }
     $events = [int] (Field $report 'applicationEventCount')
     $lines.Add((Line ($events -eq 0) "Application event log entries: $events"))
     # The installer keeps the first eight; each is listed by its first line.
-    foreach ($entry in @(Field $report 'applicationEvents')) {
+    foreach ($entry in Items $report 'applicationEvents') {
         $first = Hide-Paths ("$($entry.message)" -split "`r?`n")[0]
-        $lines.Add("  - $($entry.observedAt) $($entry.provider) $($entry.eventId): $first")
+        $lines.Add("  - $(Format-Time $entry.observedAt) $($entry.provider) $($entry.eventId): $first")
     }
 }
 
