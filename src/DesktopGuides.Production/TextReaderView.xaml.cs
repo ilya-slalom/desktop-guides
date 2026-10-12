@@ -5,7 +5,6 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
 
@@ -93,26 +92,11 @@ public sealed partial class TextReaderView : UserControl
             : Math.Max(1, (int)Math.Floor(viewer.ViewportHeight / rowHeight));
         // Pages from the real top, not the anchor, which can sit below it after Go to end.
         long target = (long)FirstVisibleIndex + (long)delta * rows;
-        MoveTo((int)Math.Clamp(target, 0, Math.Max(lines.Count - 1, 0)));
+        ScrollToLine((int)Math.Clamp(target, 0, Math.Max(lines.Count - 1, 0)));
     }
 
     public void ScrollToEdge(ReaderEdge edge) =>
-        MoveTo(edge == ReaderEdge.Start ? 0 : lines.Count - 1);
-
-    // T16.1: a page key with focus on a row moves that focus too, so the next
-    // arrow key or Tab doesn't jump back to the old place.
-    private void MoveTo(int line)
-    {
-        bool focusInList = XamlRoot is XamlRoot root &&
-            FocusManager.GetFocusedElement(root) is ListViewItem item &&
-            ItemsControl.ItemsControlFromItemContainer(item) == Lines;
-        ScrollToLine(line);
-        if (!focusInList) return;
-        // The target line, not FirstVisibleIndex: the panel reports the new
-        // top only after layout, so reading it here would focus the old top.
-        dispatcher?.TryEnqueue(DispatcherQueuePriority.Low, () =>
-            (Lines.ContainerFromIndex(anchorLine) as Control)?.Focus(FocusState.Keyboard));
-    }
+        ScrollToLine(edge == ReaderEdge.Start ? 0 : lines.Count - 1);
 
     public int FirstVisibleIndex =>
         Lines.ItemsPanelRoot is ItemsStackPanel panel ? Math.Max(panel.FirstVisibleIndex, 0) : 0;
