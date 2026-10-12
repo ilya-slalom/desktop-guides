@@ -267,7 +267,15 @@ From the [implementation plan](t17-2-release-ci-plan.md):
   14.1, 4.5 and 18.3 s), the four fixtures, and "Scratch folders
   removed". The recorded places were TXT line 76, PDF page 3 and
   `MARK-0420`; the resume and restore stages both found them.
-- PR b run: pending.
+- PR b run: [38243680186](https://github.com/ilya-slalom/desktop-guides/actions/runs/38243680186)
+  passed, with all five shards and the `workflow` stages in order. The
+  `design` shard passed on a rerun of its failed job. On the first attempt
+  the app crashed while closing after `completion-last-page` and didn't
+  exit within 20 s: an unhandled `0xc000000d` in `ntdll.dll` at offset
+  `0x6f82f`. The `workflow` shard's evidence shows the same crash during
+  the close after `workflow-read`, though every stage passed: Back had
+  already saved the places. That close-time crash is an app defect outside
+  T17.2.
 
 ## Out of scope
 
