@@ -4,6 +4,7 @@ using DesktopGuides.Core.Navigation;
 using DesktopGuides.Core.Reading;
 using DesktopGuides.Infrastructure.Reading;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Windows.System;
 
@@ -236,6 +237,7 @@ public sealed partial class ShellWindow
     private void RunForwardedKey(HtmlReaderSession source, ShortcutCommand command)
     {
         if (!ReferenceEquals(readerSession, source)) return;
+        AutomationProperties.SetItemStatus(ReaderHeading, $"Page keys {source.ForwardedKeysReceived}");
         if (command == ShortcutCommand.LeaveGuidePage)
         {
             // Alt+Left and the reader keys work from the toolbar.

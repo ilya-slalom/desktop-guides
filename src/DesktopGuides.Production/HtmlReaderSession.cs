@@ -458,6 +458,9 @@ internal sealed class HtmlReaderSession : IReaderSession
 
     public event Action<ShortcutCommand>? ForwardedCommand;
 
+    // Keys the page's listener reported, for the shell's automation status.
+    public int ForwardedKeysReceived { get; private set; }
+
     // Forwarding is a convenience: if the protocol refuses it, the guide still opens.
     private async Task StartKeyForwardingAsync(CoreWebView2 core)
     {
@@ -486,6 +489,7 @@ internal sealed class HtmlReaderSession : IReaderSession
     {
         using JsonDocument json = JsonDocument.Parse(args.ParameterObjectAsJson);
         if (json.RootElement.GetProperty("name").GetString() != KeyBinding) return;
+        ForwardedKeysReceived++;
         // The C# side checks the payload again; the page can't widen the set.
         if (json.RootElement.GetProperty("payload").GetString() is string payload &&
             HtmlKeyForwarding.TryParse(payload, out ShortcutCommand command))

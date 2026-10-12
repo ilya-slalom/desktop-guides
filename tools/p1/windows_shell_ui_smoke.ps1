@@ -4863,43 +4863,59 @@ try {
     }
     elseif ($Mode -eq 'keyboard-html-probe') {
         # T16.1 Task 3: do the app's keys reach it from inside an HTML page?
+        # Each key is tried three times, so one run shows how often it lands.
         Select-Element 'Text Size Game'
         [void](Wait-Status 'Game ready.')
         Open-GuideFromGame 'Static Web Guide'
         [void](Wait-Status 'Guide ready.')
-        $before = (Wait-VisibleById 'TextSizeValue').Current.Name
-        # Focus the page itself: a click 150 px below the reader toolbar,
-        # which is always inside the guide page.
         $rect = (Wait-VisibleById 'ReaderCommands').Current.BoundingRectangle
         $pageX = [int]($rect.Left + $rect.Width / 2)
         $pageY = [int]($rect.Bottom + 150)
-        [DesktopGuidesForegroundProbe]::Click($pageX, $pageY)
-        Start-Sleep -Milliseconds 500
-        [System.Windows.Forms.SendKeys]::SendWait('^{ADD}')
-        Start-Sleep -Milliseconds 800
-        $after = (Find-ById 'TextSizeValue').Current.Name
-        $report.nativeTextSize = ($after -ne $before)
-        [System.Windows.Forms.SendKeys]::SendWait('^0')
-        Start-Sleep -Milliseconds 500
-        # Chromium keeps Alt+Left inside a page, so Esc moves focus to the toolbar first.
-        [DesktopGuidesForegroundProbe]::Click($pageX, $pageY)
-        Start-Sleep -Milliseconds 500
-        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
-        Start-Sleep -Milliseconds 800
-        $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
-        $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
-        $inToolbar = $false
-        $node = $focused
-        while ($node) {
-            if ($node.Current.AutomationId -eq 'ReaderCommands') { $inToolbar = $true; break }
-            $node = $walker.GetParent($node)
+        function Get-PageKeys { (Find-ById 'ReaderHeading').Current.ItemStatus }
+        $report.textSizeTries = @()
+        foreach ($try in 1..3) {
+            $before = (Wait-VisibleById 'TextSizeValue').Current.Name
+            [DesktopGuidesForegroundProbe]::Click($pageX, $pageY)
+            Start-Sleep -Milliseconds 700
+            $focus = [System.Windows.Automation.AutomationElement]::FocusedElement
+            [System.Windows.Forms.SendKeys]::SendWait('^{ADD}')
+            Start-Sleep -Milliseconds 1200
+            $after = (Find-ById 'TextSizeValue').Current.Name
+            $report.textSizeTries += [ordered]@{
+                changed = ($after -ne $before); before = $before; after = $after
+                focusClass = $focus.Current.ClassName; focusType = $focus.Current.ControlType.ProgrammaticName
+                pageKeys = Get-PageKeys
+            }
+            [DesktopGuidesForegroundProbe]::Click($pageX, $pageY)
+            Start-Sleep -Milliseconds 500
+            [System.Windows.Forms.SendKeys]::SendWait('^0')
+            Start-Sleep -Milliseconds 800
         }
-        $report.escToToolbar = $inToolbar
-        [System.Windows.Forms.SendKeys]::SendWait('%{LEFT}')
-        Start-Sleep -Milliseconds 1500
+        $report.escTries = @()
+        foreach ($try in 1..3) {
+            [DesktopGuidesForegroundProbe]::Click($pageX, $pageY)
+            Start-Sleep -Milliseconds 700
+            [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+            Start-Sleep -Milliseconds 1000
+            $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+            $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
+            $inToolbar = $false
+            $node = $focused
+            while ($node) {
+                if ($node.Current.AutomationId -eq 'ReaderCommands') { $inToolbar = $true; break }
+                $node = $walker.GetParent($node)
+            }
+            $report.escTries += [ordered]@{ toolbar = $inToolbar; focusName = $focused.Current.Name; pageKeys = Get-PageKeys }
+        }
+        $report.nativeTextSize = @($report.textSizeTries | Where-Object { $_.changed }).Count -eq 3
+        $report.escToToolbar = @($report.escTries | Where-Object { $_.toolbar }).Count -eq 3
+        if ($report.escTries[-1].toolbar) {
+            [System.Windows.Forms.SendKeys]::SendWait('%{LEFT}')
+            Start-Sleep -Milliseconds 1500
+        }
         $heading = Find-ById 'GameHeading'
         $report.nativeBack = [bool]($heading -and -not $heading.Current.IsOffscreen)
-        $report.phases += "probe-textsize-$($report.nativeTextSize)-esc-$inToolbar-back-$($report.nativeBack)"
+        $report.phases += "probe-textsize-$($report.nativeTextSize)-esc-$($report.escToToolbar)-back-$($report.nativeBack)"
     }
     elseif ($Mode -eq 'prepare-game-editor-close') {
         Select-Element 'Route Test Game'
