@@ -4881,13 +4881,25 @@ try {
         $report.nativeTextSize = ($after -ne $before)
         [System.Windows.Forms.SendKeys]::SendWait('^0')
         Start-Sleep -Milliseconds 500
+        # Chromium keeps Alt+Left inside a page, so Esc moves focus to the toolbar first.
         [DesktopGuidesForegroundProbe]::Click($pageX, $pageY)
         Start-Sleep -Milliseconds 500
+        [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+        Start-Sleep -Milliseconds 800
+        $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+        $walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
+        $inToolbar = $false
+        $node = $focused
+        while ($node) {
+            if ($node.Current.AutomationId -eq 'ReaderCommands') { $inToolbar = $true; break }
+            $node = $walker.GetParent($node)
+        }
+        $report.escToToolbar = $inToolbar
         [System.Windows.Forms.SendKeys]::SendWait('%{LEFT}')
         Start-Sleep -Milliseconds 1500
         $heading = Find-ById 'GameHeading'
         $report.nativeBack = [bool]($heading -and -not $heading.Current.IsOffscreen)
-        $report.phases += "probe-textsize-$($report.nativeTextSize)-back-$($report.nativeBack)"
+        $report.phases += "probe-textsize-$($report.nativeTextSize)-esc-$inToolbar-back-$($report.nativeBack)"
     }
     elseif ($Mode -eq 'prepare-game-editor-close') {
         Select-Element 'Route Test Game'

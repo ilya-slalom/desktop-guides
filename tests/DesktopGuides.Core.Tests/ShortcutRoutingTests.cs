@@ -20,6 +20,7 @@ public sealed class ShortcutRoutingTests
         { ShortcutCommand.NextPage, Reader },
         { ShortcutCommand.GoToPage, Reader },
         { ShortcutCommand.ZoomIn, Reader },
+        { ShortcutCommand.LeaveGuidePage, Reader },
     };
 
     public static TheoryData<ShortcutCommand, ShellRoute> WrongPlace() => new()
@@ -34,6 +35,7 @@ public sealed class ShortcutRoutingTests
         { ShortcutCommand.GoToPage, Game },
         { ShortcutCommand.ZoomIn, Settings },
         { ShortcutCommand.ClearLibrarySearch, Game },
+        { ShortcutCommand.LeaveGuidePage, Game },
     };
 
     [Theory]

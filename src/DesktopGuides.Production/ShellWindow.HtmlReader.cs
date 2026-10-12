@@ -236,6 +236,12 @@ public sealed partial class ShellWindow
     private void RunForwardedKey(HtmlReaderSession source, ShortcutCommand command)
     {
         if (!ReferenceEquals(readerSession, source)) return;
+        if (command == ShortcutCommand.LeaveGuidePage)
+        {
+            // Alt+Left and the reader keys work from the toolbar.
+            ReaderActions.FocusCommands();
+            return;
+        }
         if (command == ShortcutCommand.Back)
         {
             if (!AppTitleBar.IsBackButtonEnabled || DialogOpen()) return;

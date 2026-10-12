@@ -20,6 +20,7 @@ public static class HtmlKeyForwarding
             ["Control+NumpadSubtract"] = ShortcutCommand.ZoomOut,
             ["Control+Digit0"] = ShortcutCommand.ZoomReset,
             ["Control+Numpad0"] = ShortcutCommand.ZoomReset,
+            ["Escape"] = ShortcutCommand.LeaveGuidePage,
         };
 
     public static IReadOnlyCollection<string> Payloads => (IReadOnlyCollection<string>)Keys.Keys;

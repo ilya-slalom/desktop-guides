@@ -15,6 +15,7 @@ public sealed class HtmlKeyForwardingTests
     [InlineData("Control+NumpadSubtract", ShortcutCommand.ZoomOut)]
     [InlineData("Control+Digit0", ShortcutCommand.ZoomReset)]
     [InlineData("Control+Numpad0", ShortcutCommand.ZoomReset)]
+    [InlineData("Escape", ShortcutCommand.LeaveGuidePage)]
     public void TheForwardedKeysMapToTheirCommands(string payload, ShortcutCommand expected)
     {
         Assert.True(HtmlKeyForwarding.TryParse(payload, out ShortcutCommand command));
