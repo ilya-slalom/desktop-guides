@@ -4474,6 +4474,67 @@ try {
                 $report.workflowCompletedScreenshot = Save-WindowScreenshot 'workflow-completed'
                 $report.phases += 'workflow-pdf-completed'
             }
+            elseif ($Mode -eq 'workflow-export') {
+                if (-not $BackupPath) { throw 'workflow-export needs -BackupPath.' }
+                [void](Wait-Name 'LibraryHeading' 'Library')
+                Select-Element 'Settings'
+                [void](Wait-Status 'Settings ready.')
+                [void](Show-SettingsCard 'ExportSettingsCard')
+                Invoke-Element (Wait-EnabledById 'ExportBackupButton')
+                Choose-SavePath $BackupPath
+                [void](Wait-Status ('Backup saved: ' + (Split-Path -Leaf $BackupPath) + ' (') -Prefix -Seconds 120)
+                $report.phases += 'workflow-exported'
+            }
+            elseif ($Mode -eq 'workflow-restore') {
+                if (-not $BackupPath) { throw 'workflow-restore needs -BackupPath.' }
+                $state = Read-WorkflowState
+                Enter-WorkflowGame
+                [void](Wait-GuideRowCount 3)
+                Invoke-Element (Wait-EnabledById 'RemoveGameButton')
+                [void](Wait-VisibleById 'RemoveGameDialog')
+                Invoke-Element (Wait-EnabledById 'PrimaryButton')
+                [void](Wait-HiddenById 'RemoveGameDialog')
+                [void](Wait-Name 'LibraryHeading' 'Library')
+                [void](Wait-Status "Removed $textGame.")
+                [void](Wait-Name 'LibraryEmpty' 'No games in your library.')
+                $report.phases += 'workflow-game-removed'
+
+                Select-Element 'Settings'
+                [void](Wait-Status 'Settings ready.')
+                [void](Show-SettingsCard 'RestoreSettingsExpander')
+                Invoke-Element (Wait-EnabledById 'ChooseBackupButton')
+                Choose-OpenPath $BackupPath
+                Wait-FocusedId 'ReplaceLibraryButton'
+                $holds = (Wait-VisibleById 'RestoreHoldsCard').Current.Name
+                if ($holds -notlike 'Backup holds: 1 game, 3 guides*') {
+                    throw "The backup summary was '$holds'; expected 1 game and 3 guides."
+                }
+                Invoke-Element (Wait-EnabledById 'ReplaceLibraryButton')
+                # Plan ruling 7: an empty library may not ask; confirm only if
+                # it does. A finished restore also ends the wait.
+                $asked = $false
+                $deadline = (Get-Date).AddSeconds(5)
+                do {
+                    $dialog = Find-ById 'ReplaceLibraryDialog'
+                    if ($dialog -and -not $dialog.Current.IsOffscreen) { $asked = $true; break }
+                    $probe = Find-RawById 'ShellContent'
+                    if ($probe -and $probe.Current.ItemStatus -like '*|Library restored: *') { break }
+                    Start-Sleep -Milliseconds 200
+                } while ((Get-Date) -lt $deadline)
+                $report.workflowRestoreAsked = $asked
+                if ($asked) { Invoke-Element (Wait-EnabledById 'PrimaryButton') }
+                [void](Wait-Status 'Library restored: ' -Prefix -Seconds 60)
+                [void](Wait-Name 'LibraryHeading' 'Library')
+                [void](Wait-GameRow $textGame)
+                $report.phases += 'workflow-restored'
+
+                Enter-WorkflowGame
+                [void](Wait-GuideRowCount 3)
+                Assert-WorkflowPlaces $state 'Reopening after the restore'
+                [void](Assert-RowHelp 'GuideList' $workflowGuides.pdf.title '*Completed*')
+                $report.workflowRestoredScreenshot = Save-WindowScreenshot 'workflow-restored'
+                $report.phases += 'workflow-restored-places'
+            }
         }
     }
     elseif ($Mode -in @('library-damaged', 'library-missing')) {
