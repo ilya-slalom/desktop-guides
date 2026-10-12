@@ -964,6 +964,10 @@ function Run-TxtReaderScenarios {
         Start-InstalledShell
         $report.txtReaderLight = Run-ShellSmoke 'txt-reader' -ResultName 'txt-reader-light'
         Close-InstalledShell
+        # T16.1: the TXT reader keys, on the long guide.
+        Start-InstalledShell
+        $report.keyboardTxt = Run-ShellSmoke 'keyboard-txt'
+        Close-InstalledShell
     }
     finally {
         Restore-AppThemePreference $originalTheme

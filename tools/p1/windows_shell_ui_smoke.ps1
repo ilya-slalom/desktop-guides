@@ -7,7 +7,7 @@ param(
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
         'reader-render-error-observed', 'reader-render-error-result',
-        'late-guide-after-close', 'waiting-handoff', 'material', 'icons', 'keyboard', 'catalog', 'catalog-facts', 'library-search', 'stable-navigation',
+        'late-guide-after-close', 'waiting-handoff', 'material', 'icons', 'keyboard', 'keyboard-txt', 'catalog', 'catalog-facts', 'library-search', 'stable-navigation',
         'provider-none', 'provider-offline', 'provider-settings',
         'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
@@ -1486,7 +1486,7 @@ try {
         'switch-game-loading', 'switch-game', 'theme-error', 'theme-error-retry')) {
         # These modes continue a shell left on Reader, Game, Library, or Settings.
     }
-    elseif ($Mode -in @('txt-reader', 'txt-load-paused', 'txt-back-during-load',
+    elseif ($Mode -in @('txt-reader', 'keyboard-txt', 'txt-load-paused', 'txt-back-during-load',
         'txt-load-released', 'html-reader', 'html-runtime-missing', 'pdf-reader', 'pdf-jump', 'pdf-zoom', 'pdf-keys', 'pdf-locked', 'pdf-offline',
         'html-position',
         'html-theme-open', 'html-theme-light', 'html-theme-switch',
@@ -3192,6 +3192,45 @@ try {
                 Back-ToTextGame
             }
         }
+        elseif ($Mode -eq 'keyboard-txt') {
+            # T16.1: the TXT reader keys, on the long guide whose rows name their lines.
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            Select-Element $textGame
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+            Show-TextGuide 'Long Text Guide'
+            Open-GuideFromGame 'Long Text Guide'
+            Wait-FirstTextRow
+            [void](Wait-Status 'Guide ready.')
+            # Page Down must land where Next page does: one page, not two.
+            (Get-TopRow).SetFocus()
+            [System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
+            Wait-TopLine 1 'Ctrl+Home'
+            Invoke-Element (Find-ByName 'Next page')
+            $deadline = (Get-Date).AddSeconds(10)
+            while ((Get-TopLine) -eq 1 -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
+            $afterNext = Get-TopLine
+            if ($afterNext -eq 1) { throw 'Next page did not move the TXT reader.' }
+            (Get-TopRow).SetFocus()
+            [System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
+            Wait-TopLine 1 'Ctrl+Home after Next page'
+            [System.Windows.Forms.SendKeys]::SendWait('{PGDN}')
+            Wait-TopLine $afterNext 'Page Down'
+            [System.Windows.Forms.SendKeys]::SendWait('^{END}')
+            $deadline = (Get-Date).AddSeconds(10)
+            while ((Get-TopLine) -le $afterNext -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
+            if ((Get-TopLine) -le $afterNext) { throw 'Ctrl+End did not move the TXT reader.' }
+            $size = (Wait-VisibleById 'TextSizeValue').Current.Name
+            [System.Windows.Forms.SendKeys]::SendWait('^{ADD}')
+            $deadline = (Get-Date).AddSeconds(5)
+            while ((Find-ById 'TextSizeValue').Current.Name -eq $size -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
+            if ((Find-ById 'TextSizeValue').Current.Name -eq $size) { throw 'Ctrl+Plus did not change the TXT text size.' }
+            [System.Windows.Forms.SendKeys]::SendWait('^0')
+            [System.Windows.Forms.SendKeys]::SendWait('%{LEFT}')
+            [void](Wait-Name 'GameHeading' $textGame)
+            $report.pageStep = $afterNext - 1
+            $report.phases += 'keyboard-txt'
+        }
         elseif ($Mode -like 'progress-*') {
             $saveFailed = "Couldn't save your place in this guide."
 
@@ -4891,41 +4930,6 @@ try {
                 [System.Windows.Automation.ControlType]::ListItem)
             return (Wait-VisibleById $listId).FindFirst($scope, $condition)
         }
-        # As the txt modes' Get-TopRow: the first row whose middle is inside
-        # the list, retried while the rows are still being realized.
-        function Get-TopTextLine {
-            $condition = [System.Windows.Automation.PropertyCondition]::new(
-                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
-                [System.Windows.Automation.ControlType]::ListItem)
-            $deadline = (Get-Date).AddSeconds(10)
-            do {
-                try {
-                    $list = Wait-VisibleById 'ReaderTextLines'
-                    $top = $list.Current.BoundingRectangle.Top
-                    $rows = @($list.FindAll($scope, $condition) | Where-Object { -not $_.Current.IsOffscreen } |
-                        Sort-Object { $_.Current.BoundingRectangle.Top })
-                    foreach ($row in $rows) {
-                        $bounds = $row.Current.BoundingRectangle
-                        if ($bounds.Top + $bounds.Height / 2 -ge $top -and
-                            $row.Current.Name -match '^Line (\d{4}) ') { return [int]$Matches[1] }
-                    }
-                }
-                catch [System.Windows.Automation.ElementNotAvailableException] { }
-                Start-Sleep -Milliseconds 200
-            } while ((Get-Date) -lt $deadline)
-            $seen = @($rows | Select-Object -First 3 | ForEach-Object {
-                "'$($_.Current.Name)' top $($_.Current.BoundingRectangle.Top)" }) -join '; '
-            throw "No visible TXT line: $($rows.Count) rows, list top $top; first: $seen."
-        }
-        function Wait-TopTextLine([int] $expected, [string] $step) {
-            $deadline = (Get-Date).AddSeconds(10)
-            do {
-                $line = Get-TopTextLine
-                if ($line -eq $expected) { return }
-                Start-Sleep -Milliseconds 150
-            } while ((Get-Date) -lt $deadline)
-            throw "${step}: expected top line $expected, found $line."
-        }
         function Click-Page {
             $rect = (Wait-VisibleById 'ReaderCommands').Current.BoundingRectangle
             [DesktopGuidesForegroundProbe]::Click([int]($rect.Left + $rect.Width / 2), [int]($rect.Bottom + 150))
@@ -4993,30 +4997,6 @@ try {
         Wait-FocusedName 'Remove game' 'after Esc cancelled the removal'
         [void](Wait-Name 'GameHeading' $game)
         $report.phases += 'keyboard-confirm-dialog'
-
-        # TXT: Page Down lands where Next page does, Ctrl+Home returns, and
-        # Ctrl+Plus / Ctrl+0 change and reset the text size.
-        Open-GuideFromGame 'ASCII Map Guide'
-        [void](Wait-Status 'Guide ready.')
-        $start = Get-TopTextLine
-        Invoke-Element (Find-ByName 'Next page')
-        Start-Sleep -Milliseconds 500
-        $afterNext = Get-TopTextLine
-        if ($afterNext -eq $start) { throw 'Next page did not move the TXT reader.' }
-        (Get-FirstListItem 'ReaderTextLines').SetFocus()
-        Send-Keys '^{HOME}'
-        Wait-TopTextLine $start 'Ctrl+Home'
-        Send-Keys '{PGDN}'
-        Wait-TopTextLine $afterNext 'Page Down'
-        $size = (Wait-VisibleById 'TextSizeValue').Current.Name
-        Send-Keys '^{ADD}'
-        $deadline = (Get-Date).AddSeconds(5)
-        while ((Find-ById 'TextSizeValue').Current.Name -eq $size -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
-        if ((Find-ById 'TextSizeValue').Current.Name -eq $size) { throw 'Ctrl+Plus did not change the TXT text size.' }
-        Send-Keys '^0'
-        Send-Keys '%{LEFT}'
-        [void](Wait-Name 'GameHeading' $game)
-        $report.phases += 'keyboard-txt'
 
         # HTML: the reader keys work from the reader toolbar. Keys while the
         # page itself has focus are a T16.2 gap (T16.1 Task 3 fallback).
