@@ -894,6 +894,9 @@ project uses a provisional package identity until T17.1 sets the public one.
   to the active reader's supported movement. Other contexts leave a
   shortcut unavailable without hijacking typed text. Document shortcuts
   in Settings/menus and test each with visible command parity.
+T16.2 and T16.3 moved to the final milestone after P3 (12 October 2026); see
+the [work breakdown](work-breakdown.md#final-milestone--accessibility-audit-and-store-submission).
+
 - **T16.2** Audit keyboard tab order, visible focus, return focus after
   dialogs/overlays, AutomationProperties names/states, touch hit targets,
   Windows display scaling, high contrast, and Narrator on the real WinUI

@@ -3,14 +3,17 @@
 Status: P0 merged in [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1)
 on 25 September 2026. The clean-VM prerequisite gate and Windows 10 check
 remain deferred. P1 is designed in the [technical design](p1-technical-design.md)
-and [implementation plan](p1/implementation-plan.md); on 12 October 2026, 50 of
-its 57 tasks are merged, and the plan records each one. Source:
+and [implementation plan](p1/implementation-plan.md); on 12 October 2026, 51 of
+its 54 tasks are merged, and the plan records each one. The accessibility
+audit (T16.2, T16.3) and the Microsoft Store submission (T17.5) moved to the
+[final milestone](#final-milestone--accessibility-audit-and-store-submission)
+after P3. Source:
 [initial requirements and high-level design](initial-design.md). The backlog
 defines the acceptance gates; [Windows results](p0/results.md) record
 which checks have been performed. Windows 10 is deferred; native ARM64 CI
 passed the installed reader fixtures. [P1 T10.0](p1/pdf-decision.md) selected
-a text-capable PDF prototype, now the production adapter (T10.1–T10.3); S10
-remains open until T16.3 records its accessibility check.
+a text-capable PDF prototype, now the production adapter (T10.1–T10.3); its
+accessibility record (T16.3) is part of the final milestone.
 
 ## How to use this backlog
 
@@ -509,15 +512,10 @@ visible, controls have useful names, TXT/HTML text is readable through a screen
 reader, and the UI remains usable with Windows scaling and high contrast.
 
 - **T16.1** Map and document `Ctrl+O`, library `Ctrl+F`, `Esc`, and page
-  navigation; keep every shortcut action in the visible UI.
-- **T16.2** Audit keyboard order, focus restoration, AutomationProperties,
-  touch target size, DPI scaling, and high contrast, after T11.5. Decide the
-  keys while focus is inside an HTML guide page, a gap T16.1 recorded. Run the
-  high-contrast pass deferred from T11.4: before enabling high contrast, save
-  the active `.theme` path and wallpaper, and restore them exactly afterward,
-  or run in a disposable Windows profile or VM.
-- **T16.3** Record PDF document-text access behavior from the chosen engine
-  and provide an accurate user-facing limitation if needed.
+  navigation; keep every shortcut action in the visible UI. Merged in #88.
+- T16.2 and T16.3 moved to the
+  [final milestone](#final-milestone--accessibility-audit-and-store-submission),
+  so the audit covers every feature once.
 - **TR16.1** No essential flow depends on hover or a keyboard-only gesture.
 - **TR16.2** Reader overlays return focus to the invoking control when closed.
 
@@ -553,11 +551,9 @@ machine. Missing WebView2 Runtime produces an actionable setup message.
   8 October 2026 measured the portable exe at 244 MB, 182 MB without the unused
   components, and 94 MB trimmed (42 MB compressed); see
   [P1 results](p1/results.md#portable-size-spike--8-october-2026).
-- **T17.5** Submit to the Microsoft Store with the reserved identity
-  (`IlyaLissoboi.DesktopGuides`) once feature development is finished: pass
-  Store certification, write the listing, and confirm the Store-signed
-  package upgrades sideloaded installs in place. Decide whether sideloaded
-  releases continue.
+- T17.5 moved to the
+  [final milestone](#final-milestone--accessibility-audit-and-store-submission),
+  as the very last step of currently planned feature development.
 - **T17.6** Give the app its own icon: the MSIX logos (Square44x44 with
   target sizes and unplated forms, Square150x150, Wide310x150, StoreLogo
   and SplashScreen at every scale) in both lanes, and an `.ico` for the
@@ -703,6 +699,33 @@ keyboard-accessible, and can be disabled without affecting the base reader.
   an explicit last-active-window rule.
 - **TR24.2** Annotations never modify imported guide files.
 
+## Final milestone — accessibility audit and Store submission
+
+Decided 12 October 2026: the accessibility audit and the Microsoft Store
+submission run once, after the last currently planned phase (P3), so they
+apply to every feature without repeat passes. An app that is still gaining
+major features is also unlikely to pass Store review. P1 keeps T16.1's
+keyboard work; its release claims R9 only to that extent.
+
+**Depends on:** every feature task in P1, P2 and P3.
+
+- **T16.2** Audit keyboard order, focus restoration, AutomationProperties,
+  touch target size, DPI scaling, and high contrast across every feature.
+  Decide the keys while focus is inside an HTML guide page, a gap T16.1
+  recorded. Run the high-contrast pass deferred from T11.4: before enabling
+  high contrast, save the active `.theme` path and wallpaper, and restore
+  them exactly afterward, or run in a disposable Windows profile or VM.
+- **T16.3** Record PDF document-text access behavior from the chosen engine
+  and provide an accurate user-facing limitation if needed. Closes S10.
+- **T17.5** The very last step: submit to the Microsoft Store with the
+  reserved identity (`IlyaLissoboi.DesktopGuides`) after T16.2 and T16.3.
+  Pass Store certification, write the listing, and confirm the Store-signed
+  package upgrades sideloaded installs in place. Decide whether sideloaded
+  releases continue.
+
+TR16.1, TR16.2 and TR10.3 get their full evidence here; P1 records what
+T16.1 and T10.1–T10.3 verified.
+
 ## Release gates and ordering
 
 1. Finish **S01–S02** and write down TXT, HTML, and PDF engine decisions.
@@ -712,11 +735,15 @@ keyboard-accessible, and can be disabled without affecting the base reader.
    proceed together, with T05.4 consolidating reusable catalog/workflow
    components. Build **S06** after S04, followed by S07–S10 where dependencies
    allow.
-3. Integrate **S12–S16** and **S20**, then run the clean-machine and offline
-   gate in **S17**. Keep P2/P3 outside the first-release completion claim.
+3. Integrate **S12–S15**, T16.1 and **S20**, then run the clean-machine and
+   offline gate in **S17**. Keep P2/P3 outside the first-release completion
+   claim.
 4. S20 moved into P1 because the managed library is the user's only copy
    after an original is removed, and MSIX local app data is removed on
    uninstall. Reassess archive size and restore usability during T20.1.
+5. After P3, run the final milestone: the accessibility audit (T16.2, T16.3),
+   then the Microsoft Store submission (T17.5) last.
 
-The first release is ready only when R1–R9 have passing evidence on a tested
-Windows target and all P0 decisions affecting the MVP are resolved.
+The first release is ready only when R1–R8, and R9 as far as T16.1 covers it,
+have passing evidence on a tested Windows target and all P0 decisions
+affecting the MVP are resolved. The full R9 audit is the final milestone's.

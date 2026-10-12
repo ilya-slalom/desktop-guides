@@ -1,13 +1,15 @@
 # P1 implementation plan and exit gates
 
-Status: 50 of the 57 tasks are merged, 12 October 2026. M0 to M4 are
+Status: 51 of the 54 tasks are merged, 12 October 2026. M0 to M4 are
 complete; T11.5 (colorful icons), the last M2 task, merged in #85. M5 has
-T20.1, T20.2, T15.4 and T15.1 merged, and M6 is planned. T17.6 (app icon)
-merged in #86. T16.1 (keyboard shortcuts) is in review in #88; see the
-[verification record](t16-1-keyboard-shortcuts-design.md#t161-verification-record).
+T20.1, T20.2, T15.4, T15.1 and T16.1 merged, and M6 is planned. T17.6 (app
+icon) merged in #86 and T16.1 (keyboard shortcuts) in #88. The accessibility
+audit (T16.2, T16.3) and the Microsoft Store submission (T17.5) moved out of
+P1 to the [final milestone](../work-breakdown.md#final-milestone--accessibility-audit-and-store-submission)
+after P3, decided 12 October 2026.
 P0 was merged into `main` through
 [PR #1](https://github.com/ilya-slalom/desktop-guides/pull/1).
-This plan orders all **16 P1 stories and 57 tasks** in the
+This plan orders all **16 P1 stories and 54 tasks** in the
 [work breakdown](../work-breakdown.md). The [technical design](../p1-technical-design.md)
 defines the architecture, data contracts, failure protocols, and reader
 behavior. [Implementation results](results.md) and the
@@ -735,7 +737,7 @@ extracted from proven feature content rather than created speculatively.
 | T05.4 catalog/workflow components | T04.4 | Extract only the proven reusable patterns for Library, Game, and import, including `MetadataControl` templates and T06.1 `HeaderedContentControl` groups. Virtualization and offline rendering checks prevent a visual component from adding provider calls or an item-permanent control tree. |
 | T14.4 reader/Settings adoption | T05.4, production readers, T14.2 | Apply the same language to reader commands, Toolkit `SettingsCard`/`SettingsExpander` groups, and the App theme drop-down without crowding guide content. Theme and focus checks cover TXT, HTML, PDF, and Settings. |
 | T11.5 colorful icons | T14.4 | Optional Fluent UI System Icons `*_color` set behind a Settings toggle. Runs before T16.2 so the audit sees the final icons. |
-| T16.2 final audit | Completed production UI, T11.5 | Review the complete Add → Import → Read → Complete → Export flow for hierarchy, copy, keyboard, UIA, touch, overflow/localization, themes, high contrast, DPI, and screenshot consistency. Run the high-contrast pass deferred from T11.4. Before enabling high contrast, save the active `.theme` path and wallpaper, and restore them exactly afterward. Alternatively, run in a disposable Windows profile or VM. |
+| T16.2 final audit | Every feature task | Moved to the final milestone after P3; see the work breakdown. |
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
@@ -1021,6 +1023,12 @@ T17.6 was merged in #86 (merge commit `9ee71e9`). The app's own icon
 replaces the P0 placeholder logos in both MSIX lanes and the portable exe;
 CI run [38153549552](https://github.com/ilya-slalom/desktop-guides/actions/runs/38153549552)
 passed. See the [release procedure](release-packaging.md).
+T16.1 was merged in #88 (merge commit `67bce84`). It adds Ctrl+F and Esc in
+the Library search, Ctrl+O on Game pages, the reader keys for TXT and HTML
+(taken at the shell root before the focused control), and a Settings →
+Help → Keyboard shortcuts list. CI run
+[38215923133](https://github.com/ilya-slalom/desktop-guides/actions/runs/38215923133)
+passed; see the [verification record](t16-1-keyboard-shortcuts-design.md#t161-verification-record).
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
@@ -1029,22 +1037,21 @@ passed. See the [release procedure](release-packaging.md).
 | T20.1 | T03.2, T04.4, T06.3, T15.2 | Versioned ZIP manifest and consistent SQLite/files snapshot under one write gate, including provider snapshots and managed game artwork. Export is canceled cleanly, verified by checksums, and excludes source paths, credentials, remote caches, and transient profiles. | TR20.2 |
 | T20.2 | T14.4, T15.1, T15.4, T20.1 | Toolkit `SettingsCard` Export/Restore rows and `SettingsExpander` advanced restore details, out-of-app-data destination check, first-import export reminder, full staged archive validation of guide and provider-artwork references, native Cancel/Replace confirmation, and rollback marker. Clean and populated restore, missing artwork, corrupt/unsafe ZIP, cancel, and interrupted swap tests pass. | TR20.1, TR20.2 |
 | T16.1 | T05.2, T06.1, T08.3, T10.2, T11.3 | Visible menu/toolbar parity and documented shortcuts. Keyboard trace checks context, text-field handling, dialogs, page movement, and Escape behavior. | TR16.1, TR16.2 |
-| T16.2 | T07.3, T08.3, T09.3, T10.2, T11.5, T13.1, T14.4, T16.1, T20.2 | Real WinUI and design-language audit of hierarchy, copy, tab/focus, touch, overflow/localization, high contrast, DPI, AutomationProperties, and Narrator through Add game → Import → Read → Complete → Export. TXT/HTML document text is read, overlays return focus, and final screenshots are reviewed together. Decide the keys while focus is inside an HTML guide page, which T16.1 left as a gap: WebView2 passes no keys to the app there, and Chromium keeps Alt+Left. Run the high-contrast pass deferred from T11.4. Before enabling high contrast, save the active `.theme` path and wallpaper, and restore them exactly afterward. Alternatively, run in a disposable Windows profile or VM. | TR11.3, TR14.3, TR16.1, TR16.2 |
-| T16.3 | T10.0, T10.2, T10.3 | Tagged/scanned/locked PDF UIA, selection, keyboard, and Narrator record for the selected production engine. Tagged document text passes; scanned image-only limitation is stated accurately. | TR10.3, TR16.1 |
 
 ## M6 — release evidence and tested support matrix
 
-Exit: all P1 TRs pass on a signed installed Windows 11 x64 release candidate
+Exit: all P1 TRs pass on a signed installed Windows 11 x64 release candidate,
+with TR16.1, TR16.2 and TR10.3 covered as far as T16.1 and T10.1–T10.3
+verify them (the full audit is the final milestone's),
 through the [interactive E2E procedure](e2e-testing.md), with prerequisites,
 restart, physical offline reading, upgrade, and restore evidence. Publish
 only targets with complete target-specific results.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
-| T17.2 | T04.3, T06.4, T07.3, T08.3, T09.3, T10.3, T12.3, T13.1, T14.3, T15.4, T16.2, T16.3, T20.2 | Locked Core/Infrastructure and signed installed production UI workflow CI started through an interactive scheduled task, retained P0 regression lane, and reviewable fixture/evidence checklist. Failing storage/security tests stop packaging; failing installed UI blocks release promotion. | TR17.1, TR17.2 |
+| T17.2 | T04.3, T06.4, T07.3, T08.3, T09.3, T10.3, T12.3, T13.1, T14.3, T15.4, T16.1, T20.2 | Locked Core/Infrastructure and signed installed production UI workflow CI started through an interactive scheduled task, retained P0 regression lane, and reviewable fixture/evidence checklist. Failing storage/security tests stop packaging; failing installed UI blocks release promotion. | TR17.1, TR17.2 |
 | T17.4 | T17.1, T17.2 | Distribution size pass on the final feature set. Both builds exclude the unused Windows App SDK AI, ML, Search, Widgets and DWrite components, and the MSIX keeps its `Microsoft.WindowsAppRuntime.2` dependency. The portable build is trim-safe (C#/WinRT `partial` types and generic-interface code, source-generated JSON, an AngleSharp trim review) and published trimmed and compressed; CI fails on a new trim or C#/WinRT warning. Every scenario group passes on both builds, and the release records exe, extraction and MSIX sizes plus cold and warm launch times. Start from the [size spike](results.md#portable-size-spike--8-october-2026). | TR17.3 |
 | T17.3 | T17.1, T17.2, T17.4 | Interactive-task signed install/upgrade, three-format import after original removal, offline relaunch, independent resume, deletion, and backup restore on each promised target. Record OS/CPU/package/prerequisite versions, hashes, and scanned-PDF limit. A runtime-free Windows 11 x64 VM must prove missing-prerequisite failure and offline-installer recovery before a clean-install claim. | TR17.1, TR17.2 |
-| T17.5 | T17.3 and every P1 feature task | Microsoft Store submission with the reserved identity `IlyaLissoboi.DesktopGuides` once feature development is finished: Store certification passes, the listing is written, and the Store-signed package is confirmed to upgrade sideloaded installs in place. Decide whether sideloaded releases continue. | TR17.1, TR17.2 |
 | T17.6 | T17.1 | The app's own icon replaces the P0 placeholder logos: MSIX logos at every scale and target size in both lanes, and a multi-size `.ico` for the portable exe and its window, with a simplified variant at 16 to 32 px. The package stays one `.msix` (`AppxBundle=Never`), and `verify_production_package.py` requires the new logos. Runs before T17.3 so the candidate runs ship the final icon. | TR17.2 |
 
 The existing `production-shell-ui` CI job verifies M1 routes in an already

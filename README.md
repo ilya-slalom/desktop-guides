@@ -24,9 +24,11 @@ Windows package builds. It is an evaluation harness. See the
 P1 is in progress. The production app keeps a library of games, imports TXT,
 static HTML and PDF guides into managed storage, reads those copies in
 format-specific readers, and remembers each guide's place, completion state
-and text size. Backup and restore, the accessibility audit and release
-packaging remain; the [P1 results](docs/p1/results.md) record what has been
-verified on Windows.
+and text size. It backs up and restores the library, ships signed MSIX and
+portable builds, and has keyboard shortcuts. Release CI, the size pass and
+the release-candidate runs remain in P1; the accessibility audit and the
+Microsoft Store submission come after the last planned phase. The
+[P1 results](docs/p1/results.md) record what has been verified on Windows.
 
 ## Keyboard shortcuts
 

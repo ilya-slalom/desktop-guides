@@ -74,7 +74,7 @@ tolerates any Windows rendering: Acrylic fails only if it repeats the Solid
 fill within one level on every channel. Mica gets no launch of its own,
 because with transparency off Windows draws it in the Solid fill color.
 
-High contrast runs only in T16.2. Enabling it makes Windows rewrite the active
+High contrast runs only in T16.2, now in the final milestone after P3. Enabling it makes Windows rewrite the active
 theme to `Custom.theme`, which this harness cannot restore.
 
 ## Portable build
@@ -333,7 +333,7 @@ production app. Add cases as the dependent P1 tasks complete.
 | Import and offline reading | Add a game and import TXT, static HTML with local assets, and PDF through the UI. Remove the originals; while online in a fresh WebView2 profile, verify a reachable HTML canary receives zero guide-originated requests. Then remove all egress, relaunch, and open all three managed copies while recording disconnected state through the final check. | T04–T10, T17.3, TR17.1 |
 | Independent state | Move to different positions in two guides, restart, and verify their locators separately. Change layout/theme, check exact or labeled approximate restore, and toggle completion explicitly; reaching the end must not mark complete. | T12–T14, TR12.1–TR14.2 |
 | Removal and recovery | Cancel and confirm guide/game removal, restart around an interrupted operation, and verify only owned records and files change. Export outside app data and restore into both clean and populated libraries. | T15.2–T15.4, T20.1–T20.2 |
-| Accessibility and PDF limits | Drive import/read/complete/export with keyboard and UIA; record focus, high contrast, DPI, and Narrator checks. Tagged PDF text must be accessible; scanned, locked, and long PDFs get their stated checks and limits. | T10.2–T10.3, T16.1–T16.3 |
+| Accessibility and PDF limits | Drive import/read/complete/export with keyboard and UIA; record focus, high contrast, DPI, and Narrator checks. Tagged PDF text must be accessible; scanned, locked, and long PDFs get their stated checks and limits. | T10.2–T10.3, T16.1; T16.2–T16.3 in the final milestone |
 | Prerequisites and target matrix | On a disposable runtime-free Windows 11 x64 VM, observe missing Windows App Runtime/WebView2 behavior and offline-installer recovery. Repeat the complete installed workflow on each advertised OS/CPU target. | T17.3, TR17.2 |
 
 The runtime-free VM gate is deferred. Windows 10 x64, 200% display scaling,
