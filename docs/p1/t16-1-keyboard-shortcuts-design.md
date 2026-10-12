@@ -209,7 +209,7 @@ on `feat/p1-t16-1-keyboard-shortcuts`, PR #88.
     the existing PDF key smoke passes with the shell's new key handling.
 - **Full PR CI:** run
   [38215923133](https://github.com/ilya-slalom/desktop-guides/actions/runs/38215923133)
-  passed on `65e0e1f`.
+  passed on `42aad86`.
 - **Final review:** a fresh reviewer found 0 Critical, 1 Important and 6
   Minor.
   - **The Important did not reproduce.** It predicted that TXT page keys
