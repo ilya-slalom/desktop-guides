@@ -16,8 +16,8 @@ public sealed partial class ShellWindow
     {
         AddShortcut(VirtualKey.F, ShortcutCommand.FocusLibrarySearch, FocusLibrarySearch);
         AddShortcut(VirtualKey.O, ShortcutCommand.ImportGuide, ImportFromKeyboard);
-        // Not handledEventsToo: the box's own Esc closes its suggestions first.
-        LibrarySearchInput.KeyDown += LibrarySearchKeyDown;
+        // The inner text box marks Esc handled, so this runs on the way down.
+        LibrarySearchInput.PreviewKeyDown += LibrarySearchKeyDown;
         ShowShortcut(ImportGuideButton, "Import guide", ShortcutCommand.ImportGuide);
         ShowShortcut(LibrarySearchInput, "Search", ShortcutCommand.FocusLibrarySearch);
     }
@@ -71,7 +71,8 @@ public sealed partial class ShellWindow
 
     private void LibrarySearchKeyDown(object sender, KeyRoutedEventArgs args)
     {
-        if (args.Key != VirtualKey.Escape ||
+        // An open suggestion list closes first, as the box itself does.
+        if (args.Key != VirtualKey.Escape || LibrarySearchInput.IsSuggestionListOpen ||
             ShortcutRouting.Resolve(ShortcutCommand.ClearLibrarySearch, navigator.Current, true, DialogOpen())
                 != ShortcutDecision.Run)
         {
