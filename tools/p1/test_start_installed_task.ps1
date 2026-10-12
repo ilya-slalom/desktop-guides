@@ -39,6 +39,9 @@ try {
     path = $env:PATH; dotnetRoot = $env:DOTNET_ROOT
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $ResultDirectory 'fake-received.json') -Encoding UTF8
 Write-Output 'fake line one'
+# The installer sends dotnet build to Out-Host, which skips the streams.
+'fake host line' | Out-Host
+Write-Host 'fake write-host line'
 Write-Output 'fake line last'
 exit 3
 '@
@@ -60,6 +63,8 @@ exit 3
     Assert-True ($received.dotnetRoot -eq 'C:\dg-fake-dotnet-root') "DOTNET_ROOT arrived as '$($received.dotnetRoot)'."
     Assert-True ($run.output -contains 'fake line one') 'The first line did not reach the output.'
     Assert-True ($run.output -contains 'fake line last') 'The last line did not reach the output.'
+    Assert-True ($run.output -contains 'fake host line') 'Out-Host output did not reach the output.'
+    Assert-True ($run.output -contains 'fake write-host line') 'Write-Host output did not reach the output.'
     $log = Get-Content -LiteralPath (Join-Path $out 'installer.log') -Raw
     Assert-True ($log.Contains('fake line one') -and $log.Contains('fake line last')) 'installer.log is incomplete.'
     $handOver = Get-Content -LiteralPath (Join-Path $out 'task-input.json') -Raw
