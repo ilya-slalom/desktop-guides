@@ -90,11 +90,13 @@ Remove-Item -LiteralPath $logPath, $exitPath, $startedPath -Force -ErrorAction S
 } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $inputPath -Encoding UTF8
 
 # The task runs this same PowerShell, so CI keeps pwsh and the host 5.1.
+# Its console is hidden: a visible one on the test desktop takes focus from
+# the app under test, which the installer's own tasks avoid the same way.
 $taskName = $taskPrefix + [Guid]::NewGuid().ToString('N')
 $shell = (Get-Process -Id $PID).Path
 $inner = Join-Path $PSScriptRoot 'run_installed_task_inner.ps1'
 $action = New-ScheduledTaskAction -Execute $shell -WorkingDirectory $PSScriptRoot -Argument (
-    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $inner +
+    '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $inner +
     '" -InputPath "' + $inputPath + '"')
 $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `

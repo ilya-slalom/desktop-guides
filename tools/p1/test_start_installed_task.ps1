@@ -33,7 +33,13 @@ $savedRoot = $env:DOTNET_ROOT
 try {
     # 1, 4 and 5: arguments, output, environment and the exit code.
     $record = New-Fake 'fake-record.ps1' @'
+Add-Type -Namespace DgEntryTest -Name Native -MemberDefinition @"
+[System.Runtime.InteropServices.DllImport("kernel32.dll")] public static extern System.IntPtr GetConsoleWindow();
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool IsWindowVisible(System.IntPtr window);
+"@
+$console = [DgEntryTest.Native]::GetConsoleWindow()
 [ordered]@{
+    consoleVisible = ($console -ne [System.IntPtr]::Zero -and [DgEntryTest.Native]::IsWindowVisible($console))
     packagePath = $PackagePath; resultDirectory = $ResultDirectory
     groups = @($Groups); designOnly = [bool] $DesignOnly
     path = $env:PATH; dotnetRoot = $env:DOTNET_ROOT; psHome = $PSHOME
@@ -59,6 +65,9 @@ exit 3
     Assert-True ($received.resultDirectory -eq $out) "The result folder arrived as '$($received.resultDirectory)'."
     Assert-True ((@($received.groups) -join ',') -eq 'core,txt') "Groups arrived as '$(@($received.groups) -join ',')'."
     Assert-True ($received.designOnly) 'The switch did not arrive.'
+    # A visible console in the test user's desktop can take focus from the
+    # app under test, as the installer's own hidden tasks avoid.
+    Assert-True (-not $received.consoleVisible) "The installer's console window was visible on the desktop."
     # pwsh puts its own folder first when it starts; 5.1 doesn't. Nothing
     # else may come before the caller's whole PATH.
     $carried = "$marker;$savedPath"

@@ -210,6 +210,12 @@ first dispatches:
 7. **`pwsh` puts its own folder first in `PATH` when it starts**, so under
    PowerShell 7 the installer's `PATH` is `$PSHOME` followed by the
    caller's whole `PATH`. The test allows exactly that and nothing else.
+8. **The task's console is hidden** (`-WindowStyle Hidden`), as the
+   installer's own launch and smoke tasks are. With a visible console on
+   the test desktop, the `design` shard failed twice in a row on focus:
+   `completion-restart-after` ("Web page guides couldn't start.") and then
+   `keyboard` (`SetFocus` threw). The test now requires the installer's
+   console window to be hidden.
 
 ## Delivery and verification
 
@@ -234,6 +240,10 @@ One PR:
   The `workflow` shard passed, with the `dotnet build` output in
   `installer.log`. `core-tests` failed on the `PATH` assertion under
   PowerShell 7 (ruling 7).
-- PR run: pending.
+- PR run 38258342552: `core-tests` and four shards passed. The `design`
+  shard failed, and failed again on a rerun of the job, each time on a
+  different focus-dependent scenario. Cause: the task's visible console
+  window (ruling 8).
+- PR run after ruling 8: pending.
 - In every run, the `workflow` shard's evidence lists the #93 crash on
   close after `workflow-read`; the stages still pass.
