@@ -7,7 +7,7 @@ param(
         'queue-game-editor', 'queue-later-guide', 'later-guide-result',
         'later-guide-failed-result', 'queue-reader-render-error',
         'reader-render-error-observed', 'reader-render-error-result',
-        'late-guide-after-close', 'waiting-handoff', 'material', 'icons', 'keyboard-html-probe', 'catalog', 'catalog-facts', 'library-search', 'stable-navigation',
+        'late-guide-after-close', 'waiting-handoff', 'material', 'icons', 'keyboard', 'catalog', 'catalog-facts', 'library-search', 'stable-navigation',
         'provider-none', 'provider-offline', 'provider-settings',
         'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
@@ -4861,33 +4861,190 @@ try {
         $report.icons = $state
         $report.phases += "icons-$state-captured"
     }
-    elseif ($Mode -eq 'keyboard-html-probe') {
-        # T16.1 Task 3: do the app's keys reach it from inside an HTML page?
-        Select-Element 'Text Size Game'
+    elseif ($Mode -eq 'keyboard') {
+        # T16.1: a keyboard-only trace. Each check reads app-owned state:
+        # focus, automation ids and names, item status and the status sequence.
+        function Send-Keys([string] $keys) {
+            [System.Windows.Forms.SendKeys]::SendWait($keys)
+            Start-Sleep -Milliseconds 300
+        }
+        function Get-StatusSequence {
+            $status = (Find-RawById 'ShellContent').Current.ItemStatus
+            if ($status -match '^(\d+)\|') { return [long]$Matches[1] }
+            return 0
+        }
+        function Get-FocusedName {
+            $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+            if ($focused) { return $focused.Current.Name } else { return '' }
+        }
+        function Wait-FocusedName([string] $expected, [string] $step) {
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                if ((Get-FocusedName) -eq $expected) { return }
+                Start-Sleep -Milliseconds 150
+            } while ((Get-Date) -lt $deadline)
+            throw "${step}: expected focus on '$expected', found '$(Get-FocusedName)'."
+        }
+        function Get-FirstListItem([string] $listId) {
+            $condition = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::ListItem)
+            return (Wait-VisibleById $listId).FindFirst($scope, $condition)
+        }
+        function Get-TopTextLine {
+            $list = Wait-VisibleById 'ReaderTextLines'
+            $top = $list.Current.BoundingRectangle.Top
+            $condition = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::ListItem)
+            foreach ($row in $list.FindAll($scope, $condition)) {
+                if (-not $row.Current.IsOffscreen -and $row.Current.BoundingRectangle.Top -ge $top -1 -and
+                    $row.Current.Name -match '^Line (\d{4}) ') { return [int]$Matches[1] }
+            }
+            throw 'No visible TXT line.'
+        }
+        function Wait-TopTextLine([int] $expected, [string] $step) {
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                $line = Get-TopTextLine
+                if ($line -eq $expected) { return }
+                Start-Sleep -Milliseconds 150
+            } while ((Get-Date) -lt $deadline)
+            throw "${step}: expected top line $expected, found $line."
+        }
+        function Click-Page {
+            $rect = (Wait-VisibleById 'ReaderCommands').Current.BoundingRectangle
+            [DesktopGuidesForegroundProbe]::Click([int]($rect.Left + $rect.Width / 2), [int]($rect.Bottom + 150))
+            Start-Sleep -Milliseconds 500
+        }
+
+        Resize-ShellWindow 1500 720
+        Select-Element 'Library'
+        [void](Wait-VisibleById 'LibraryHeading')
+
+        # Library: Ctrl+F from a game row, then Esc clears and Esc leaves.
+        $firstGame = Get-FirstListItem 'GameList'
+        $firstGameName = $firstGame.Current.Name
+        $firstGame.SetFocus()
+        Wait-FocusedName $firstGameName 'first game row'
+        Send-Keys '^f'
+        Wait-FocusWithin 'LibrarySearchInput'
+        Send-Keys 'zzqx'
+        [void](Wait-Status 'No games match.' -AllowHidden)
+        Send-Keys '{ESC}'
+        $deadline = (Get-Date).AddSeconds(10)
+        while ((Get-SearchText 'LibrarySearchInput') -ne '' -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
+        if ((Get-SearchText 'LibrarySearchInput') -ne '') { throw 'Esc did not clear the Library search.' }
+        Wait-FocusWithin 'LibrarySearchInput'
+        Send-Keys '{ESC}'
+        Wait-FocusedName $firstGameName 'Esc in an empty search'
+        $report.phases += 'keyboard-library-search'
+
+        # Wrong context: Ctrl+O on the Library does nothing.
+        $sequence = Get-StatusSequence
+        Send-Keys '^o'
+        Start-Sleep -Milliseconds 800
+        Wait-FocusedName $firstGameName 'Ctrl+O on the Library'
+        if ((Get-StatusSequence) -ne $sequence) { throw 'Ctrl+O on the Library changed the status.' }
+        $report.phases += 'keyboard-wrong-context'
+
+        # Game page: Enter opens it; Ctrl+O opens the picker; Esc returns focus.
+        $game = 'Text Size Game'
+        $row = Find-ByName $game
+        $row.SetFocus()
+        Wait-FocusedName $game 'Text Size Game row'
+        Send-Keys '{ENTER}'
+        [void](Wait-Name 'GameHeading' $game)
         [void](Wait-Status 'Game ready.')
+        $firstGuide = Get-FirstListItem 'GuideList'
+        $firstGuideName = $firstGuide.Current.Name
+        $firstGuide.SetFocus()
+        Wait-FocusedName $firstGuideName 'first guide row'
+        Send-Keys '^o'
+        $picker = Wait-FilePicker
+        Send-Keys '{ESC}'
+        Wait-PickerClosed $picker
+        Wait-FocusedName $firstGuideName 'after the import picker closed'
+        $report.phases += 'keyboard-import-picker'
+
+        # A confirmation dialog: Esc cancels it, and focus returns to its button.
+        $remove = Find-ByName 'Remove game'
+        $remove.SetFocus()
+        Wait-FocusedName 'Remove game' 'Remove game button'
+        Send-Keys '{ENTER}'
+        [void](Wait-VisibleById 'PrimaryButton')
+        Send-Keys '{ESC}'
+        [void](Wait-HiddenById 'PrimaryButton')
+        Wait-FocusedName 'Remove game' 'after Esc cancelled the removal'
+        [void](Wait-Name 'GameHeading' $game)
+        $report.phases += 'keyboard-confirm-dialog'
+
+        # TXT: Page Down lands where Next page does, Ctrl+Home returns, and
+        # Ctrl+Plus / Ctrl+0 change and reset the text size.
+        Open-GuideFromGame 'ASCII Map Guide'
+        [void](Wait-Status 'Guide ready.')
+        $start = Get-TopTextLine
+        Invoke-Element (Find-ByName 'Next page')
+        Start-Sleep -Milliseconds 500
+        $afterNext = Get-TopTextLine
+        if ($afterNext -eq $start) { throw 'Next page did not move the TXT reader.' }
+        (Get-FirstListItem 'ReaderTextLines').SetFocus()
+        Send-Keys '^{HOME}'
+        Wait-TopTextLine $start 'Ctrl+Home'
+        Send-Keys '{PGDN}'
+        Wait-TopTextLine $afterNext 'Page Down'
+        $size = (Wait-VisibleById 'TextSizeValue').Current.Name
+        Send-Keys '^{ADD}'
+        $deadline = (Get-Date).AddSeconds(5)
+        while ((Find-ById 'TextSizeValue').Current.Name -eq $size -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
+        if ((Find-ById 'TextSizeValue').Current.Name -eq $size) { throw 'Ctrl+Plus did not change the TXT text size.' }
+        Send-Keys '^0'
+        Send-Keys '%{LEFT}'
+        [void](Wait-Name 'GameHeading' $game)
+        $report.phases += 'keyboard-txt'
+
+        # HTML: the reader keys work from the reader toolbar. Keys while the
+        # page itself has focus are a T16.2 gap (T16.1 Task 3 fallback).
         Open-GuideFromGame 'Static Web Guide'
         [void](Wait-Status 'Guide ready.')
-        $before = (Wait-VisibleById 'TextSizeValue').Current.Name
-        # Focus the page itself: a click 150 px below the reader toolbar,
-        # which is always inside the guide page.
-        $rect = (Wait-VisibleById 'ReaderCommands').Current.BoundingRectangle
-        $pageX = [int]($rect.Left + $rect.Width / 2)
-        $pageY = [int]($rect.Bottom + 150)
-        [DesktopGuidesForegroundProbe]::Click($pageX, $pageY)
-        Start-Sleep -Milliseconds 500
-        [System.Windows.Forms.SendKeys]::SendWait('^{ADD}')
-        Start-Sleep -Milliseconds 800
-        $after = (Find-ById 'TextSizeValue').Current.Name
-        $report.nativeTextSize = ($after -ne $before)
-        [System.Windows.Forms.SendKeys]::SendWait('^0')
-        Start-Sleep -Milliseconds 500
-        [DesktopGuidesForegroundProbe]::Click($pageX, $pageY)
-        Start-Sleep -Milliseconds 500
-        [System.Windows.Forms.SendKeys]::SendWait('%{LEFT}')
-        Start-Sleep -Milliseconds 1500
-        $heading = Find-ById 'GameHeading'
-        $report.nativeBack = [bool]($heading -and -not $heading.Current.IsOffscreen)
-        $report.phases += "probe-textsize-$($report.nativeTextSize)-back-$($report.nativeBack)"
+        $size = (Wait-VisibleById 'TextSizeValue').Current.Name
+        $larger = Find-ByName 'Larger text'
+        $larger.SetFocus()
+        Wait-FocusedName 'Larger text' 'HTML toolbar'
+        Send-Keys '^{ADD}'
+        $deadline = (Get-Date).AddSeconds(5)
+        while ((Find-ById 'TextSizeValue').Current.Name -eq $size -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 150 }
+        if ((Find-ById 'TextSizeValue').Current.Name -eq $size) { throw 'Ctrl+Plus on the HTML toolbar did not change the text size.' }
+        Send-Keys '^0'
+        Send-Keys '%{LEFT}'
+        [void](Wait-Name 'GameHeading' $game)
+        $report.phases += 'keyboard-html'
+
+        # Settings: the list shows every shortcut.
+        Select-Element 'Settings'
+        [void](Wait-Name 'SettingsHeading' 'Settings')
+        $expander = Show-SettingsCard 'KeyboardShortcutsExpander'
+        $pattern = $expander.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern)
+        if ($pattern.Current.ExpandCollapseState -ne 'Expanded') { $pattern.Expand() }
+        $expected = [ordered]@{
+            ShortcutBack = 'Go back, Alt+Left'
+            ShortcutFocusLibrarySearch = 'Search the library, Ctrl+F'
+            ShortcutClearLibrarySearch = 'Clear the search, Esc'
+            ShortcutImportGuide = 'Import a guide, Ctrl+O'
+            ShortcutPreviousPage = 'Previous page (TXT, PDF), Page Up'
+            ShortcutNextPage = 'Next page (TXT, PDF), Page Down'
+            ShortcutPageStart = 'Go to start (TXT, PDF), Ctrl+Home'
+            ShortcutPageEnd = 'Go to end (TXT, PDF), Ctrl+End'
+            ShortcutGoToPage = 'Go to page (PDF), Ctrl+G'
+            ShortcutZoomIn = 'Zoom in (PDF) or larger text, Ctrl+Plus'
+            ShortcutZoomOut = 'Zoom out (PDF) or smaller text, Ctrl+Minus'
+            ShortcutZoomReset = 'Fit to width (PDF) or reset text size, Ctrl+0'
+            ShortcutCloseDialog = 'Close the dialog, Esc'
+        }
+        foreach ($id in $expected.Keys) { [void](Wait-Name $id $expected[$id]) }
+        [void](Show-SettingsCard 'ShortcutImportGuide')
+        $report.settingsScreenshot = Save-WindowScreenshot 'settings-shortcuts'
+        $report.phases += 'keyboard-settings'
     }
     elseif ($Mode -eq 'prepare-game-editor-close') {
         Select-Element 'Route Test Game'

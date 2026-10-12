@@ -27,3 +27,21 @@ format-specific readers, and remembers each guide's place, completion state
 and text size. Backup and restore, the accessibility audit and release
 packaging remain; the [P1 results](docs/p1/results.md) record what has been
 verified on Windows.
+
+## Keyboard shortcuts
+
+| Where | Keys | Does |
+| --- | --- | --- |
+| Everywhere | Alt+Left | Go back |
+| Library | Ctrl+F | Search the library |
+| Library search | Esc | Clear the search |
+| Game page | Ctrl+O | Import a guide |
+| Reader (TXT, PDF) | Page Up / Page Down | Previous / next page |
+| Reader (TXT, PDF) | Ctrl+Home / Ctrl+End | Go to start / end |
+| Reader (PDF) | Ctrl+G | Go to page |
+| Reader | Ctrl+Plus / Ctrl+Minus / Ctrl+0 | Zoom (PDF) or text size (TXT, HTML) |
+| Dialogs | Esc | Close the dialog |
+
+In an HTML guide, the reader keys work while focus is on the reader
+controls rather than inside the page. Settings → Help → Keyboard shortcuts
+lists the same keys.
