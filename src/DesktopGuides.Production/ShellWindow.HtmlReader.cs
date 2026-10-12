@@ -5,6 +5,7 @@ using DesktopGuides.Core.Reading;
 using DesktopGuides.Infrastructure.Reading;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.System;
 
 namespace DesktopGuides.Production;
 
@@ -46,6 +47,8 @@ public sealed partial class ShellWindow
         HtmlReaderSession session = new(loaded, cacheRoot!, HtmlReaderSession.DiagnosticsForTest());
         // The next render disposes it if this one is cancelled.
         readerSession = session;
+        session.ForwardedCommand += command =>
+            DispatcherQueue.TryEnqueue(() => RunForwardedKey(session, command));
         session.ExternalLinkRequested += OnExternalLinkRequested;
         session.UnavailableLinkRequested += OnUnavailableLinkRequested;
         session.Failed += OnReaderSessionFailed;
@@ -228,4 +231,24 @@ public sealed partial class ShellWindow
     // Collapsed once closed, so the Reader's layout returns to normal.
     private void ReaderUnavailableLinkBarClosed(InfoBar sender, InfoBarClosedEventArgs args) =>
         ReaderUnavailableLinkBar.Visibility = Visibility.Collapsed;
+
+    // T16.1: a key from inside the page runs the same command as its accelerator.
+    private void RunForwardedKey(HtmlReaderSession source, ShortcutCommand command)
+    {
+        if (!ReferenceEquals(readerSession, source)) return;
+        if (command == ShortcutCommand.Back)
+        {
+            if (!AppTitleBar.IsBackButtonEnabled || DialogOpen()) return;
+            CancelReaderLoad();
+            _ = RunNavigationAsync(GoBackAsync);
+            return;
+        }
+        VirtualKey key = command switch
+        {
+            ShortcutCommand.ZoomIn => VirtualKey.Add,
+            ShortcutCommand.ZoomOut => VirtualKey.Subtract,
+            _ => VirtualKey.Number0
+        };
+        ReaderActions.TryRunKey(key, VirtualKeyModifiers.Control);
+    }
 }

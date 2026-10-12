@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Navigation;
 using DesktopGuides.Core.Reading;
 using DesktopGuides.Infrastructure.Reading;
 using Microsoft.UI.Dispatching;
@@ -230,6 +231,7 @@ internal sealed class HtmlReaderSession : IReaderSession
             core.DownloadStarting += OnDownloadStarting;
             core.LaunchingExternalUriScheme += OnLaunchingExternalUriScheme;
             core.ProcessFailed += OnProcessFailed;
+            await StartKeyForwardingAsync(core);
             core.NavigationCompleted += Completed;
             pendingNavigation = completion;
             core.Navigate(policy.EntryUri.AbsoluteUri);
@@ -446,6 +448,49 @@ internal sealed class HtmlReaderSession : IReaderSession
         catch (Exception)
         {
             return null;
+        }
+    }
+
+    // T16.1: page keys the app owns. The listener lives in an isolated world;
+    // the guide's own scripts stay off and can't call the binding.
+    private const string KeyBinding = "desktopGuidesKey";
+    private const string KeyWorld = "desktop-guides-keys";
+
+    public event Action<ShortcutCommand>? ForwardedCommand;
+
+    // Forwarding is a convenience: if the protocol refuses it, the guide still opens.
+    private async Task StartKeyForwardingAsync(CoreWebView2 core)
+    {
+        try
+        {
+            core.GetDevToolsProtocolEventReceiver("Runtime.bindingCalled")
+                .DevToolsProtocolEventReceived += OnBindingCalled;
+            await core.CallDevToolsProtocolMethodAsync("Runtime.enable", "{}");
+            await core.CallDevToolsProtocolMethodAsync("Runtime.addBinding",
+                JsonSerializer.Serialize(new { name = KeyBinding, executionContextName = KeyWorld }));
+            await core.CallDevToolsProtocolMethodAsync("Page.addScriptToEvaluateOnNewDocument",
+                JsonSerializer.Serialize(new
+                {
+                    source = HtmlKeyForwarding.Script(KeyBinding),
+                    worldName = KeyWorld,
+                    runImmediately = true
+                }));
+        }
+        catch (Exception)
+        {
+            // The reader's toolbar keys still work once focus leaves the page.
+        }
+    }
+
+    private void OnBindingCalled(CoreWebView2 sender, CoreWebView2DevToolsProtocolEventReceivedEventArgs args)
+    {
+        using JsonDocument json = JsonDocument.Parse(args.ParameterObjectAsJson);
+        if (json.RootElement.GetProperty("name").GetString() != KeyBinding) return;
+        // The C# side checks the payload again; the page can't widen the set.
+        if (json.RootElement.GetProperty("payload").GetString() is string payload &&
+            HtmlKeyForwarding.TryParse(payload, out ShortcutCommand command))
+        {
+            ForwardedCommand?.Invoke(command);
         }
     }
 
