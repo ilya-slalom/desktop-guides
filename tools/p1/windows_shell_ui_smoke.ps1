@@ -4964,7 +4964,8 @@ try {
         $picker = Wait-FilePicker
         Send-Keys '{ESC}'
         Wait-PickerClosed $picker
-        Wait-FocusedName $firstGuideName 'after the import picker closed'
+        # The spec: focus returns to Import guide, which the import flow restores.
+        Wait-FocusedName 'Import guide' 'after the import picker closed'
         $report.phases += 'keyboard-import-picker'
 
         # A confirmation dialog: Esc cancels it, and focus returns to its button.
