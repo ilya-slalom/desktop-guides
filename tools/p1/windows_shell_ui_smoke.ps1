@@ -3240,7 +3240,9 @@ try {
             Start-Sleep -Milliseconds 700
             $scrollAfterDown = (Find-ById 'ReaderTextLines').GetCurrentPattern(
                 [System.Windows.Automation.ScrollPattern]::Pattern).Current.VerticalScrollPercent
-            if ($scrollAfterDown -lt $scrollAfterPage - 0.01) {
+            # One page is a tiny share of this long guide, so the tolerance is
+            # a fraction of a page: a one-line scroll back fails it.
+            if ($scrollAfterDown -lt $scrollAfterPage * 0.995) {
                 throw "Down after Page Down jumped back: $scrollAfterPage% to $scrollAfterDown%."
             }
             $report.downAfterPage = [ordered]@{ page = $scrollAfterPage; down = $scrollAfterDown }
