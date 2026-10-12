@@ -106,8 +106,11 @@ function Format-Time($value) {
 New-Item -ItemType Directory -Force $OutDirectory | Out-Null
 $reportName = Split-Path -Leaf $ReportPath
 $report = $null
+$reportUnreadable = $false
 if (Test-Path -LiteralPath $ReportPath) {
-    $report = Get-Content -LiteralPath $ReportPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    # A job killed mid-write leaves a cut-off file; that is a failed line too.
+    try { $report = Get-Content -LiteralPath $ReportPath -Raw -Encoding UTF8 | ConvertFrom-Json }
+    catch { $reportUnreadable = $true }
 }
 
 $lines = [System.Collections.Generic.List[string]]::new()
@@ -117,7 +120,7 @@ $lines.Add('### Run')
 $lines.Add((Line ([bool] $Commit) "Commit ``$Commit``"))
 $lines.Add((Line ([bool] $RunId) "Run ``$RunId``"))
 if (-not $report) {
-    $lines.Add((Line $false "No installer report ($reportName)"))
+    $lines.Add((Line $false "$(if ($reportUnreadable) { 'Unreadable' } else { 'No' }) installer report ($reportName)"))
 }
 else {
     $lines.Add((Line $true "Groups ``$((@(Field $report 'scenarioGroupsRun')) -join ', ')`` (scope ``$(Field $report 'scenarioScope')``)"))
@@ -128,7 +131,12 @@ else {
     $lines.Add(''); $lines.Add('### Target')
     $lines.Add((Line ([bool] (Field $report 'osBuild')) "Windows build ``$(Field $report 'osBuild')``, CPU ``$(Field $report 'cpuArchitecture')``"))
     $lines.Add((Line ([bool] (Field $report 'dotnetSdk')) ".NET SDK ``$(Field $report 'dotnetSdk')``"))
-    $lines.Add((Line ([bool] (Field $report 'windowsAppRuntime')) "Windows App Runtime ``$((@(Field $report 'windowsAppRuntime') | ForEach-Object { "$_" }) -join '; ')``"))
+    if ((Field $report 'mode') -eq 'portable') {
+        $lines.Add((Line $true 'Windows App Runtime bundled in the portable exe'))
+    }
+    else {
+        $lines.Add((Line ([bool] (Field $report 'windowsAppRuntime')) "Windows App Runtime ``$((@(Field $report 'windowsAppRuntime') | ForEach-Object { "$_" }) -join '; ')``"))
+    }
     $lines.Add((Line ([bool] (Field $report 'webView2Version')) "WebView2 Runtime ``$(Field $report 'webView2Version')``"))
 
     $lines.Add(''); $lines.Add('### Package')

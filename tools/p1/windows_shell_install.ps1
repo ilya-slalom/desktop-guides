@@ -2645,6 +2645,13 @@ try {
         $report.packageFullName = $installed.PackageFullName
         $report.packageFamilyName = $installed.PackageFamilyName
         $report.installLocation = $installed.InstallLocation
+        # T17.2: the runtime the package resolved. A fresh runner registers
+        # the framework for this user only with the install, so the query
+        # before it can come back empty.
+        $report.windowsAppRuntime = @(
+            $installed.Dependencies |
+                Where-Object { $_.Name -like 'Microsoft.WindowsAppRuntime.2*' } |
+                ForEach-Object { "$($_.Name) $($_.Version)" })
         $expectedExecutablePath = Join-Path $installed.InstallLocation `
             'DesktopGuides.Production.exe'
 

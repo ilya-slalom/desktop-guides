@@ -92,6 +92,19 @@ try {
     $text = Get-Content -LiteralPath (& $writer -ReportPath $none -FixtureRoot $fixtures -OutDirectory (Join-Path $root 'out2') -Shard 'pdf') -Raw -Encoding UTF8
     Assert-True ($text.Contains("- $fail No installer report (none.json)")) 'A missing report was not reported.'
     Assert-True ($text.Contains("- $fail No scenario timings recorded")) 'A missing report printed a blank scenario.'
+
+    # A report cut off mid-write is a failed line, not a failed step.
+    $cut = Join-Path $root 'cut.json'
+    Set-Content -LiteralPath $cut -Value '{"runId": "r1", "smokeRuns": [' -Encoding UTF8
+    $text = Get-Content -LiteralPath (& $writer -ReportPath $cut -FixtureRoot $fixtures -OutDirectory (Join-Path $root 'out3')) -Raw -Encoding UTF8
+    Assert-True ($text.Contains("- $fail Unreadable installer report (cut.json)")) 'A truncated report was not reported.'
+
+    # The portable exe carries its own Windows App Runtime.
+    $portable = [ordered]@{ mode = 'portable'; windowsAppRuntime = @(); portableDataStillPresent = $false; applicationEventCount = 0 }
+    $portablePath = Join-Path $root 'portable-run.json'
+    $portable | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $portablePath -Encoding UTF8
+    $text = Get-Content -LiteralPath (& $writer -ReportPath $portablePath -FixtureRoot $fixtures -OutDirectory (Join-Path $root 'out4')) -Raw -Encoding UTF8
+    Assert-True ($text.Contains("- $pass Windows App Runtime bundled in the portable exe")) 'The portable runtime line was wrong.'
 }
 finally {
     Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
