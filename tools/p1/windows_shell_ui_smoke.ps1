@@ -1294,7 +1294,27 @@ try {
         else {
             Click-Element $expander
         }
-        [void](Wait-VisibleById 'IgdbClientIdInput')
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $field = Find-ById 'IgdbClientIdInput'
+            if ($field -and -not $field.Current.IsOffscreen) { return }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        # Record why, for a failure no other check explains.
+        $state = $null
+        $current = Find-ById 'ProviderSettingsExpander'
+        if ($current -and $current.TryGetCurrentPattern(
+            [System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$pattern)) {
+            $state = "$($pattern.Current.ExpandCollapseState)"
+        }
+        $report.providerFieldHidden = [ordered]@{
+            expanderState = $state
+            expanderBounds = if ($current) { "$($current.Current.BoundingRectangle)" } else { $null }
+            fieldFound = [bool] $field
+            fieldBounds = if ($field) { "$($field.Current.BoundingRectangle)" } else { $null }
+        }
+        $report.providerFieldScreenshot = Save-WindowScreenshot 'provider-field-hidden'
+        throw "Expected visible 'IgdbClientIdInput'."
     }
 
     function Assert-ProviderSettingsExpanded {
