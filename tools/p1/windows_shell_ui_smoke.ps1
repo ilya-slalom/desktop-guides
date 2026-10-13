@@ -6768,6 +6768,9 @@ try {
         }
     }
     elseif ($Mode -eq 'provider-settings') {
+        # The provider card's controls need more height than the runner's
+        # default window; use the size other layout-dependent modes do.
+        Resize-ShellWindow 1500 720
         $igdb = Read-LabelledValues $IgdbCredentialFile @('igdb client id', 'igdb client secret')
         $steamGridDbKey = $null
         if ($SteamGridDbCredentialFile) {
@@ -6960,6 +6963,7 @@ try {
         $report.phases += 'add-manually-from-search'
     }
     elseif ($Mode -eq 'provider-remove') {
+        Resize-ShellWindow 1500 720
         Open-ProviderSettings
         Invoke-Element (Wait-EnabledById 'ProviderRemoveButton')
         [void](Wait-Name 'ProviderSettingsStatus' 'Provider credentials removed.')
