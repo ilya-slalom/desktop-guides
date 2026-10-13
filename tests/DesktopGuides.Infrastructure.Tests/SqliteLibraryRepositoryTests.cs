@@ -15,6 +15,54 @@ public sealed class SqliteLibraryRepositoryTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 25, 0, 0, 0, TimeSpan.Zero);
 
+    // #94: the latest write's stages, so a stalled place save shows which one stalled.
+    [Fact]
+    public async Task LastWriteTimingCoversEachStageOfAFinishedWrite()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Timing", null, null);
+        Guid guide = Guid.NewGuid();
+        InsertGuide(directory.Paths.DatabasePath, guide, game.Id);
+
+        await repository.SaveReadingLocationAsync(guide, "{\"t\":1}", 0.5);
+
+        RepositoryWriteTiming timing = Assert.IsType<RepositoryWriteTiming>(repository.LastWriteTiming);
+        Assert.True(timing.GateWaitMs >= 0, $"gate {timing.GateWaitMs}");
+        Assert.True(timing.QueueWaitMs >= 0, $"queue {timing.QueueWaitMs}");
+        Assert.True(timing.WorkMs >= 0, $"work {timing.WorkMs}");
+    }
+
+    [Fact]
+    public async Task LastWriteTimingShowsAWriteStillWaitingForTheGate()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Timing", null, null);
+        Guid guide = Guid.NewGuid();
+        InsertGuide(directory.Paths.DatabasePath, guide, game.Id);
+        using SemaphoreSlim entered = new(0);
+        using SemaphoreSlim release = new(0);
+        Task import = repository.RunImportAsync<bool>(async (_, _) =>
+        {
+            entered.Release();
+            await release.WaitAsync();
+            return true;
+        }, CancellationToken.None);
+        await entered.WaitAsync();
+
+        Task save = repository.SaveReadingLocationAsync(guide, "{\"t\":2}", 0.5);
+        await Task.Delay(100);
+        Assert.Equal(new RepositoryWriteTiming(-1, -1, -1), repository.LastWriteTiming);
+
+        release.Release();
+        await import;
+        await save;
+        Assert.True(repository.LastWriteTiming!.WorkMs >= 0);
+    }
+
     [Fact]
     public async Task PersistsTwoIndependentGuideStatesAndSettingsAcrossReopen()
     {
