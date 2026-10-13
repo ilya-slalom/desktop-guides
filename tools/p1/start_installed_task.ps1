@@ -90,14 +90,16 @@ Remove-Item -LiteralPath $logPath, $exitPath, $startedPath -Force -ErrorAction S
 } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $inputPath -Encoding UTF8
 
 # The task runs this same PowerShell, so CI keeps pwsh and the host 5.1.
-# Its console is hidden: a visible one on the test desktop takes focus from
-# the app under test, which the installer's own tasks avoid the same way.
+# A visible console on the test desktop takes focus from the app under test.
+# -WindowStyle Hidden hides it only after it appears, and a window created a
+# moment late stayed visible, so the console host runs headless: no window.
 $taskName = $taskPrefix + [Guid]::NewGuid().ToString('N')
 $shell = (Get-Process -Id $PID).Path
 $inner = Join-Path $PSScriptRoot 'run_installed_task_inner.ps1'
-$action = New-ScheduledTaskAction -Execute $shell -WorkingDirectory $PSScriptRoot -Argument (
-    '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $inner +
-    '" -InputPath "' + $inputPath + '"')
+$action = New-ScheduledTaskAction -Execute (Join-Path $env:SystemRoot 'System32\conhost.exe') `
+    -WorkingDirectory $PSScriptRoot -Argument (
+    '--headless "' + $shell + '" -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' +
+    $inner + '" -InputPath "' + $inputPath + '"')
 $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -ExecutionTimeLimit (New-TimeSpan -Minutes ([Math]::Ceiling($TimeoutMinutes) + 5))
@@ -132,15 +134,16 @@ function Write-NewLogLines([switch] $Final) {
     }
 }
 
+# Ends the inner script's whole tree first: stopping the task first ends the
+# inner script alone and orphans the installer it started.
 function Stop-InnerRun {
-    Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if (Test-Path -LiteralPath $startedPath) {
         $innerId = [int] (Get-Content -LiteralPath $startedPath -Raw | ConvertFrom-Json).processId
-        # Stopping the task may already have ended it, so taskkill stays quiet.
         if (Get-Process -Id $innerId -ErrorAction SilentlyContinue) {
             & cmd.exe /c "taskkill /PID $innerId /T /F >nul 2>&1"
         }
     }
+    Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 }
 
 # Lists what the installer's own cleanup would have removed. Never removes it.

@@ -216,6 +216,16 @@ first dispatches:
    `completion-restart-after` ("Web page guides couldn't start.") and then
    `keyboard` (`SetFocus` threw). The test now requires the installer's
    console window to be hidden.
+9. **The console host runs headless, and a timeout kills the tree first**
+   (follow-up to #95). `-WindowStyle Hidden` hides the window only after
+   it appears, and once it was created late and stayed visible. That
+   failed the hidden-console check in CI. The task now starts PowerShell
+   under `conhost.exe --headless`, which creates no window. Separately, on
+   a timeout, `Stop-ScheduledTask` ended the inner script first, so
+   `taskkill /T` found no tree to walk, and the installer's own process
+   kept running (seen once on Windows Server 2025, as #95's final review
+   predicted). The entry point now kills the inner tree before stopping
+   the task.
 
 ## Delivery and verification
 
