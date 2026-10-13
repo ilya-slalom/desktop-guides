@@ -9,10 +9,25 @@ internal sealed class ProviderServices : IDisposable
 {
     public ProviderServices(string localStatePath)
     {
-        Http = new ProviderHttp();
+        Http = CreateHttp(localStatePath);
         Tokens = new TwitchTokenSource(Http);
         Thumbnails = new ProviderThumbnailLoader(Http);
         Credentials = WindowsProviderCredentialStore.Create(localStatePath);
+    }
+
+    private static ProviderHttp CreateHttp(string localStatePath)
+    {
+#if !PUBLIC_LANE
+        // T17.2 D: the fake-provider CI lane. Preview builds only, and only
+        // while an installed test holds this gate open with fixtures staged.
+        string fixtures = Path.Combine(localStatePath, "test", "providers");
+        if (TestGate.IsOpen(AppLane.Current.LocalEvent("ProviderFixtures")) &&
+            File.Exists(Path.Combine(fixtures, FixtureProviderHandler.ManifestName)))
+        {
+            return new ProviderHttp(new FixtureProviderHandler(fixtures));
+        }
+#endif
+        return new ProviderHttp();
     }
 
     public ProviderHttp Http { get; }
