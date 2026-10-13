@@ -1294,8 +1294,6 @@ try {
         else {
             Click-Element $expander
         }
-        # The expanded card can open below the fold in a short window.
-        [void](Scroll-SettingsUntilVisible 'IgdbClientIdInput')
         [void](Wait-VisibleById 'IgdbClientIdInput')
     }
 
@@ -6937,6 +6935,9 @@ try {
         $report.phases += 'add-manually-from-search'
     }
     elseif ($Mode -eq 'provider-remove') {
+        # A fresh launch opens at the runner's small default size, where the
+        # expanded provider card is below the fold; use the size other modes do.
+        Resize-ShellWindow 1500 720
         Open-ProviderSettings
         Invoke-Element (Wait-EnabledById 'ProviderRemoveButton')
         [void](Wait-Name 'ProviderSettingsStatus' 'Provider credentials removed.')
