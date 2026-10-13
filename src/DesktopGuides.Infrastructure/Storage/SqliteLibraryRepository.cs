@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Paths;
@@ -6,6 +7,11 @@ using DesktopGuides.Infrastructure.Artwork;
 using Microsoft.Data.Sqlite;
 
 namespace DesktopGuides.Infrastructure.Storage;
+
+// #94: how long the latest write waited for the write gate, waited for a
+// thread-pool thread, and ran its SQL. -1 marks a stage not reached yet, so
+// a write that is still stuck shows where.
+public sealed record RepositoryWriteTiming(long GateWaitMs, long QueueWaitMs, long WorkMs);
 
 public sealed class SqliteLibraryRepository : ILibraryRepository
 {
@@ -25,6 +31,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
     private readonly TimeProvider clock;
     private readonly Action<int>? migrationCheckpoint;
     private readonly SemaphoreSlim writeGate = new(1, 1);
+    private WriteMarks? lastWrite;
 
     public SqliteLibraryRepository(ILibraryPaths paths, TimeProvider? clock = null)
     {
@@ -1348,12 +1355,31 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         }
     }
 
-    private async Task WriteAsync(Action action, CancellationToken token)
+    /// <summary>The latest write's stage timings, or null before any write.</summary>
+    public RepositoryWriteTiming? LastWriteTiming => Volatile.Read(ref lastWrite)?.Timing();
+
+    private Task WriteAsync(Action action, CancellationToken token) =>
+        WriteAsync<bool>(() =>
+        {
+            action();
+            return true;
+        }, token);
+
+    private async Task<T> WriteAsync<T>(Func<T> action, CancellationToken token)
     {
+        WriteMarks marks = new();
+        Volatile.Write(ref lastWrite, marks);
         await writeGate.WaitAsync(token);
         try
         {
-            await Task.Run(action, token);
+            marks.Mark(ref marks.GateEntered);
+            return await Task.Run(() =>
+            {
+                marks.Mark(ref marks.Started);
+                T result = action();
+                marks.Mark(ref marks.Ended);
+                return result;
+            }, token);
         }
         finally
         {
@@ -1361,17 +1387,28 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         }
     }
 
-    private async Task<T> WriteAsync<T>(Func<T> action, CancellationToken token)
+    private sealed class WriteMarks
     {
-        await writeGate.WaitAsync(token);
-        try
+        private readonly long requested = Stopwatch.GetTimestamp();
+        public long GateEntered;
+        public long Started;
+        public long Ended;
+
+        public void Mark(ref long stage) => Volatile.Write(ref stage, Stopwatch.GetTimestamp());
+
+        public RepositoryWriteTiming Timing()
         {
-            return await Task.Run(action, token);
+            long gate = Volatile.Read(ref GateEntered);
+            long started = Volatile.Read(ref Started);
+            long ended = Volatile.Read(ref Ended);
+            return new(
+                Between(requested, gate),
+                gate == 0 ? -1 : Between(gate, started),
+                started == 0 ? -1 : Between(started, ended));
         }
-        finally
-        {
-            writeGate.Release();
-        }
+
+        private static long Between(long from, long to) =>
+            to == 0 ? -1 : (long)Stopwatch.GetElapsedTime(from, to).TotalMilliseconds;
     }
 
     private static Task<T> ReadAsync<T>(Func<T> action, CancellationToken token) =>

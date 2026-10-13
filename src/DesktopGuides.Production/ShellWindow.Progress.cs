@@ -1,6 +1,7 @@
 using System.Text.Json;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Reading;
+using DesktopGuides.Infrastructure.Storage;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -17,6 +18,10 @@ public sealed partial class ShellWindow
     private ProgressCoordinator? progress;
     private IProgressTracking? progressTracking;
     private readonly object progressCountsFile = new();
+    // #94: taken when a save failure is first counted, so later saves don't
+    // overwrite where the failed write was stuck.
+    private int diagnosedFailures;
+    private object? failureContext;
 
     private void StartProgress(IReadingLocationStore store)
     {
@@ -41,6 +46,19 @@ public sealed partial class ShellWindow
         string path = Path.Combine(folder, $"progress-{Environment.ProcessId}.json");
         lock (progressCountsFile)
         {
+            if (counts.Failures != diagnosedFailures)
+            {
+                diagnosedFailures = counts.Failures;
+                RepositoryWriteTiming? write = repository?.LastWriteTiming;
+                failureContext = new
+                {
+                    gateWaitMs = write?.GateWaitMs,
+                    queueWaitMs = write?.QueueWaitMs,
+                    workMs = write?.WorkMs,
+                    poolThreads = ThreadPool.ThreadCount,
+                    poolPending = ThreadPool.PendingWorkItemCount,
+                };
+            }
             try
             {
                 Directory.CreateDirectory(folder);
@@ -61,6 +79,7 @@ public sealed partial class ShellWindow
                         captureMs = lastFailure.CaptureMs,
                         writeMs = lastFailure.WriteMs,
                     },
+                    failureContext,
                 }));
                 File.Move(temp, path, true);
             }
