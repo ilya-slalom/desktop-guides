@@ -331,9 +331,17 @@ refuses the release.
 `tools/p1` script that doesn't parse, or whose if-chain has a branch after
 its `else`, which PowerShell would otherwise run as a command.
 
-Provider live scenarios skip on CI, because the runner has no credential files.
+On CI the `provider` group runs the whole provider journey against recorded
+fixtures (T17.2 piece D). The installer's `-FakeProviders` switch, used only
+when no real IGDB credential file exists, copies
+`tests/fixtures/p1/providers` into the app's `test\providers` folder, holds
+the `ProviderFixtures` test gate open, and types the fixtures' fake
+credentials. A Preview build then answers every provider request from those
+files, with no network; a Public build doesn't contain this path. Any request
+the fixtures don't cover fails the group. The fixtures don't follow changes in
+the real APIs.
 Run them on the Windows host with `-ProviderOnly`, using the user's keys and
-normal provider requests. Use the host for other scenarios only to debug a CI
+normal provider requests. That host run is the check for real-API drift. Use the host for other scenarios only to debug a CI
 failure. One `*Only` switch runs a single scenario group against a fresh
 install: `-CoreOnly`, `-DesignOnly`, `-CatalogOnly`, `-TxtOnly`, `-HtmlOnly`,
 `-PdfOnly`, `-ProgressOnly`, `-CompletionOnly`, `-ThemeOnly`, `-TextSizeOnly`, `-ImportOnly`, `-GameActionsOnly`, `-ProviderOnly`, `-BackupOnly` or `-WorkflowOnly`. With none,

@@ -1,6 +1,6 @@
 # T17.2 piece D: the fake-provider CI lane design
 
-Status: design approved in brainstorming; spec awaiting review.
+Status: approved; implemented on `feat/p1-t17-2-fake-providers`.
 Pieces A, B, C and E merged in #90, #91, #100 and #95; see the
 [T17.2 design](t17-2-release-ci-design.md).
 
@@ -157,6 +157,59 @@ One PR:
   lane accepts "not observed".
 - **Fixtures drifting from the real API:** they can drift from what IGDB
   and SteamGridDB return. Only a host run with real keys catches that.
+
+## Rulings
+
+From the [implementation plan](t17-2-fake-provider-plan.md), and from the
+first installed runs:
+
+1. **The fake credentials stay out of the copied folder, and the manifest
+   holds no secret.** The leak scan searches the app's data folder for the
+   credential values. So the credential files live in `credentials/`,
+   which the installer doesn't copy. The token route matches only the
+   smoke's known wrong secret (`desktop-guides-wrong-secret`, giving 400),
+   before a catch-all route giving 200.
+2. **Routes have `delayMilliseconds` and `times`.** The "Final Fantasy"
+   search is held for 3 s so `provider-live` can press Cancel; `times` lets
+   a route answer only N times, for a 429-then-200 retry.
+3. **One generated PNG serves every image URL**, because the artwork
+   validator accepts a file by its header.
+4. **`provider-live` waits for Cancel to appear.** It pressed Search and
+   looked for Cancel once, at once. Not seeing it, it assumed the search had
+   finished, then typed into a box the still-running search kept disabled.
+   Fast real searches hid this.
+5. **`provider-live` resizes to 1500 × 720 first,** as other layout-dependent
+   modes do. In the runner's 768 × 519 window the Add game dialog's fixed
+   360 px results row puts "Add manually" out of view. `provider-live` had
+   never run in CI before.
+6. **`Expand-ProviderSettings` scrolls until the Test button row shows.**
+   A fresh launch's Settings put the expanded provider card at the bottom
+   edge, with its fields below the fold. Two earlier attempts were reverted:
+   scrolling to the IGDB field hid the Test button, and resizing wasn't the
+   cause. A screenshot capture showed the real layout. The capture stays in
+   the smoke.
+
+## T17.2 piece D verification record
+
+- **Infrastructure tests:** the handler tests (6) and the fixture-set
+  tests (3) failed first, then passed on the Windows host. The suite is at
+  784/784.
+- **Preview-only check:** dispatch
+  [38403593637](https://github.com/ilya-slalom/desktop-guides/actions/runs/38403593637)
+  failed it before the wiring ("The Preview package lacks the
+  fixture-provider wiring"). After the wiring,
+  [38404425541](https://github.com/ilya-slalom/desktop-guides/actions/runs/38404425541)
+  reported "Fixture providers: in the Preview package, absent from the
+  Public package."
+- **The provider journey against fixtures:** dispatch
+  [38413022128](https://github.com/ilya-slalom/desktop-guides/actions/runs/38413022128)
+  passed on both lanes.
+  - All five stages passed: `provider-none`, `provider-offline-none`,
+    `provider-settings`, `provider-live` and `provider-remove`.
+  - The search cancel was observed, with no unmatched requests.
+  - Both leak scans were clean, and `providers.bin` was gone after removal.
+  - Earlier dispatches, from 38405079953 to 38411889341, found rulings 4–6.
+- **PR run:** recorded in the PR description.
 
 ## Out of scope
 
