@@ -293,7 +293,7 @@ checklist covers:
 - the run: commit, run ID and groups;
 - the target: OS build, CPU, .NET SDK, Windows App Runtime and WebView2;
 - the package: name, source and signed MSIX SHA-256, and certificate
-  thumbprint;
+  thumbprint; for a portable shard, the portable exe and zip SHA-256;
 - the fixtures, hashed from the files;
 - each scenario with its duration;
 - cleanup.
@@ -301,7 +301,8 @@ checklist covers:
 The checklist is appended to the job's step summary, and uploaded as
 `evidence.md` and `evidence.json` in the shard's artifact. Paths are
 rewritten to `%USERPROFILE%`, `%LOCALAPPDATA%` and `%TEMP%` forms, and the
-checklist holds no machine or user name. Both package jobs depend on
+checklist holds no machine or user name. The package jobs
+(`packages`, `production-packages` and `portable-packages`) depend on
 `core-tests`, so a failing storage, security or script test stops
 packaging. The P0 `packages` and native ARM64 jobs still run as the P0
 regression lane.
