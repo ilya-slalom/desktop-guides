@@ -6904,6 +6904,24 @@ try {
         }
         if ($report.cancelObserved) { $report.phases += 'cancel-during-search-shows-nothing' }
 
+        # After a cancel the dialog must still offer Add manually; record why if not.
+        $deadline = (Get-Date).AddSeconds(5)
+        do {
+            $manual = Find-ById 'AddGameManuallyLink'
+            if ($manual -and -not $manual.Current.IsOffscreen) { break }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        if (-not $manual -or $manual.Current.IsOffscreen) {
+            $dialogElement = Find-ById 'GameSearchInput'
+            $report.manualLinkAfterCancel = [ordered]@{
+                found = [bool] $manual
+                enabled = if ($manual) { $manual.Current.IsEnabled } else { $null }
+                bounds = if ($manual) { "$($manual.Current.BoundingRectangle)" } else { $null }
+                searchBoxBounds = if ($dialogElement) { "$($dialogElement.Current.BoundingRectangle)" } else { $null }
+                results = (Get-SearchResults).Count
+            }
+            $report.manualLinkScreenshot = Save-WindowScreenshot 'provider-live-after-cancel'
+        }
         Invoke-Element (Wait-VisibleById 'AddGameManuallyLink')
         [void](Wait-VisibleById 'GameTitleInput')
         Assert-Absent 'GameEditorNotice'
