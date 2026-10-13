@@ -1294,6 +1294,8 @@ try {
         else {
             Click-Element $expander
         }
+        # The expanded card can open below the fold in a short window.
+        [void](Scroll-SettingsUntilVisible 'IgdbClientIdInput')
         [void](Wait-VisibleById 'IgdbClientIdInput')
     }
 
