@@ -6,7 +6,9 @@ param(
     [Parameter(Mandatory = $true)] [string] $OutDirectory,
     [string] $Commit = $env:GITHUB_SHA,
     [string] $RunId = $env:GITHUB_RUN_ID,
-    [string] $Shard = ''
+    [string] $Shard = '',
+    # The portable zip's SHA-256 as the CI verify step checked it; reported only.
+    [string] $PortableZipSha256 = ''
 )
 $ErrorActionPreference = 'Stop'
 $pass = [string][char]0x2713
@@ -147,6 +149,10 @@ else {
         $lines.Add((Line ([bool] (Field $report 'signedPackageSha256')) "Signed MSIX SHA-256 ``$(Field $report 'signedPackageSha256')``"))
         $lines.Add((Line ([bool] (Field $report 'certificateThumbprint')) "Test certificate ``$(Field $report 'certificateThumbprint')``"))
     }
+    else {
+        $lines.Add((Line ([bool] (Field $report 'portableExecutableSha256')) "Portable exe SHA-256 ``$(Field $report 'portableExecutableSha256')``"))
+        $lines.Add((Line ([bool] $PortableZipSha256) "Portable zip SHA-256 ``$PortableZipSha256``"))
+    }
 }
 
 $fixtures = @(Get-Fixtures $report)
@@ -196,6 +202,7 @@ $markdown = Join-Path $OutDirectory 'evidence.md'
 ($lines -join "`n") + "`n" | Set-Content -LiteralPath $markdown -Encoding UTF8 -NoNewline
 [ordered]@{
     shard = $Shard; commit = $Commit; runId = $RunId; reportFound = [bool] $report
+    portableZipSha256 = $PortableZipSha256
     report = Hide-Value $report; fixtures = $fixtures
 } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $OutDirectory 'evidence.json') -Encoding UTF8
 return $markdown

@@ -99,12 +99,27 @@ try {
     $text = Get-Content -LiteralPath (& $writer -ReportPath $cut -FixtureRoot $fixtures -OutDirectory (Join-Path $root 'out3')) -Raw -Encoding UTF8
     Assert-True ($text.Contains("- $fail Unreadable installer report (cut.json)")) 'A truncated report was not reported.'
 
-    # The portable exe carries its own Windows App Runtime.
-    $portable = [ordered]@{ mode = 'portable'; windowsAppRuntime = @(); portableDataStillPresent = $false; applicationEventCount = 0 }
+    # The portable exe carries its own Windows App Runtime, and the run
+    # names both the exe and the zip it came from.
+    $portable = [ordered]@{
+        mode = 'portable'; windowsAppRuntime = @(); portableDataStillPresent = $false
+        applicationEventCount = 0; portableExecutableSha256 = 'EEE'
+    }
     $portablePath = Join-Path $root 'portable-run.json'
     $portable | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $portablePath -Encoding UTF8
-    $text = Get-Content -LiteralPath (& $writer -ReportPath $portablePath -FixtureRoot $fixtures -OutDirectory (Join-Path $root 'out4')) -Raw -Encoding UTF8
+    $text = Get-Content -LiteralPath (& $writer -ReportPath $portablePath -FixtureRoot $fixtures `
+        -OutDirectory (Join-Path $root 'out4') -PortableZipSha256 'FFF') -Raw -Encoding UTF8
     Assert-True ($text.Contains("- $pass Windows App Runtime bundled in the portable exe")) 'The portable runtime line was wrong.'
+    Assert-True ($text.Contains("- $pass Portable exe SHA-256 ``EEE``")) 'The portable exe hash is missing.'
+    Assert-True ($text.Contains("- $pass Portable zip SHA-256 ``FFF``")) 'The portable zip hash is missing.'
+    Assert-True (-not $text.Contains('MSIX')) 'A portable run listed MSIX lines.'
+    $json = Get-Content -LiteralPath (Join-Path $root 'out4\evidence.json') -Raw -Encoding UTF8
+    Assert-True ($json -match '"portableZipSha256":\s*"FFF"') 'evidence.json lacks the zip hash.'
+
+    # Review Focus 3: a portable shard with no report still names it.
+    $text = Get-Content -LiteralPath (& $writer -ReportPath (Join-Path $root 'absent\portable-run.json') `
+        -FixtureRoot $fixtures -OutDirectory (Join-Path $root 'out5') -PortableZipSha256 'FFF') -Raw -Encoding UTF8
+    Assert-True ($text.Contains("- $fail No installer report (portable-run.json)")) 'A missing portable report was not named.'
 }
 finally {
     Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue

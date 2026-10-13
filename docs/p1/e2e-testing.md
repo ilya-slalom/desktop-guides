@@ -130,6 +130,11 @@ in place. It writes `portable-run.json` with `mode: "portable"`. A portable run
 is not evidence for any signed install, identity, upgrade, or package-data
 gate; the portable build's own release gates come later under T17.3.
 
+CI runs every scenario group against a Preview-lane portable zip on every
+PR and push (T17.2 piece C). The released zip is built for the Public
+lane, whose window title, instance key and test-event prefix differ; those
+names aren't covered in CI.
+
 ## Runner contract
 
 1. Stage source, fixtures, scripts, and artifacts under
@@ -265,12 +270,21 @@ former 30-second cutoff.
 
 CI `production-shell-ui` runs the full installed harness on every PR and is the
 gate of record for the shell, design-language, material and catalog scenarios.
-It runs as five parallel shards, each a fresh install on its own runner:
+It runs five shards in each of two lanes, each a fresh install on its own runner:
 `core` (core, txt, game-actions), `design` (design, catalog, completion,
 backup), `pdf` (pdf, progress, theme, text-size), `html` (html, import,
 provider) and `workflow` (the whole journey). Each shard
-uploads its JSON results and screenshots as `production-shell-ui-<shard>`,
+uploads its JSON results and screenshots as `production-shell-ui-<lane>-<shard>`,
 and PRs link to those artifacts. A shard failing doesn't cancel the others.
+
+The `msix` lane installs the signed MSIX. The `portable` lane runs the
+same shards against the portable single-file exe. `portable-packages`
+builds it with the default Preview lane, whose event names the installed
+UI tests use, and zips it with `package_portable_release.ps1`. Each
+portable shard checks the zip against its `.sha256`, unzips it, and
+requires the exe to be the only file. Shards are named
+`production-shell-ui (<lane>, <shard>)`. A dispatch's `shell-lane` input
+(`both`, `msix` or `portable`) narrows it to one lane.
 
 After the run, each shard writes an evidence checklist with
 `tools/p1/write_shell_evidence.ps1`, even when its scenarios failed. The
@@ -279,7 +293,7 @@ checklist covers:
 - the run: commit, run ID and groups;
 - the target: OS build, CPU, .NET SDK, Windows App Runtime and WebView2;
 - the package: name, source and signed MSIX SHA-256, and certificate
-  thumbprint;
+  thumbprint; for a portable shard, the portable exe and zip SHA-256;
 - the fixtures, hashed from the files;
 - each scenario with its duration;
 - cleanup.
@@ -287,7 +301,8 @@ checklist covers:
 The checklist is appended to the job's step summary, and uploaded as
 `evidence.md` and `evidence.json` in the shard's artifact. Paths are
 rewritten to `%USERPROFILE%`, `%LOCALAPPDATA%` and `%TEMP%` forms, and the
-checklist holds no machine or user name. Both package jobs depend on
+checklist holds no machine or user name. The package jobs
+(`packages`, `production-packages` and `portable-packages`) depend on
 `core-tests`, so a failing storage, security or script test stops
 packaging. The P0 `packages` and native ARM64 jobs still run as the P0
 regression lane.
