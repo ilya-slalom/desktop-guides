@@ -305,8 +305,13 @@ between stages:
 6. Remove the game, restore the backup, and check the guides, places and
    completion again.
 
-Its evidence lists the five stages in that order. A failing stage fails
-the `windows-ci` run, and `release_ci_gate.ps1` then refuses the release.
+Its evidence lists the five stages in that order. The lane then opens the
+PDF guide and closes the app five more times (`workflow-pdf-exit-1` to
+`-5`), because a crash at exit after a PDF session was intermittent (#93).
+The lane never kills the app, so any crash or error-report entry for the
+app in the Application log during the lane fails it. A failing stage or a
+crash entry fails the `windows-ci` run, and `release_ci_gate.ps1` then
+refuses the release.
 `tools/p1/test_windows_scripts_parse.ps1`, in `core-tests`, fails on any
 `tools/p1` script that doesn't parse, or whose if-chain has a branch after
 its `else`, which PowerShell would otherwise run as a command.

@@ -99,6 +99,8 @@ internal static class Program
             closingSignal?.Dispose();
             closingSignal = null;
         }
+        // Only a normal close gets here; an exception above still propagates.
+        ProcessExit.EndAfterNormalClose();
     }
 
     internal static void ReleaseInstanceKey()
