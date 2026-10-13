@@ -128,6 +128,10 @@ else {
     $lines.Add((Line $true "Groups ``$((@(Field $report 'scenarioGroupsRun')) -join ', ')`` (scope ``$(Field $report 'scenarioScope')``)"))
     $lines.Add((Line ([bool] (Field $report 'finishedAt')) "Started $(Format-Time (Field $report 'observedAt')), finished $(Format-Time (Field $report 'finishedAt'))"))
     $lines.Add((Line ([bool] (Field $report 'success')) "Run result: $(if (Field $report 'success') { 'passed' } else { 'failed' })"))
+    $providers = Field $report 'providers'
+    if ($providers -and $providers.PSObject.Properties['source']) {
+        $lines.Add((Line $true "Providers: $($providers.source)"))
+    }
     if (Field $report 'error') { $lines.Add((Line $false ("Error: " + (Hide-Paths ("$(Field $report 'error')" -split "`n")[0])))) }
 
     $lines.Add(''); $lines.Add('### Target')

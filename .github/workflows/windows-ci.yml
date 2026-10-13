@@ -659,6 +659,7 @@ jobs:
             -ResultDirectory artifacts/production-shell/installed `
             -Groups @($env:SHELL_GROUPS -split ',') `
             -TimeoutMinutes 45 `
+            -FakeProviders `
             @filter
           exit $LASTEXITCODE
       - name: Write installed shell evidence

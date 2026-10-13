@@ -46,6 +46,7 @@ try {
         applicationEventCount = 1
         applicationEvents = @([ordered]@{ observedAt = '2026-10-12T00:04:00.1000000Z'; provider = '.NET Runtime'; eventId = 1026
             message = "Application: DesktopGuides.Production.exe`nat C:\Users\someone\x" })
+        providers = [ordered]@{ source = 'fixtures' }
     }
     $reportPath = Join-Path $root 'signed-install.json'
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding UTF8
@@ -62,6 +63,7 @@ try {
     Assert-True ($text.Contains("- $pass design-system (12.5 s)")) 'The passing scenario line is missing.'
     Assert-True ($text.Contains("- $fail keyboard (30 s)")) 'The failing scenario line is missing.'
     Assert-True ($text.Contains("- $pass Package removed")) 'The cleanup line is missing.'
+    Assert-True ($text.Contains("- $pass Providers: fixtures")) 'The providers line is missing.'
     Assert-True ($text.Contains("- $pass No test-owned scheduled task or process left")) 'A report without cleanup errors showed one.'
     Assert-True ($text.Contains('Started 2026-10-12T00:00:00Z, finished 2026-10-12T00:05:00Z')) 'The run times are missing.'
     Assert-True ($text.Contains("- $fail Application event log entries: 1")) 'The event count is missing.'

@@ -42,7 +42,11 @@ param(
 
     # Wait for windows_provider_offline_controller.ps1 to block the app's
     # network access for one scenario. Needs the user's authorization.
-    [switch] $AllowOfflineFirewallRule
+    [switch] $AllowOfflineFirewallRule,
+
+    # T17.2 D: with no real IGDB credential file, run the provider group
+    # against the recorded fixtures in tests/fixtures/p1/providers.
+    [switch] $FakeProviders
 )
 
 $ErrorActionPreference = 'Stop'
@@ -2603,10 +2607,19 @@ function Run-BackupScenarios {
 }
 
 function Run-ProviderScenarios {
-    $report.providers = [ordered]@{}
+    $report.providers = [ordered]@{ source = 'live' }
     $providers = $report.providers
     $fixtureDirectory = Join-Path $PSScriptRoot `
         '..\..\tests\DesktopGuides.Infrastructure.Tests\Providers\Fixtures'
+    # T17.2 D: real keys win. Without them, the fixtures stand in for the
+    # providers, answered inside a Preview build through the gate below.
+    $fixtureSource = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures\p1\providers')).Path
+    $fixtureGate = $null
+    if ($FakeProviders -and -not (Test-Path -LiteralPath $IgdbCredentialFile -PathType Leaf)) {
+        $IgdbCredentialFile = Join-Path $fixtureSource 'credentials\igdb-credentials.txt'
+        $SteamGridDbCredentialFile = Join-Path $fixtureSource 'credentials\steamgriddb-credentials.txt'
+        $providers.source = 'fixtures'
+    }
     $secrets = @()
     $igdbReady = $false
     $steamGridDbFile = ''
@@ -2630,6 +2643,15 @@ function Run-ProviderScenarios {
     }
 
     [void](Invoke-ShellSeed @('seed-linked-game', $dataRoot))
+    if ($providers.source -eq 'fixtures') {
+        # The credential files stay behind: the leak scans search this folder.
+        $fixtureFolder = Join-Path $dataRoot 'test\providers'
+        New-Item -ItemType Directory -Force -Path $fixtureFolder | Out-Null
+        Get-ChildItem -LiteralPath $fixtureSource -File | Copy-Item -Destination $fixtureFolder
+        $fixtureGate = [System.Threading.EventWaitHandle]::new(
+            $false, [System.Threading.EventResetMode]::ManualReset,
+            'Local\DesktopGuides.Preview.ProviderFixtures')
+    }
     Start-InstalledShell
     $providers.none = Run-ShellSmoke 'provider-none'
     $providers.offlineWithoutCredentials = Run-ShellSmoke 'provider-offline' `
@@ -2646,8 +2668,11 @@ function Run-ProviderScenarios {
         return
     }
 
-    $providers.fixtureFields = Invoke-ShellSeed @(
-        'check-igdb-fields', $IgdbCredentialFile, $fixtureDirectory)
+    $providers.fixtureFields = if ($providers.source -eq 'fixtures') {
+        'skipped: the fixtures would be compared with themselves'
+    } else {
+        Invoke-ShellSeed @('check-igdb-fields', $IgdbCredentialFile, $fixtureDirectory)
+    }
     $saved = Get-ProviderState
     if (-not $saved.CredentialBlobExists) {
         throw 'Saving provider credentials did not create providers.bin.'
@@ -2690,6 +2715,18 @@ function Run-ProviderScenarios {
     $providers.finalState = Get-ProviderState
     if ($providers.finalState.CredentialBlobExists) {
         throw 'Removing provider credentials left providers.bin behind.'
+    }
+    if ($fixtureGate) {
+        $fixtureGate.Dispose()
+        $unmatchedPath = Join-Path $dataRoot 'test\providers\unmatched.json'
+        $providers.unmatched = @(if (Test-Path -LiteralPath $unmatchedPath) {
+            Get-Content -LiteralPath $unmatchedPath -Raw | ConvertFrom-Json
+        })
+        if ($providers.unmatched.Count -gt 0) {
+            Copy-Item -LiteralPath $unmatchedPath -Destination (Join-Path $ResultDirectory 'provider-unmatched.json')
+            throw "The fixtures had no route for $($providers.unmatched.Count) provider request(s): " +
+                (($providers.unmatched | ForEach-Object { "$($_.method) $($_.host)$($_.path)" }) -join '; ')
+        }
     }
     Assert-NoCredentialLeak $secrets 'AfterRemove'
 }

@@ -29,6 +29,10 @@ param(
     [string] $SteamGridDbCredentialFile,
     [switch] $AllowOfflineFirewallRule,
 
+    # T17.2 D: with no real IGDB credential file, run the provider group
+    # against the recorded fixtures in tests/fixtures/p1/providers.
+    [switch] $FakeProviders,
+
     # The entry point's own.
     [double] $TimeoutMinutes = 45,
     [string] $Installer = (Join-Path $PSScriptRoot 'windows_shell_install.ps1')
