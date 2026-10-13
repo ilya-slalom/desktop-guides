@@ -6872,9 +6872,19 @@ try {
         $report.cancelAttempts = 0
         for ($attempt = 1; $attempt -le 3 -and -not $report.cancelObserved; $attempt++) {
             $report.cancelAttempts = $attempt
+            # An earlier attempt's search may still be running, which keeps the box disabled.
+            [void](Wait-EnabledById 'GameSearchInput')
             Set-SearchQuery 'Final Fantasy'
             Invoke-Element (Wait-EnabledById 'GameSearchButton')
-            $cancel = Find-ById 'GameSearchCancel'
+            # Cancel can appear a moment after the search starts; not seeing it at once
+            # doesn't mean the search finished.
+            $cancel = $null
+            $deadline = (Get-Date).AddSeconds(2)
+            do {
+                $cancel = Find-ById 'GameSearchCancel'
+                if ($cancel -and -not $cancel.Current.IsOffscreen) { break }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
             if (-not $cancel -or $cancel.Current.IsOffscreen) {
                 $report.cancelReason = 'The search finished before Cancel could be pressed.'
                 Start-Sleep -Seconds 2
