@@ -1,0 +1,5 @@
+[
+  { "id": 385, "name": "Final Fantasy", "first_release_date": 566179200,
+    "game_type": { "id": 0, "type": "Main Game" },
+    "platforms": [ { "id": 99, "name": "Family Computer" } ] }
+]

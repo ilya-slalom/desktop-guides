@@ -1,0 +1,15 @@
+{
+  "routes": [
+    { "method": "POST", "host": "id.twitch.tv", "path": "/oauth2/token", "contains": "client_secret=desktop-guides-wrong-secret", "status": 400, "body": "token-rejected.json" },
+    { "method": "POST", "host": "id.twitch.tv", "path": "/oauth2/token", "status": 200, "body": "token.json" },
+    { "method": "POST", "host": "api.igdb.com", "path": "/v4/games", "contains": "fields id; limit 1;", "status": 200, "body": "igdb-test.json" },
+    { "method": "POST", "host": "api.igdb.com", "path": "/v4/games", "contains": "search \"Half-Life\"", "status": 200, "body": "igdb-search-half-life.json" },
+    { "method": "POST", "host": "api.igdb.com", "path": "/v4/games", "contains": "search \"zzqx no such game 91377\"", "status": 200, "body": "igdb-empty.json" },
+    { "method": "POST", "host": "api.igdb.com", "path": "/v4/games", "contains": "search \"Final Fantasy\"", "status": 200, "body": "igdb-search-final-fantasy.json", "delayMilliseconds": 3000 },
+    { "method": "POST", "host": "api.igdb.com", "path": "/v4/games", "contains": "where id = 231;", "status": 200, "body": "igdb-game-half-life.json" },
+    { "method": "GET", "host": "images.igdb.com", "path": "/igdb/image/upload/t_thumb/co1abc.jpg", "status": 200, "body": "image.png" },
+    { "method": "GET", "host": "images.igdb.com", "path": "/igdb/image/upload/t_cover_big/co1abc.jpg", "status": 200, "body": "image.png" },
+    { "method": "GET", "host": "www.steamgriddb.com", "path": "/api/v2/grids/steam/70", "status": 200, "body": "steamgriddb-grids.json" },
+    { "method": "GET", "host": "cdn2.steamgriddb.com", "path": "/grid/desktop-guides-fixture.png", "status": 200, "body": "image.png" }
+  ]
+}
