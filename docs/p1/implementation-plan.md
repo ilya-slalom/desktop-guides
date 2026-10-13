@@ -1,8 +1,10 @@
 # P1 implementation plan and exit gates
 
-Status: 51 of the 54 tasks are merged, 12 October 2026. M0 to M4 are
+Status: 52 of the 54 tasks are merged, 14 October 2026. M0 to M4 are
 complete; T11.5 (colorful icons), the last M2 task, merged in #85. M5 has
-T20.1, T20.2, T15.4, T15.1 and T16.1 merged, and M6 is planned. T17.6 (app
+T20.1, T20.2, T15.4, T15.1 and T16.1 merged. In M6, T17.2 (release CI) is
+complete; T17.4 (size pass) and then T17.3 (release-candidate runs)
+remain. T17.6 (app
 icon) merged in #86 and T16.1 (keyboard shortcuts) in #88. The accessibility
 audit (T16.2, T16.3) and the Microsoft Store submission (T17.5) moved out of
 P1 to the [final milestone](../work-breakdown.md#final-milestone--accessibility-audit-and-store-submission)
@@ -1035,8 +1037,9 @@ T17.2 is in progress. Pieces A and B are merged: #90 (merge commit
 the signed install, which blocks release promotion when it fails. Piece C
 (#100, merge commit `77af7a5`) runs every installed shard against the
 portable exe as well; see the [piece C design](t17-2-portable-ci-design.md).
-Piece D runs the installed provider journey against recorded fixtures; see
-the [piece D design](t17-2-fake-provider-design.md). Piece E,
+Piece D (#104, merge commit `928407c`) runs the installed provider journey
+against recorded fixtures; see the [piece D design](t17-2-fake-provider-design.md).
+With D, every planned T17.2 piece is merged and T17.2 is complete. Piece E,
 #95 (merge commit `b3786ac`), starts every installed shell run through an
 elevated interactive scheduled task, `tools/p1/start_installed_task.ps1`,
 on CI and on the host; see the [piece E design](t17-2-task-entry-design.md).

@@ -707,7 +707,8 @@ apply to every feature without repeat passes. An app that is still gaining
 major features is also unlikely to pass Store review. P1 keeps T16.1's
 keyboard work; its release claims R9 only to that extent.
 
-**Depends on:** every feature task in P1, P2 and P3.
+**Depends on:** every feature task in P1, P2 and P3. T17.7 is optional and
+can run at any point in this milestone before T17.5.
 
 - **T16.2** Audit keyboard order, focus restoration, AutomationProperties,
   touch target size, DPI scaling, and high contrast across every feature.
@@ -717,6 +718,26 @@ keyboard work; its release claims R9 only to that extent.
   them exactly afterward, or run in a disposable Windows profile or VM.
 - **T16.3** Record PDF document-text access behavior from the chosen engine
   and provide an accurate user-facing limitation if needed. Closes S10.
+- **T17.7 (optional)** Rewrite the installed end-to-end harness in C#,
+  decided 14 October 2026. The harness is about 15,000 lines of
+  PowerShell, plus small C# helpers compiled at run time. A rewrite with
+  MSTest and a UIA3 library such as FlaUI would bring compile-time
+  checking, one runtime instead of Windows PowerShell 5.1 and PowerShell 7,
+  IDE debugging and TRX results.
+  - **Not done during feature work:** a rewrite would risk the gate of
+    record while features are still landing, and most CI failures don't
+    depend on the harness language.
+  - **The evidence:** in run 38419706291, the slowest shard spent about
+    6 of its 10 minutes inside scenarios, with an estimated 1–2 minutes of
+    per-scenario PowerShell start-up. Of the week's failures, only the
+    PowerShell-specific ones would go away: an `elseif` parsed as a
+    command, and differences between 5.1 and 7. App defects (#93, #94,
+    #102), timing (#99) and layout assumptions would not.
+  - **Before deciding:** measure the per-scenario overhead. Try the cheap
+    win first: precompile the C# helpers, or keep one test process per app
+    session.
+  - **If it goes ahead,** port incrementally and keep CI green
+    throughout. Don't use retries on release gates.
 - **T17.5** The very last step: submit to the Microsoft Store with the
   reserved identity (`IlyaLissoboi.DesktopGuides`) after T16.2 and T16.3.
   Pass Store certification, write the listing, and confirm the Store-signed
