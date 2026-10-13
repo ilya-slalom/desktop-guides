@@ -1294,6 +1294,11 @@ try {
         else {
             Click-Element $expander
         }
+        # Show-SettingsCard brings the header into view, and an expanded card
+        # at the bottom edge leaves its fields below the fold. The Test button
+        # row is the card's last control row; once it shows, the fields above
+        # it do too.
+        [void](Scroll-SettingsUntilVisible 'ProviderTestButton')
         $deadline = (Get-Date).AddSeconds(15)
         do {
             $field = Find-ById 'IgdbClientIdInput'
@@ -6955,9 +6960,6 @@ try {
         $report.phases += 'add-manually-from-search'
     }
     elseif ($Mode -eq 'provider-remove') {
-        # A fresh launch opens at the runner's small default size, where the
-        # expanded provider card is below the fold; use the size other modes do.
-        Resize-ShellWindow 1500 720
         Open-ProviderSettings
         Invoke-Element (Wait-EnabledById 'ProviderRemoveButton')
         [void](Wait-Name 'ProviderSettingsStatus' 'Provider credentials removed.')
