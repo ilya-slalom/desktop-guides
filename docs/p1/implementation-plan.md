@@ -1032,7 +1032,9 @@ passed; see the [verification record](t16-1-keyboard-shortcuts-design.md#t161-ve
 T17.2 is in progress. Pieces A and B are merged: #90 (merge commit
 `60ef03b`) added an evidence checklist to every installed shard, and #91
 (merge commit `9ba1fd4`) added the `workflow` shard, the whole journey on
-the signed install, which blocks release promotion when it fails. Piece E,
+the signed install, which blocks release promotion when it fails. Piece C
+runs every installed shard against the portable exe as well; see the
+[piece C design](t17-2-portable-ci-design.md). Piece E,
 #95 (merge commit `b3786ac`), starts every installed shell run through an
 elevated interactive scheduled task, `tools/p1/start_installed_task.ps1`,
 on CI and on the host; see the [piece E design](t17-2-task-entry-design.md).

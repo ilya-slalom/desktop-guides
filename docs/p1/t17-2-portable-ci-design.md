@@ -1,6 +1,6 @@
 # T17.2 piece C: the portable CI job design
 
-Status: design approved in brainstorming; spec awaiting review.
+Status: approved; implemented on `feat/p1-t17-2-portable-ci`.
 Pieces A, B and E merged in #90, #91 and #95; see the
 [T17.2 design](t17-2-release-ci-design.md) and the
 [piece E design](t17-2-task-entry-design.md).
@@ -150,6 +150,41 @@ One PR:
    `shell-scope=all` runs every group in portable mode for the first time.
    Each failure is diagnosed and fixed as described above.
 3. **Full run:** the full PR run passes with all 10 shards.
+
+## Rulings
+
+1. **Script tests ran in CI only.** The Windows host was unreachable over
+   SSH, so the evidence-writer and release-gate tests ran under `pwsh` in
+   `core-tests`, through `dev-fast` dispatches. They had no PowerShell 5.1
+   run.
+2. **No harness changes were needed.** Every scenario group passed in
+   portable mode once its run wasn't stopped by an intermittent failure.
+   No `if ($portable)` fix or skip was added, so the report has no
+   `portableSkipped` list.
+
+## T17.2 piece C verification record
+
+- **Pipeline:** dispatch
+  [38355366505](https://github.com/ilya-slalom/desktop-guides/actions/runs/38355366505)
+  ran the portable `workflow` shard, which passed with both portable
+  hashes in its evidence and the portable data folder removed.
+- **Both lanes:** dispatch
+  [38355995908](https://github.com/ilya-slalom/desktop-guides/actions/runs/38355995908)
+  ran the `workflow` shard in both lanes, and both passed. Its `core-tests`
+  failed once on #95's hidden-console check. That check is intermittent
+  and isn't part of this piece.
+- **First full portable run:** dispatch
+  [38356005318](https://github.com/ilya-slalom/desktop-guides/actions/runs/38356005318)
+  passed `core`, `design`, `html` and `workflow`. The `pdf` shard stopped
+  in `progress-restored`, where an HTML guide stayed on "Loading guide…".
+  Three portable `progress` reruns passed that scenario. One of them
+  failed `progress-changed`, which is #94, also seen on the MSIX lane
+  (timed save, 0 ms capture, 2,001 ms write).
+- **Confirmation:** dispatch
+  [38379616531](https://github.com/ilya-slalom/desktop-guides/actions/runs/38379616531)
+  passed all five portable shards, with no ✗ line in any evidence
+  checklist.
+- **PR run:** pending.
 
 ## Out of scope
 
