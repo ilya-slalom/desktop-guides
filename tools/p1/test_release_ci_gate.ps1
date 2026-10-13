@@ -76,6 +76,9 @@ try {
     $ci = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot '..\..\.github\workflows\windows-ci.yml')
     Assert-True ($ci.Contains('{"shard":"workflow","groups":"workflow"}')) `
         'The workflow shard is missing from the push and pull_request matrix.'
+    # T17.2 C: push and PR runs test the portable exe too.
+    Assert-True ($ci.Contains("|| '[""msix"",""portable""]'")) `
+        'The portable lane is missing from the push and pull_request matrix.'
     Assert-True (-not $ci.Contains('continue-on-error')) 'A windows-ci job may fail without failing the run.'
     # The rejected cases leave git's expected failure in $LASTEXITCODE, which
     # the CI pwsh wrapper would report as the step's exit code.
