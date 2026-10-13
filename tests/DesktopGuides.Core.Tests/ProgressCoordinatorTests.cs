@@ -340,8 +340,46 @@ public sealed class ProgressCoordinatorTests
         Assert.Equal(3, store.Attempts);
         Assert.Equal(GuideA, Assert.Single(failed).GuideId);
         Assert.Equal(new ProgressCounts(1, 0, 2, 1), coordinator.Counts);
-        Assert.Equal(new ProgressFailure("write", nameof(IOException), new IOException().HResult),
+        Assert.Equal(new ProgressFailure("write", nameof(IOException), new IOException().HResult, "timer", 0, 0),
             coordinator.LastFailure);
+    }
+
+    // #94: a failure says what started the save and where its time went.
+    [Fact]
+    public void TimedSaveStuckInItsWriteRecordsTheTriggerAndTimes()
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        FakeSession session = new();
+        Track(coordinator, GuideA, session, null);
+        store.SaveHold = new TaskCompletionSource();
+
+        session.Move();
+        clock.Advance(ProgressCoordinator.Quiet);
+        clock.Advance(ProgressCoordinator.FlushTimeout);
+
+        Assert.True(SpinWait.SpinUntil(() => coordinator.LastFailure is not null, TimeSpan.FromSeconds(5)));
+        Assert.Equal(new ProgressFailure("write", nameof(TaskCanceledException), new TaskCanceledException().HResult,
+            "timer", 0, 2000), coordinator.LastFailure);
+    }
+
+    [Fact]
+    public async Task CloseSaveRecordsTheCaptureAndWriteTimes()
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        FakeSession session = new() { Hold = new TaskCompletionSource() };
+        IProgressTracking tracking = Track(coordinator, GuideA, session, null);
+        store.SaveHold = new TaskCompletionSource();
+
+        session.Move();
+        ValueTask dispose = tracking.DisposeAsync();
+        clock.Advance(TimeSpan.FromMilliseconds(1500));
+        session.Hold.SetResult();
+        Assert.True(SpinWait.SpinUntil(() => store.Attempts == 1, TimeSpan.FromSeconds(5)));
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+
+        await dispose.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(new ProgressFailure("write", nameof(TaskCanceledException), new TaskCanceledException().HResult,
+            "close", 1500, 500), coordinator.LastFailure);
     }
 
     [Fact]
@@ -527,6 +565,7 @@ public sealed class ProgressCoordinatorTests
         public List<(Guid Guide, DateTimeOffset At)> Opens { get; } = [];
         public Queue<Exception> OpenFailures { get; } = new();
         public TaskCompletionSource? OpenHold { get; set; }
+        public TaskCompletionSource? SaveHold { get; set; }
         public List<string> Events { get; } = [];
 
         public Task SaveReadingLocationAsync(
@@ -535,6 +574,7 @@ public sealed class ProgressCoordinatorTests
         {
             Attempts++;
             if (Failures.TryDequeue(out Exception? error)) return Task.FromException(error);
+            if (SaveHold is TaskCompletionSource hold) return hold.Task;
             Writes.Add((guideId, locatorJson, estimatedFraction));
             Events.Add("save");
             return Task.CompletedTask;
