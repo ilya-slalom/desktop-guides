@@ -6782,6 +6782,9 @@ try {
         [void](Wait-Status 'Library ready.')
     }
     elseif ($Mode -eq 'provider-live') {
+        # The Add game dialog's results row is 360 px tall; in a short window
+        # Add manually is scrolled out of view, so use the size other modes do.
+        Resize-ShellWindow 1500 720
         Open-AddGameSearch
         Set-SearchQuery 'Half-Life'
         Start-Sleep -Seconds 1
