@@ -8,7 +8,12 @@ public sealed record ProgressCounts(
 
 // Where the latest failure happened (open, turn, capture or write) and its
 // exception type and HResult. Never the message, which may hold a path.
-public sealed record ProgressFailure(string Stage, string ErrorType, int HResult);
+// Trigger says what started the save (timer, flush or close), and CaptureMs
+// and WriteMs how long each stage ran before it ended, so a timed-out save
+// shows where its time went (#94).
+public sealed record ProgressFailure(
+    string Stage, string ErrorType, int HResult,
+    string Trigger = "", long CaptureMs = 0, long WriteMs = 0);
 
 public sealed class ProgressSaveFailedEventArgs(Guid guideId, Exception error) : EventArgs
 {
@@ -96,13 +101,14 @@ public sealed class ProgressCoordinator
         CountsChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void RecordFailure(string stage, Exception error)
+    private void RecordFailure(
+        string stage, Exception error, string trigger = "", long captureMs = 0, long writeMs = 0)
     {
         lock (countsGate)
         {
             if (stage == "open") openFailures++;
             else failures++;
-            lastFailure = new(stage, error.GetType().Name, error.HResult);
+            lastFailure = new(stage, error.GetType().Name, error.HResult, trigger, captureMs, writeMs);
         }
         CountsChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -145,7 +151,7 @@ public sealed class ProgressCoordinator
                 if (ended) return;
             }
             // Not dirty may mean a save is mid-capture: SaveAsync waits for it.
-            await SaveAsync(token);
+            await SaveAsync(token, "flush");
         }
 
         public async ValueTask DisposeAsync()
@@ -237,12 +243,17 @@ public sealed class ProgressCoordinator
         private async Task SaveFromTimerAsync()
         {
             using CancellationTokenSource timeout = new(FlushTimeout, owner.clock);
-            await SaveAsync(timeout.Token);
+            await SaveAsync(timeout.Token, "timer");
         }
 
         // Never throws. A capture or write that finishes after End is dropped.
-        private async Task SaveAsync(CancellationToken token)
+        private async Task SaveAsync(CancellationToken token, string trigger)
         {
+            lock (gate)
+            {
+                // Dispose flushes; that is the last save, on Back or close.
+                if (disposing) trigger = "close";
+            }
             try
             {
                 await turn.WaitAsync(token);
@@ -254,10 +265,12 @@ public sealed class ProgressCoordinator
                 {
                     if (!dirty) return;
                 }
-                Failed("turn", error);
+                Failed("turn", error, trigger);
                 return;
             }
             string stage = "capture";
+            DateTimeOffset captureStarted = owner.clock.GetUtcNow();
+            DateTimeOffset? writeStarted = null;
             try
             {
                 lock (gate)
@@ -280,6 +293,7 @@ public sealed class ProgressCoordinator
                     return;
                 }
                 stage = "write";
+                writeStarted = owner.clock.GetUtcNow();
                 await owner.store.SaveReadingLocationAsync(guideId, json, estimate, token)
                     .WaitAsync(token).ConfigureAwait(false);
                 lastJson = json;
@@ -291,7 +305,10 @@ public sealed class ProgressCoordinator
             }
             catch (Exception error)
             {
-                Failed(stage, error);
+                DateTimeOffset ended = owner.clock.GetUtcNow();
+                long captureMs = Milliseconds(captureStarted, writeStarted ?? ended);
+                long writeMs = writeStarted is DateTimeOffset started ? Milliseconds(started, ended) : 0;
+                Failed(stage, error, trigger, captureMs, writeMs);
             }
             finally
             {
@@ -299,7 +316,11 @@ public sealed class ProgressCoordinator
             }
         }
 
-        private void Failed(string stage, Exception error)
+        private static long Milliseconds(DateTimeOffset from, DateTimeOffset to) =>
+            (long)Math.Round((to - from).TotalMilliseconds);
+
+        private void Failed(
+            string stage, Exception error, string trigger, long captureMs = 0, long writeMs = 0)
         {
             bool report;
             lock (gate)
@@ -310,7 +331,7 @@ public sealed class ProgressCoordinator
                 report = !failureReported;
                 failureReported = true;
             }
-            owner.RecordFailure(stage, error);
+            owner.RecordFailure(stage, error, trigger, captureMs, writeMs);
             if (report) owner.SaveFailed?.Invoke(owner, new ProgressSaveFailedEventArgs(guideId, error));
         }
 

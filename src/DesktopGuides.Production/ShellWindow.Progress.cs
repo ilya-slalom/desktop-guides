@@ -57,6 +57,9 @@ public sealed partial class ShellWindow
                         stage = lastFailure.Stage,
                         type = lastFailure.ErrorType,
                         hresult = lastFailure.HResult,
+                        trigger = lastFailure.Trigger,
+                        captureMs = lastFailure.CaptureMs,
+                        writeMs = lastFailure.WriteMs,
                     },
                 }));
                 File.Move(temp, path, true);
