@@ -2629,6 +2629,9 @@ function Run-ProviderScenarios {
         $igdbReady = $true
     }
     catch {
+        # The fixtures supply their own key files, so a failure here is a
+        # broken fixture, not a missing user key: a skip would pass silently.
+        if ($providers.source -eq 'fixtures') { throw }
         $providers.live = 'skipped'
         $providers.liveSkipReason = $_.Exception.Message
     }
@@ -2638,6 +2641,7 @@ function Run-ProviderScenarios {
         $steamGridDbFile = $SteamGridDbCredentialFile
     }
     catch {
+        if ($providers.source -eq 'fixtures') { throw }
         $providers.steamGridDb = 'skipped'
         $providers.steamGridDbSkipReason = $_.Exception.Message
     }
