@@ -1294,7 +1294,32 @@ try {
         else {
             Click-Element $expander
         }
-        [void](Wait-VisibleById 'IgdbClientIdInput')
+        # Show-SettingsCard brings the header into view, and an expanded card
+        # at the bottom edge leaves its fields below the fold. The Test button
+        # row is the card's last control row; once it shows, the fields above
+        # it do too.
+        [void](Scroll-SettingsUntilVisible 'ProviderTestButton')
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            $field = Find-ById 'IgdbClientIdInput'
+            if ($field -and -not $field.Current.IsOffscreen) { return }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        # Record why, for a failure no other check explains.
+        $state = $null
+        $current = Find-ById 'ProviderSettingsExpander'
+        if ($current -and $current.TryGetCurrentPattern(
+            [System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$pattern)) {
+            $state = "$($pattern.Current.ExpandCollapseState)"
+        }
+        $report.providerFieldHidden = [ordered]@{
+            expanderState = $state
+            expanderBounds = if ($current) { "$($current.Current.BoundingRectangle)" } else { $null }
+            fieldFound = [bool] $field
+            fieldBounds = if ($field) { "$($field.Current.BoundingRectangle)" } else { $null }
+        }
+        $report.providerFieldScreenshot = Save-WindowScreenshot 'provider-field-hidden'
+        throw "Expected visible 'IgdbClientIdInput'."
     }
 
     function Assert-ProviderSettingsExpanded {
@@ -6743,6 +6768,9 @@ try {
         }
     }
     elseif ($Mode -eq 'provider-settings') {
+        # The provider card's controls need more height than the runner's
+        # default window; use the size other layout-dependent modes do.
+        Resize-ShellWindow 1500 720
         $igdb = Read-LabelledValues $IgdbCredentialFile @('igdb client id', 'igdb client secret')
         $steamGridDbKey = $null
         if ($SteamGridDbCredentialFile) {
@@ -6782,6 +6810,9 @@ try {
         [void](Wait-Status 'Library ready.')
     }
     elseif ($Mode -eq 'provider-live') {
+        # The Add game dialog's results row is 360 px tall; in a short window
+        # Add manually is scrolled out of view, so use the size other modes do.
+        Resize-ShellWindow 1500 720
         Open-AddGameSearch
         Set-SearchQuery 'Half-Life'
         Start-Sleep -Seconds 1
@@ -6872,9 +6903,19 @@ try {
         $report.cancelAttempts = 0
         for ($attempt = 1; $attempt -le 3 -and -not $report.cancelObserved; $attempt++) {
             $report.cancelAttempts = $attempt
+            # An earlier attempt's search may still be running, which keeps the box disabled.
+            [void](Wait-EnabledById 'GameSearchInput')
             Set-SearchQuery 'Final Fantasy'
             Invoke-Element (Wait-EnabledById 'GameSearchButton')
-            $cancel = Find-ById 'GameSearchCancel'
+            # Cancel can appear a moment after the search starts; not seeing it at once
+            # doesn't mean the search finished.
+            $cancel = $null
+            $deadline = (Get-Date).AddSeconds(2)
+            do {
+                $cancel = Find-ById 'GameSearchCancel'
+                if ($cancel -and -not $cancel.Current.IsOffscreen) { break }
+                Start-Sleep -Milliseconds 100
+            } while ((Get-Date) -lt $deadline)
             if (-not $cancel -or $cancel.Current.IsOffscreen) {
                 $report.cancelReason = 'The search finished before Cancel could be pressed.'
                 Start-Sleep -Seconds 2
@@ -6894,6 +6935,24 @@ try {
         }
         if ($report.cancelObserved) { $report.phases += 'cancel-during-search-shows-nothing' }
 
+        # After a cancel the dialog must still offer Add manually; record why if not.
+        $deadline = (Get-Date).AddSeconds(5)
+        do {
+            $manual = Find-ById 'AddGameManuallyLink'
+            if ($manual -and -not $manual.Current.IsOffscreen) { break }
+            Start-Sleep -Milliseconds 200
+        } while ((Get-Date) -lt $deadline)
+        if (-not $manual -or $manual.Current.IsOffscreen) {
+            $dialogElement = Find-ById 'GameSearchInput'
+            $report.manualLinkAfterCancel = [ordered]@{
+                found = [bool] $manual
+                enabled = if ($manual) { $manual.Current.IsEnabled } else { $null }
+                bounds = if ($manual) { "$($manual.Current.BoundingRectangle)" } else { $null }
+                searchBoxBounds = if ($dialogElement) { "$($dialogElement.Current.BoundingRectangle)" } else { $null }
+                results = (Get-SearchResults).Count
+            }
+            $report.manualLinkScreenshot = Save-WindowScreenshot 'provider-live-after-cancel'
+        }
         Invoke-Element (Wait-VisibleById 'AddGameManuallyLink')
         [void](Wait-VisibleById 'GameTitleInput')
         Assert-Absent 'GameEditorNotice'
@@ -6904,6 +6963,7 @@ try {
         $report.phases += 'add-manually-from-search'
     }
     elseif ($Mode -eq 'provider-remove') {
+        Resize-ShellWindow 1500 720
         Open-ProviderSettings
         Invoke-Element (Wait-EnabledById 'ProviderRemoveButton')
         [void](Wait-Name 'ProviderSettingsStatus' 'Provider credentials removed.')

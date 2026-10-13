@@ -184,7 +184,9 @@ One PR:
   [38379616531](https://github.com/ilya-slalom/desktop-guides/actions/runs/38379616531)
   passed all five portable shards, with no ✗ line in any evidence
   checklist.
-- **PR run:** pending.
+- **PR run:** [38383088085](https://github.com/ilya-slalom/desktop-guides/actions/runs/38383088085)
+  passed on the first attempt, with all 10 shards. Merged in #100 (merge
+  commit `77af7a5`).
 
 ## Out of scope
 
