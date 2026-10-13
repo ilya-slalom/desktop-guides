@@ -3335,7 +3335,10 @@ try {
                     throw ("$step had $($counts.failures) failed saves; the last failed at " +
                         "$($last.stage) with $($last.type) (0x$('{0:X8}' -f [int] $last.hresult)), " +
                         "started by $($last.trigger), after $($last.captureMs) ms capturing and " +
-                        "$($last.writeMs) ms writing.")
+                        "$($last.writeMs) ms writing. The write waited $($counts.failureContext.gateWaitMs) ms " +
+                        "for the gate and $($counts.failureContext.queueWaitMs) ms for a thread, and its SQL ran " +
+                        "$($counts.failureContext.workMs) ms (-1: not reached); the pool had " +
+                        "$($counts.failureContext.poolThreads) threads and $($counts.failureContext.poolPending) queued items.")
                 }
                 if ([int] $counts.openFailures -ne 0) {
                     $report.progressOpenFailures = [ordered]@{
