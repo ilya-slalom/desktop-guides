@@ -382,6 +382,42 @@ jobs:
             --version 1.0.0.0 `
             --architecture x64
           exit $LASTEXITCODE
+      - name: Check the fixture providers are Preview-only
+        if: matrix.architecture == 'x64'
+        shell: pwsh
+        run: |
+          # T17.2 D: the fake-provider wiring is compiled out of the Public
+          # lane (#if !PUBLIC_LANE). The Preview package is the positive
+          # control, so this check can't pass because the string moved.
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          function Test-DllString([string] $msix, [string] $text) {
+            $zip = [System.IO.Compression.ZipFile]::OpenRead($msix)
+            try {
+              $entry = $zip.Entries | Where-Object { $_.FullName -eq 'DesktopGuides.Production.dll' } |
+                Select-Object -First 1
+              if (-not $entry) { throw "$msix has no DesktopGuides.Production.dll." }
+              $stream = $entry.Open()
+              $memory = [System.IO.MemoryStream]::new()
+              try { $stream.CopyTo($memory) } finally { $stream.Dispose() }
+              $bytes = $memory.ToArray()
+              # String literals are UTF-16 and may start at an odd offset.
+              foreach ($start in 0, 1) {
+                $decoded = [Text.Encoding]::Unicode.GetString($bytes, $start, $bytes.Length - $start)
+                if ($decoded.Contains($text)) { return $true }
+              }
+              return $false
+            }
+            finally { $zip.Dispose() }
+          }
+          $preview = @(Get-ChildItem artifacts/production-build -Filter 'DesktopGuides.Production_*_x64.msix')[0].FullName
+          $public = @(Get-ChildItem artifacts/public-lane -Recurse -Filter 'DesktopGuides.Production_*_x64.msix')[0].FullName
+          if (-not (Test-DllString $preview 'ProviderFixtures')) {
+            throw 'The Preview package lacks the fixture-provider wiring; the check would prove nothing.'
+          }
+          if (Test-DllString $public 'ProviderFixtures') {
+            throw 'The Public package contains the fixture-provider wiring.'
+          }
+          Write-Output 'Fixture providers: in the Preview package, absent from the Public package.'
       - name: Upload production package and manifest
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
