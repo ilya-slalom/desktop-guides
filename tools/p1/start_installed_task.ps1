@@ -42,10 +42,13 @@ param(
 
     # The entry point's own.
     [double] $TimeoutMinutes = 45,
-    [string] $Installer = (Join-Path $PSScriptRoot 'windows_shell_install.ps1')
+    [string] $Installer
 )
 
 $ErrorActionPreference = 'Stop'
+# Resolved here: Windows PowerShell leaves $PSScriptRoot empty in parameter
+# defaults when the script runs with -File.
+if (-not $Installer) { $Installer = Join-Path $PSScriptRoot 'windows_shell_install.ps1' }
 . (Join-Path $PSScriptRoot 'windows_shell_lane.ps1')
 $taskPrefix = 'DesktopGuides-P1-Installed-'
 $pathParameters = @('PackagePath', 'PortableExecutable', 'ResultDirectory',

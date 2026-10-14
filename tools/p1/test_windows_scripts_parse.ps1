@@ -15,6 +15,15 @@ foreach ($file in Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.ps1') {
         $node -is [System.Management.Automation.Language.CommandAst] -and
             $node.GetCommandName() -in @('elseif', 'else')
     }, $true)
+    # Windows PowerShell 5.1 leaves $PSScriptRoot empty in parameter
+    # defaults under -File; resolve such defaults in the script body.
+    if ($ast.ParamBlock) {
+        foreach ($parameter in $ast.ParamBlock.Parameters) {
+            if ($parameter.DefaultValue -and $parameter.DefaultValue.Extent.Text -match '\$PSScriptRoot') {
+                $failures.Add("$($file.Name):$($parameter.Extent.StartLineNumber): -$($parameter.Name.VariablePath.UserPath) defaults to a `$PSScriptRoot path")
+            }
+        }
+    }
     # Names are case-insensitive: assigning $lane to a validated -Lane
     # parameter fails at run time with "cannot be validated".
     $validated = @()

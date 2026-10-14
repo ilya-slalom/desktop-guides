@@ -5,11 +5,14 @@ param(
     # A portable bundle list (BundleFileListPath), one relative path a line.
     [string] $FileList,
     [string] $Msix,
-    [string] $LockFile = (Join-Path $PSScriptRoot '..\..\src\DesktopGuides.Production\packages.lock.json'),
+    [string] $LockFile,
     [string] $PackageRoot,
     [string] $MinimumRuntime = '2.5.1.0'
 )
 $ErrorActionPreference = 'Stop'
+# Resolved here: Windows PowerShell leaves $PSScriptRoot empty in parameter
+# defaults when the script runs with -File.
+if (-not $LockFile) { $LockFile = Join-Path $PSScriptRoot '..\..\src\DesktopGuides.Production\packages.lock.json' }
 $excluded = @('Microsoft.WindowsAppSDK.AI', 'Microsoft.WindowsAppSDK.ML',
     'Microsoft.WindowsAppSDK.Search', 'Microsoft.WindowsAppSDK.Widgets',
     'Microsoft.WindowsAppSDK.DWrite', 'Microsoft.Windows.AI.MachineLearning')
