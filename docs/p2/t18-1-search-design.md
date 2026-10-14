@@ -134,16 +134,24 @@ See the [PR a plan](t18-1-search-plan.md).
   - three `ColumnOf` tests;
   - the keyboard table, plus a routing test.
 
-  The full Core suite passes, 1189/1189.
+  The full Core suite passes, 1190/1190, with the review fix's test
+  `ResumingTakesTheCurrentPlaceAsTheBaseline`.
 - **Production:** it builds with 0 errors and 0 warnings.
 - **Installed:** dispatch
   [38600617803](https://github.com/ilya-slalom/desktop-guides/actions/runs/38600617803)
   passed the new `navigation` shard on both lanes (`find-txt`, `find-back`
-  and `find-unsupported`).
-  - **What failed:** `reader-toolbar-ui`. Its test harness still used the
-    removed `FindAction`, and its smoke tested the old prompt dialog.
-  - **The fix:** the harness now logs the toolbar's `FindRequested`, and
-    the smoke expects it. The re-dispatch is recorded in the PR.
+  and `find-unsupported`), but failed `reader-toolbar-ui`: its harness
+  still used the removed `FindAction`, and its smoke tested the old prompt
+  dialog. The harness now logs the toolbar's `FindRequested`, and the smoke
+  expects it. The re-dispatch,
+  [38615503420](https://github.com/ilya-slalom/desktop-guides/actions/runs/38615503420),
+  passed every job. The [find-txt screenshot](evidence/ci/t18-1/find-txt.png)
+  is from it.
+- **Final review:** two Important findings, both fixed:
+  1. closing the bar saved the match's place on the next tick; resuming
+     now takes the place shown as the baseline, without saving it;
+  2. two quick Ctrl+F presses could open the bar twice and leak a pause;
+     opening is now guarded, and needs the guide's tracking to have started.
 - **Rulings:**
   1. **No custom highlight brush.** A theme-aware brush can't be looked up
      reliably from code-behind, so `TextHighlighter`'s default system
@@ -156,3 +164,6 @@ See the [PR a plan](t18-1-search-plan.md).
      higher after Page Down. The installer checks the stored estimate.
   4. **The toolbar smoke follows the find-bar change:** it expects the
      find request, not the prompt.
+  5. **The open-twice fix has no failing test first.** The race needs two
+     key presses inside the pause's await, which the installed smoke can't
+     time reliably.
