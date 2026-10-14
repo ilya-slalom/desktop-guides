@@ -24,6 +24,7 @@ param(
     [switch] $BackupOnly,
     [switch] $WorkflowOnly,
     [switch] $RcOnly,
+    [switch] $NavigationOnly,
     [string[]] $Groups,
     [string[]] $PassFilter,
     [string] $IgdbCredentialFile,

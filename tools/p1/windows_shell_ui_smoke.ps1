@@ -26,6 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
+        'find-txt', 'find-back', 'find-unsupported',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -1556,12 +1557,13 @@ try {
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
+        'find-txt', 'find-back', 'find-unsupported',
         'workflow-pdf-exit')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
             elseif ($Mode -like 'html-theme-*') { 'Web Theme Game' }
             elseif ($Mode -like 'pdf-*') { 'PDF Reader Game' }
-            elseif ($Mode -like 'progress-*' -or $Mode -like 'completion-*') { 'Progress Game' }
+            elseif ($Mode -like 'progress-*' -or $Mode -like 'completion-*' -or $Mode -like 'find-*') { 'Progress Game' }
             elseif ($Mode -like 'text-size-*') { 'Text Size Game' }
             elseif ($Mode -like 'workflow-*') { 'Workflow Game' }
             else { 'Text Reader Game' }
@@ -4294,6 +4296,95 @@ try {
                 [void](Assert-RowHelp 'GuideList' $workflowGuides.pdf.title '*Completed*')
                 $report.workflowRestoredScreenshot = Save-WindowScreenshot 'workflow-restored'
                 $report.phases += 'workflow-restored-places'
+            }
+        }
+        elseif ($Mode -like 'find-*') {
+            # T18.1: in-guide search. Searching must never save the reading place.
+            function Read-Saves { return [int] (Read-ProgressCounts).saves }
+
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            Resize-ShellWindow 1500 720
+            Select-Element $textGame
+            [void](Wait-Name 'GameHeading' $textGame)
+            [void](Wait-Status 'Game ready.')
+
+            if ($Mode -eq 'find-txt') {
+                Open-TextGuide 'Numbered Lines Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Wait-FirstTextRow
+                Wait-TopLine 1 'Opening'
+                Start-Sleep -Seconds 2
+                $baseline = Read-Saves
+                [System.Windows.Forms.SendKeys]::SendWait('^f')
+                [void](Wait-VisibleById 'ReaderFindBar')
+                Wait-FocusedId 'FindQueryInput'
+                # Typed, not set: the keys, the space included, must stay in the box.
+                [System.Windows.Forms.SendKeys]::SendWait('line 0250')
+                Start-Sleep -Milliseconds 300
+                Wait-TopLine 1 'Typing a query'
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                [void](Wait-Name 'FindCount' '1 of 1')
+                Start-Sleep -Milliseconds 500
+                $top = Get-TopLine
+                if ($top -gt 250 -or $top -lt 240) { throw "After finding Line 0250 the top line is $top." }
+                $report.findTopLine = $top
+                Invoke-Element (Wait-VisibleById 'FindBackButton')
+                Wait-TopLine 1 'Back to my place'
+                (Get-SearchPattern 'FindQueryInput').SetValue('line 02')
+                (Wait-VisibleById 'FindQueryInput').SetFocus()
+                Wait-FocusedId 'FindQueryInput'
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                [void](Wait-Name 'FindCount' '1 of 100')
+                [System.Windows.Forms.SendKeys]::SendWait('{F3}')
+                [void](Wait-Name 'FindCount' '2 of 100')
+                [System.Windows.Forms.SendKeys]::SendWait('+{F3}')
+                [void](Wait-Name 'FindCount' '1 of 100')
+                [System.Windows.Forms.SendKeys]::SendWait('+{F3}')
+                [void](Wait-Name 'FindCount' '100 of 100')
+                $report.findScreenshot = Save-WindowScreenshot 'find-txt'
+                [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                Wait-HiddenById 'ReaderFindBar'
+                # Longer than the 1 s quiet timer and the 4 s deadline.
+                Start-Sleep -Seconds 5
+                $afterSearch = Read-Saves
+                if ($afterSearch -ne $baseline) {
+                    throw "Searching saved the place: saves went from $baseline to $afterSearch."
+                }
+                $report.findSavedNothing = $true
+                [System.Windows.Forms.SendKeys]::SendWait('{PGDN}')
+                $deadline = (Get-Date).AddSeconds(8)
+                do {
+                    Start-Sleep -Milliseconds 250
+                    $afterMove = Read-Saves
+                } while ($afterMove -le $baseline -and (Get-Date) -lt $deadline)
+                if ($afterMove -le $baseline) { throw 'After closing the find bar, paging down saved nothing.' }
+                $report.phases += 'find-txt'
+            }
+            elseif ($Mode -eq 'find-back') {
+                Open-TextGuide 'Numbered Lines Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Wait-FirstTextRow
+                [System.Windows.Forms.SendKeys]::SendWait('^f')
+                [void](Wait-VisibleById 'ReaderFindBar')
+                (Get-SearchPattern 'FindQueryInput').SetValue('line 0300')
+                (Wait-VisibleById 'FindQueryInput').SetFocus()
+                Wait-FocusedId 'FindQueryInput'
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                [void](Wait-Name 'FindCount' '1 of 1')
+                [System.Windows.Forms.SendKeys]::SendWait('%{LEFT}')
+                [void](Wait-Name 'GameHeading' $textGame)
+                $report.phases += 'find-back'
+            }
+            elseif ($Mode -eq 'find-unsupported') {
+                # HTML search arrives in T18.1 PR b; until then Ctrl+F says so.
+                Open-TextGuide 'Long Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                [System.Windows.Forms.SendKeys]::SendWait('^f')
+                [void](Wait-Status "Search isn't available for this guide.")
+                Assert-Absent 'ReaderFindBar'
+                $report.phases += 'find-unsupported'
             }
         }
         else {

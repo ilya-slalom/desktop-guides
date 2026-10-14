@@ -28,6 +28,8 @@ param(
     # T17.3: the release-candidate journey. Needs -Lane Public, -ReleaseSigned,
     # -PreviousPackage and -PackagePath (the candidate); runs alone.
     [switch] $RcOnly,
+    # T18.1: in-guide search.
+    [switch] $NavigationOnly,
 
     # Or name several groups, as CI shards do. They still run in the order
     # listed below. Don't combine with an *Only switch.
@@ -90,6 +92,7 @@ $scenarioGroups = [ordered]@{
     'provider' = $ProviderOnly.IsPresent
     'backup' = $BackupOnly.IsPresent
     'workflow' = $WorkflowOnly.IsPresent
+    'navigation' = $NavigationOnly.IsPresent
     'rc' = $RcOnly.IsPresent
 }
 $selectedGroups = @($scenarioGroups.Keys | Where-Object { $scenarioGroups[$_] })
@@ -1706,6 +1709,31 @@ function Run-PdfReaderScenarios {
     }
 }
 
+# T18.1: in-guide search. Searching must never save the reading place; the
+# smoke checks the save count, and this checks the stored estimate.
+function Run-NavigationScenarios {
+    $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
+    Invoke-ShellSeed @('seed-progress', $dataRoot, $fixtureRoot) | Out-Null
+    $estimateOf = {
+        param([string] $title)
+        @(Invoke-ShellSeed @('describe-progress', $dataRoot) | ConvertFrom-Json |
+            Where-Object { $_.title -eq $title })[0].estimate
+    }
+
+    $report.findTxt = Invoke-ProgressPass 'find-txt' 0
+    if ($null -eq (& $estimateOf 'Numbered Lines Guide')) {
+        throw 'After closing the find bar and paging down, no place was stored.'
+    }
+
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.findBack = Invoke-ProgressPass 'find-back' 0
+    if ($null -ne (& $estimateOf 'Numbered Lines Guide')) {
+        throw 'Leaving the guide with the find bar open stored a place.'
+    }
+
+    $report.findUnsupported = Invoke-ProgressPass 'find-unsupported' 0
+}
+
 function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $Kill, [string] $resultName = $mode) {
     Start-InstalledShell
     $processId = $report.launchedProcessId
@@ -3113,6 +3141,7 @@ try {
     if (Enter-ScenarioGroup 'provider') { Run-ProviderScenarios }
     if (Enter-ScenarioGroup 'backup') { Run-BackupScenarios }
     if (Enter-ScenarioGroup 'workflow') { Run-WorkflowScenarios }
+    if (Enter-ScenarioGroup 'navigation') { Run-NavigationScenarios }
     if (Enter-ScenarioGroup 'rc') { Run-RcScenarios }
 
     $report.success = $true
