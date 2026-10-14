@@ -381,7 +381,7 @@ try {
     (Find-ById $stand).SetFocus()
     [void](Wait-FocusedId $stand)
     Send-ToolbarKeys '{PGDN}' $stand
-    Assert-ActionStays 'Find boss' 'Page Down with keys off'
+    Assert-ActionStays 'Find requested' 'Page Down with keys off'
     Invoke-Id 'KeysOn'
     (Find-ById $stand).SetFocus()
     foreach ($pair in @(@('{PGDN}', 'Page turn 1'), @('{PGUP}', 'Page turn -1'),
