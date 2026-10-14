@@ -90,7 +90,7 @@ public sealed class HtmlReaderStyleTests
     public void WriteScriptCarriesTheCssAsAJsonLiteral()
     {
         string script = HtmlReaderStyle.WriteScript(ReaderTheme.Dark, 1.5);
-        string literal = JsonSerializer.Serialize(HtmlReaderStyle.Css(ReaderTheme.Dark, 1.5));
+        string literal = JsonSerializer.Serialize(HtmlReaderStyle.Css(ReaderTheme.Dark, 1.5), TestJson.Options);
 
         Assert.Equal(
             "(() => { const css = " + literal + "; " +

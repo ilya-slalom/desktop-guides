@@ -18,18 +18,5 @@ public sealed record PdfSessionDiagnostics(
     int Evictions,
     bool AbandonedExtraction)
 {
-    public string ToJson() => JsonSerializer.Serialize(new
-    {
-        requests = Requests,
-        loads = Loads,
-        staleResults = StaleResults,
-        peakCacheBytes = PeakCacheBytes,
-        maxCacheBytes = MaxCacheBytes,
-        cachedPagesAtClose = CachedPagesAtClose,
-        peakTextPages = PeakTextPages,
-        peakTextCharacters = PeakTextCharacters,
-        disposedCleanly = DisposedCleanly,
-        evictions = Evictions,
-        abandonedExtraction = AbandonedExtraction
-    });
+    public string ToJson() => JsonSerializer.Serialize(this, CoreJsonContext.Default.PdfSessionDiagnostics);
 }

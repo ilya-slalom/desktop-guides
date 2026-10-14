@@ -154,7 +154,9 @@ public static class HtmlLocationRules
     public static string FindArgs(HtmlPosition position)
     {
         ArgumentNullException.ThrowIfNull(position);
-        return JsonSerializer.Serialize(new { offset = position.TextOffset, quote = position.TextQuote, id = position.ElementId });
+        return JsonSerializer.Serialize(
+            new HtmlFindArgs(position.TextOffset, position.TextQuote, position.ElementId),
+            CoreJsonContext.Default.HtmlFindArgs);
     }
 
     public static HtmlRestoreTarget? Resolve(HtmlRestorePlan plan, HtmlFindResult? find)
@@ -323,3 +325,5 @@ public static class HtmlLocationRules
         _ => new RestoreOutcome(RestoreKind.Exact)
     };
 }
+
+internal sealed record HtmlFindArgs(int Offset, string? Quote, string? Id);

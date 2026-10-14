@@ -59,7 +59,7 @@ public static class HtmlReaderStyle
     // The lookup names the tag, so a page element that has the same id is
     // never emptied.
     public static string WriteScript(ReaderTheme theme, double scale) =>
-        "(() => { const css = " + JsonSerializer.Serialize(Css(theme, scale)) + "; " +
+        "(() => { const css = " + JsonSerializer.Serialize(Css(theme, scale), CoreJsonContext.Default.String) + "; " +
         "let style = document.querySelector(\"style#" + ElementId + "\"); " +
         "if (!style) { style = document.createElement(\"style\"); style.id = \"" + ElementId + "\"; " +
         "(document.head || document.documentElement).appendChild(style); } " +

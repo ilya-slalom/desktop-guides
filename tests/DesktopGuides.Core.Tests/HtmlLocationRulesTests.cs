@@ -15,7 +15,7 @@ public sealed class HtmlLocationRulesTests
     private static readonly string OtherSha = new('b', 64);
     private const string Path = "guide.html";
 
-    private static string Str(string? value) => JsonSerializer.Serialize(value);
+    private static string Str(string? value) => JsonSerializer.Serialize(value, TestJson.Options);
 
     private static Dictionary<string, string> GoodRaw() => new()
     {
