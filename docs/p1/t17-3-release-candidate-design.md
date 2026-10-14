@@ -1,9 +1,8 @@
 # T17.3 release-candidate runs design
 
-Status: design approved, 14 October 2026. PR 1 (the harness and the docs)
-is implemented on `feat/p1-t17-3-rc`; the candidate run (tag `v1.0.1`)
-follows. Prerequisites T17.1, T17.2 and T17.4 are merged (T17.4 in #106,
-#107 and #108).
+Status: complete. PR 1 (#110) is merged, and the v1.0.1 candidate run
+passed on 14 October 2026. Publishing the v1.0.1 draft is the user's
+step.
 
 ## Intent
 
@@ -243,3 +242,33 @@ See the [PR 1 plan](t17-3-rc-plan.md).
   3. The firewall handshake is shared, as `Invoke-WithFirewallBlock`.
   4. A release-signed run's cleanup line names the release certificate.
   5. The two parse-test guards were added to pin the bugs above.
+
+## v1.0.1 candidate run record
+
+- **The tag:** `v1.0.1`, at `77f45f2` (the #110 merge), pushed with the
+  user's OK after main's push run
+  [38575975111](https://github.com/ilya-slalom/desktop-guides/actions/runs/38575975111)
+  passed. Release run
+  [38578894569](https://github.com/ilya-slalom/desktop-guides/actions/runs/38578894569)
+  built and signed it, ran its upgrade check, and created the draft.
+- **The assets, checked before the run:**
+  - the MSIX SHA-256 `EAA2F6A0…B478F1` matches the draft's manifest;
+  - the draft's `.cer` is byte-identical to the repo's;
+  - the manifest's signer is the pin.
+
+  v1.0.0 (`F3B75010…015B9`) matched its own manifest.
+- **The run** (`rc` group, pcsx2-win, offline authorized by the user):
+  every evidence line passed.
+  - **Signing and upgrade:** the release signer matches the pin, and the
+    upgrade from 1.0.0.0 to 1.0.1.0 kept the family and left the library
+    intact.
+  - **Offline:** the rule was added, no connection was made, and the rule
+    was removed.
+  - **The stages:** build 8.2 s, read 14.4 s, resume 10.3 s, offline
+    10.5 s, export 4.1 s, restore 13.3 s.
+  - **Cleanup:** the package was removed, the trust wasn't left behind, no
+    tasks or processes remained, and 0 crash entries were logged.
+
+  Afterwards the host had no package, trust, rule or task left.
+- **The record:** the [tested matrix](release/tested-matrix.md) row and
+  `results.md`.

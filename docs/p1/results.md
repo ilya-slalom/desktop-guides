@@ -126,6 +126,7 @@ links the task's own verification section, which has the full evidence.
 | [#106](https://github.com/ilya-slalom/desktop-guides/pull/106) | 2026-10-14 | `1c01e75` | T17.4 (PR a) | [38498084563](https://github.com/ilya-slalom/desktop-guides/actions/runs/38498084563) | 1167 | 784 | [t17-4-size-pass-design](t17-4-size-pass-design.md#pr-a-verification-record) | Both builds exclude the unused Windows App SDK components; a component check runs on every build; releases record sizes and portable launch times. |
 | [#107](https://github.com/ilya-slalom/desktop-guides/pull/107) | 2026-10-14 | `78d02eb` | T17.4 (PR b1) | [38507857287](https://github.com/ilya-slalom/desktop-guides/actions/runs/38507857287) | 1172 | 790 | [t17-4-size-pass-design](t17-4-size-pass-design.md#pr-b1-verification-record) | Trim-safe code: C#/WinRT `partial` types and source-generated JSON; CI fails on a new trim or C#/WinRT warning. |
 | [#108](https://github.com/ilya-slalom/desktop-guides/pull/108) | 2026-10-14 | `3b8c71f` | T17.4 (PR b2) | [38520092403](https://github.com/ilya-slalom/desktop-guides/actions/runs/38520092403) | 1172 | 790 | [t17-4-size-pass-design](t17-4-size-pass-design.md#pr-b2-verification-record) | The portable exe ships trimmed, compressed and ReadyToRun: 59.9 MB. The cold-launch limit was revised to 3.5 s. |
+| [#110](https://github.com/ilya-slalom/desktop-guides/pull/110) | 2026-10-14 | `77f45f2` | T17.3 (PR 1) | [38573092235](https://github.com/ilya-slalom/desktop-guides/actions/runs/38573092235) | 1172 | 790 | [t17-3-release-candidate-design](t17-3-release-candidate-design.md#pr-1-verification-record) | The release-candidate harness: `-Lane Public`, `-ReleaseSigned` and the `rc` group; the tested matrix and the release-note limits. |
 
 ## M2 T04.1 game editor — implementation check, 27 September 2026
 
@@ -1560,6 +1561,21 @@ ReadyToRun ([design](t17-4-size-pass-design.md#pr-b2-verification-record)).
 - **The trimmed crash's root cause** is in the design's PR b2 record. In
   short: C#/WinRT wrappers for types that weren't `partial`, and
   reflection JSON, which trimming turns off. #107 fixed both.
+
+## T17.3: the v1.0.1 release candidate — 14 October 2026
+
+The `rc` group ran on the v1.0.1 draft's own MSIX on pcsx2-win, upgrading
+from v1.0.0, and every stage passed. See the
+[tested matrix](release/tested-matrix.md#101) for the row, and the
+[design](t17-3-release-candidate-design.md) for the method.
+
+- **The package:** `DesktopGuides-1.0.1.0-x64.msix`, SHA-256 `EAA2F6A0…B478F1`,
+  built from `77f45f2` by release run 38578894569. The signer matches the
+  pin.
+- **The run:** 1 minute 42 seconds, stages 4.1 to 14.4 s. The offline rule
+  was user-authorized, added, and removed.
+- **Not claimed:** a clean machine without the Windows App Runtime (T17.8),
+  Windows 10, and ARM64.
 
 ## Intermittent CI failures — triage, 9 October 2026
 
