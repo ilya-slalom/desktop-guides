@@ -17,7 +17,7 @@ public sealed class FixtureProviderHandlerTests : IDisposable
 
     private ProviderHttp Http(object manifest, params (string Name, string Text)[] files)
     {
-        File.WriteAllText(Path.Combine(folder, FixtureProviderHandler.ManifestName), JsonSerializer.Serialize(manifest));
+        File.WriteAllText(Path.Combine(folder, FixtureProviderHandler.ManifestName), JsonSerializer.Serialize(manifest, TestJson.Options));
         foreach ((string name, string text) in files) File.WriteAllText(Path.Combine(folder, name), text);
         return new ProviderHttp(new FixtureProviderHandler(folder));
     }
@@ -105,7 +105,7 @@ public sealed class FixtureProviderHandlerTests : IDisposable
         File.WriteAllText(Path.Combine(folder, FixtureProviderHandler.ManifestName), JsonSerializer.Serialize(new
         {
             routes = new object[] { new { method = "GET", host = "api.igdb.com", path = "/x", status = 200, body = "..\\outside.json" } },
-        }));
+        }, TestJson.Options));
 
         Assert.Throws<InvalidDataException>(() => new FixtureProviderHandler(folder));
     }

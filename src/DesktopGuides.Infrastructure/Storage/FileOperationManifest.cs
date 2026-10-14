@@ -27,12 +27,9 @@ internal sealed record FileOperationManifest(IReadOnlyList<Guid> GuideIds)
     {
         Guid[] ids = NormalizeGuideIds(kind, guideIds.ToArray());
         string[] names = ids.Select(id => id.ToString("N")).ToArray();
-        string json = JsonSerializer.Serialize(new
-        {
-            schemaVersion = 1,
-            guideIds = names,
-            ownedPaths = ExpectedPaths(kind, operationId, names)
-        });
+        string json = JsonSerializer.Serialize(
+            new FileOperationManifestJson(1, names, ExpectedPaths(kind, operationId, names)),
+            InfrastructureJsonContext.Default.FileOperationManifestJson);
         if (Encoding.UTF8.GetByteCount(json) > MaxManifestBytes)
         {
             throw new InvalidDataException("File-operation manifest is too large.");
@@ -158,3 +155,5 @@ internal sealed record FileOperationManifest(IReadOnlyList<Guid> GuideIds)
             .OrderBy(path => path, StringComparer.Ordinal).ToArray();
     }
 }
+
+internal sealed record FileOperationManifestJson(int SchemaVersion, string[] GuideIds, string[] OwnedPaths);

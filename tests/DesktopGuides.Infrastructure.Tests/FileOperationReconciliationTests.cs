@@ -91,7 +91,7 @@ public sealed class FileOperationReconciliationTests
             schemaVersion = 1,
             guideIds = new[] { badGuide.ToString("N") },
             ownedPaths = new[] { "../../outside" }
-        });
+        }, TestJson.Options);
         InsertOperation(directory.Paths.DatabasePath, badOperation, "Import", "Prepared",
             malicious, createdUtcMs: 2);
 
@@ -243,7 +243,7 @@ public sealed class FileOperationReconciliationTests
                 manifest["unexpected"] = true;
                 break;
             case "duplicate-guide":
-                manifest["guideIds"]!.AsArray().Add(guideId.ToString("N"));
+                manifest["guideIds"]!.AsArray().Add((JsonNode)JsonValue.Create(guideId.ToString("N")));
                 break;
         }
         InsertOperation(directory.Paths.DatabasePath, operationId, "Import", "Prepared",
@@ -380,7 +380,7 @@ public sealed class FileOperationReconciliationTests
             schemaVersion = 1,
             guideIds = ids,
             ownedPaths = paths
-        });
+        }, TestJson.Options);
     }
 
     private static void InsertOperation(

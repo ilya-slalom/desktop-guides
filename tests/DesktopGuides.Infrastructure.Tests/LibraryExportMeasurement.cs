@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using DesktopGuides.Core.Backup;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
@@ -67,6 +68,6 @@ public sealed class LibraryExportMeasurement
             gateHeldMs = (long)(written - gateHeld).TotalMilliseconds,
             totalMs = total.ElapsedMilliseconds,
             machine = Environment.MachineName
-        }, new JsonSerializerOptions { WriteIndented = true }));
+        }, new JsonSerializerOptions { WriteIndented = true, TypeInfoResolver = new DefaultJsonTypeInfoResolver() }));
     }
 }
