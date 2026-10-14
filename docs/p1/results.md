@@ -1501,6 +1501,36 @@ back; its 291 files matched the pre-run list by path, size and write time.
 The runs switched the Windows app theme and restored it (dark). The
 extraction folder and the spike copies were removed afterwards.
 
+## T17.4 PR a: components excluded — 14 October 2026
+
+Both builds now exclude the unused Windows App SDK AI, ML, Search, Widgets
+and DWrite components ([design](t17-4-size-pass-design.md)). A component
+check on every CI and release build fails if any of their files comes back.
+
+| Build | Exe or MSIX | Extraction | Cold / warm launch | Measured on |
+| --- | --- | --- | --- | --- |
+| Spike `80d2647` (portable) | 244.0 MB | 551 files, 233.3 MB | 2.2 s / 0.5 s | host |
+| Spike V1 (portable) | 181.8 MB | 485 files, 171.2 MB | 1.5 s / 0.5 s | host |
+| Before PR a (portable, Preview) | 246.0 MB | — | — | host build |
+| PR a portable (Preview) | 183.9 MB | 565 files, 173.1 MB | 2.9 s / 1.24 s | CI runner, run [38492789165](https://github.com/ilya-slalom/desktop-guides/actions/runs/38492789165) |
+| PR a portable (Public) | 183.9 MB | 567 files, 173.1 MB | 2.54 s / 1.10 s | release runner, dry run [38494268276](https://github.com/ilya-slalom/desktop-guides/actions/runs/38494268276) |
+| Before PR a (MSIX, Preview, x64) | 70.3 MB | — | — | host build |
+| PR a MSIX (Public, x64) | 52.6 MB | — | — | release dry run 38494268276 |
+
+- **The MSIX shrank too.** Before the change it carried the ML package's
+  `onnxruntime.dll`, `DirectML.dll` and `Microsoft.ML.OnnxRuntime.dll`,
+  and the AI, Search, Widgets and MachineLearning projection DLLs.
+- **Runner times are a new baseline.** They are each the median of 3
+  launches, timed until the library view shows. They aren't comparable
+  with the spike's host figures, which came from a different machine and a
+  different stopwatch. PR b's launch limit (2.5 s cold) is checked on the
+  host.
+- **The extraction has 565 files, against the spike's V1 with 485.** The
+  bytes match (173.1 MB against 171.2 MB), and the cause of the count
+  difference isn't known. The spike built from `80d2647`, and this build
+  has the features merged since. The bundle lists 650 entries, down from
+  716.
+
 ## Intermittent CI failures — triage, 9 October 2026
 
 A read-only pass over about 200 `windows-ci.yml` runs (5–8 October) found

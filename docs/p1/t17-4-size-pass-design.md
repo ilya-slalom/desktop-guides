@@ -1,7 +1,8 @@
 # T17.4 distribution size pass design
 
-Status: design approved, 14 October 2026. Two PRs: PR a (component
-exclusion and measurement), then PR b (a trim-safe, trimmed portable build).
+Status: design approved, 14 October 2026. PR a (component exclusion and
+measurement) is implemented on `feat/p1-t17-4-size-pass`; PR b (a
+trim-safe, trimmed portable build) follows.
 Prerequisites T17.1 and T17.2 are merged (T17.2's last piece in #104).
 
 ## Intent
@@ -163,6 +164,44 @@ row is revised with the user, since it calls for a trimmed build.
 - The crash's root cause.
 - A size and time table: trimmed against PR a against the spike.
 - The host launch figures.
+
+## PR a verification record
+
+- **The check failed first.** Before the exclusion, on the host:
+  - the portable bundle list (716 entries, exe 246.0 MB) failed, naming
+    `DWriteCore.dll`, `onnxruntime.dll`, `DirectML.dll`, the Workloads,
+    Search and Widgets DLLs and the AI projections;
+  - the Preview MSIX (70.3 MB) failed, naming `DirectML.dll`,
+    `onnxruntime.dll`, `Microsoft.ML.OnnxRuntime.dll` and the AI, Search,
+    Widgets and MachineLearning projection DLLs.
+- **Then it passed.** After it, both builds passed: "none of 60 file
+  names". Both locked restores passed, and the portable publish had no
+  warnings. The exe was 183.8 MB with 650 bundle entries, and the MSIX
+  52.6 MB.
+- **The lock files:** the Production lock file changed only the six
+  packages' entries, with no resolved version moving. The P0 app and the
+  toolbar smoke lock files changed only those packages' `type`, to
+  `CentralTransitive`.
+- **CI dispatch**
+  [38492789165](https://github.com/ilya-slalom/desktop-guides/actions/runs/38492789165)
+  (`core` on the portable lane): the component check passed on both MSIX
+  lanes, the Public MSIX and the bundle list, and `portable-measure`
+  passed. It also found the two stale lock files (NU1004).
+- **Release dry run**
+  [38494268276](https://github.com/ilya-slalom/desktop-guides/actions/runs/38494268276)
+  (tag v1.0.1) passed, and its manifest recorded `measurements`.
+- **Rulings:**
+  1. The check reads the bundle's input list (`FilesToBundle`), because a
+     single-file publish folder holds only the exe.
+  2. The forbidden names are the six packages' own `.dll` and `.winmd`
+     files.
+  3. The MSIX payload is checked as well as its runtime dependency.
+  4. Measurement has its own CI job, `portable-measure`.
+  5. Central versions for the six packages also changed the P0 app's and
+     the toolbar smoke's lock files. They were regenerated rather than the
+     versions moved into the Production project.
+
+Sizes and times are in [results.md](results.md#t174-pr-a-components-excluded--14-october-2026).
 
 ## Out of scope
 
