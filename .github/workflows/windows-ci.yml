@@ -161,6 +161,12 @@ jobs:
       - name: Check portable release packaging
         shell: pwsh
         run: ./tools/p1/test_package_portable_release.ps1
+      - name: Check the excluded-component check
+        shell: pwsh
+        run: ./tools/p1/test_assert_excluded_components.ps1
+      - name: Check the distribution measurement
+        shell: pwsh
+        run: ./tools/p1/test_windows_distribution_measure.ps1
       - name: Check release version parsing
         shell: pwsh
         run: ./tools/p1/test_release_version.ps1
@@ -340,6 +346,7 @@ jobs:
             --version 0.1.0.0 `
             --architecture '${{ matrix.architecture }}'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./tools/p1/assert_excluded_components.ps1 -Msix $packages[0].FullName
           $packageIdentity = $identityJson | ConvertFrom-Json
           New-Item -ItemType Directory -Force artifacts/production-build | Out-Null
           [ordered]@{
@@ -381,7 +388,8 @@ jobs:
             --publisher 'CN=359962D5-3801-484E-BE5B-39D0D498BEA4' `
             --version 1.0.0.0 `
             --architecture x64
-          exit $LASTEXITCODE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./tools/p1/assert_excluded_components.ps1 -Msix $packages[0].FullName
       - name: Check the fixture providers are Preview-only
         if: matrix.architecture == 'x64'
         shell: pwsh
@@ -451,8 +459,9 @@ jobs:
           $publish = "$PWD/artifacts/portable-ci-publish"
           dotnet publish src/DesktopGuides.Production/DesktopGuides.Production.csproj `
             -c Release --no-restore -p:Platform=x64 -p:Portable=true `
-            -p:PublishDir=$publish/
+            -p:PublishDir=$publish/ -p:BundleFileListPath=$PWD/artifacts/portable-bundle-files.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./tools/p1/assert_excluded_components.ps1 -FileList artifacts/portable-bundle-files.txt
           ./tools/p1/package_portable_release.ps1 -Commit $env:GITHUB_SHA `
             -PublishDirectory $publish -OutputDirectory artifacts/portable-ci
       - name: Upload the portable zip
@@ -460,6 +469,36 @@ jobs:
         with:
           name: desktop-guides-portable-x64
           path: artifacts/portable-ci/*
+          if-no-files-found: error
+
+  # T17.4: the portable exe's size, extraction and launch times. A job of
+  # its own, so the installed shards don't wait for it.
+  portable-measure:
+    needs: portable-packages
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: desktop-guides-portable-x64
+          path: artifacts/portable-measure/download
+      - name: Measure the portable exe
+        shell: pwsh
+        run: |
+          $zips = @(Get-ChildItem artifacts/portable-measure/download -Filter 'DesktopGuides-portable-x64-*.zip')
+          if ($zips.Count -ne 1) { throw "Expected one portable zip, found $($zips.Count)." }
+          Expand-Archive -LiteralPath $zips[0].FullName -DestinationPath artifacts/portable-measure/exe
+          ./tools/p1/start_installed_task.ps1 `
+            -PortableExecutable artifacts/portable-measure/exe/DesktopGuides.Production.exe `
+            -ResultDirectory artifacts/portable-measure/result `
+            -Installer ./tools/p1/measure_distribution.ps1 -TimeoutMinutes 10
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Content artifacts/portable-measure/result/measurements.json
+      - name: Upload the portable measurements
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-guides-portable-measurements
+          path: artifacts/portable-measure/result/measurements.json
           if-no-files-found: error
 
   public-upgrade:

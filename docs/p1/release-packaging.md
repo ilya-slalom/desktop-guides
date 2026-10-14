@@ -104,6 +104,14 @@ release output until its complete native P1 workflow passes. Both the MSIX
 and the portable exe carry `THIRD-PARTY-NOTICES.txt`, the MIT notice for
 the Fluent UI System Icons used by the optional colorful icons (T11.5).
 
+`release-manifest.json` also records `measurements` (T17.4): the MSIX size,
+and for the portable exe its size, what its first launch extracts (files
+and bytes), and the median cold and warm launch times on the release
+runner, from start until the library view shows. Each cold launch starts
+with an empty extraction folder; warm launches reuse one. Runner times are
+noisier than a desktop's, so compare them with earlier releases, not with
+host measurements.
+
 The app icon (T17.6) is the source for every logo in
 `src/DesktopGuides.Production/Assets`: the Square44x44 logo at five scales
 and 14 target sizes (plain, unplated and light-unplated), Square150x150,

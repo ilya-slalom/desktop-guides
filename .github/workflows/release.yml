@@ -174,12 +174,25 @@ jobs:
           $publish = "$PWD/artifacts/portable-release-publish"
           dotnet publish src/DesktopGuides.Production/DesktopGuides.Production.csproj `
             -c Release --no-restore -p:Platform=x64 -p:Portable=true -p:PackageLane=Public `
-            -p:PublishDir=$publish/
+            -p:PublishDir=$publish/ -p:BundleFileListPath=$PWD/artifacts/portable-release-bundle-files.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./tools/p1/package_portable_release.ps1 -Commit $env:COMMIT -Version ($env:VERSION -replace '\.0$', '') `
             -PublishDirectory $publish -OutputDirectory artifacts/release
           # Its build record names the runner; keep it in the run artifact, not the release.
           Move-Item "artifacts/release/DesktopGuides-portable-x64-$($env:VERSION -replace '\.0$', '').json" artifacts/
+      - name: Check the release builds for excluded components
+        shell: pwsh
+        run: |
+          ./tools/p1/assert_excluded_components.ps1 -FileList artifacts/portable-release-bundle-files.txt
+          ./tools/p1/assert_excluded_components.ps1 -Msix "artifacts/release/DesktopGuides-$env:VERSION-x64.msix"
+      - name: Measure the portable release
+        shell: pwsh
+        run: |
+          # The public exe, before zipping; the zip holds the same bytes.
+          ./tools/p1/start_installed_task.ps1 `
+            -PortableExecutable artifacts/portable-release-publish/DesktopGuides.Production.exe `
+            -ResultDirectory artifacts/measure -Installer ./tools/p1/measure_distribution.ps1 -TimeoutMinutes 10
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Write the release manifest and notes
         shell: pwsh
         run: |
@@ -198,6 +211,10 @@ jobs:
             identity = [ordered]@{ name = 'IlyaLissoboi.DesktopGuides'; publisher = 'CN=359962D5-3801-484E-BE5B-39D0D498BEA4'; architecture = 'x64' }
             msix = [ordered]@{ file = $msix.Name; bytes = $msix.Length; sha256 = $msixHash }
             portable = [ordered]@{ file = $portable.Name; bytes = $portable.Length; sha256 = (Get-FileHash $portable.FullName -Algorithm SHA256).Hash }
+            measurements = [ordered]@{
+              msixBytes = $msix.Length
+              portable = Get-Content artifacts/measure/measurements.json -Raw | ConvertFrom-Json
+            }
             signer = [ordered]@{ thumbprint = $signing.signerThumbprint; notAfter = $pin.notAfter; timestamped = $signing.timestamped }
             windowsAppRuntimeMinimum = '${{ steps.package.outputs.runtime }}'
             windowsAppSdk = $windowsAppSdk
@@ -206,7 +223,7 @@ jobs:
               webView2 = 'https://developer.microsoft.com/microsoft-edge/webview2/'
             }
             previousRelease = '${{ steps.package.outputs.previous }}' -ne ''
-          } | ConvertTo-Json -Depth 4 | Set-Content artifacts/release/release-manifest.json -Encoding utf8
+          } | ConvertTo-Json -Depth 6 | Set-Content artifacts/release/release-manifest.json -Encoding utf8
           Copy-Item docs/p1/release/desktop-guides-release.cer artifacts/release/
           $notes = Get-Content docs/p1/release/release-notes-template.md -Raw
           $notes = $notes -replace '(?s)^<!--.*?-->\s*', ''
