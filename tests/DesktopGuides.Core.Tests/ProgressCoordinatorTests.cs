@@ -513,6 +513,58 @@ public sealed class ProgressCoordinatorTests
         Assert.Equal(0, session.Subscribers);
     }
 
+    [Fact]
+    public async Task PauseSavesAPendingMoveThenIgnoresMovement()
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        FakeSession session = new();
+        IProgressTracking tracking = Track(coordinator, GuideA, session, null);
+
+        session.Move();
+        string before = session.CurrentJson;
+        IDisposable pause = await tracking.PauseAsync(CancellationToken.None);
+        Assert.Equal(before, store.Writes[^1].Json);
+
+        session.Move();
+        clock.Advance(TimeSpan.FromSeconds(10));
+        await tracking.FlushAsync(CancellationToken.None);
+        Assert.Single(store.Writes);
+        pause.Dispose();
+    }
+
+    [Fact]
+    public async Task AfterResumingTheNextMoveSaves()
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        FakeSession session = new();
+        IProgressTracking tracking = Track(coordinator, GuideA, session, session.CurrentJson);
+
+        IDisposable pause = await tracking.PauseAsync(CancellationToken.None);
+        session.Move();
+        pause.Dispose();
+        pause.Dispose();
+        clock.Advance(TimeSpan.FromSeconds(10));
+        Assert.Empty(store.Writes);
+
+        session.Move();
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal(session.CurrentJson, Assert.Single(store.Writes).Json);
+    }
+
+    [Fact]
+    public async Task DisposeWhilePausedSavesNothing()
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        FakeSession session = new();
+        IProgressTracking tracking = Track(coordinator, GuideA, session, session.CurrentJson);
+
+        _ = await tracking.PauseAsync(CancellationToken.None);
+        session.Move();
+        await tracking.DisposeAsync();
+
+        Assert.Empty(store.Writes);
+    }
+
     private static IProgressTracking Track(
         ProgressCoordinator coordinator, Guid guideId, FakeSession session,
         string? restoredJson, SynchronizationContext? context = null)

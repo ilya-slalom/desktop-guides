@@ -28,6 +28,11 @@ public interface IProgressTracking : IAsyncDisposable
 
     // Stops tracking without saving, for a session that has failed.
     void Abandon();
+
+    // T18.1: saves a pending move, then saves nothing (not even on flush or
+    // dispose) until the returned handle is disposed. Search holds it, so
+    // moving to matches never moves the saved place.
+    Task<IDisposable> PauseAsync(CancellationToken token);
 }
 
 // Saves the open guide's position 1 s after movement stops, or 4 s after the
@@ -129,6 +134,7 @@ public sealed class ProgressCoordinator
         private bool disposing;
         private bool ended;
         private bool failureReported;
+        private int pauses;
 
         public Tracking(
             ProgressCoordinator owner, Guid guideId, IReaderSession session,
@@ -172,6 +178,35 @@ public sealed class ProgressCoordinator
 
         public void Abandon() => End();
 
+        public async Task<IDisposable> PauseAsync(CancellationToken token)
+        {
+            await FlushAsync(token);
+            lock (gate)
+            {
+                pauses++;
+                StopTimers();
+            }
+            return new Pause(this);
+        }
+
+        private void Resume()
+        {
+            lock (gate)
+            {
+                if (pauses > 0) pauses--;
+            }
+        }
+
+        private sealed class Pause(Tracking owner) : IDisposable
+        {
+            private int disposed;
+
+            public void Dispose()
+            {
+                if (Interlocked.Exchange(ref disposed, 1) == 0) owner.Resume();
+            }
+        }
+
         internal void End()
         {
             lock (gate)
@@ -190,7 +225,7 @@ public sealed class ProgressCoordinator
         {
             lock (gate)
             {
-                if (ended || disposing) return;
+                if (ended || disposing || pauses > 0) return;
                 dirty = true;
                 quiet.Change(Quiet, Timeout.InfiniteTimeSpan);
                 ArmDeadline();
@@ -275,7 +310,7 @@ public sealed class ProgressCoordinator
             {
                 lock (gate)
                 {
-                    if (ended || !dirty) return;
+                    if (ended || !dirty || pauses > 0) return;
                     dirty = false;
                     StopTimers();
                 }
