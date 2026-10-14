@@ -1,8 +1,8 @@
 # T17.4 distribution size pass design
 
-Status: design approved, 14 October 2026. PR a (component exclusion and
-measurement) is implemented on `feat/p1-t17-4-size-pass`; PR b (a
-trim-safe, trimmed portable build) follows.
+Status: PR a merged in #106 (merge commit `1c01e75`). PR b1 (trim-safe
+code and the warning gate) is implemented on `feat/p1-t17-4-trim`; PR b2
+(the trimmed, compressed exe) follows.
 Prerequisites T17.1 and T17.2 are merged (T17.2's last piece in #104).
 
 ## Intent
@@ -265,6 +265,23 @@ compressed exe). See the [b1 plan](t17-4-trim-plan.md).
     while the build stays at `TrimMode=partial`.
 - **The allow-list:** `IL2104` for AngleSharp, `Microsoft.Windows.SDK.NET`
   and `WinRT.Runtime`.
+- **CI dispatch
+  [38505896730](https://github.com/ilya-slalom/desktop-guides/actions/runs/38505896730)**
+  (`html` on both lanes): every job passed. `core-tests` ran the gate's
+  tests under pwsh 7, `portable-trim-analysis` reported "Trim warnings:
+  none new; 3 allowed.", and the `html` shards passed on both lanes.
+- **Rulings:**
+  1. The gate reads the publish log; see the first bullet.
+  2. PR b splits into b1 and b2.
+  3. Production's JSON is checked by the gate and the installed shards,
+     because that project has no unit-test project.
+  4. Reflection JSON is off in the Core and Infrastructure test projects.
+  5. The gate resolves its default paths in its body. Windows PowerShell
+     5.1 leaves `$PSScriptRoot` empty in parameter defaults under `-File`,
+     so the first version crashed on its first real run. A test now runs
+     it that way.
+  6. Two test-side JSON calls needed the explicit reflection path: one
+     test's options, and a `JsonArray.Add<T>` call.
 
 ## Out of scope
 
