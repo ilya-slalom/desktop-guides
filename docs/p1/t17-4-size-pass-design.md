@@ -192,6 +192,15 @@ row is revised with the user, since it calls for a trimmed build.
 - **Release dry run**
   [38494268276](https://github.com/ilya-slalom/desktop-guides/actions/runs/38494268276)
   (tag v1.0.1) passed, and its manifest recorded `measurements`.
+- **After the final review's fix,** whose ready signal is `LibraryEmpty`
+  (ruling 6): dry run 38495508903 failed, because the readiness closure got
+  null UI Automation values (`GetNewClosure` keeps only a function's
+  locals). After that fix, dispatch
+  [38496516651](https://github.com/ilya-slalom/desktop-guides/actions/runs/38496516651)
+  passed every job it ran, including `packages`, `reader-toolbar-ui` and
+  `portable-measure`. Dry run
+  [38496519722](https://github.com/ilya-slalom/desktop-guides/actions/runs/38496519722)
+  passed, with `readyWhen` naming `LibraryEmpty`.
 - **Rulings:**
   1. The check reads the bundle's input list (`FilesToBundle`), because a
      single-file publish folder holds only the exe.

@@ -1512,16 +1512,19 @@ check on every CI and release build fails if any of their files comes back.
 | Spike `80d2647` (portable) | 244.0 MB | 551 files, 233.3 MB | 2.2 s / 0.5 s | host |
 | Spike V1 (portable) | 181.8 MB | 485 files, 171.2 MB | 1.5 s / 0.5 s | host |
 | Before PR a (portable, Preview) | 246.0 MB | — | — | host build |
-| PR a portable (Preview) | 183.9 MB | 565 files, 173.1 MB | 2.9 s / 1.24 s | CI runner, run [38492789165](https://github.com/ilya-slalom/desktop-guides/actions/runs/38492789165) |
-| PR a portable (Public) | 183.9 MB | 567 files, 173.1 MB | 2.54 s / 1.10 s | release runner, dry run [38494268276](https://github.com/ilya-slalom/desktop-guides/actions/runs/38494268276) |
+| PR a portable (Preview) | 183.9 MB | 565 files, 173.1 MB | 3.77 s / 1.09 s | CI runner, run [38496516651](https://github.com/ilya-slalom/desktop-guides/actions/runs/38496516651) |
+| PR a portable (Public) | 183.9 MB | 567 files, 173.1 MB | 2.20 s / 0.85 s | release runner, dry run [38496519722](https://github.com/ilya-slalom/desktop-guides/actions/runs/38496519722) |
 | Before PR a (MSIX, Preview, x64) | 70.3 MB | — | — | host build |
-| PR a MSIX (Public, x64) | 52.6 MB | — | — | release dry run 38494268276 |
+| PR a MSIX (Public, x64) | 52.6 MB | — | — | release dry run 38496519722 |
 
 - **The MSIX shrank too.** Before the change it carried the ML package's
   `onnxruntime.dll`, `DirectML.dll` and `Microsoft.ML.OnnxRuntime.dll`,
   and the AI, Search, Widgets and MachineLearning projection DLLs.
-- **Runner times are a new baseline.** They are each the median of 3
-  launches, timed until the library view shows. They aren't comparable
+- **Runner times are a new baseline, and noisy.** They are each the median
+  of 3 launches, timed until the opened, empty library shows
+  (`LibraryEmpty`). The Preview and Public builds differ only in their
+  lane, yet their cold medians, on two runners the same morning, were
+  3.77 s and 2.20 s. They aren't comparable
   with the spike's host figures, which came from a different machine and a
   different stopwatch. PR b's launch limit (2.5 s cold) is checked on the
   host.
