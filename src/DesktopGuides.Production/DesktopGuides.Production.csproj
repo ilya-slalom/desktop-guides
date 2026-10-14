@@ -70,6 +70,16 @@
     <!-- T14.4: Styles/Controls.xaml uses FrameworkElementExtensions directly. -->
     <PackageReference Include="CommunityToolkit.WinUI.Extensions" />
     <PackageReference Include="Microsoft.WindowsAppSDK" />
+    <!-- T17.4: the app uses only Foundation, WinUI and WebView2, and the
+         system DWrite.dll. Referencing only those components made NuGet
+         resolve the Toolkit's metapackage at 1.6, which collides with the
+         2.x components, so the unused ones are excluded instead. -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.AI" ExcludeAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.ML" ExcludeAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Search" ExcludeAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Widgets" ExcludeAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.DWrite" ExcludeAssets="all" />
+    <PackageReference Include="Microsoft.Windows.AI.MachineLearning" ExcludeAssets="all" />
     <ProjectReference Include="../DesktopGuides.Core/DesktopGuides.Core.csproj" />
     <ProjectReference Include="../DesktopGuides.Infrastructure/DesktopGuides.Infrastructure.csproj" />
     <Manifest Include="$(ApplicationManifest)" />
