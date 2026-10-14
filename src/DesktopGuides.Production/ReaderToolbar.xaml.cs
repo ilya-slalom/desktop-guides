@@ -484,24 +484,9 @@ public sealed partial class ReaderToolbar : UserControl
         await ExecuteAsync(new PageJumpAction(page), "go to that page");
     }
 
-    private async void FindInGuideClicked(object sender, RoutedEventArgs args)
-    {
-        IReaderSession? current = session;
-        if (current is null)
-        {
-            return;
-        }
-        string? query = await PromptAsync(
-            "Find in guide", "Search text", "Find", FindInGuide, current);
-        if (query is null || !ReferenceEquals(current, session))
-        {
-            return;
-        }
-        if (query.Length == 0)
-        {
-            CommandFailed?.Invoke("Enter text to find.");
-            return;
-        }
-        await ExecuteAsync(new FindAction(query), "find that text");
-    }
+    // T18.1: the shell opens the find bar; the old prompt dialog is gone.
+    public event EventHandler? FindRequested;
+
+    private void FindInGuideClicked(object sender, RoutedEventArgs args) =>
+        FindRequested?.Invoke(this, EventArgs.Empty);
 }

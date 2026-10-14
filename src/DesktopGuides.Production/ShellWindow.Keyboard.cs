@@ -1,5 +1,6 @@
 using CommunityToolkit.WinUI;
 using DesktopGuides.Core.Navigation;
+using DesktopGuides.Core.Reading;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -14,7 +15,8 @@ public sealed partial class ShellWindow
     // only where KeyboardShortcuts places it, and never over typing.
     private void InitializeKeyboard()
     {
-        AddShortcut(VirtualKey.F, ShortcutCommand.FocusLibrarySearch, FocusLibrarySearch);
+        AddShortcut(VirtualKey.F, ShortcutCommand.FocusLibrarySearch, () =>
+            navigator.Current is ReaderRoute ? OpenFindFromKeyboard() : FocusLibrarySearch());
         AddShortcut(VirtualKey.O, ShortcutCommand.ImportGuide, ImportFromKeyboard);
         // The inner text box marks Esc handled, so this runs on the way down.
         LibrarySearchInput.PreviewKeyDown += LibrarySearchKeyDown;
@@ -36,10 +38,23 @@ public sealed partial class ShellWindow
             _ = GoBackFromKeyboardAsync();
             return;
         }
+        // T18.1: F3 and Shift+F3 step matches, even from the find box.
+        if (navigator.Current is ReaderRoute && args.Key == VirtualKey.F3 && ReaderFind.Visibility == Visibility.Visible)
+        {
+            args.Handled = true;
+            _ = FindStepAsync(modifiers == VirtualKeyModifiers.Shift ? FindDirection.Previous : FindDirection.Next);
+            return;
+        }
         if (navigator.Current is ReaderRoute && args.OriginalSource is not (TextBox or PasswordBox))
         {
             args.Handled = ReaderActions.TryRunKey(args.Key, modifiers);
         }
+    }
+
+    private bool OpenFindFromKeyboard()
+    {
+        _ = OpenFindAsync();
+        return true;
     }
 
     private static void ShowShortcut(FrameworkElement control, string label, ShortcutCommand command)
@@ -53,7 +68,11 @@ public sealed partial class ShellWindow
         KeyboardAccelerator accelerator = new() { Key = key, Modifiers = VirtualKeyModifiers.Control };
         accelerator.Invoked += (_, args) =>
         {
-            if (ShortcutRouting.Resolve(command, navigator.Current, TextInputFocused(), DialogOpen())
+            // T18.1: in the reader, Ctrl+F is the guide search, not the library's.
+            ShortcutCommand resolved = navigator.Current is ReaderRoute && command == ShortcutCommand.FocusLibrarySearch
+                ? ShortcutCommand.FindInGuide
+                : command;
+            if (ShortcutRouting.Resolve(resolved, navigator.Current, TextInputFocused(), DialogOpen())
                 == ShortcutDecision.Run)
             {
                 args.Handled = run();

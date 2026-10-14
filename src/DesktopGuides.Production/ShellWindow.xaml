@@ -509,6 +509,7 @@
 
                 <StackPanel Grid.Row="1">
                     <local:ReaderToolbar x:Name="ReaderActions" />
+                    <local:FindBar x:Name="ReaderFind" Visibility="Collapsed" />
                     <!-- Collapsed while closed, so the Reader's layout is unchanged without a link. -->
                     <InfoBar x:Name="ReaderExternalLinkBar"
                              Margin="{StaticResource DesktopGuidesReaderGapAbove}"
