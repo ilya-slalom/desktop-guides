@@ -8,14 +8,14 @@ internal static class GameMetadataJson
 {
     public const int MaxLength = 65536;
 
-    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
+    private static readonly InfrastructureJsonContext Json = new(new JsonSerializerOptions(JsonSerializerDefaults.Web)
     {
-        Converters = { new JsonStringEnumConverter(allowIntegerValues: false) }
-    };
+        Converters = { new JsonStringEnumConverter<GameTypeTag>(allowIntegerValues: false) }
+    });
 
     public static string Serialize(GameMetadataSnapshot snapshot)
     {
-        string json = JsonSerializer.Serialize(snapshot, Options);
+        string json = JsonSerializer.Serialize(snapshot, Json.GameMetadataSnapshot);
         if (json.Length > MaxLength)
         {
             throw new ArgumentException("The metadata snapshot is too large to store.", nameof(snapshot));
@@ -28,7 +28,7 @@ internal static class GameMetadataJson
         if (string.IsNullOrEmpty(json) || json.Length > MaxLength) return null;
         try
         {
-            GameMetadataSnapshot? value = JsonSerializer.Deserialize<GameMetadataSnapshot>(json, Options);
+            GameMetadataSnapshot? value = JsonSerializer.Deserialize(json, Json.GameMetadataSnapshot);
             return value is { SchemaVersion: GameMetadataSnapshot.CurrentSchemaVersion } &&
                 value.Genres is not null && value.Developers is not null &&
                 value.Publishers is not null && value.Platforms is not null &&

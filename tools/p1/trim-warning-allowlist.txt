@@ -1,0 +1,6 @@
+# T17.4: trim warnings the portable build accepts, checked by
+# assert_trim_warnings.ps1. One "IL2104 <assembly>  # reason" a line, for
+# assemblies the project doesn't own. The project's own code gets no entries.
+IL2104 AngleSharp  # HTML import parser; reflection over its own element and options types, reviewed in T17.4 (design, PR b1 record)
+IL2104 Microsoft.Windows.SDK.NET  # Windows SDK projection; warnings are in its generated ABI marshalling for generic WinRT interfaces
+IL2104 WinRT.Runtime  # C#/WinRT runtime; warnings are in its own marshalling helpers, outside the project's code

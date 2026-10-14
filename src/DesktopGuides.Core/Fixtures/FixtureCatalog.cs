@@ -23,8 +23,7 @@ public sealed class FixtureCatalog
     {
         string fullRoot = System.IO.Path.GetFullPath(root);
         string manifestText = File.ReadAllText(System.IO.Path.Combine(fullRoot, "manifest.json"));
-        FixtureManifest? manifest = JsonSerializer.Deserialize<FixtureManifest>(
-            manifestText, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        FixtureManifest? manifest = JsonSerializer.Deserialize(manifestText, ManifestJson.FixtureManifest);
         if (manifest?.SchemaVersion != 1 || manifest.Fixtures is null)
         {
             throw new InvalidDataException("Unsupported fixture manifest.");
@@ -80,5 +79,8 @@ public sealed class FixtureCatalog
 
     public string Resolve(string id) => paths[id];
 
-    private sealed record FixtureManifest(int SchemaVersion, List<FixtureEntry> Fixtures);
+    private static readonly CoreJsonContext ManifestJson =
+        new(new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+    internal sealed record FixtureManifest(int SchemaVersion, List<FixtureEntry> Fixtures);
 }

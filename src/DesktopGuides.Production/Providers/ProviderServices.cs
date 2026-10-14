@@ -5,7 +5,7 @@ using DesktopGuides.Infrastructure.Providers;
 
 namespace DesktopGuides.Production.Providers;
 
-internal sealed class ProviderServices : IDisposable
+internal sealed partial class ProviderServices : IDisposable
 {
     public ProviderServices(string localStatePath)
     {

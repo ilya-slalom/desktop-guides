@@ -67,29 +67,36 @@ public sealed class HtmlSessionDiagnostics
     {
         lock (gate)
         {
-            return JsonSerializer.Serialize(new
-            {
-                guideId = guideId.ToString("N"),
-                served = served.ToArray(),
-                denied = denied
+            return JsonSerializer.Serialize(new HtmlSessionDiagnosticsJson(
+                guideId.ToString("N"),
+                served.ToArray(),
+                denied
                     .OrderBy(pair => pair.Key.Reason.ToString(), StringComparer.Ordinal)
                     .ThenBy(pair => pair.Key.Context, StringComparer.Ordinal)
-                    .Select(pair => new { reason = pair.Key.Reason.ToString(), context = pair.Key.Context, count = pair.Value })
+                    .Select(pair => new HtmlDeniedJson(pair.Key.Reason.ToString(), pair.Key.Context, pair.Value))
                     .ToArray(),
                 rejectedCaptures,
-                restores = new Dictionary<string, int>(restores),
+                new Dictionary<string, int>(restores),
                 entryNavigations,
-                appearance = new
-                {
-                    theme = appearanceTheme,
-                    scale = appearanceScale,
-                    applications = appearanceApplications,
-                    failures = appearanceFailures,
-                    bodyBackground = appearanceComputed?.BodyBackground,
-                    bodyColor = appearanceComputed?.BodyColor,
-                    rootZoom = appearanceComputed?.RootZoom
-                }
-            });
+                new HtmlAppearanceJson(
+                    appearanceTheme,
+                    appearanceScale,
+                    appearanceApplications,
+                    appearanceFailures,
+                    appearanceComputed?.BodyBackground,
+                    appearanceComputed?.BodyColor,
+                    appearanceComputed?.RootZoom)),
+                CoreJsonContext.Default.HtmlSessionDiagnosticsJson);
         }
     }
 }
+
+internal sealed record HtmlSessionDiagnosticsJson(
+    string GuideId, string[] Served, HtmlDeniedJson[] Denied, int RejectedCaptures,
+    Dictionary<string, int> Restores, int EntryNavigations, HtmlAppearanceJson Appearance);
+
+internal sealed record HtmlDeniedJson(string Reason, string Context, int Count);
+
+internal sealed record HtmlAppearanceJson(
+    string? Theme, double? Scale, int Applications, int Failures,
+    string? BodyBackground, string? BodyColor, string? RootZoom);

@@ -35,7 +35,7 @@ public static class ProviderCredentialBlob
             root["igdb"] = new JsonObject { ["clientId"] = igdb.ClientId, ["clientSecret"] = igdb.ClientSecret };
         }
         if (valid.SteamGridDbKey is { } key) root["steamGridDbKey"] = key;
-        return JsonSerializer.SerializeToUtf8Bytes(root);
+        return JsonSerializer.SerializeToUtf8Bytes(root, InfrastructureJsonContext.Default.JsonObject);
     }
 
     public static ProviderCredentials Parse(ReadOnlySpan<byte> data)

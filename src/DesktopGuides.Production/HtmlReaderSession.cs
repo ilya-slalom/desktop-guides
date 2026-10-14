@@ -453,7 +453,9 @@ internal sealed class HtmlReaderSession : IReaderSession
     // own refreshes and redirects look like a person's click to the
     // navigation policy. Runtime.evaluate without one keeps them page-initiated.
     private static string EvaluateParams(string script) =>
-        JsonSerializer.Serialize(new { expression = script, returnByValue = true, userGesture = false });
+        JsonSerializer.Serialize(
+            new DevToolsEvaluateParams(script, ReturnByValue: true, UserGesture: false),
+            ProductionJsonContext.Default.DevToolsEvaluateParams);
 
     // The value as JSON, as ExecuteScriptAsync would give it; null when the
     // script threw.
@@ -894,17 +896,17 @@ internal sealed class HtmlReaderSession : IReaderSession
         {
             string? locator = current is null ? null : ReaderLocationCodec.Serialize(
                 HtmlLocationRules.Capture(contentSha256 ?? string.Empty, policy.Entry.RequestPath, current));
-            string json = JsonSerializer.Serialize(new
-            {
-                locator,
-                kind = lastOutcome?.Kind.ToString(),
-                step = lastStep?.ToString(),
-                reason = lastOutcome?.Reason,
-                appearanceKind = appearanceOutcome?.Kind.ToString(),
-                appearanceStep = appearanceStep?.ToString(),
-                appearanceScale,
-                appearanceRestores
-            });
+            string json = JsonSerializer.Serialize(
+                new HtmlPositionForTest(
+                    locator,
+                    lastOutcome?.Kind.ToString(),
+                    lastStep?.ToString(),
+                    lastOutcome?.Reason,
+                    appearanceOutcome?.Kind.ToString(),
+                    appearanceStep?.ToString(),
+                    appearanceScale,
+                    appearanceRestores),
+                ProductionJsonContext.Default.HtmlPositionForTest);
             string folder = Path.Combine(cacheRoot, "diagnostics");
             Directory.CreateDirectory(folder);
             string path = Path.Combine(folder, $"html-position-{Environment.ProcessId}.json");

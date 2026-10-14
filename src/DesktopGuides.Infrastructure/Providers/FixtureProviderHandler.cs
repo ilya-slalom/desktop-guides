@@ -13,7 +13,7 @@ public sealed class FixtureProviderHandler : HttpMessageHandler
     public const string ManifestName = "manifest.json";
     public const string UnmatchedName = "unmatched.json";
 
-    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
+    private static readonly InfrastructureJsonContext Json = new(new JsonSerializerOptions(JsonSerializerDefaults.Web));
     private readonly string folder;
     private readonly IReadOnlyList<FixtureRoute> routes;
     private readonly int[] used;
@@ -23,7 +23,7 @@ public sealed class FixtureProviderHandler : HttpMessageHandler
     {
         this.folder = Path.GetFullPath(folder);
         string manifest = File.ReadAllText(Path.Combine(this.folder, ManifestName));
-        routes = JsonSerializer.Deserialize<FixtureManifest>(manifest, Options)?.Routes ?? [];
+        routes = JsonSerializer.Deserialize(manifest, Json.FixtureManifest)?.Routes ?? [];
         foreach (FixtureRoute route in routes)
         {
             if (route.Body is string body && Path.GetFileName(body) != body)
@@ -80,17 +80,17 @@ public sealed class FixtureProviderHandler : HttpMessageHandler
     {
         string path = Path.Combine(folder, UnmatchedName);
         List<UnmatchedRequest> entries = File.Exists(path)
-            ? JsonSerializer.Deserialize<List<UnmatchedRequest>>(File.ReadAllText(path), Options) ?? []
+            ? JsonSerializer.Deserialize(File.ReadAllText(path), Json.ListUnmatchedRequest) ?? []
             : [];
         entries.Add(new UnmatchedRequest(method, uri.Host, uri.AbsolutePath));
-        File.WriteAllText(path, JsonSerializer.Serialize(entries, Options));
+        File.WriteAllText(path, JsonSerializer.Serialize(entries, Json.ListUnmatchedRequest));
     }
 
-    private sealed record FixtureManifest(IReadOnlyList<FixtureRoute> Routes);
+    internal sealed record FixtureManifest(IReadOnlyList<FixtureRoute> Routes);
 
-    private sealed record FixtureRoute(
+    internal sealed record FixtureRoute(
         string Method, string Host, string Path, string? Contains, int Status, string? Body,
         int? RetryAfterSeconds, int DelayMilliseconds, int? Times);
 
-    private sealed record UnmatchedRequest(string Method, string Host, string Path);
+    internal sealed record UnmatchedRequest(string Method, string Host, string Path);
 }

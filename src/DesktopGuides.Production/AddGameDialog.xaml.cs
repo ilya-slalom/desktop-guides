@@ -11,7 +11,7 @@ using Windows.Storage.Streams;
 
 namespace DesktopGuides.Production;
 
-public sealed class GameSearchItem : ArtworkItem
+public sealed partial class GameSearchItem : ArtworkItem
 {
     internal GameSearchItem(ProviderSearchResult result)
         : this(

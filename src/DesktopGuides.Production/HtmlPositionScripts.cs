@@ -176,7 +176,7 @@ internal static class HtmlPositionScripts
     // Puts the character's box top at the viewport top, clamped by the
     // browser to the scroll range.
     public static string ScrollToOffset(int offset) =>
-        "(() => {" + Prelude + "const offset = " + JsonSerializer.Serialize(offset) + ";" + """
+        "(() => {" + Prelude + "const offset = " + JsonSerializer.Serialize(offset, ProductionJsonContext.Default.Int32) + ";" + """
         const w = walk(), box = boxAt(w, offset);
         if (box === null) return null;
         // The page's first text is its start: the margin above it stays.
@@ -187,7 +187,7 @@ internal static class HtmlPositionScripts
         """;
 
     public static string ScrollToFraction(double fraction) =>
-        "(() => {" + Prelude + "const f = " + JsonSerializer.Serialize(fraction) + ";" + """
+        "(() => {" + Prelude + "const f = " + JsonSerializer.Serialize(fraction, ProductionJsonContext.Default.Double) + ";" + """
         const max = heightOf.call(scrollingOf.call(document)) - innerHeight;
         scrollTo(0, max > 0 ? f * max : 0);
         return pending();
