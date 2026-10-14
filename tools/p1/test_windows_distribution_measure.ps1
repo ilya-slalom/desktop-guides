@@ -17,6 +17,15 @@ $summary = New-LaunchSummary @(1210.4, 1190.6, 1500.2)
 Assert-True ($summary.medianMs -eq 1210) "Unexpected median: $($summary.medianMs)"
 Assert-True ((@($summary.runsMs) -join ',') -eq '1210,1191,1500') "Runs keep their order: $(@($summary.runsMs) -join ',')"
 
+# Ready only once the library has opened: the navigation item exists from
+# the first frame, before the library opens, so it alone isn't ready.
+function New-Finder([string[]] $Present) { return { param([string] $id) $id -in $Present }.GetNewClosure() }
+Assert-True (-not (Test-LibraryShown (New-Finder @('LibraryNavigation')))) 'The navigation item alone is not ready.'
+Assert-True (Test-LibraryShown (New-Finder @('LibraryNavigation', 'LibraryEmpty'))) 'The empty library view is ready.'
+$refusal = $null
+try { Test-LibraryShown (New-Finder @('LibraryNavigation', 'LibraryUnavailable')) | Out-Null } catch { $refusal = "$_" }
+Assert-True ($refusal -like '*library could not open*') "An unavailable library should fail, got: $refusal"
+
 $scratch = Join-Path ([IO.Path]::GetTempPath()) "desktop-guides-measure-test-$([Guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path (Join-Path $scratch 'tree\sub') | Out-Null
 $saved = $env:LOCALAPPDATA

@@ -25,3 +25,15 @@ function New-LaunchSummary([double[]] $Runs) {
         runsMs = @($Runs | ForEach-Object { [long] [Math]::Round($_, [MidpointRounding]::AwayFromZero) })
     }
 }
+
+# Whether a launch has reached the opened library. $Find takes an
+# AutomationId and says whether that element shows. The navigation item
+# exists from the first frame, so readiness is the empty library view that
+# rendering shows once the library has opened; a timed launch always opens
+# the empty library its untimed first launch created.
+function Test-LibraryShown([scriptblock] $Find) {
+    if (& $Find 'LibraryUnavailable') {
+        throw 'The library could not open, so the launch time means nothing.'
+    }
+    return [bool] (& $Find 'LibraryEmpty')
+}

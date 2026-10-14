@@ -47,7 +47,8 @@ own plan).
   the six packages' `type` (Transitive to Direct) and their
   `requested` ranges.
 - **Ready means:** the main window exists, and UI Automation finds
-  `LibraryNavigation` and no `LibraryUnavailable`.
+  `LibraryNavigation` and no `LibraryUnavailable`. (Superseded in the
+  final review: ready is `LibraryEmpty`; see the design's ruling 6.)
 - **Launch runs:** one untimed first launch, then 3 cold launches (each
   with a new, empty extraction folder) and 3 warm launches (reusing the
   last cold extraction). Each figure is the median.

@@ -25,8 +25,6 @@ if ($sessionId -eq 0 -or -not @(Get-Process explorer -ErrorAction SilentlyContin
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 $automation = [System.Windows.Automation.AutomationElement]
 $descendants = [System.Windows.Automation.TreeScope]::Descendants
-$library = [System.Windows.Automation.PropertyCondition]::new($automation::AutomationIdProperty, 'LibraryNavigation')
-$unavailable = [System.Windows.Automation.PropertyCondition]::new($automation::AutomationIdProperty, 'LibraryUnavailable')
 
 function Stop-MeasuredApp([Diagnostics.Process] $Process) {
     if ($Process.HasExited) { return }
@@ -50,12 +48,14 @@ function Measure-Launch([string] $ExtractBase) {
             if ($process.MainWindowHandle -ne 0) {
                 $root = $null
                 try { $root = $automation::FromHandle($process.MainWindowHandle) } catch { }
-                if ($root -and $root.FindFirst($descendants, $library)) {
-                    $elapsed = $clock.Elapsed.TotalMilliseconds
-                    if ($root.FindFirst($descendants, $unavailable)) {
-                        throw 'The library could not open, so the launch time means nothing.'
-                    }
-                    return $elapsed
+                $find = {
+                    param([string] $id)
+                    $condition = [System.Windows.Automation.PropertyCondition]::new(
+                        $automation::AutomationIdProperty, $id)
+                    return [bool] $root.FindFirst($descendants, $condition)
+                }.GetNewClosure()
+                if ($root -and (Test-LibraryShown $find)) {
+                    return $clock.Elapsed.TotalMilliseconds
                 }
             }
             if ($clock.Elapsed.TotalSeconds -gt $ReadyTimeoutSeconds) {
@@ -89,7 +89,7 @@ try {
         extraction = $extraction
         coldLaunch = New-LaunchSummary $cold
         warmLaunch = New-LaunchSummary $warm
-        readyWhen = 'the main window shows and UI Automation finds LibraryNavigation'
+        readyWhen = 'UI Automation finds the opened, empty library view (LibraryEmpty)'
         osBuild = [Environment]::OSVersion.Version.ToString()
         processor = (Get-CimInstance Win32_Processor | Select-Object -First 1).Name
         measuredAt = (Get-Date).ToUniversalTime().ToString('o')

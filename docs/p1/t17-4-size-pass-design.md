@@ -69,9 +69,11 @@ writes its result into the release manifest as a `measurements` block:
 - **Sizes:** the MSIX and portable exe in bytes, and the extraction's file
   count and total bytes.
 - **Cold launch:** from starting the portable exe, with its
-  `%TEMP%\.net` extraction folder removed first, until the main window
-  exists and UI Automation finds `LibraryNavigation`. This is the wait the
-  installed smoke already uses, so the app doesn't change.
+  `%TEMP%\.net` extraction folder removed first, until UI Automation finds
+  the opened, empty library view (`LibraryEmpty`). The installed smoke
+  waits for the same element, so the app doesn't change. (The navigation
+  item `LibraryNavigation` shows from the first frame, before the library
+  opens, so it doesn't mark readiness; see the PR a verification record.)
 - **Warm launch:** the same, on a following launch.
 - **Runs:** the median of 3 runs for each launch time.
 
@@ -200,6 +202,13 @@ row is revised with the user, since it calls for a trimmed build.
   5. Central versions for the six packages also changed the P0 app's and
      the toolbar smoke's lock files. They were regenerated rather than the
      versions moved into the Production project.
+  6. Launches are ready at `LibraryEmpty`, not `LibraryNavigation`. The
+     final review found that the navigation item exists before the library
+     opens, so a failed open would still have counted as ready. A launch
+     that shows `LibraryUnavailable` fails the run, and one that never
+     reaches the empty library times out. The first measurements (the
+     dispatch and dry run above) used the navigation item and are
+     superseded.
 
 Sizes and times are in [results.md](results.md#t174-pr-a-components-excluded--14-october-2026).
 
