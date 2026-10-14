@@ -48,11 +48,15 @@ function Measure-Launch([string] $ExtractBase) {
             if ($process.MainWindowHandle -ne 0) {
                 $root = $null
                 try { $root = $automation::FromHandle($process.MainWindowHandle) } catch { }
+                # GetNewClosure keeps only this function's locals, so the
+                # script-level UIA values are copied in first.
+                $window = $root
+                $idProperty = $automation::AutomationIdProperty
+                $scope = $descendants
                 $find = {
                     param([string] $id)
-                    $condition = [System.Windows.Automation.PropertyCondition]::new(
-                        $automation::AutomationIdProperty, $id)
-                    return [bool] $root.FindFirst($descendants, $condition)
+                    $condition = [System.Windows.Automation.PropertyCondition]::new($idProperty, $id)
+                    return [bool] $window.FindFirst($scope, $condition)
                 }.GetNewClosure()
                 if ($root -and (Test-LibraryShown $find)) {
                     return $clock.Elapsed.TotalMilliseconds
