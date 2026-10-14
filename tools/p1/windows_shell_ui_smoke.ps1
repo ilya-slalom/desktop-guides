@@ -25,7 +25,7 @@ param(
         'import-reminder', 'export-backup', 'export-cancel', 'export-protected',
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
-        'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-export', 'workflow-restore',
+        'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -1555,7 +1555,7 @@ try {
         'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry',
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
-        'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-export', 'workflow-restore',
+        'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
         'workflow-pdf-exit')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
@@ -4214,6 +4214,15 @@ try {
                 [void](Assert-RowHelp 'GuideList' $pdf '*Completed*')
                 $report.workflowCompletedScreenshot = Save-WindowScreenshot 'workflow-completed'
                 $report.phases += 'workflow-pdf-completed'
+            }
+            elseif ($Mode -eq 'workflow-offline') {
+                # T17.3: with the app's network blocked, each managed copy
+                # still opens at its place, and nothing reaches out.
+                $state = Read-WorkflowState
+                Enter-WorkflowGame
+                Assert-WorkflowPlaces $state 'Relaunching offline'
+                Assert-NoRemoteConnections 'offline relaunch'
+                $report.phases += 'workflow-offline'
             }
             elseif ($Mode -eq 'workflow-pdf-exit') {
                 # #93: render a PDF page and leave it, so the close that
