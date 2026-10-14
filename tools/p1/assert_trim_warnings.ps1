@@ -5,10 +5,14 @@
 param(
     [Parameter(Mandatory = $true)]
     [string] $Log,
-    [string] $AllowList = (Join-Path $PSScriptRoot 'trim-warning-allowlist.txt'),
-    [string] $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+    [string] $AllowList,
+    [string] $RepoRoot
 )
 $ErrorActionPreference = 'Stop'
+# Resolved here: Windows PowerShell leaves $PSScriptRoot empty in parameter
+# defaults when the script runs with -File.
+if (-not $AllowList) { $AllowList = Join-Path $PSScriptRoot 'trim-warning-allowlist.txt' }
+if (-not $RepoRoot) { $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path }
 $lines = @(Get-Content -LiteralPath $Log)
 if (-not ($lines | Where-Object { $_ -like '*Optimizing assemblies for size*' })) {
     throw "$Log shows no trimming; it isn't a trim-analysis publish."

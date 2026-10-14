@@ -59,6 +59,16 @@ try {
     $plain = New-Log 'plain.log' @('Build succeeded.')
     Assert-Rejected { & $gate -Log $plain @common } 'shows no trimming' 'A log without trimming should fail.'
 
+    # Run as CI and the host do, with -File and the default allow-list:
+    # Windows PowerShell leaves $PSScriptRoot empty in parameter defaults.
+    $shell = (Get-Process -Id $PID).Path
+    $bare = New-Log 'bare.log' @($trimmed)
+    $ErrorActionPreference = 'Continue'
+    $default = & $shell -NoProfile -ExecutionPolicy Bypass -File $gate -Log $bare 2>&1
+    $ErrorActionPreference = 'Stop'
+    Assert-True ($LASTEXITCODE -eq 0 -and "$default" -like 'Trim warnings: none new*') `
+        "The default allow-list should load under -File, got: $default"
+
     # Entries need a reason, and only assembly-level entries are allowed.
     $noReason = Join-Path $scratch 'no-reason.txt'
     Set-Content -LiteralPath $noReason -Value @('IL2104 WinRT.Runtime')
