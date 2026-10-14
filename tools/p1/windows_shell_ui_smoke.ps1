@@ -104,7 +104,10 @@ param(
     # the file that carries recorded places from one stage to the next.
     [string] $WorkflowRoot = '',
 
-    [string] $WorkflowStatePath = ''
+    [string] $WorkflowStatePath = '',
+
+    # T17.3: the lane's event prefix, from the installer.
+    [string] $EventPrefix = 'DesktopGuides.Preview'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -2661,7 +2664,7 @@ try {
             # is still on top.
             $delay = [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::ManualReset,
-                "Local\DesktopGuides.Preview.HtmlAssetDelay.$ProcessId")
+                "Local\$EventPrefix.HtmlAssetDelay.$ProcessId")
             try {
                 $delayed = Open-RestoredGuide 'Long Web Guide' $saved
             }
@@ -4288,7 +4291,7 @@ try {
             # The view re-measures at a larger test font size on this signal.
             $remeasure = [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::AutoReset,
-                "Local\DesktopGuides.Preview.TextRemeasure.$($process.Id)")
+                "Local\$EventPrefix.TextRemeasure.$($process.Id)")
             $report.txtPosition = [ordered]@{}
             [void](Wait-Name 'LibraryHeading' 'Library')
             # Startup found Missing File Guide's file gone (TR15.1).

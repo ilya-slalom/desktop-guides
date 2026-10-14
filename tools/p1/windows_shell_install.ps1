@@ -25,6 +25,9 @@ param(
     [switch] $ProviderOnly,
     [switch] $BackupOnly,
     [switch] $WorkflowOnly,
+    # T17.3: the release-candidate journey. Needs -Lane Public, -ReleaseSigned,
+    # -PreviousPackage and -PackagePath (the candidate); runs alone.
+    [switch] $RcOnly,
 
     # Or name several groups, as CI shards do. They still run in the order
     # listed below. Don't combine with an *Only switch.
@@ -46,11 +49,28 @@ param(
 
     # T17.2 D: with no real IGDB credential file, run the provider group
     # against the recorded fixtures in tests/fixtures/p1/providers.
-    [switch] $FakeProviders
+    [switch] $FakeProviders,
+
+    # T17.3: Public drives the released identity: IlyaLissoboi.DesktopGuides,
+    # with events under Local\DesktopGuides.*.
+    [ValidateSet('Preview', 'Public')]
+    [string] $Lane = 'Preview',
+
+    # T17.3: install packages already signed with the release certificate,
+    # checked against docs/p1/release/release-certificate.json; nothing is
+    # re-signed.
+    [switch] $ReleaseSigned,
+
+    # T17.3: the published release the rc group upgrades from.
+    [string] $PreviousPackage
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+. (Join-Path $PSScriptRoot 'windows_shell_lane.ps1')
+$lane = Get-ShellLane $Lane
+$lanePackage = $lane.PackageName
+$eventPrefix = $lane.EventPrefix
 # Scenario groups in run order; CI's shell-scope input uses these names.
 $scenarioGroups = [ordered]@{
     'core' = $CoreOnly.IsPresent
@@ -103,6 +123,12 @@ if ($portable -eq [bool]$PackagePath) {
     throw 'Pass either -PackagePath or -PortableExecutable.'
 }
 . (Join-Path $PSScriptRoot 'windows_shell_profile.ps1')
+if ($ReleaseSigned -and $portable) { throw '-ReleaseSigned applies only to an MSIX.' }
+if ($ReleaseSigned -and $Lane -ne 'Public') { throw '-ReleaseSigned needs -Lane Public.' }
+if (-not $portable -and $Lane -eq 'Public' -and -not $ReleaseSigned) {
+    throw 'A Public MSIX can only be installed release-signed: pass -ReleaseSigned.'
+}
+if ($PreviousPackage -and -not $RcOnly) { throw '-PreviousPackage applies only to the rc group.' }
 if ($portable) {
     if ((Split-Path $PortableExecutable -Leaf) -ne 'DesktopGuides.Production.exe' -or
         -not (Test-Path -LiteralPath $PortableExecutable -PathType Leaf)) {
@@ -120,10 +146,10 @@ else {
     if ($packageName -notmatch '^DesktopGuides\.Production_[0-9]+(\.[0-9]+){3}_x64\.msix$') {
         throw "Expected an x64 production MSIX, got $packageName."
     }
-    if (Get-AppxPackage -Name DesktopGuides.Preview) {
-        throw 'A production preview package is already installed; refusing to replace it.'
+    if (Get-AppxPackage -Name $lanePackage) {
+        throw "A $lanePackage package is already installed; refusing to replace it."
     }
-    Assert-FreshPreviewProfile $env:LOCALAPPDATA
+    Assert-FreshPackageProfile $env:LOCALAPPDATA $lanePackage
 }
 . (Join-Path $PSScriptRoot 'windows_shell_smoke_result.ps1')
 . (Join-Path $PSScriptRoot 'windows_shell_task_cleanup.ps1')
@@ -310,7 +336,7 @@ function Assert-SingleInstance {
     $focusResultPath = "$secondLaunchResultPath.foreground.json"
     $activationEvent = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::AutoReset,
-        'Local\DesktopGuides.Preview.RedirectedActivation')
+        "Local\$eventPrefix.RedirectedActivation")
     try {
         $activationEvent.Reset() | Out-Null
         Register-ScheduledTask -TaskName $secondLaunchTask -Action $foregroundAction `
@@ -563,10 +589,10 @@ function Assert-ReaderRenderErrorDoesNotSaveResume {
     $processId = $report.launchedProcessId
     $reached = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::AutoReset,
-        "Local\DesktopGuides.Preview.ReaderLoad.$($processId).Reached")
+        "Local\$eventPrefix.ReaderLoad.$($processId).Reached")
     $resume = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
-        "Local\DesktopGuides.Preview.ReaderLoad.$($processId).Continue")
+        "Local\$eventPrefix.ReaderLoad.$($processId).Continue")
     $fixtureCorrupted = $false
     try {
         $report.queuedBeforeRenderError = Run-ShellSmoke 'queue-reader-render-error'
@@ -627,10 +653,10 @@ function Assert-ClosingTargetRedirect {
     $closingProcessId = $report.launchedProcessId
     $selected = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::AutoReset,
-        'Local\DesktopGuides.Preview.RedirectSelected')
+        "Local\$eventPrefix.RedirectSelected")
     $resume = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
-        'Local\DesktopGuides.Preview.RedirectContinue')
+        "Local\$eventPrefix.RedirectContinue")
     try {
         $selected.Reset() | Out-Null
         $resume.Reset() | Out-Null
@@ -659,10 +685,10 @@ function Assert-QueuedActivationClose {
     $closingProcessId = $report.launchedProcessId
     $queued = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::AutoReset,
-        'Local\DesktopGuides.Preview.ActivationQueued')
+        "Local\$eventPrefix.ActivationQueued")
     $resume = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
-        'Local\DesktopGuides.Preview.ActivationContinue')
+        "Local\$eventPrefix.ActivationContinue")
     try {
         $queued.Reset() | Out-Null
         $resume.Reset() | Out-Null
@@ -691,10 +717,10 @@ function Assert-AcceptedThenClose {
     $closingProcessId = $report.launchedProcessId
     $received = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::AutoReset,
-        'Local\DesktopGuides.Preview.AcceptanceReceived')
+        "Local\$eventPrefix.AcceptanceReceived")
     $resume = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
-        'Local\DesktopGuides.Preview.AcceptanceContinue')
+        "Local\$eventPrefix.AcceptanceContinue")
     try {
         $received.Reset() | Out-Null
         $resume.Reset() | Out-Null
@@ -777,6 +803,7 @@ function Run-ShellSmoke(
             ' -ExitDelayMilliseconds ' + $ExitDelayMilliseconds +
             ' -ExpectedScalePercent ' + $ExpectedScalePercent +
             ' -ExpectedTopLine ' + $ExpectedTopLine
+        $arguments += ' -EventPrefix ' + $eventPrefix
         if ($ExpectedMaterial) {
             $arguments += ' -ExpectedMaterial ' + $ExpectedMaterial
         }
@@ -1011,10 +1038,10 @@ function Assert-TxtBackDuringLoad {
     $processId = $report.launchedProcessId
     $reached = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::AutoReset,
-        "Local\DesktopGuides.Preview.TextLoad.$($processId).Reached")
+        "Local\$eventPrefix.TextLoad.$($processId).Reached")
     $resume = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
-        "Local\DesktopGuides.Preview.TextLoad.$($processId).Continue")
+        "Local\$eventPrefix.TextLoad.$($processId).Continue")
     try {
         $report.txtLoadPaused = Run-ShellSmoke 'txt-load-paused'
         if (-not $reached.WaitOne(15000)) {
@@ -1121,16 +1148,16 @@ function Invoke-HtmlReaderPass([string] $resultName, [string] $mode = 'html-read
     $processId = $report.launchedProcessId
     $diagnosticsGate = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
-        "Local\DesktopGuides.Preview.HtmlDiagnostics.$processId")
+        "Local\$eventPrefix.HtmlDiagnostics.$processId")
     $launchGate = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
-        "Local\DesktopGuides.Preview.ExternalLaunch.$processId")
+        "Local\$eventPrefix.ExternalLaunch.$processId")
     # Points the runtime probe at an empty folder, as on a PC without WebView2.
     $runtimeGate = $null
     if ($NoRuntime) {
         $runtimeGate = [System.Threading.EventWaitHandle]::new(
             $false, [System.Threading.EventResetMode]::ManualReset,
-            "Local\DesktopGuides.Preview.WebView2Missing.$processId")
+            "Local\$eventPrefix.WebView2Missing.$processId")
     }
     if ($lease) { $lease.Dispose() }
     try {
@@ -1300,7 +1327,7 @@ function Invoke-HtmlPositionPass([string] $resultName) {
         foreach ($name in @('HtmlDiagnostics', 'HtmlPosition', 'ProgressDiagnostics', 'ProgressOverride')) {
             [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::ManualReset,
-                "Local\DesktopGuides.Preview.$name.$processId")
+                "Local\$eventPrefix.$name.$processId")
         })
     try {
         $result = Run-ShellSmoke 'html-position' -ResultName $resultName `
@@ -1409,7 +1436,7 @@ function Invoke-HtmlThemePass([string] $mode) {
         foreach ($name in @('HtmlDiagnostics', 'HtmlPosition', 'ProgressOverride')) {
             [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::ManualReset,
-                "Local\DesktopGuides.Preview.$name.$processId")
+                "Local\$eventPrefix.$name.$processId")
         })
     try {
         $result = Run-ShellSmoke $mode -ResultName $mode `
@@ -1485,7 +1512,7 @@ function Invoke-PdfReaderPass([string] $resultName, [string] $mode = 'pdf-reader
     Start-InstalledShell
     $diagnosticsGate = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
-        "Local\DesktopGuides.Preview.PdfDiagnostics.$($report.launchedProcessId)")
+        "Local\$eventPrefix.PdfDiagnostics.$($report.launchedProcessId)")
     try {
         $report.pdfReader[$resultName] = Run-ShellSmoke $mode -ResultName $resultName
         Close-InstalledShell
@@ -1672,7 +1699,7 @@ function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $K
         foreach ($name in @('ProgressDiagnostics', 'ProgressOverride')) {
             [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::ManualReset,
-                "Local\DesktopGuides.Preview.$name.$processId")
+                "Local\$eventPrefix.$name.$processId")
         })
     try {
         $result = Run-ShellSmoke $mode -ResultName $resultName -ExpectedTopLine $expectedTopLine `
@@ -1956,7 +1983,7 @@ function Invoke-TextSizeLaunch([scriptblock] $passes) {
         foreach ($name in @('TextDiagnostics', 'HtmlDiagnostics')) {
             [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::ManualReset,
-                "Local\DesktopGuides.Preview.$name.$processId")
+                "Local\$eventPrefix.$name.$processId")
         })
     try {
         & $passes
@@ -2485,7 +2512,7 @@ function Run-BackupScenarios {
 
         $canceled = Join-Path $backupRoot 'canceled.zip'
         Start-InstalledShell
-        $prefix = "Local\DesktopGuides.Preview.Backup.$($report.launchedProcessId)"
+        $prefix = "Local\$eventPrefix.Backup.$($report.launchedProcessId)"
         $reached = [System.Threading.EventWaitHandle]::new(
             $false, [System.Threading.EventResetMode]::AutoReset, "$prefix.Reached")
         $resume = [System.Threading.EventWaitHandle]::new(
@@ -2565,7 +2592,7 @@ function Run-BackupScenarios {
             Start-InstalledShell
             $gate = $null
             if ($case.Mode -eq 'restore-cancel') {
-                $prefix = "Local\DesktopGuides.Preview.Backup.$($report.launchedProcessId)"
+                $prefix = "Local\$eventPrefix.Backup.$($report.launchedProcessId)"
                 $gate = @(
                     [System.Threading.EventWaitHandle]::new(
                         $false, [System.Threading.EventResetMode]::AutoReset, "$prefix.Reached"),
@@ -2654,7 +2681,7 @@ function Run-ProviderScenarios {
         Get-ChildItem -LiteralPath $fixtureSource -File | Copy-Item -Destination $fixtureFolder
         $fixtureGate = [System.Threading.EventWaitHandle]::new(
             $false, [System.Threading.EventResetMode]::ManualReset,
-            'Local\DesktopGuides.Preview.ProviderFixtures')
+            "Local\$eventPrefix.ProviderFixtures")
     }
     Start-InstalledShell
     $providers.none = Run-ShellSmoke 'provider-none'
@@ -2782,12 +2809,12 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Signed MSIX verification failed.' }
         $report.signedPackageSha256 = (Get-FileHash $signed -Algorithm SHA256).Hash
 
-        if (Get-AppxPackage -Name DesktopGuides.Preview) {
+        if (Get-AppxPackage -Name $lanePackage) {
             throw 'A production preview package appeared before test install.'
         }
-        Assert-FreshPreviewProfile $env:LOCALAPPDATA
+        Assert-FreshPackageProfile $env:LOCALAPPDATA $lanePackage
         Add-AppxPackage -Path $signed
-        $installed = Get-AppxPackage -Name DesktopGuides.Preview
+        $installed = Get-AppxPackage -Name $lanePackage
         if (-not $installed) { throw 'Production package did not install.' }
         $report.packageFullName = $installed.PackageFullName
         $report.packageFamilyName = $installed.PackageFamilyName
@@ -3025,7 +3052,7 @@ finally {
         }
     }
     else {
-        $installedNow = @(Get-AppxPackage -Name DesktopGuides.Preview)
+        $installedNow = @(Get-AppxPackage -Name $lanePackage)
         $ownedPackage = @($installedNow | Where-Object {
             $installed -and $_.PackageFullName -eq $installed.PackageFullName
         })
@@ -3043,7 +3070,7 @@ finally {
                 -ErrorAction SilentlyContinue
         }
         Remove-Item $public -ErrorAction SilentlyContinue
-        $remainingPackages = @(Get-AppxPackage -Name DesktopGuides.Preview)
+        $remainingPackages = @(Get-AppxPackage -Name $lanePackage)
         $report.packageStillInstalled = $remainingPackages.Count -gt 0
         $report.certificateStillTrusted = if ($certificate) {
             Test-Path "Cert:\LocalMachine\TrustedPeople\$($certificate.Thumbprint)"
@@ -3053,7 +3080,7 @@ finally {
             $report.cleanupError = if ($remainingPackages.Count -gt 0 -and
                 ($ownedPackage.Count -eq 0 -or
                  $remainingPackages[0].PackageFullName -ne $installed.PackageFullName)) {
-                'A Preview package not confirmed as test-owned remains untouched.'
+                "A $lanePackage package not confirmed as test-owned remains untouched."
             } else {
                 'Temporary package or certificate remains.'
             }

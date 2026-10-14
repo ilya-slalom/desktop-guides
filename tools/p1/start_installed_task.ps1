@@ -23,6 +23,7 @@ param(
     [switch] $ProviderOnly,
     [switch] $BackupOnly,
     [switch] $WorkflowOnly,
+    [switch] $RcOnly,
     [string[]] $Groups,
     [string[]] $PassFilter,
     [string] $IgdbCredentialFile,
@@ -33,15 +34,22 @@ param(
     # against the recorded fixtures in tests/fixtures/p1/providers.
     [switch] $FakeProviders,
 
+    # T17.3: the lane, release-signed packages and the previous release.
+    [ValidateSet('Preview', 'Public')]
+    [string] $Lane,
+    [switch] $ReleaseSigned,
+    [string] $PreviousPackage,
+
     # The entry point's own.
     [double] $TimeoutMinutes = 45,
     [string] $Installer = (Join-Path $PSScriptRoot 'windows_shell_install.ps1')
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'windows_shell_lane.ps1')
 $taskPrefix = 'DesktopGuides-P1-Installed-'
 $pathParameters = @('PackagePath', 'PortableExecutable', 'ResultDirectory',
-    'IgdbCredentialFile', 'SteamGridDbCredentialFile')
+    'IgdbCredentialFile', 'SteamGridDbCredentialFile', 'PreviousPackage')
 
 # The task starts in tools\p1, so relative paths are made absolute here.
 function Get-FullPath([string] $path) {
@@ -153,8 +161,10 @@ function Stop-InnerRun {
 # Lists what the installer's own cleanup would have removed. Never removes it.
 function Write-Leftovers {
     $left = @()
-    if (Get-AppxPackage -Name 'DesktopGuides.Preview' -ErrorAction SilentlyContinue) {
-        $left += 'the DesktopGuides.Preview package is still installed'
+    foreach ($name in Get-ShellLanePackageNames) {
+        if (Get-AppxPackage -Name $name -ErrorAction SilentlyContinue) {
+            $left += "the $name package is still installed"
+        }
     }
     $tasks = @(Get-ScheduledTask -TaskName 'DesktopGuides-P1-*' -ErrorAction SilentlyContinue |
         Where-Object { $_.TaskName -ne $taskName })
