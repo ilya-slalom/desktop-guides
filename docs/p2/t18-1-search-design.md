@@ -1,7 +1,8 @@
 # T18.1 in-guide search: design
 
-Status: approved, 15 October 2026. Prerequisites: P1 complete. This builds
-on the [P2 technical design](../p2-technical-design.md#3-s18-search-t181).
+Status: approved, 15 October 2026. PR a (the contract, TXT search and the
+find bar) is implemented on `feat/p2-t18-1-search`. PR b (HTML) and PR c
+(PDF) follow.
 
 ## Intent
 
@@ -122,3 +123,36 @@ Find is already partly built:
    is planned as a follow-up.
 2. **The existing `FindAction` command and its prompt dialog are replaced**
    by `IFindableReader` and the find bar, rather than kept alongside them.
+
+## PR a verification record
+
+See the [PR a plan](t18-1-search-plan.md).
+
+- **Core,** each test failing first and then passing on the host:
+  - `TextMatcherTests` (10);
+  - three pause tests in `ProgressCoordinatorTests` (34 in all);
+  - three `ColumnOf` tests;
+  - the keyboard table, plus a routing test.
+
+  The full Core suite passes, 1189/1189.
+- **Production:** it builds with 0 errors and 0 warnings.
+- **Installed:** dispatch
+  [38600617803](https://github.com/ilya-slalom/desktop-guides/actions/runs/38600617803)
+  passed the new `navigation` shard on both lanes (`find-txt`, `find-back`
+  and `find-unsupported`).
+  - **What failed:** `reader-toolbar-ui`. Its test harness still used the
+    removed `FindAction`, and its smoke tested the old prompt dialog.
+  - **The fix:** the harness now logs the toolbar's `FindRequested`, and
+    the smoke expects it. The re-dispatch is recorded in the PR.
+- **Rulings:**
+  1. **No custom highlight brush.** A theme-aware brush can't be looked up
+     reliably from code-behind, so `TextHighlighter`'s default system
+     highlight colours are used. They follow the theme and high contrast.
+  2. **Focus after closing the find bar** goes to the reader toolbar,
+     where the reader keys route from.
+  3. **The find modes sit in the smoke's shared reader block,** beside the
+     progress modes. `find-txt` checks the progress save count directly,
+     without a hand-off to the installer: unchanged after searching, and
+     higher after Page Down. The installer checks the stored estimate.
+  4. **The toolbar smoke follows the find-bar change:** it expects the
+     find request, not the prompt.
