@@ -1,8 +1,7 @@
 # T17.4 distribution size pass design
 
-Status: PR a (#106) and PR b1 (#107) merged. PR b2 (the trimmed,
-compressed, ReadyToRun portable exe) is implemented on
-`feat/p1-t17-4-trimmed-exe`.
+Status: complete. PR a (#106), PR b1 (#107) and PR b2 (#108) are merged,
+14 October 2026.
 Prerequisites T17.1 and T17.2 are merged (T17.2's last piece in #104).
 
 ## Intent
@@ -142,7 +141,9 @@ time. The cause is recorded here.
 ### 4. The trimmed, compressed portable build
 
 The portable publish sets `PublishTrimmed`, `TrimMode=partial` and
-`EnableCompressionInSingleFile`. `TrimMode=full` is out of scope.
+`EnableCompressionInSingleFile`. `TrimMode=full` is out of scope. As
+shipped in PR b2, it also sets `PublishReadyToRun` and
+`CsWinRTAotWarningLevel=2`.
 
 It ships only if all of these hold:
 
@@ -158,7 +159,8 @@ dropping compression recovers it. The user chose trimmed, compressed and
 ReadyToRun. The condition became: host median cold launch of 3.5 s or
 less, and warm launch no slower than the untrimmed build's.
 
-If cold launch is over the limit, ReadyToRun is tried next, trading some
+As planned before the host check (superseded by the revision above): if
+cold launch is over the limit, ReadyToRun is tried next, trading some
 size for start time. The spike's trimmed launch times came from crashing
 builds, so the baseline is PR a's measurement, not the spike's.
 
@@ -332,6 +334,9 @@ See the [b2 plan](t17-4-trimmed-exe-plan.md).
 | Trimmed, uncompressed | 96.7 MB | 437 files, 86.1 MB | 3.40 s | 1.10 s |
 | Trimmed, uncompressed, ReadyToRun | 135.9 MB | 438 files, 125.6 MB | 3.20 s | 0.56 s |
 
+- **The ReadyToRun timings** came from an exe built with the same
+  settings through command-line overrides (59,868,601 bytes); the shipped
+  csproj build is 59,867,661 bytes.
 - **The decision.** The user chose trimmed, compressed and ReadyToRun
   (see the revised ship condition above). ReadyToRun needs no lock-file
   change, because Crossgen2 is a pack download.

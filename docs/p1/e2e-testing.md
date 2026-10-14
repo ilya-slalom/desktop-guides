@@ -113,8 +113,8 @@ which holds the exe alone, plus a `.zip.sha256` file and a `.json` manifest
 with both hashes, to `artifacts\portable\release\`.
 
 On its first launch each build unpacks every bundled file to
-`%TEMP%\.net\DesktopGuides.Production\<bundle id>\` (551 files, 233 MB at
-`80d2647`) and reuses them afterwards. The Windows App SDK's single-file mode
+`%TEMP%\.net\DesktopGuides.Production\<bundle id>\` (440 files, 126 MB for
+the trimmed 1.0.1 build; 551 files and 233 MB before T17.4) and reuses them afterwards. The Windows App SDK's single-file mode
 requires this full extraction for its DLL redirection. A newer build unpacks
 to a new folder, and nothing removes the older one. Deleting the folder while
 the app is closed is safe; the next launch unpacks it again.
