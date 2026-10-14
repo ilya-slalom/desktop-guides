@@ -343,6 +343,7 @@ jobs:
             --version 0.1.0.0 `
             --architecture '${{ matrix.architecture }}'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./tools/p1/assert_excluded_components.ps1 -Msix $packages[0].FullName
           $packageIdentity = $identityJson | ConvertFrom-Json
           New-Item -ItemType Directory -Force artifacts/production-build | Out-Null
           [ordered]@{
@@ -384,7 +385,8 @@ jobs:
             --publisher 'CN=359962D5-3801-484E-BE5B-39D0D498BEA4' `
             --version 1.0.0.0 `
             --architecture x64
-          exit $LASTEXITCODE
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./tools/p1/assert_excluded_components.ps1 -Msix $packages[0].FullName
       - name: Check the fixture providers are Preview-only
         if: matrix.architecture == 'x64'
         shell: pwsh
@@ -454,8 +456,9 @@ jobs:
           $publish = "$PWD/artifacts/portable-ci-publish"
           dotnet publish src/DesktopGuides.Production/DesktopGuides.Production.csproj `
             -c Release --no-restore -p:Platform=x64 -p:Portable=true `
-            -p:PublishDir=$publish/
+            -p:PublishDir=$publish/ -p:BundleFileListPath=$PWD/artifacts/portable-bundle-files.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./tools/p1/assert_excluded_components.ps1 -FileList artifacts/portable-bundle-files.txt
           ./tools/p1/package_portable_release.ps1 -Commit $env:GITHUB_SHA `
             -PublishDirectory $publish -OutputDirectory artifacts/portable-ci
       - name: Upload the portable zip

@@ -54,6 +54,14 @@
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
   </PropertyGroup>
+  <!-- T17.4: the publish folder holds only the exe, so the excluded-component
+       check reads the bundle's own input list, written when asked for. -->
+  <Target Name="WriteBundleFileList" AfterTargets="PrepareForBundle"
+          Condition="'$(BundleFileListPath)' != ''">
+    <WriteLinesToFile File="$(BundleFileListPath)"
+                      Lines="@(FilesToBundle->'%(RelativePath)')"
+                      Overwrite="true" />
+  </Target>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" />
     <PackageReference Include="CommunityToolkit.WinUI.Controls.MetadataControl" />
