@@ -62,7 +62,11 @@ try {
     # Run as CI and the host do, with -File and the default allow-list:
     # Windows PowerShell leaves $PSScriptRoot empty in parameter defaults.
     $shell = (Get-Process -Id $PID).Path
-    $bare = New-Log 'bare.log' @($trimmed)
+    # One warning for each real entry, so only loading the default is tested.
+    $real = @(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'trim-warning-allowlist.txt') |
+        Where-Object { $_.Trim() -and -not $_.Trim().StartsWith('#') } |
+        ForEach-Object { "ILLink : Trim analysis warning IL2104: Assembly '$((($_ -split '#')[0].Trim() -split '\s+')[1])' produced trim warnings." })
+    $bare = New-Log 'bare.log' (@($trimmed) + $real)
     $ErrorActionPreference = 'Continue'
     $default = & $shell -NoProfile -ExecutionPolicy Bypass -File $gate -Log $bare 2>&1
     $ErrorActionPreference = 'Stop'

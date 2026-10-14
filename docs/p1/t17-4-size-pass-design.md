@@ -221,6 +221,51 @@ row is revised with the user, since it calls for a trimmed build.
 
 Sizes and times are in [results.md](results.md#t174-pr-a-components-excluded--14-october-2026).
 
+## PR b1 verification record
+
+PR b splits in two: **b1** (sections 1 and 2: trim-safe code and the
+warning gate) and **b2** (sections 3 and 4: the crash and the trimmed,
+compressed exe). See the [b1 plan](t17-4-trim-plan.md).
+
+- **The gate reads the publish log.** MSBuild can't suppress IL2104 for
+  one assembly, so `tools/p1/assert_trim_warnings.ps1` checks a trimmed
+  publish's log against `tools/p1/trim-warning-allowlist.txt`. It accepts
+  only IL2104 entries for assemblies the project doesn't own, each with a
+  reason, and it fails on stale entries and on a log without trimming. CI
+  runs it in `portable-trim-analysis`.
+- **The gate failed first.** On the host's trimmed publish of the base
+  commit, it listed:
+  - CsWinRT1028 in 4 files;
+  - CsWinRT1030 in 7 files;
+  - IL2026 in 13 files (5 Core, 4 Infrastructure, 4 Production);
+  - IL2104 for AngleSharp, `Microsoft.Windows.SDK.NET` and `WinRT.Runtime`.
+- **C#/WinRT:** after four `partial` types and `AllowUnsafeBlocks`, no
+  CsWinRT warning is left, and the MSIX build has 0 warnings.
+- **JSON:**
+  - **Pinned first:** exact-output tests pinned each Core and
+    Infrastructure payload, and passed on the old code (5 and 6 tests).
+  - **Then red:** with reflection JSON switched off in both test
+    projects, 19 Core and 385 Infrastructure tests failed. The
+    Infrastructure count is high because imports, removals and restores
+    all write a file-operation manifest.
+  - **Then green:** after the source-generated contexts, Core passed
+    1172/1172 and Infrastructure 790/790.
+  - **Production:** its four files are checked by the gate and by the
+    installed groups that read their payloads.
+- **The AngleSharp review:**
+  - **Where it's used:** only `StaticHtmlDependencyScanner`, through
+    `HtmlParser` and `CssParser`.
+  - **Its reflection:** the warnings come from
+    `DocumentExtensions.CreateElement<TElement>` and
+    `ObjectExtensions.ToDictionary`. The app calls neither.
+  - **Trimmability:** neither AngleSharp nor AngleSharp.Css declares
+    `IsTrimmable`, in any target framework, so `TrimMode=partial` keeps
+    both whole.
+  - **The decision:** its IL2104 is allowed. PR b2 needs no root for it
+    while the build stays at `TrimMode=partial`.
+- **The allow-list:** `IL2104` for AngleSharp, `Microsoft.Windows.SDK.NET`
+  and `WinRT.Runtime`.
+
 ## Out of scope
 
 - Trimming the MSIX.
