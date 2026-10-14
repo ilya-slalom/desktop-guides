@@ -68,9 +68,11 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 . (Join-Path $PSScriptRoot 'windows_shell_lane.ps1')
-$lane = Get-ShellLane $Lane
-$lanePackage = $lane.PackageName
-$eventPrefix = $lane.EventPrefix
+# Not $lane: PowerShell names are case-insensitive, so that would assign to
+# the validated -Lane parameter.
+$laneNames = Get-ShellLane $Lane
+$lanePackage = $laneNames.PackageName
+$eventPrefix = $laneNames.EventPrefix
 # Scenario groups in run order; CI's shell-scope input uses these names.
 $scenarioGroups = [ordered]@{
     'core' = $CoreOnly.IsPresent

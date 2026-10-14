@@ -4909,7 +4909,7 @@ try {
             Send-ThemeKeys '{ENTER}'
         }
 
-        $windowsTheme = if ($WindowsTheme) { $WindowsTheme }
+        $currentWindowsTheme = if ($WindowsTheme) { $WindowsTheme }
             elseif ($ExpectedThemeStatus -like 'System (*)') {
                 $ExpectedThemeStatus.Substring(8).TrimEnd(')') }
             else { '' }
@@ -4967,12 +4967,12 @@ try {
             if ($Mode -eq 'theme-change') {
                 Select-ThemeByKeys $ExpectedTheme $SwitchToTheme
                 [void](Wait-Status "App theme set to $SwitchToTheme.")
-                if ($SwitchToTheme -eq 'System' -and -not $windowsTheme) {
+                if ($SwitchToTheme -eq 'System' -and -not $currentWindowsTheme) {
                     throw 'Switching to System needs -WindowsTheme or a System start status.'
                 }
-                $after = if ($SwitchToTheme -eq 'System') { "System ($windowsTheme)" } else { $SwitchToTheme }
+                $after = if ($SwitchToTheme -eq 'System') { "System ($currentWindowsTheme)" } else { $SwitchToTheme }
                 Assert-ThemeShown $SwitchToTheme $after 'Change'
-                $dialogTheme = if ($SwitchToTheme -eq 'System') { $windowsTheme } else { $SwitchToTheme }
+                $dialogTheme = if ($SwitchToTheme -eq 'System') { $currentWindowsTheme } else { $SwitchToTheme }
                 [void](Wait-HiddenById 'ShellStatus')
                 Assert-ShellForeground
                 $report.themeSettingsScreenshot = Save-WindowScreenshot "theme-$SwitchToTheme-settings"
