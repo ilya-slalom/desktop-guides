@@ -2542,6 +2542,12 @@ function Invoke-RcUpgrade {
     Add-AppxPackage -Path $PackagePath
     $after = Get-AppxPackage -Name $lanePackage
     if (-not $after) { throw 'The candidate did not install over the previous release.' }
+    # Recorded before any check, so cleanup owns (and removes) the candidate
+    # even when a check below fails.
+    $script:installed = $after
+    $report.packageFullName = $after.PackageFullName
+    $report.installLocation = $after.InstallLocation
+    $script:expectedExecutablePath = Join-Path $after.InstallLocation 'DesktopGuides.Production.exe'
     $report.rc.candidateVersion = $after.Version.ToString()
     $report.rc.familyUnchanged = $after.PackageFamilyName -eq $before.PackageFamilyName
     if (-not $report.rc.familyUnchanged) {
@@ -2552,10 +2558,6 @@ function Invoke-RcUpgrade {
     }
     $report.rc.libraryIntact = (Invoke-ShellSeed @('describe-library', $dataRoot)) -eq $libraryBefore
     if (-not $report.rc.libraryIntact) { throw 'The library changed across the upgrade.' }
-    $script:installed = $after
-    $report.packageFullName = $after.PackageFullName
-    $report.installLocation = $after.InstallLocation
-    $script:expectedExecutablePath = Join-Path $after.InstallLocation 'DesktopGuides.Production.exe'
     $script:launchAction = New-ShellLaunchAction $launchResultPath
     $script:secondLaunchAction = New-ShellLaunchAction $secondLaunchResultPath
     Register-ScheduledTask -TaskName $launchTask -Action $script:launchAction `
