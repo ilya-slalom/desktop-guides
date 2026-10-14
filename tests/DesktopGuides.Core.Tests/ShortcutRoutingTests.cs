@@ -124,4 +124,16 @@ public sealed class ShortcutRoutingTests
     {
         Assert.Equal(LibrarySearchEscape.FocusAddGame, ShortcutRouting.LibrarySearchEsc(false, 0));
     }
+
+    [Fact]
+    public void SearchKeysRunInTheReaderEvenFromTheFindBox()
+    {
+        foreach (ShortcutCommand command in new[] { ShortcutCommand.FindInGuide, ShortcutCommand.FindNext, ShortcutCommand.FindPrevious })
+        {
+            Assert.Equal(ShortcutDecision.Run, ShortcutRouting.Resolve(command, Reader, textInputFocused: true, dialogOpen: false));
+            Assert.Equal(ShortcutDecision.Ignore, ShortcutRouting.Resolve(command, Library, textInputFocused: false, dialogOpen: false));
+        }
+        Assert.Equal(ShortcutDecision.Ignore,
+            ShortcutRouting.Resolve(ShortcutCommand.FocusLibrarySearch, Reader, false, false));
+    }
 }

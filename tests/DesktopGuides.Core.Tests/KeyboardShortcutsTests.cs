@@ -22,6 +22,9 @@ public sealed class KeyboardShortcutsTests
                 (ShortcutContext.Reader, "Ctrl+Plus", ShortcutCommand.ZoomIn, "Zoom in (PDF) or larger text"),
                 (ShortcutContext.Reader, "Ctrl+Minus", ShortcutCommand.ZoomOut, "Zoom out (PDF) or smaller text"),
                 (ShortcutContext.Reader, "Ctrl+0", ShortcutCommand.ZoomReset, "Fit to width (PDF) or reset text size"),
+                (ShortcutContext.Reader, "Ctrl+F", ShortcutCommand.FindInGuide, "Search in the guide"),
+                (ShortcutContext.Reader, "F3", ShortcutCommand.FindNext, "Next match"),
+                (ShortcutContext.Reader, "Shift+F3", ShortcutCommand.FindPrevious, "Previous match"),
                 (ShortcutContext.Dialog, "Esc", ShortcutCommand.CloseDialog, "Close the dialog"),
             ],
             KeyboardShortcuts.All.Select(s => (s.Context, s.Keys, s.Command, s.Description)));
