@@ -1237,7 +1237,8 @@ Step 1 found:
                 [System.Windows.Forms.SendKeys]::SendWait('^f')
                 [void](Wait-VisibleById 'ReaderFindBar')
                 Wait-FocusedId 'FindQueryInput'
-                (Get-SearchPattern 'FindQueryInput').SetValue('line 0250')
+                # Typed, not set: the keys, the space included, must stay in the box.
+                [System.Windows.Forms.SendKeys]::SendWait('line 0250')
                 Start-Sleep -Milliseconds 300
                 Wait-TopLine 1 'Typing a query'
                 [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
