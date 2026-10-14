@@ -552,6 +552,25 @@ public sealed class ProgressCoordinatorTests
     }
 
     [Fact]
+    public async Task ResumingTakesTheCurrentPlaceAsTheBaseline()
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        FakeSession session = new();
+        IProgressTracking tracking = Track(coordinator, GuideA, session, session.CurrentJson);
+
+        IDisposable pause = await tracking.PauseAsync(CancellationToken.None);
+        session.Move();
+        pause.Dispose();
+        // A late event from the last match (closing the bar resizes the view).
+        session.Touch();
+        clock.Advance(TimeSpan.FromSeconds(10));
+        await tracking.FlushAsync(CancellationToken.None);
+
+        Assert.Empty(store.Writes);
+        GC.KeepAlive(tracking);
+    }
+
+    [Fact]
     public async Task DisposeWhilePausedSavesNothing()
     {
         ProgressCoordinator coordinator = new(store, clock);

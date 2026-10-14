@@ -191,9 +191,47 @@ public sealed class ProgressCoordinator
 
         private void Resume()
         {
+            bool rebaseline;
             lock (gate)
             {
                 if (pauses > 0) pauses--;
+                rebaseline = pauses == 0 && !ended && !disposing;
+            }
+            if (rebaseline) _ = RebaselineAsync();
+        }
+
+        // T18.1: the place shown when search ends becomes the baseline, so a
+        // late event from the last match (closing the bar resizes the view)
+        // isn't saved; only the user's next move is. Never throws.
+        private async Task RebaselineAsync()
+        {
+            using CancellationTokenSource timeout = new(FlushTimeout, owner.clock);
+            try
+            {
+                await turn.WaitAsync(timeout.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            try
+            {
+                lock (gate)
+                {
+                    if (ended) return;
+                }
+                ReaderLocation location = await session.GetLocationAsync(timeout.Token)
+                    .WaitAsync(timeout.Token).ConfigureAwait(false);
+                double? estimate = ProgressEstimate.Bound(location.EstimatedFraction);
+                lastJson = ReaderLocationCodec.Serialize(location with { EstimatedFraction = estimate });
+            }
+            catch (Exception)
+            {
+                // Keep the old baseline: a later move still saves.
+            }
+            finally
+            {
+                turn.Release();
             }
         }
 
