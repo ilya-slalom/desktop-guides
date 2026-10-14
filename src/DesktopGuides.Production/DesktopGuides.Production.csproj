@@ -12,6 +12,9 @@
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- T17.4: C#/WinRT generates the WinRT interface code for generic
+         collections passed to WinUI (CsWinRT1030), which needs unsafe code. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PublishProfile>Properties\PublishProfiles\win10-$(Platform).pubxml</PublishProfile>
     <!-- The portable release is one file. Analyze both builds so they restore
          the same packages and share packages.lock.json. -->

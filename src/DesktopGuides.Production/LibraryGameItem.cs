@@ -2,7 +2,7 @@ using DesktopGuides.Core.Library;
 
 namespace DesktopGuides.Production;
 
-public sealed class LibraryGameItem : CatalogRowItem
+public sealed partial class LibraryGameItem : CatalogRowItem
 {
     internal LibraryGameItem(
         LibrarySearchMatch match, int attentionCount = 0, bool colorful = false, bool highContrast = false)

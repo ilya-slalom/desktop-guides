@@ -5,7 +5,7 @@ namespace DesktopGuides.Production;
 
 // A Game-page row. Rows are rebuilt on every render, so callers match guides
 // by Guide.Id, never by row identity.
-public sealed class GuideRowItem : CatalogRowItem
+public sealed partial class GuideRowItem : CatalogRowItem
 {
     internal GuideRowItem(
         GuideSummary summary, TimeProvider clock, CultureInfo culture,
