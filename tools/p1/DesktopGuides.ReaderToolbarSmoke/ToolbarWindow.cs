@@ -30,6 +30,8 @@ public sealed class ToolbarWindow : Window
         AutomationProperties.SetAutomationId(lastAction, "LastReaderAction");
         session.ActionExecuted += action => lastAction.Text = Describe(action);
         toolbar.CommandFailed += message => lastAction.Text = message;
+        // T18.1: Find asks the shell for its find bar; there is no action to run.
+        toolbar.FindRequested += (_, _) => lastAction.Text = "Find requested";
         toolbar.SetSession(session);
         // A five-page document, so the dialog's range is 1 to 5.
         toolbar.PageCount = 5;
@@ -160,7 +162,6 @@ public sealed class ToolbarWindow : Window
         FitWidthAction => "Fit to width",
         ZoomAction zoom => $"Zoom {zoom.Factor:G}",
         TextSizeAction text => $"Text size {text.Scale:G}",
-        FindAction find => $"Find {find.Query}",
         _ => action.Command.ToString()
     };
 

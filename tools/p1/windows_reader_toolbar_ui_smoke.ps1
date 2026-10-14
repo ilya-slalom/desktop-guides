@@ -356,12 +356,11 @@ try {
     Open-Overflow
     Invoke-Command 'Fit to width' 'Fit to width'
     Open-Overflow
+    # T18.1: Find no longer opens a prompt; it asks the shell for the find bar.
     Invoke-Element (Wait-VisibleByName 'Find in guide')
-    Enter-DialogText 'boss' 'Find'
-    Wait-Action 'Find boss'
-    [void](Wait-FocusedCommand 'Find in guide')
-    $report.phases += 'find-dialog-restores-overflow-focus'
-    Close-Overflow
+    Wait-Action 'Find requested'
+    $report.phases += 'find-requests-the-find-bar'
+    if (Find-VisibleByName 'Go to page') { Close-Overflow }
     $report.phases += 'all-capabilities-dispatch'
 
     foreach ($pair in @(@('Previous page', 'Page Up'), @('Next page', 'Page Down'),
