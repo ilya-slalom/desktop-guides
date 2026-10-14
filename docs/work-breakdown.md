@@ -547,7 +547,8 @@ machine. Missing WebView2 Runtime produces an actionable setup message.
   T17.8 in the
   [final milestone](#final-milestone--accessibility-audit-and-store-submission),
   decided 14 October 2026. Until T17.8 passes, P1 makes no clean-install
-  claim.
+  claim. Complete (#110): v1.0.1 passed its candidate run on Windows 11
+  x64; see the [tested matrix](p1/release/tested-matrix.md).
 - **T17.4** Run a distribution size pass on the final feature set, before the
   T17.3 candidate runs. Exclude the Windows App SDK components the app doesn't
   use (AI, ML, Search, Widgets, DWrite) from both builds. Make the portable
