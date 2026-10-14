@@ -1,4 +1,4 @@
-function Assert-FreshPreviewProfile([string] $LocalAppDataPath) {
+function Assert-FreshPackageProfile([string] $LocalAppDataPath, [string] $PackageName) {
     if ([string]::IsNullOrWhiteSpace($LocalAppDataPath)) {
         throw 'Local app data path is unavailable.'
     }
@@ -10,10 +10,14 @@ function Assert-FreshPreviewProfile([string] $LocalAppDataPath) {
         throw 'Package profile root is not a directory.'
     }
     $profiles = @(Get-ChildItem -LiteralPath $packagesRoot -Directory `
-        -Filter 'DesktopGuides.Preview_*' -ErrorAction Stop)
+        -Filter "$($PackageName)_*" -ErrorAction Stop)
     if ($profiles.Count -gt 0) {
-        throw 'A DesktopGuides.Preview profile already exists; refusing the fresh-profile install test.'
+        throw "A $PackageName profile already exists; refusing the fresh-profile install test."
     }
+}
+
+function Assert-FreshPreviewProfile([string] $LocalAppDataPath) {
+    Assert-FreshPackageProfile $LocalAppDataPath 'DesktopGuides.Preview'
 }
 
 # The portable build has no package profile; its data lives in

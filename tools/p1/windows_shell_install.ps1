@@ -25,6 +25,9 @@ param(
     [switch] $ProviderOnly,
     [switch] $BackupOnly,
     [switch] $WorkflowOnly,
+    # T17.3: the release-candidate journey. Needs -Lane Public, -ReleaseSigned,
+    # -PreviousPackage and -PackagePath (the candidate); runs alone.
+    [switch] $RcOnly,
 
     # Or name several groups, as CI shards do. They still run in the order
     # listed below. Don't combine with an *Only switch.
@@ -46,11 +49,30 @@ param(
 
     # T17.2 D: with no real IGDB credential file, run the provider group
     # against the recorded fixtures in tests/fixtures/p1/providers.
-    [switch] $FakeProviders
+    [switch] $FakeProviders,
+
+    # T17.3: Public drives the released identity: IlyaLissoboi.DesktopGuides,
+    # with events under Local\DesktopGuides.*.
+    [ValidateSet('Preview', 'Public')]
+    [string] $Lane = 'Preview',
+
+    # T17.3: install packages already signed with the release certificate,
+    # checked against docs/p1/release/release-certificate.json; nothing is
+    # re-signed.
+    [switch] $ReleaseSigned,
+
+    # T17.3: the published release the rc group upgrades from.
+    [string] $PreviousPackage
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+. (Join-Path $PSScriptRoot 'windows_shell_lane.ps1')
+# Not $lane: PowerShell names are case-insensitive, so that would assign to
+# the validated -Lane parameter.
+$laneNames = Get-ShellLane $Lane
+$lanePackage = $laneNames.PackageName
+$eventPrefix = $laneNames.EventPrefix
 # Scenario groups in run order; CI's shell-scope input uses these names.
 $scenarioGroups = [ordered]@{
     'core' = $CoreOnly.IsPresent
@@ -68,6 +90,7 @@ $scenarioGroups = [ordered]@{
     'provider' = $ProviderOnly.IsPresent
     'backup' = $BackupOnly.IsPresent
     'workflow' = $WorkflowOnly.IsPresent
+    'rc' = $RcOnly.IsPresent
 }
 $selectedGroups = @($scenarioGroups.Keys | Where-Object { $scenarioGroups[$_] })
 if ($selectedGroups.Count -gt 1) {
@@ -80,6 +103,11 @@ if ($Groups) {
     $selectedGroups = @($scenarioGroups.Keys | Where-Object { $_ -in $Groups })
 }
 $scenarioScope = if ($selectedGroups.Count -gt 0) { $selectedGroups -join ',' } else { 'all' }
+# T17.3: rc runs only when asked for, on a release candidate.
+if ($selectedGroups -contains 'rc' -and -not $RcOnly) { throw 'Run the rc group with -RcOnly.' }
+if ($RcOnly -and -not ($Lane -eq 'Public' -and $ReleaseSigned -and $PackagePath -and $PreviousPackage)) {
+    throw '-RcOnly needs -Lane Public, -ReleaseSigned, -PackagePath (the candidate) and -PreviousPackage.'
+}
 $pdfModes = @('pdf-reader', 'pdf-zoom', 'pdf-keys', 'pdf-jump', 'pdf-locked')
 function Test-PdfPassSelected([string] $pass) {
     if (-not $PassFilter) { return $true }
@@ -103,6 +131,12 @@ if ($portable -eq [bool]$PackagePath) {
     throw 'Pass either -PackagePath or -PortableExecutable.'
 }
 . (Join-Path $PSScriptRoot 'windows_shell_profile.ps1')
+if ($ReleaseSigned -and $portable) { throw '-ReleaseSigned applies only to an MSIX.' }
+if ($ReleaseSigned -and $Lane -ne 'Public') { throw '-ReleaseSigned needs -Lane Public.' }
+if (-not $portable -and $Lane -eq 'Public' -and -not $ReleaseSigned) {
+    throw 'A Public MSIX can only be installed release-signed: pass -ReleaseSigned.'
+}
+if ($PreviousPackage -and -not $RcOnly) { throw '-PreviousPackage applies only to the rc group.' }
 if ($portable) {
     if ((Split-Path $PortableExecutable -Leaf) -ne 'DesktopGuides.Production.exe' -or
         -not (Test-Path -LiteralPath $PortableExecutable -PathType Leaf)) {
@@ -117,13 +151,19 @@ if ($portable) {
 }
 else {
     $packageName = Split-Path $PackagePath -Leaf
-    if ($packageName -notmatch '^DesktopGuides\.Production_[0-9]+(\.[0-9]+){3}_x64\.msix$') {
+    # Release assets are DesktopGuides-<version>-x64.msix (release.yml).
+    $expectedName = if ($ReleaseSigned) { '^DesktopGuides-[0-9]+(\.[0-9]+){3}-x64\.msix$' }
+        else { '^DesktopGuides\.Production_[0-9]+(\.[0-9]+){3}_x64\.msix$' }
+    if ($packageName -notmatch $expectedName) {
         throw "Expected an x64 production MSIX, got $packageName."
     }
-    if (Get-AppxPackage -Name DesktopGuides.Preview) {
-        throw 'A production preview package is already installed; refusing to replace it.'
+    if ($PreviousPackage -and (Split-Path $PreviousPackage -Leaf) -notmatch $expectedName) {
+        throw "Expected the previous release's MSIX, got $(Split-Path $PreviousPackage -Leaf)."
     }
-    Assert-FreshPreviewProfile $env:LOCALAPPDATA
+    if (Get-AppxPackage -Name $lanePackage) {
+        throw "A $lanePackage package is already installed; refusing to replace it."
+    }
+    Assert-FreshPackageProfile $env:LOCALAPPDATA $lanePackage
 }
 . (Join-Path $PSScriptRoot 'windows_shell_smoke_result.ps1')
 . (Join-Path $PSScriptRoot 'windows_shell_task_cleanup.ps1')
@@ -310,7 +350,7 @@ function Assert-SingleInstance {
     $focusResultPath = "$secondLaunchResultPath.foreground.json"
     $activationEvent = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::AutoReset,
-        'Local\DesktopGuides.Preview.RedirectedActivation')
+        "Local\$eventPrefix.RedirectedActivation")
     try {
         $activationEvent.Reset() | Out-Null
         Register-ScheduledTask -TaskName $secondLaunchTask -Action $foregroundAction `
@@ -563,10 +603,10 @@ function Assert-ReaderRenderErrorDoesNotSaveResume {
     $processId = $report.launchedProcessId
     $reached = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::AutoReset,
-        "Local\DesktopGuides.Preview.ReaderLoad.$($processId).Reached")
+        "Local\$eventPrefix.ReaderLoad.$($processId).Reached")
     $resume = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
-        "Local\DesktopGuides.Preview.ReaderLoad.$($processId).Continue")
+        "Local\$eventPrefix.ReaderLoad.$($processId).Continue")
     $fixtureCorrupted = $false
     try {
         $report.queuedBeforeRenderError = Run-ShellSmoke 'queue-reader-render-error'
@@ -627,10 +667,10 @@ function Assert-ClosingTargetRedirect {
     $closingProcessId = $report.launchedProcessId
     $selected = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::AutoReset,
-        'Local\DesktopGuides.Preview.RedirectSelected')
+        "Local\$eventPrefix.RedirectSelected")
     $resume = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
-        'Local\DesktopGuides.Preview.RedirectContinue')
+        "Local\$eventPrefix.RedirectContinue")
     try {
         $selected.Reset() | Out-Null
         $resume.Reset() | Out-Null
@@ -659,10 +699,10 @@ function Assert-QueuedActivationClose {
     $closingProcessId = $report.launchedProcessId
     $queued = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::AutoReset,
-        'Local\DesktopGuides.Preview.ActivationQueued')
+        "Local\$eventPrefix.ActivationQueued")
     $resume = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
-        'Local\DesktopGuides.Preview.ActivationContinue')
+        "Local\$eventPrefix.ActivationContinue")
     try {
         $queued.Reset() | Out-Null
         $resume.Reset() | Out-Null
@@ -691,10 +731,10 @@ function Assert-AcceptedThenClose {
     $closingProcessId = $report.launchedProcessId
     $received = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::AutoReset,
-        'Local\DesktopGuides.Preview.AcceptanceReceived')
+        "Local\$eventPrefix.AcceptanceReceived")
     $resume = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
-        'Local\DesktopGuides.Preview.AcceptanceContinue')
+        "Local\$eventPrefix.AcceptanceContinue")
     try {
         $received.Reset() | Out-Null
         $resume.Reset() | Out-Null
@@ -777,6 +817,7 @@ function Run-ShellSmoke(
             ' -ExitDelayMilliseconds ' + $ExitDelayMilliseconds +
             ' -ExpectedScalePercent ' + $ExpectedScalePercent +
             ' -ExpectedTopLine ' + $ExpectedTopLine
+        $arguments += ' -EventPrefix ' + $eventPrefix
         if ($ExpectedMaterial) {
             $arguments += ' -ExpectedMaterial ' + $ExpectedMaterial
         }
@@ -1011,10 +1052,10 @@ function Assert-TxtBackDuringLoad {
     $processId = $report.launchedProcessId
     $reached = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::AutoReset,
-        "Local\DesktopGuides.Preview.TextLoad.$($processId).Reached")
+        "Local\$eventPrefix.TextLoad.$($processId).Reached")
     $resume = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
-        "Local\DesktopGuides.Preview.TextLoad.$($processId).Continue")
+        "Local\$eventPrefix.TextLoad.$($processId).Continue")
     try {
         $report.txtLoadPaused = Run-ShellSmoke 'txt-load-paused'
         if (-not $reached.WaitOne(15000)) {
@@ -1121,16 +1162,16 @@ function Invoke-HtmlReaderPass([string] $resultName, [string] $mode = 'html-read
     $processId = $report.launchedProcessId
     $diagnosticsGate = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
-        "Local\DesktopGuides.Preview.HtmlDiagnostics.$processId")
+        "Local\$eventPrefix.HtmlDiagnostics.$processId")
     $launchGate = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
-        "Local\DesktopGuides.Preview.ExternalLaunch.$processId")
+        "Local\$eventPrefix.ExternalLaunch.$processId")
     # Points the runtime probe at an empty folder, as on a PC without WebView2.
     $runtimeGate = $null
     if ($NoRuntime) {
         $runtimeGate = [System.Threading.EventWaitHandle]::new(
             $false, [System.Threading.EventResetMode]::ManualReset,
-            "Local\DesktopGuides.Preview.WebView2Missing.$processId")
+            "Local\$eventPrefix.WebView2Missing.$processId")
     }
     if ($lease) { $lease.Dispose() }
     try {
@@ -1300,7 +1341,7 @@ function Invoke-HtmlPositionPass([string] $resultName) {
         foreach ($name in @('HtmlDiagnostics', 'HtmlPosition', 'ProgressDiagnostics', 'ProgressOverride')) {
             [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::ManualReset,
-                "Local\DesktopGuides.Preview.$name.$processId")
+                "Local\$eventPrefix.$name.$processId")
         })
     try {
         $result = Run-ShellSmoke 'html-position' -ResultName $resultName `
@@ -1409,7 +1450,7 @@ function Invoke-HtmlThemePass([string] $mode) {
         foreach ($name in @('HtmlDiagnostics', 'HtmlPosition', 'ProgressOverride')) {
             [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::ManualReset,
-                "Local\DesktopGuides.Preview.$name.$processId")
+                "Local\$eventPrefix.$name.$processId")
         })
     try {
         $result = Run-ShellSmoke $mode -ResultName $mode `
@@ -1485,7 +1526,7 @@ function Invoke-PdfReaderPass([string] $resultName, [string] $mode = 'pdf-reader
     Start-InstalledShell
     $diagnosticsGate = [System.Threading.EventWaitHandle]::new(
         $false, [System.Threading.EventResetMode]::ManualReset,
-        "Local\DesktopGuides.Preview.PdfDiagnostics.$($report.launchedProcessId)")
+        "Local\$eventPrefix.PdfDiagnostics.$($report.launchedProcessId)")
     try {
         $report.pdfReader[$resultName] = Run-ShellSmoke $mode -ResultName $resultName
         Close-InstalledShell
@@ -1672,7 +1713,7 @@ function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $K
         foreach ($name in @('ProgressDiagnostics', 'ProgressOverride')) {
             [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::ManualReset,
-                "Local\DesktopGuides.Preview.$name.$processId")
+                "Local\$eventPrefix.$name.$processId")
         })
     try {
         $result = Run-ShellSmoke $mode -ResultName $resultName -ExpectedTopLine $expectedTopLine `
@@ -1956,7 +1997,7 @@ function Invoke-TextSizeLaunch([scriptblock] $passes) {
         foreach ($name in @('TextDiagnostics', 'HtmlDiagnostics')) {
             [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::ManualReset,
-                "Local\DesktopGuides.Preview.$name.$processId")
+                "Local\$eventPrefix.$name.$processId")
         })
     try {
         & $passes
@@ -2347,7 +2388,10 @@ function Wait-HandshakeFile([string] $Path, [int] $Seconds) {
     return $null
 }
 
-function Run-BlockedNetworkScenario {
+# Asks the elevated offline controller to block the app's executable, runs
+# $Body, then asks for the rule's removal. The block is required: no
+# controller means a failure, never a skip.
+function Invoke-WithFirewallBlock([Collections.IDictionary] $Record, [scriptblock] $Body) {
     $handshake = Join-Path $ResultDirectory 'offline-handshake'
     New-Item -ItemType Directory -Force $handshake | Out-Null
     [ordered]@{ runId = $runId; program = $expectedExecutablePath } |
@@ -2356,28 +2400,32 @@ function Run-BlockedNetworkScenario {
     if (-not $blocked) {
         throw 'The offline controller did not confirm the firewall rule.'
     }
-    $report.providers.firewallRule = $blocked.ruleName
+    $Record.firewallRule = $blocked.ruleName
     try {
-        Start-InstalledShell
-        $report.providers.blockedNetwork = Run-ShellSmoke 'provider-offline' `
-            -ResultName 'provider-offline-blocked' -ExpectedProviderFailure 'Unavailable'
-        Close-InstalledShell
+        & $Body
     }
     finally {
         [ordered]@{ runId = $runId } | ConvertTo-Json |
             Set-Content (Join-Path $handshake 'done.json') -Encoding UTF8
         $restored = Wait-HandshakeFile (Join-Path $handshake 'restored.json') 60
-        $report.providers.firewallRuleRemoved = [bool]($restored -and $restored.removed)
-        if (-not $report.providers.firewallRuleRemoved) {
+        $Record.firewallRuleRemoved = [bool]($restored -and $restored.removed)
+        if (-not $Record.firewallRuleRemoved) {
             $cleanupErrors.Add('The offline controller did not confirm that it removed the firewall rule.')
         }
     }
 }
 
-function Run-WorkflowScenarios {
-    # T17.2 A: the whole journey through visible controls, from an empty
-    # library, with the app restarted between stages. The originals are
-    # copies in a scratch folder, deleted once imported.
+function Run-BlockedNetworkScenario {
+    Invoke-WithFirewallBlock $report.providers {
+        Start-InstalledShell
+        $report.providers.blockedNetwork = Run-ShellSmoke 'provider-offline' `
+            -ResultName 'provider-offline-blocked' -ExpectedProviderFailure 'Unavailable'
+        Close-InstalledShell
+    }
+}
+
+# The workflow lane's four originals, copied to a scratch folder outside the repo.
+function New-WorkflowOriginals {
     $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
     $fixtures = @('p1/txt-numbered.txt', 'p1/html-long', 'p0/generated/pdf-long.pdf', 'p0/pdf-access.pdf')
     $report.fixtures = $fixtures
@@ -2386,8 +2434,6 @@ function Run-WorkflowScenarios {
     $originals = Join-Path $scratch 'originals'
     $state = Join-Path $ResultDirectory 'workflow-state.json'
     Remove-Item -LiteralPath $state -Force -ErrorAction SilentlyContinue
-    # #93: the lane never kills the app, so any crash entry is a real crash.
-    $crashWatchStart = Get-Date
     New-Item -ItemType Directory -Path $originals | Out-Null
     try {
         foreach ($fixture in $fixtures) {
@@ -2397,45 +2443,79 @@ function Run-WorkflowScenarios {
             }
             Copy-Item -LiteralPath $source -Destination $originals -Recurse
         }
-        $hashOriginals = {
-            @(Get-ChildItem -LiteralPath $originals -Recurse -File | Sort-Object FullName | ForEach-Object {
-                $_.FullName.Substring($originals.Length) + '=' +
-                    (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
-            }) -join ';'
-        }
-        $copied = & $hashOriginals
+    }
+    catch {
+        Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
+        throw
+    }
+    $hash = {
+        @(Get-ChildItem -LiteralPath $originals -Recurse -File | Sort-Object FullName | ForEach-Object {
+            $_.FullName.Substring($originals.Length) + '=' +
+                (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+        }) -join ';'
+    }.GetNewClosure()
+    return [pscustomobject]@{
+        Scratch = $scratch; Originals = $originals; State = $state
+        Hash = $hash; Copied = (& $hash); FixtureRoot = $fixtureRoot
+    }
+}
+
+# The app must read its managed copies from here on; pdf-access.pdf stays as a control.
+function Remove-WorkflowOriginals([string] $Originals) {
+    Remove-Item -LiteralPath (Join-Path $Originals 'txt-numbered.txt'), (Join-Path $Originals 'pdf-long.pdf') -Force
+    Remove-Item -LiteralPath (Join-Path $Originals 'html-long') -Recurse -Force
+}
+
+# The control was never imported; nothing may have touched it.
+function Assert-WorkflowControl($Workflow) {
+    $control = (Get-FileHash -LiteralPath (Join-Path $Workflow.Originals 'pdf-access.pdf') -Algorithm SHA256).Hash
+    if ($control -ne (Get-FileHash -LiteralPath (Join-Path $Workflow.FixtureRoot 'p0\pdf-access.pdf') -Algorithm SHA256).Hash) {
+        throw 'The untouched control original changed.'
+    }
+}
+
+# #93: the lane never kills the app, so any crash entry is a real crash.
+function Assert-NoWorkflowCrashes([datetime] $Since) {
+    # A crash entry can land a moment after the process has gone.
+    Start-Sleep -Seconds 5
+    $crashes = @(Get-AppCrashEvents $Since)
+    $report.workflowCrashEntries = $crashes.Count
+    if ($crashes.Count -gt 0) {
+        $first = ("$($crashes[-1].Message)" -split "`r?`n" | Select-Object -First 4) -join ' | '
+        throw "The app wrote $($crashes.Count) crash entries during the workflow lane (#93); the first: $first"
+    }
+}
+
+function Run-WorkflowScenarios {
+    # T17.2 A: the whole journey through visible controls, from an empty
+    # library, with the app restarted between stages. The originals are
+    # copies in a scratch folder, deleted once imported.
+    $crashWatchStart = Get-Date
+    $workflow = New-WorkflowOriginals
+    try {
+        Start-InstalledShell
+        $report.workflowBuild = Run-ShellSmoke 'workflow-build' -WorkflowRoot $workflow.Originals
+        Close-InstalledShell
+        if ((& $workflow.Hash) -ne $workflow.Copied) { throw 'Importing changed an original file.' }
+        Remove-WorkflowOriginals $workflow.Originals
 
         Start-InstalledShell
-        $report.workflowBuild = Run-ShellSmoke 'workflow-build' -WorkflowRoot $originals
-        Close-InstalledShell
-        if ((& $hashOriginals) -ne $copied) { throw 'Importing changed an original file.' }
-
-        # The app must read its managed copies from here on.
-        Remove-Item -LiteralPath (Join-Path $originals 'txt-numbered.txt'), (Join-Path $originals 'pdf-long.pdf') -Force
-        Remove-Item -LiteralPath (Join-Path $originals 'html-long') -Recurse -Force
-
-        Start-InstalledShell
-        $report.workflowRead = Run-ShellSmoke 'workflow-read' -WorkflowStatePath $state
+        $report.workflowRead = Run-ShellSmoke 'workflow-read' -WorkflowStatePath $workflow.State
         Close-InstalledShell
         Start-InstalledShell
-        $report.workflowResume = Run-ShellSmoke 'workflow-resume' -WorkflowStatePath $state
+        $report.workflowResume = Run-ShellSmoke 'workflow-resume' -WorkflowStatePath $workflow.State
         Close-InstalledShell
 
-        $backup = Join-Path $scratch 'workflow-backup.zip'
+        $backup = Join-Path $workflow.Scratch 'workflow-backup.zip'
         Start-InstalledShell
         $report.workflowExport = Run-ShellSmoke 'workflow-export' -BackupPath $backup
         Close-InstalledShell
         if (-not (Test-Path -LiteralPath $backup)) { throw 'workflow-export saved no backup.' }
 
         Start-InstalledShell
-        $report.workflowRestore = Run-ShellSmoke 'workflow-restore' -BackupPath $backup -WorkflowStatePath $state
+        $report.workflowRestore = Run-ShellSmoke 'workflow-restore' -BackupPath $backup -WorkflowStatePath $workflow.State
         Close-InstalledShell
-
-        # The control was never imported; nothing may have touched it.
-        $control = (Get-FileHash -LiteralPath (Join-Path $originals 'pdf-access.pdf') -Algorithm SHA256).Hash
-        if ($control -ne (Get-FileHash -LiteralPath (Join-Path $fixtureRoot 'p0\pdf-access.pdf') -Algorithm SHA256).Hash) {
-            throw 'The untouched control original changed.'
-        }
+        Assert-WorkflowControl $workflow
 
         # #93: Windows.Data.Pdf crashed the app at exit after a PDF session,
         # about half the time, so the lane closes after one five times.
@@ -2445,18 +2525,89 @@ function Run-WorkflowScenarios {
             $report.workflowPdfExits += Run-ShellSmoke 'workflow-pdf-exit' -ResultName "workflow-pdf-exit-$round"
             Close-InstalledShell
         }
-        # A crash entry can land a moment after the process has gone.
-        Start-Sleep -Seconds 5
-        $crashes = @(Get-AppCrashEvents $crashWatchStart)
-        $report.workflowCrashEntries = $crashes.Count
-        if ($crashes.Count -gt 0) {
-            $first = ("$($crashes[-1].Message)" -split "`r?`n" | Select-Object -First 4) -join ' | '
-            throw "The app wrote $($crashes.Count) crash entries during the workflow lane (#93); the first: $first"
-        }
+        Assert-NoWorkflowCrashes $crashWatchStart
     }
     finally {
-        Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
-        $report.scratchFoldersRemaining = @(if (Test-Path -LiteralPath $scratch) { $scratch })
+        Remove-Item -LiteralPath $workflow.Scratch -Recurse -Force -ErrorAction SilentlyContinue
+        $report.scratchFoldersRemaining = @(if (Test-Path -LiteralPath $workflow.Scratch) { $workflow.Scratch })
+    }
+}
+
+# T17.3: replaces the previous release with the candidate in place. The
+# version must rise, the family stay, and the library read the same; the
+# install location carries the version, so the launch task is rebuilt.
+function Invoke-RcUpgrade {
+    $before = Get-AppxPackage -Name $lanePackage
+    $libraryBefore = Invoke-ShellSeed @('describe-library', $dataRoot)
+    Add-AppxPackage -Path $PackagePath
+    $after = Get-AppxPackage -Name $lanePackage
+    if (-not $after) { throw 'The candidate did not install over the previous release.' }
+    # Recorded before any check, so cleanup owns (and removes) the candidate
+    # even when a check below fails.
+    $script:installed = $after
+    $report.packageFullName = $after.PackageFullName
+    $report.installLocation = $after.InstallLocation
+    $script:expectedExecutablePath = Join-Path $after.InstallLocation 'DesktopGuides.Production.exe'
+    $report.rc.candidateVersion = $after.Version.ToString()
+    $report.rc.familyUnchanged = $after.PackageFamilyName -eq $before.PackageFamilyName
+    if (-not $report.rc.familyUnchanged) {
+        throw "The upgrade changed the family from $($before.PackageFamilyName) to $($after.PackageFamilyName)."
+    }
+    if ([version] $after.Version -le [version] $before.Version) {
+        throw "The upgrade went from $($before.Version) to $($after.Version)."
+    }
+    $report.rc.libraryIntact = (Invoke-ShellSeed @('describe-library', $dataRoot)) -eq $libraryBefore
+    if (-not $report.rc.libraryIntact) { throw 'The library changed across the upgrade.' }
+    $script:launchAction = New-ShellLaunchAction $launchResultPath
+    $script:secondLaunchAction = New-ShellLaunchAction $secondLaunchResultPath
+    Register-ScheduledTask -TaskName $launchTask -Action $script:launchAction `
+        -Principal $principal -Force | Out-Null
+}
+
+# T17.3: the release-candidate journey. The previous release builds the
+# library through the UI; the candidate then reads, resumes, relaunches
+# offline, exports and restores it.
+function Run-RcScenarios {
+    $crashWatchStart = Get-Date
+    $workflow = New-WorkflowOriginals
+    try {
+        Start-InstalledShell
+        $report.workflowBuild = Run-ShellSmoke 'workflow-build' -WorkflowRoot $workflow.Originals
+        Close-InstalledShell
+        if ((& $workflow.Hash) -ne $workflow.Copied) { throw 'Importing changed an original file.' }
+        Remove-WorkflowOriginals $workflow.Originals
+
+        Invoke-RcUpgrade
+
+        Start-InstalledShell
+        $report.workflowRead = Run-ShellSmoke 'workflow-read' -WorkflowStatePath $workflow.State
+        Close-InstalledShell
+        Start-InstalledShell
+        $report.workflowResume = Run-ShellSmoke 'workflow-resume' -WorkflowStatePath $workflow.State
+        Close-InstalledShell
+
+        $report.rc.offline = [ordered]@{}
+        Invoke-WithFirewallBlock $report.rc.offline {
+            Start-InstalledShell
+            $report.workflowOffline = Run-ShellSmoke 'workflow-offline' -WorkflowStatePath $workflow.State
+            Close-InstalledShell
+        }
+
+        $backup = Join-Path $workflow.Scratch 'workflow-backup.zip'
+        Start-InstalledShell
+        $report.workflowExport = Run-ShellSmoke 'workflow-export' -BackupPath $backup
+        Close-InstalledShell
+        if (-not (Test-Path -LiteralPath $backup)) { throw 'workflow-export saved no backup.' }
+
+        Start-InstalledShell
+        $report.workflowRestore = Run-ShellSmoke 'workflow-restore' -BackupPath $backup -WorkflowStatePath $workflow.State
+        Close-InstalledShell
+        Assert-WorkflowControl $workflow
+        Assert-NoWorkflowCrashes $crashWatchStart
+    }
+    finally {
+        Remove-Item -LiteralPath $workflow.Scratch -Recurse -Force -ErrorAction SilentlyContinue
+        $report.scratchFoldersRemaining = @(if (Test-Path -LiteralPath $workflow.Scratch) { $workflow.Scratch })
     }
 }
 
@@ -2485,7 +2636,7 @@ function Run-BackupScenarios {
 
         $canceled = Join-Path $backupRoot 'canceled.zip'
         Start-InstalledShell
-        $prefix = "Local\DesktopGuides.Preview.Backup.$($report.launchedProcessId)"
+        $prefix = "Local\$eventPrefix.Backup.$($report.launchedProcessId)"
         $reached = [System.Threading.EventWaitHandle]::new(
             $false, [System.Threading.EventResetMode]::AutoReset, "$prefix.Reached")
         $resume = [System.Threading.EventWaitHandle]::new(
@@ -2565,7 +2716,7 @@ function Run-BackupScenarios {
             Start-InstalledShell
             $gate = $null
             if ($case.Mode -eq 'restore-cancel') {
-                $prefix = "Local\DesktopGuides.Preview.Backup.$($report.launchedProcessId)"
+                $prefix = "Local\$eventPrefix.Backup.$($report.launchedProcessId)"
                 $gate = @(
                     [System.Threading.EventWaitHandle]::new(
                         $false, [System.Threading.EventResetMode]::AutoReset, "$prefix.Reached"),
@@ -2654,7 +2805,7 @@ function Run-ProviderScenarios {
         Get-ChildItem -LiteralPath $fixtureSource -File | Copy-Item -Destination $fixtureFolder
         $fixtureGate = [System.Threading.EventWaitHandle]::new(
             $false, [System.Threading.EventResetMode]::ManualReset,
-            'Local\DesktopGuides.Preview.ProviderFixtures')
+            "Local\$eventPrefix.ProviderFixtures")
     }
     Start-InstalledShell
     $providers.none = Run-ShellSmoke 'provider-none'
@@ -2755,41 +2906,75 @@ try {
     }
     else {
         $report.sourcePackageSha256 = (Get-FileHash $PackagePath -Algorithm SHA256).Hash
-        Copy-Item $PackagePath $signed -Force
-
-        $certificate = New-SelfSignedCertificate `
-            -Type CodeSigningCert `
-            -Subject 'CN=DesktopGuides Development' `
-            -CertStoreLocation 'Cert:\CurrentUser\My' `
-            -KeyExportPolicy NonExportable `
-            -HashAlgorithm SHA256 `
-            -NotAfter (Get-Date).AddDays(1)
-        $report.certificateThumbprint = $certificate.Thumbprint
-        Export-Certificate -Cert $certificate -FilePath $public | Out-Null
-        Import-Certificate -FilePath $public `
-            -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
-        $imported = $true
-
-        $signTool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' `
-            -Recurse -Filter signtool.exe |
-            Where-Object { $_.FullName -like '*\x64\signtool.exe' } |
-            Sort-Object FullName |
-            Select-Object -Last 1 -ExpandProperty FullName
-        if (-not $signTool) { throw 'Windows SDK SignTool is unavailable.' }
-        & $signTool sign /fd SHA256 /sha1 $certificate.Thumbprint /s My $signed
-        if ($LASTEXITCODE -ne 0) { throw "SignTool failed with exit code $LASTEXITCODE." }
-        & $signTool verify /pa $signed
-        if ($LASTEXITCODE -ne 0) { throw 'Signed MSIX verification failed.' }
-        $report.signedPackageSha256 = (Get-FileHash $signed -Algorithm SHA256).Hash
-
-        if (Get-AppxPackage -Name DesktopGuides.Preview) {
-            throw 'A production preview package appeared before test install.'
+        if ($ReleaseSigned) {
+            # T17.3: the bytes under test are the release's own; nothing is re-signed.
+            $releaseRoot = Join-Path $PSScriptRoot '..\..\docs\p1\release'
+            $releaseThumbprint = Get-ReleasePin (Join-Path $releaseRoot 'release-certificate.json')
+            $releaseCertificate = Join-Path $releaseRoot 'desktop-guides-release.cer'
+            if ((Get-PfxCertificate -FilePath $releaseCertificate).Thumbprint -ne $releaseThumbprint) {
+                throw 'desktop-guides-release.cer does not match the pinned thumbprint.'
+            }
+            foreach ($package in @(@($PackagePath, $PreviousPackage) | Where-Object { $_ })) {
+                Assert-ReleaseSigner $package $releaseThumbprint
+            }
+            $report.releaseSigned = $true
+            $report.certificateThumbprint = $releaseThumbprint
+            $signed = $PackagePath
+            $report.signedPackageSha256 = $report.sourcePackageSha256
+            if ($PreviousPackage) {
+                $report.previousPackageSha256 = (Get-FileHash $PreviousPackage -Algorithm SHA256).Hash
+            }
+            # Trusted only for this run, and only if it wasn't already.
+            if (-not (Test-Path "Cert:\LocalMachine\TrustedPeople\$releaseThumbprint")) {
+                Import-Certificate -FilePath $releaseCertificate `
+                    -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
+                $releaseTrustAdded = $true
+            }
         }
-        Assert-FreshPreviewProfile $env:LOCALAPPDATA
-        Add-AppxPackage -Path $signed
-        $installed = Get-AppxPackage -Name DesktopGuides.Preview
+        else {
+            Copy-Item $PackagePath $signed -Force
+
+            $certificate = New-SelfSignedCertificate `
+                -Type CodeSigningCert `
+                -Subject 'CN=DesktopGuides Development' `
+                -CertStoreLocation 'Cert:\CurrentUser\My' `
+                -KeyExportPolicy NonExportable `
+                -HashAlgorithm SHA256 `
+                -NotAfter (Get-Date).AddDays(1)
+            $report.certificateThumbprint = $certificate.Thumbprint
+            Export-Certificate -Cert $certificate -FilePath $public | Out-Null
+            Import-Certificate -FilePath $public `
+                -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
+            $imported = $true
+
+            $signTool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' `
+                -Recurse -Filter signtool.exe |
+                Where-Object { $_.FullName -like '*\x64\signtool.exe' } |
+                Sort-Object FullName |
+                Select-Object -Last 1 -ExpandProperty FullName
+            if (-not $signTool) { throw 'Windows SDK SignTool is unavailable.' }
+            & $signTool sign /fd SHA256 /sha1 $certificate.Thumbprint /s My $signed
+            if ($LASTEXITCODE -ne 0) { throw "SignTool failed with exit code $LASTEXITCODE." }
+            & $signTool verify /pa $signed
+            if ($LASTEXITCODE -ne 0) { throw 'Signed MSIX verification failed.' }
+            $report.signedPackageSha256 = (Get-FileHash $signed -Algorithm SHA256).Hash
+        }
+
+        if (Get-AppxPackage -Name $lanePackage) {
+            throw "A $lanePackage package appeared before test install."
+        }
+        Assert-FreshPackageProfile $env:LOCALAPPDATA $lanePackage
+        # The rc group installs the previous release first and upgrades later.
+        Add-AppxPackage -Path $(if ($RcOnly) { $PreviousPackage } else { $signed })
+        $installed = Get-AppxPackage -Name $lanePackage
         if (-not $installed) { throw 'Production package did not install.' }
         $report.packageFullName = $installed.PackageFullName
+        if ($RcOnly) {
+            $report.rc = [ordered]@{
+                previousVersion = $installed.Version.ToString(); candidateVersion = $null
+                familyUnchanged = $false; libraryIntact = $false; offline = $null
+            }
+        }
         $report.packageFamilyName = $installed.PackageFamilyName
         $report.installLocation = $installed.InstallLocation
         # T17.2: the runtime the package resolved. A fresh runner registers
@@ -2820,6 +3005,7 @@ try {
     # Each group after the first starts from an empty data root, so a single
     # group run against a fresh install sees what the full run gives it.
     function Enter-ScenarioGroup([string] $name) {
+        if ($name -eq 'rc' -and -not $RcOnly) { return $false }
         if ($scenarioScope -ne 'all' -and $selectedGroups -notcontains $name) { return $false }
         if ($report.scenarioGroupsRun.Count -gt 0) {
             Get-ChildItem -LiteralPath $dataRoot -Force | Remove-Item -Recurse -Force
@@ -2927,6 +3113,7 @@ try {
     if (Enter-ScenarioGroup 'provider') { Run-ProviderScenarios }
     if (Enter-ScenarioGroup 'backup') { Run-BackupScenarios }
     if (Enter-ScenarioGroup 'workflow') { Run-WorkflowScenarios }
+    if (Enter-ScenarioGroup 'rc') { Run-RcScenarios }
 
     $report.success = $true
 }
@@ -3025,7 +3212,7 @@ finally {
         }
     }
     else {
-        $installedNow = @(Get-AppxPackage -Name DesktopGuides.Preview)
+        $installedNow = @(Get-AppxPackage -Name $lanePackage)
         $ownedPackage = @($installedNow | Where-Object {
             $installed -and $_.PackageFullName -eq $installed.PackageFullName
         })
@@ -3042,18 +3229,23 @@ finally {
             Remove-Item "Cert:\CurrentUser\My\$($certificate.Thumbprint)" `
                 -ErrorAction SilentlyContinue
         }
+        if ($releaseTrustAdded) {
+            Remove-Item "Cert:\LocalMachine\TrustedPeople\$releaseThumbprint" -ErrorAction SilentlyContinue
+        }
         Remove-Item $public -ErrorAction SilentlyContinue
-        $remainingPackages = @(Get-AppxPackage -Name DesktopGuides.Preview)
+        $remainingPackages = @(Get-AppxPackage -Name $lanePackage)
         $report.packageStillInstalled = $remainingPackages.Count -gt 0
         $report.certificateStillTrusted = if ($certificate) {
             Test-Path "Cert:\LocalMachine\TrustedPeople\$($certificate.Thumbprint)"
+        } elseif ($releaseTrustAdded) {
+            Test-Path "Cert:\LocalMachine\TrustedPeople\$releaseThumbprint"
         } else { $false }
         if ($report.packageStillInstalled -or $report.certificateStillTrusted) {
             $report.success = $false
             $report.cleanupError = if ($remainingPackages.Count -gt 0 -and
                 ($ownedPackage.Count -eq 0 -or
                  $remainingPackages[0].PackageFullName -ne $installed.PackageFullName)) {
-                'A Preview package not confirmed as test-owned remains untouched.'
+                "A $lanePackage package not confirmed as test-owned remains untouched."
             } else {
                 'Temporary package or certificate remains.'
             }

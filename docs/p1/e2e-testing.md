@@ -414,13 +414,43 @@ production app. Add cases as the dependent P1 tasks complete.
 | Duplicate import | After Import publication, pick `txt-legacy` again in the same game and choose CP437. The preview's `ImportDuplicate` InfoBar names the existing guide, and the primary button reads Import another copy. In dark, import a copy under a new title; it is selected and focused. In light, choose Open existing; the dialog closes and the Reader shows the first guide. Afterwards the library has two CP437 guides, two content directories, and no file operation or staging entry. | T06.4, TR06.3, TR11.3 |
 | Guide removal | After Duplicate import, open the imported guide, go back and invoke Remove guide. The `RemoveGuideDialog` names the guide and 1 managed file. In dark, Cancel returns focus to Remove guide and the library is unchanged. In light, Remove closes the dialog, the status reads "Removed {title}.", and the remaining guide is selected and focused. Afterwards the library has one guide, one content directory, one reading state, one preferences row, and no trash entry, file operation or staging entry. | T15.3, TR15.1, TR15.2, TR11.3 |
 | Library recovery | `-TxtOnly`, after the TXT reader modes. With the shell closed, `break-library` replaces `library.sqlite` with non-database bytes (`library-damaged`) or removes it (`library-missing`). The shell shows the `LibraryUnavailable` page: its title and body for the issue, `LibraryUnavailableDataFolder`, and **Try again** focused beside **Open data folder**. The database bytes, or their absence, are unchanged afterwards. The seed restores the database, and **Try again** reads "Library ready." and lists Text Reader Game. | T15.1, TR15.1, TR11.3 |
-| Install and upgrade | Signed MSIX installs in an interactive session; an older version upgrades under the same identity without losing a populated library. Verify package version, launch, and data after restart. | T17.1, T17.3, TR17.2 |
+| Install and upgrade | Signed MSIX installs in an interactive session; an older version upgrades under the same identity without losing a populated library. Verify package version, launch, and data after restart. For a release, the `rc` group does this on the draft's own assets (T17.3). | T17.1, T17.3, TR17.2 |
 | Provider-backed game addition | Search the selected provider, distinguish editions, add one result, and verify its provider provenance, normalized metadata, and validated artwork. Disconnect and relaunch to confirm the cached display remains usable. Exercise duplicate selection, cancellation, malformed/oversized data, unavailable service, and `Create manually`; failed attempts leave no game or managed artwork. Refresh source data and verify local title, platform, and notes remain unchanged. | T04.4, TR04.3, TR04.4 |
 | Import and offline reading | Add a game and import TXT, static HTML with local assets, and PDF through the UI. Remove the originals; while online in a fresh WebView2 profile, verify a reachable HTML canary receives zero guide-originated requests. Then remove all egress, relaunch, and open all three managed copies while recording disconnected state through the final check. | T04–T10, T17.3, TR17.1 |
 | Independent state | Move to different positions in two guides, restart, and verify their locators separately. Change layout/theme, check exact or labeled approximate restore, and toggle completion explicitly; reaching the end must not mark complete. | T12–T14, TR12.1–TR14.2 |
 | Removal and recovery | Cancel and confirm guide/game removal, restart around an interrupted operation, and verify only owned records and files change. Export outside app data and restore into both clean and populated libraries. | T15.2–T15.4, T20.1–T20.2 |
 | Accessibility and PDF limits | Drive import/read/complete/export with keyboard and UIA; record focus, high contrast, DPI, and Narrator checks. Tagged PDF text must be accessible; scanned, locked, and long PDFs get their stated checks and limits. | T10.2–T10.3, T16.1; T16.2–T16.3 in the final milestone |
-| Prerequisites and target matrix | On a disposable runtime-free Windows 11 x64 VM, observe missing Windows App Runtime/WebView2 behavior and offline-installer recovery. Repeat the complete installed workflow on each advertised OS/CPU target. | T17.3, TR17.2 |
+| Prerequisites and target matrix | On a disposable runtime-free Windows 11 x64 VM, observe missing Windows App Runtime/WebView2 behavior and offline-installer recovery (T17.8, in the final milestone). Repeat the complete installed workflow on each advertised OS/CPU target with the `rc` group, and record it in the [tested matrix](release/tested-matrix.md). | T17.3, TR17.2 |
+
+### The release-candidate group (`rc`, T17.3)
+
+`-RcOnly` runs the journey on a release's draft assets. It takes
+`-Lane Public`, `-ReleaseSigned`, `-PackagePath <candidate>` and
+`-PreviousPackage <previous release>`, and runs alone.
+
+- **Before installing,** each package's signer must be the pinned release
+  certificate. The certificate is trusted for the run only, and only if it
+  wasn't already.
+- **The stages:**
+  1. the previous release installs and builds a library through the UI
+     (`workflow-build`);
+  2. the originals are removed;
+  3. the candidate upgrades in place: the version rises, the family stays,
+     and `describe-library` is unchanged;
+  4. then `workflow-read`, `workflow-resume` and `workflow-offline`;
+  5. then `workflow-export` and `workflow-restore`.
+- **Offline:** `workflow-offline` relaunches the app while the elevated
+  offline controller blocks the package's executable. Each guide must open
+  at its place with no non-loopback connection.
+- **The offline method:** T17.3 uses this app-scoped rule instead of the
+  adapter disconnect in step 6 above. It proves TR17.1 for the app without
+  cutting the host's network, and with it the SSH session coordinating the
+  run.
+- **Authorization:** the controller is started separately, elevated, with
+  the user's authorization for each run. Without it, the stage fails: it
+  is never skipped.
+- **The record:** the sanitized result goes to the
+  [tested matrix](release/tested-matrix.md).
 
 The runtime-free VM gate is deferred. Windows 10 x64, 200% display scaling,
 and the complete P1 ARM64 workflow remain untested. The current Windows 11

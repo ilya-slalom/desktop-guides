@@ -72,6 +72,43 @@ try {
     $folderHash = Get-FolderHash (Join-Path $fixtures 'p1\html-long')
     Assert-True ($text.Contains("``tests/fixtures/p1/html-long`` ``$folderHash``")) 'The folder fixture hash is wrong.'
 
+    # T17.3: a release-candidate run shows the signer, the upgrade and offline.
+    $rcReport = [ordered]@{}
+    foreach ($key in $report.Keys) { $rcReport[$key] = $report[$key] }
+    $rcReport.releaseSigned = $true
+    $rcReport.certificateThumbprint = 'BAA638E4DCFA4E1C5A2F65E3DC838BA7B3B59EB6'
+    $rcReport.previousPackageSha256 = 'PPP'
+    $rcReport.rc = [ordered]@{
+        previousVersion = '1.0.0.0'; candidateVersion = '1.0.1.0'; familyUnchanged = $true; libraryIntact = $true
+        offline = [ordered]@{ firewallRule = 'DesktopGuides-P1-ProviderOffline-r1'; firewallRuleRemoved = $true }
+    }
+    $rcReport.workflowOffline = [ordered]@{ remoteConnections = 0 }
+    $rcPath = Join-Path $root 'rc-install.json'
+    $rcReport | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $rcPath -Encoding UTF8
+    $rcMd = & $writer -ReportPath $rcPath -FixtureRoot $fixtures -OutDirectory (Join-Path $root 'rc-out') -Commit 'abc123' -RunId '43' -Shard 'rc'
+    $rcText = Get-Content -LiteralPath $rcMd -Raw -Encoding UTF8
+    Assert-True ($rcText.Contains("- $pass Release signer ``BAA638E4DCFA4E1C5A2F65E3DC838BA7B3B59EB6`` matches the pin")) 'The signer line is missing.'
+    Assert-True ($rcText.Contains("- $pass Previous release SHA-256 ``PPP``")) 'The previous package line is missing.'
+    Assert-True ($rcText.Contains('### Release candidate')) 'The release-candidate section is missing.'
+    Assert-True ($rcText.Contains("- $pass Upgrade 1.0.0.0 -> 1.0.1.0: same family, library intact")) 'The upgrade line is missing.'
+    Assert-True ($rcText.Contains("- $pass Offline relaunch: rule added, no connection, rule removed")) 'The offline line is missing.'
+    Assert-True (-not $rcText.Contains('Test certificate')) 'A release-signed run named a test certificate.'
+    Assert-True ($rcText.Contains("- $pass Release certificate not left trusted by the run")) 'The release trust cleanup line is missing.'
+
+    # A changed library, a wrong signer and a rule left behind all show as failures.
+    $rcReport.certificateThumbprint = 'OTHER'
+    $rcReport.rc.libraryIntact = $false
+    $rcReport.rc.offline.firewallRuleRemoved = $false
+    $rcReport | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $rcPath -Encoding UTF8
+    $badMd = & $writer -ReportPath $rcPath -FixtureRoot $fixtures -OutDirectory (Join-Path $root 'rc-bad') -Commit 'abc123' -RunId '44' -Shard 'rc'
+    $badText = Get-Content -LiteralPath $badMd -Raw -Encoding UTF8
+    Assert-True ($badText.Contains("- $fail Release signer ``OTHER`` matches the pin")) 'A wrong signer passed.'
+    Assert-True ($badText.Contains("- $fail Upgrade 1.0.0.0 -> 1.0.1.0: same family, library intact")) 'A changed library passed.'
+    Assert-True ($badText.Contains("- $fail Offline relaunch: rule added, no connection, rule removed")) 'A remaining rule passed.'
+
+    # Without a release candidate, there is no such section.
+    Assert-True (-not $text.Contains('### Release candidate')) 'An ordinary run showed a release-candidate section.'
+
     # Anonymisation reaches nested strings.
     $json = Get-Content -LiteralPath (Join-Path $out 'evidence.json') -Raw -Encoding UTF8
     Assert-True (-not $json.Contains('someone')) 'A user name leaked into evidence.json.'

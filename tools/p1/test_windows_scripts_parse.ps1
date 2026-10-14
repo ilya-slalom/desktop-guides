@@ -15,6 +15,36 @@ foreach ($file in Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.ps1') {
         $node -is [System.Management.Automation.Language.CommandAst] -and
             $node.GetCommandName() -in @('elseif', 'else')
     }, $true)
+    # Windows PowerShell 5.1 leaves $PSScriptRoot empty in parameter
+    # defaults under -File; resolve such defaults in the script body.
+    if ($ast.ParamBlock) {
+        foreach ($parameter in $ast.ParamBlock.Parameters) {
+            if ($parameter.DefaultValue -and $parameter.DefaultValue.Extent.Text -match '\$PSScriptRoot') {
+                $failures.Add("$($file.Name):$($parameter.Extent.StartLineNumber): -$($parameter.Name.VariablePath.UserPath) defaults to a `$PSScriptRoot path")
+            }
+        }
+    }
+    # Names are case-insensitive: assigning $lane to a validated -Lane
+    # parameter fails at run time with "cannot be validated".
+    $validated = @()
+    if ($ast.ParamBlock) {
+        $validated = @($ast.ParamBlock.Parameters | Where-Object {
+            $_.Attributes | Where-Object { $_.TypeName.Name -like 'Validate*' }
+        } | ForEach-Object { $_.Name.VariablePath.UserPath })
+    }
+    if ($validated.Count -gt 0) {
+        $assignments = $ast.FindAll({
+            param($node)
+            $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+                $node.Left -is [System.Management.Automation.Language.VariableExpressionAst]
+        }, $true)
+        foreach ($assignment in $assignments) {
+            $name = $assignment.Left.VariablePath.UserPath
+            if ($validated | Where-Object { [string]::Equals($_, $name, [StringComparison]::OrdinalIgnoreCase) }) {
+                $failures.Add("$($file.Name):$($assignment.Extent.StartLineNumber): assigns `$$name, a validated parameter")
+            }
+        }
+    }
     foreach ($command in $stray) {
         $failures.Add("$($file.Name):$($command.Extent.StartLineNumber): '$($command.GetCommandName())' after the end of its if-chain")
     }

@@ -11,6 +11,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'windows_shell_lane.ps1')
 $principal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw 'The offline controller must run elevated.'
@@ -43,7 +44,7 @@ try {
         return
     }
     if ($request.runId -notmatch '^[0-9a-f]{32}$' -or
-        $request.program -notlike "$env:ProgramFiles\WindowsApps\DesktopGuides.Preview_*_x64__*\DesktopGuides.Production.exe" -or
+        -not (Test-InstalledLaneExecutable $request.program) -or
         -not (Test-Path -LiteralPath $request.program -PathType Leaf)) {
         throw 'The offline request did not name the installed Desktop Guides executable.'
     }

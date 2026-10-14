@@ -38,6 +38,13 @@ try {
     Assert-Rejected { Assert-FreshPreviewProfile '' } `
         'An unavailable app-data path was accepted.'
 
+    # T17.3: the Public lane's profile is guarded the same way.
+    Assert-FreshPackageProfile $scratch 'IlyaLissoboi.DesktopGuides'
+    $publicProfile = Join-Path $packagesRoot 'IlyaLissoboi.DesktopGuides_test'
+    New-Item -ItemType Directory -Path $publicProfile | Out-Null
+    Assert-Rejected { Assert-FreshPackageProfile $scratch 'IlyaLissoboi.DesktopGuides' } `
+        'An existing Public profile was accepted.'
+
     Assert-FreshPortableProfile $scratch
     $portableRoot = Join-Path $scratch 'DesktopGuides'
     New-Item -ItemType Directory -Path $portableRoot | Out-Null

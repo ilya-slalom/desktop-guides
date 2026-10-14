@@ -25,7 +25,7 @@ param(
         'import-reminder', 'export-backup', 'export-cancel', 'export-protected',
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
-        'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-export', 'workflow-restore',
+        'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -104,7 +104,10 @@ param(
     # the file that carries recorded places from one stage to the next.
     [string] $WorkflowRoot = '',
 
-    [string] $WorkflowStatePath = ''
+    [string] $WorkflowStatePath = '',
+
+    # T17.3: the lane's event prefix, from the installer.
+    [string] $EventPrefix = 'DesktopGuides.Preview'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -1552,7 +1555,7 @@ try {
         'completion-segmented', 'completion-last-page', 'completion-game', 'completion-reader', 'completion-restart', 'completion-restart-after', 'completion-error-prepare', 'completion-error', 'completion-error-retry',
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
-        'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-export', 'workflow-restore',
+        'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
         'workflow-pdf-exit')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
@@ -2661,7 +2664,7 @@ try {
             # is still on top.
             $delay = [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::ManualReset,
-                "Local\DesktopGuides.Preview.HtmlAssetDelay.$ProcessId")
+                "Local\$EventPrefix.HtmlAssetDelay.$ProcessId")
             try {
                 $delayed = Open-RestoredGuide 'Long Web Guide' $saved
             }
@@ -4212,6 +4215,15 @@ try {
                 $report.workflowCompletedScreenshot = Save-WindowScreenshot 'workflow-completed'
                 $report.phases += 'workflow-pdf-completed'
             }
+            elseif ($Mode -eq 'workflow-offline') {
+                # T17.3: with the app's network blocked, each managed copy
+                # still opens at its place, and nothing reaches out.
+                $state = Read-WorkflowState
+                Enter-WorkflowGame
+                Assert-WorkflowPlaces $state 'Relaunching offline'
+                Assert-NoRemoteConnections 'offline relaunch'
+                $report.phases += 'workflow-offline'
+            }
             elseif ($Mode -eq 'workflow-pdf-exit') {
                 # #93: render a PDF page and leave it, so the close that
                 # follows runs with Windows.Data.Pdf loaded.
@@ -4288,7 +4300,7 @@ try {
             # The view re-measures at a larger test font size on this signal.
             $remeasure = [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::AutoReset,
-                "Local\DesktopGuides.Preview.TextRemeasure.$($process.Id)")
+                "Local\$EventPrefix.TextRemeasure.$($process.Id)")
             $report.txtPosition = [ordered]@{}
             [void](Wait-Name 'LibraryHeading' 'Library')
             # Startup found Missing File Guide's file gone (TR15.1).
@@ -4897,7 +4909,7 @@ try {
             Send-ThemeKeys '{ENTER}'
         }
 
-        $windowsTheme = if ($WindowsTheme) { $WindowsTheme }
+        $currentWindowsTheme = if ($WindowsTheme) { $WindowsTheme }
             elseif ($ExpectedThemeStatus -like 'System (*)') {
                 $ExpectedThemeStatus.Substring(8).TrimEnd(')') }
             else { '' }
@@ -4955,12 +4967,12 @@ try {
             if ($Mode -eq 'theme-change') {
                 Select-ThemeByKeys $ExpectedTheme $SwitchToTheme
                 [void](Wait-Status "App theme set to $SwitchToTheme.")
-                if ($SwitchToTheme -eq 'System' -and -not $windowsTheme) {
+                if ($SwitchToTheme -eq 'System' -and -not $currentWindowsTheme) {
                     throw 'Switching to System needs -WindowsTheme or a System start status.'
                 }
-                $after = if ($SwitchToTheme -eq 'System') { "System ($windowsTheme)" } else { $SwitchToTheme }
+                $after = if ($SwitchToTheme -eq 'System') { "System ($currentWindowsTheme)" } else { $SwitchToTheme }
                 Assert-ThemeShown $SwitchToTheme $after 'Change'
-                $dialogTheme = if ($SwitchToTheme -eq 'System') { $windowsTheme } else { $SwitchToTheme }
+                $dialogTheme = if ($SwitchToTheme -eq 'System') { $currentWindowsTheme } else { $SwitchToTheme }
                 [void](Wait-HiddenById 'ShellStatus')
                 Assert-ShellForeground
                 $report.themeSettingsScreenshot = Save-WindowScreenshot "theme-$SwitchToTheme-settings"

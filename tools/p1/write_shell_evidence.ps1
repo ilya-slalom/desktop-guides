@@ -11,6 +11,7 @@ param(
     [string] $PortableZipSha256 = ''
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'windows_shell_lane.ps1')
 $pass = [string][char]0x2713
 $fail = [string][char]0x2717
 
@@ -151,11 +152,32 @@ else {
         $lines.Add((Line ([bool] (Field $report 'packageFullName')) "Package ``$(Field $report 'packageFullName')``"))
         $lines.Add((Line ([bool] (Field $report 'sourcePackageSha256')) "Source MSIX SHA-256 ``$(Field $report 'sourcePackageSha256')``"))
         $lines.Add((Line ([bool] (Field $report 'signedPackageSha256')) "Signed MSIX SHA-256 ``$(Field $report 'signedPackageSha256')``"))
-        $lines.Add((Line ([bool] (Field $report 'certificateThumbprint')) "Test certificate ``$(Field $report 'certificateThumbprint')``"))
+        if (Field $report 'releaseSigned') {
+            $pin = Get-ReleasePin (Join-Path $PSScriptRoot '..\..\docs\p1\release\release-certificate.json')
+            $signer = Field $report 'certificateThumbprint'
+            $lines.Add((Line ($signer -eq $pin) "Release signer ``$signer`` matches the pin"))
+            if (Field $report 'previousPackageSha256') {
+                $lines.Add((Line $true "Previous release SHA-256 ``$(Field $report 'previousPackageSha256')``"))
+            }
+        }
+        else {
+            $lines.Add((Line ([bool] (Field $report 'certificateThumbprint')) "Test certificate ``$(Field $report 'certificateThumbprint')``"))
+        }
     }
     else {
         $lines.Add((Line ([bool] (Field $report 'portableExecutableSha256')) "Portable exe SHA-256 ``$(Field $report 'portableExecutableSha256')``"))
         $lines.Add((Line ([bool] $PortableZipSha256) "Portable zip SHA-256 ``$PortableZipSha256``"))
+    }
+    $rc = Field $report 'rc'
+    if ($rc) {
+        $lines.Add(''); $lines.Add('### Release candidate')
+        $upgraded = [bool] (Field $rc 'familyUnchanged') -and [bool] (Field $rc 'libraryIntact')
+        $lines.Add((Line $upgraded "Upgrade $(Field $rc 'previousVersion') -> $(Field $rc 'candidateVersion'): same family, library intact"))
+        $offline = Field $rc 'offline'
+        $remote = Field (Field $report 'workflowOffline') 'remoteConnections'
+        $offlineOk = [bool] (Field $offline 'firewallRule') -and [bool] (Field $offline 'firewallRuleRemoved') -and
+            ($null -ne $remote) -and ([int] $remote -eq 0)
+        $lines.Add((Line $offlineOk 'Offline relaunch: rule added, no connection, rule removed'))
     }
 }
 
@@ -185,7 +207,8 @@ if ($report) {
     }
     else {
         $lines.Add((Line (-not (Field $report 'packageStillInstalled')) 'Package removed'))
-        $lines.Add((Line (-not (Field $report 'certificateStillTrusted')) 'Test certificate no longer trusted'))
+        $trustLabel = if (Field $report 'releaseSigned') { 'Release certificate not left trusted by the run' } else { 'Test certificate no longer trusted' }
+        $lines.Add((Line (-not (Field $report 'certificateStillTrusted')) $trustLabel))
     }
     $processErrors = Items $report 'processCleanupErrors'
     $lines.Add((Line ($processErrors.Count -eq 0) "No test-owned scheduled task or process left$(if ($processErrors.Count) { ': ' + (Hide-Paths ($processErrors -join '; ')) })"))
