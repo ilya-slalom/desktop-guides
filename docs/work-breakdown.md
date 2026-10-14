@@ -607,17 +607,23 @@ library and points to Export in Settings.
 
 ## P2 — reader depth and local ownership
 
+Designed in the [P2 technical design](p2-technical-design.md), 15 October
+2026. S18 and S19 are designed in full; S21 starts with T21.1's survey, and
+each format then gets its own design.
+
 ### S18 — Search and navigate within guides
 
 **Story:** As a reader, I want to find a word or jump to a section inside a
 guide. **Depends on:** S08, S09, S11, S12.
 
-**Acceptance:** TXT/HTML search finds next and previous matches without
-replacing the saved reading anchor; HTML headings or anchors and detected TXT
+**Acceptance:** TXT, HTML and PDF search finds next and previous matches
+without replacing the saved reading anchor (PDF added 15 October 2026,
+because P1 extracts PDF page text; image-only pages are reported as not
+searchable); HTML headings or anchors, PDF outlines, and detected TXT
 sections form a usable table of contents when available.
 
-- **T18.1** Add TXT search over normalized text and HTML search over permitted
-  DOM text.
+- **T18.1** Add TXT search over normalized text, HTML search over permitted
+  DOM text, and PDF search over extracted page text.
 - **T18.2** Add HTML heading/anchor collection and conservative TXT section
   heuristics with manual fallback when no TOC is found. Use a native
   `TreeView` for the table of contents and Toolkit `GridSplitter` only when
