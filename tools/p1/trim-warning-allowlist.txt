@@ -1,0 +1,3 @@
+# T17.4: trim warnings the portable build accepts, checked by
+# assert_trim_warnings.ps1. One "IL2104 <assembly>  # reason" a line, for
+# assemblies the project doesn't own. The project's own code gets no entries.

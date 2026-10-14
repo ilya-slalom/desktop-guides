@@ -167,6 +167,9 @@ jobs:
       - name: Check the distribution measurement
         shell: pwsh
         run: ./tools/p1/test_windows_distribution_measure.ps1
+      - name: Check the trim-warning gate
+        shell: pwsh
+        run: ./tools/p1/test_assert_trim_warnings.ps1
       - name: Check release version parsing
         shell: pwsh
         run: ./tools/p1/test_release_version.ps1
