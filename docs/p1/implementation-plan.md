@@ -1,10 +1,11 @@
 # P1 implementation plan and exit gates
 
-Status: 52 of the 54 tasks are merged, 14 October 2026. M0 to M4 are
+Status: 53 of the 54 tasks are merged, 14 October 2026. M0 to M4 are
 complete; T11.5 (colorful icons), the last M2 task, merged in #85. M5 has
 T20.1, T20.2, T15.4, T15.1 and T16.1 merged. In M6, T17.2 (release CI) is
-complete. T17.4 (size pass) has PR a (#106) and PR b1 (#107) merged and PR b2
-in review; T17.3 (release-candidate runs) comes after it. T17.6 (app
+complete, and T17.4 (size pass) is complete (#106, #107, #108). T17.3
+(release-candidate runs) remains; its runtime-free VM check moved to T17.8
+in the final milestone, so P1 makes no clean-install claim until then. T17.6 (app
 icon) merged in #86 and T16.1 (keyboard shortcuts) in #88. The accessibility
 audit (T16.2, T16.3) and the Microsoft Store submission (T17.5) moved out of
 P1 to the [final milestone](../work-breakdown.md#final-milestone--accessibility-audit-and-store-submission)
@@ -1066,8 +1067,8 @@ only targets with complete target-specific results.
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
 | T17.2 | T04.3, T06.4, T07.3, T08.3, T09.3, T10.3, T12.3, T13.1, T14.3, T15.4, T16.1, T20.2 | Locked Core/Infrastructure and signed installed production UI workflow CI started through an interactive scheduled task, retained P0 regression lane, and reviewable fixture/evidence checklist. Failing storage/security tests stop packaging; failing installed UI blocks release promotion. | TR17.1, TR17.2 |
-| T17.4 | T17.1, T17.2 | Distribution size pass on the final feature set. Both builds exclude the unused Windows App SDK AI, ML, Search, Widgets and DWrite components, and the MSIX keeps its `Microsoft.WindowsAppRuntime.2` dependency. The portable build is trim-safe (C#/WinRT `partial` types and generic-interface code, source-generated JSON, an AngleSharp trim review) and published trimmed and compressed; CI fails on a new trim or C#/WinRT warning. Every scenario group passes on both builds, and the release records exe, extraction and MSIX sizes plus cold and warm launch times. Start from the [size spike](results.md#portable-size-spike--8-october-2026). | TR17.3 |
-| T17.3 | T17.1, T17.2, T17.4 | Interactive-task signed install/upgrade, three-format import after original removal, offline relaunch, independent resume, deletion, and backup restore on each promised target. Record OS/CPU/package/prerequisite versions, hashes, and scanned-PDF limit. A runtime-free Windows 11 x64 VM must prove missing-prerequisite failure and offline-installer recovery before a clean-install claim. | TR17.1, TR17.2 |
+| T17.4 | T17.1, T17.2 | Distribution size pass on the final feature set. Both builds exclude the unused Windows App SDK AI, ML, Search, Widgets and DWrite components, and the MSIX keeps its `Microsoft.WindowsAppRuntime.2` dependency. The portable build is trim-safe (C#/WinRT `partial` types and generic-interface code, source-generated JSON, an AngleSharp trim review) and published trimmed, compressed and ReadyToRun; CI fails on a new trim or C#/WinRT warning. Every scenario group passes on both builds, and the release records exe, extraction and MSIX sizes plus cold and warm launch times. Start from the [size spike](results.md#portable-size-spike--8-october-2026). | TR17.3 |
+| T17.3 | T17.1, T17.2, T17.4 | Interactive-task signed install/upgrade, three-format import after original removal, offline relaunch, independent resume, deletion, and backup restore on each promised target. Record OS/CPU/package/prerequisite versions, hashes, and scanned-PDF limit. The runtime-free Windows 11 x64 VM check (missing-prerequisite failure, offline-installer recovery) is T17.8 in the [final milestone](../work-breakdown.md#final-milestone--accessibility-audit-and-store-submission); P1 makes no clean-install claim before it. | TR17.1, TR17.2 |
 | T17.6 | T17.1 | The app's own icon replaces the P0 placeholder logos: MSIX logos at every scale and target size in both lanes, and a multi-size `.ico` for the portable exe and its window, with a simplified variant at 16 to 32 px. The package stays one `.msix` (`AppxBundle=Never`), and `verify_production_package.py` requires the new logos. Runs before T17.3 so the candidate runs ship the final icon. | TR17.2 |
 
 The existing `production-shell-ui` CI job verifies M1 routes in an already

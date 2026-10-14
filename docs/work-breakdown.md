@@ -542,7 +542,12 @@ machine. Missing WebView2 Runtime produces an actionable setup message.
   [installed E2E procedure](p1/e2e-testing.md). Signed-MSIX runs do not
   cover the portable build; its release gates (first run without
   installation, data location, and replacing the executable with a newer
-  build) are defined separately later.
+  build) are defined separately later. The runtime-free VM check
+  (missing-prerequisite failure and offline-installer recovery) moved to
+  T17.8 in the
+  [final milestone](#final-milestone--accessibility-audit-and-store-submission),
+  decided 14 October 2026. Until T17.8 passes, P1 makes no clean-install
+  claim.
 - **T17.4** Run a distribution size pass on the final feature set, before the
   T17.3 candidate runs. Exclude the Windows App SDK components the app doesn't
   use (AI, ML, Search, Widgets, DWrite) from both builds. Make the portable
@@ -551,6 +556,10 @@ machine. Missing WebView2 Runtime produces an actionable setup message.
   8 October 2026 measured the portable exe at 244 MB, 182 MB without the unused
   components, and 94 MB trimmed (42 MB compressed); see
   [P1 results](p1/results.md#portable-size-spike--8-october-2026).
+  Complete (#106, #107, #108): the portable exe ships trimmed, compressed and
+  ReadyToRun at 59.9 MB (zip 54.0 MB). The user revised the cold-launch limit
+  to 3.5 s; see
+  [P1 results](p1/results.md#t174-pr-b2-trimmed-compressed-and-readytorun--14-october-2026).
 - T17.5 moved to the
   [final milestone](#final-milestone--accessibility-audit-and-store-submission),
   as the very last step of currently planned feature development.
@@ -708,7 +717,8 @@ major features is also unlikely to pass Store review. P1 keeps T16.1's
 keyboard work; its release claims R9 only to that extent.
 
 **Depends on:** every feature task in P1, P2 and P3. T17.7 is optional and
-can run at any point in this milestone before T17.5.
+can run at any point in this milestone before T17.5. T17.8 needs Hyper-V
+on the Windows host, which is unavailable until then.
 
 - **T16.2** Audit keyboard order, focus restoration, AutomationProperties,
   touch target size, DPI scaling, and high contrast across every feature.
@@ -718,6 +728,20 @@ can run at any point in this milestone before T17.5.
   them exactly afterward, or run in a disposable Windows profile or VM.
 - **T16.3** Record PDF document-text access behavior from the chosen engine
   and provide an accurate user-facing limitation if needed. Closes S10.
+- **T17.8** Prove the clean-install path in a runtime-free Windows 11 x64
+  Hyper-V VM on the Windows host, deferred from T17.3 on 14 October 2026.
+  - **The VM:** a fresh Windows 11 install without the Windows App
+    Runtime, with a checkpoint so every run starts from the same state.
+    OpenSSH and an auto-logon desktop let the existing scheduled-task
+    harness run unchanged.
+  - **The checks:** the signed MSIX fails clearly when its prerequisite is
+    missing, and the offline installer recovers it. The VM's network
+    adapter is disconnected for the offline steps.
+  - **Why it waits:** Hyper-V can't be enabled on the host yet. Windows
+    containers can't run the WinUI 3 app or install an MSIX, so they don't
+    qualify.
+  - **The outcome:** it allows the clean-install claim that P1 doesn't
+    make.
 - **T17.7 (optional)** Rewrite the installed end-to-end harness in C#,
   decided 14 October 2026. The harness is about 15,000 lines of
   PowerShell, plus small C# helpers compiled at run time. A rewrite with
