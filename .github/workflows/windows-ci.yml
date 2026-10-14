@@ -170,6 +170,9 @@ jobs:
       - name: Check the trim-warning gate
         shell: pwsh
         run: ./tools/p1/test_assert_trim_warnings.ps1
+      - name: Check the lane and release-signer helpers
+        shell: pwsh
+        run: ./tools/p1/test_windows_shell_lane.ps1
       - name: Check release version parsing
         shell: pwsh
         run: ./tools/p1/test_release_version.ps1
