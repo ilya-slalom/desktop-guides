@@ -1,6 +1,6 @@
 # T17.2 piece D: the fake-provider CI lane design
 
-Status: approved; implemented on `feat/p1-t17-2-fake-providers`.
+Status: merged in #104 (merge commit `928407c`), 14 October 2026.
 Pieces A, B, C and E merged in #90, #91, #100 and #95; see the
 [T17.2 design](t17-2-release-ci-design.md).
 
@@ -188,6 +188,9 @@ first installed runs:
    scrolling to the IGDB field hid the Test button, and resizing wasn't the
    cause. A screenshot capture showed the real layout. The capture stays in
    the smoke.
+7. **Every provider scenario starts at 1500 × 720.** Whether
+   `provider-settings` passed depended on the window size a launch got; in
+   the runner's 768 × 519 window the Test button fell below the fold.
 
 ## T17.2 piece D verification record
 
@@ -209,7 +212,13 @@ first installed runs:
   - The search cancel was observed, with no unmatched requests.
   - Both leak scans were clean, and `providers.bin` was gone after removal.
   - Earlier dispatches, from 38405079953 to 38411889341, found rulings 4–6.
-- **PR run:** recorded in the PR description.
+- **PR run:** [38419706291](https://github.com/ilya-slalom/desktop-guides/actions/runs/38419706291)
+  passed on the first attempt, with all 10 installed shards; both `html`
+  shards show "Providers: fixtures" with all five provider stages. The run
+  before it, 38416197769, failed portable `provider-settings` in a small
+  window, which led to ruling 7 (every provider scenario starts at
+  1500 × 720). A review fix makes a fixture key file that doesn't parse
+  fail the run instead of skipping the provider steps.
 
 ## Out of scope
 

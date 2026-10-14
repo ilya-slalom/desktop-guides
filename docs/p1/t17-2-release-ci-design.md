@@ -1,8 +1,9 @@
 # T17.2 release CI: evidence checklist and workflow lane design
 
-Status: pieces A and B merged: PR a (the evidence checklist) in #90, merge
-commit `60ef03b`; PR b (the workflow lane) in #91, merge commit `9ba1fd4`.
-Pieces E, C and D follow, each with its own design.
+Status: T17.2 complete. Pieces A and B merged in #90 (`60ef03b`) and #91
+(`9ba1fd4`); E in #95 ([design](t17-2-task-entry-design.md)), C in #100
+([design](t17-2-portable-ci-design.md)) and D in #104
+([design](t17-2-fake-provider-design.md)).
 Prerequisites in the plan's T17.2 row are merged, including T16.1 (#88).
 T16.2 and T16.3 left T17.2's prerequisites when the accessibility audit moved
 to the final milestone after P3 (#89).
