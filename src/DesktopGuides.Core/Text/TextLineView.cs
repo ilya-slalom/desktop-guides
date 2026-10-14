@@ -63,6 +63,21 @@ public static class TextLineView
         return end;
     }
 
+    /// <summary>The display column of <paramref name="offset"/> (an index
+    /// into <see cref="TextGuideDocument.Text"/>) in <paramref name="line"/>,
+    /// clamped to the line.</summary>
+    public static int ColumnOf(TextGuideDocument document, int line, int offset)
+    {
+        (int start, int end) = Bounds(document, line);
+        int stop = Math.Clamp(offset, start, end);
+        int columns = 0;
+        for (int index = start; index < stop; index++)
+        {
+            columns += Width(document.Text[index], columns);
+        }
+        return columns;
+    }
+
     private static int Width(char character, int column) =>
         character == '\t' ? TabWidth - column % TabWidth : 1;
 

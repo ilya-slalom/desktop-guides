@@ -106,4 +106,35 @@ public sealed class TextLineViewTests
     {
         Assert.Equal(offset, TextLineView.SourceOffset(Document("x\nab\tc"), 1, column));
     }
+
+    [Fact]
+    public void ColumnOfCountsTabExpansion()
+    {
+        TextGuideDocument document = Document("ab\tcd\nx\ty");
+
+        Assert.Equal(0, TextLineView.ColumnOf(document, 0, 0));
+        Assert.Equal(2, TextLineView.ColumnOf(document, 0, 2));
+        Assert.Equal(8, TextLineView.ColumnOf(document, 0, 3));
+        Assert.Equal(9, TextLineView.ColumnOf(document, 0, 4));
+        Assert.Equal(8, TextLineView.ColumnOf(document, 1, 8));
+    }
+
+    [Fact]
+    public void ColumnOfClampsToTheLine()
+    {
+        TextGuideDocument document = Document("abc\ndef");
+
+        Assert.Equal(3, TextLineView.ColumnOf(document, 0, 99));
+        Assert.Equal(0, TextLineView.ColumnOf(document, 1, 0));
+    }
+
+    [Fact]
+    public void ColumnOfRoundTripsWithSourceOffset()
+    {
+        TextGuideDocument document = Document("a\tb\tcdef");
+        for (int offset = 0; offset < document.Text.Length; offset++)
+        {
+            Assert.Equal(offset, TextLineView.SourceOffset(document, 0, TextLineView.ColumnOf(document, 0, offset)));
+        }
+    }
 }
