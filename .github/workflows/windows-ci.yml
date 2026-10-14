@@ -471,6 +471,36 @@ jobs:
           path: artifacts/portable-ci/*
           if-no-files-found: error
 
+  # T17.4: the portable exe's size, extraction and launch times. A job of
+  # its own, so the installed shards don't wait for it.
+  portable-measure:
+    needs: portable-packages
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: desktop-guides-portable-x64
+          path: artifacts/portable-measure/download
+      - name: Measure the portable exe
+        shell: pwsh
+        run: |
+          $zips = @(Get-ChildItem artifacts/portable-measure/download -Filter 'DesktopGuides-portable-x64-*.zip')
+          if ($zips.Count -ne 1) { throw "Expected one portable zip, found $($zips.Count)." }
+          Expand-Archive -LiteralPath $zips[0].FullName -DestinationPath artifacts/portable-measure/exe
+          ./tools/p1/start_installed_task.ps1 `
+            -PortableExecutable artifacts/portable-measure/exe/DesktopGuides.Production.exe `
+            -ResultDirectory artifacts/portable-measure/result `
+            -Installer ./tools/p1/measure_distribution.ps1 -TimeoutMinutes 10
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Content artifacts/portable-measure/result/measurements.json
+      - name: Upload the portable measurements
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-guides-portable-measurements
+          path: artifacts/portable-measure/result/measurements.json
+          if-no-files-found: error
+
   public-upgrade:
     # T17.1: two public builds from one commit, signed with a throwaway
     # certificate whose Subject is the public Publisher, must upgrade in place.
