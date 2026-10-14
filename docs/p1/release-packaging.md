@@ -112,6 +112,11 @@ with an empty extraction folder; warm launches reuse one. Runner times are
 noisier than a desktop's, so compare them with earlier releases, not with
 host measurements.
 
+The portable exe is trimmed (`TrimMode=partial`), compressed and
+ReadyToRun. `tools/p1/assert_trim_warnings.ps1` fails its publish on any
+trim or C#/WinRT warning that `tools/p1/trim-warning-allowlist.txt` doesn't
+name.
+
 The app icon (T17.6) is the source for every logo in
 `src/DesktopGuides.Production/Assets`: the Square44x44 logo at five scales
 and 14 target sizes (plain, unplated and light-unplated), Square150x150,

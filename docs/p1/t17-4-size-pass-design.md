@@ -1,8 +1,8 @@
 # T17.4 distribution size pass design
 
-Status: PR a merged in #106 (merge commit `1c01e75`). PR b1 (trim-safe
-code and the warning gate) is implemented on `feat/p1-t17-4-trim`; PR b2
-(the trimmed, compressed exe) follows.
+Status: PR a (#106) and PR b1 (#107) merged. PR b2 (the trimmed,
+compressed, ReadyToRun portable exe) is implemented on
+`feat/p1-t17-4-trimmed-exe`.
 Prerequisites T17.1 and T17.2 are merged (T17.2's last piece in #104).
 
 ## Intent
@@ -151,6 +151,13 @@ It ships only if all of these hold:
 - on pcsx2-win, the spike's machine, the median cold launch is **2.5 s or
   less**, with warm launch recorded. CI timings are too noisy to gate on.
 
+**Revised 14 October 2026, after the host check (PR b2).** No trimmed
+build met 2.5 s: trimming adds about 1.3 s to the first launch of each
+version, the one that extracts the bundle, and neither ReadyToRun nor
+dropping compression recovers it. The user chose trimmed, compressed and
+ReadyToRun. The condition became: host median cold launch of 3.5 s or
+less, and warm launch no slower than the untrimmed build's.
+
 If cold launch is over the limit, ReadyToRun is tried next, trading some
 size for start time. The spike's trimmed launch times came from crashing
 builds, so the baseline is PR a's measurement, not the spike's.
@@ -282,6 +289,67 @@ compressed exe). See the [b1 plan](t17-4-trim-plan.md).
      it that way.
   6. Two test-side JSON calls needed the explicit reflection path: one
      test's options, and a `JsonArray.Add<T>` call.
+
+## PR b2 verification record
+
+See the [b2 plan](t17-4-trimmed-exe-plan.md).
+
+- **The root cause of the trimmed crash.** Three throwaway CI runs, each
+  with a trimmed exe and an exception log:
+  - **38511158128:** main after #107, trimmed: every portable group
+    passed.
+  - **38513401525 (A):** the code before #107, trimmed: it crashed.
+  - **38513404216 (B):** A plus #107's C#/WinRT commit.
+
+  The causes:
+  1. **The crash.** XAML reads list items through `IList.GetAt`, and
+     C#/WinRT then builds each item's COM wrapper at runtime. For
+     WinRT-exposed types that weren't `partial`,
+     `WinRT.TypeExtensions.GetAbiToProjectionVftblPtr` threw
+     `NullReferenceException`, because trimming had removed the helper it
+     looks up. The XAML runtime raised that as the stowed exception
+     `0xc000027b`. A crashed; B didn't.
+  2. **The functional failures.** `PublishTrimmed` turns reflection-based
+     JSON off. In B, every reflection call threw "Reflection-based
+     serialization has been disabled": guide removal failed, and a reader
+     scenario timed out. #107's source-generated JSON fixed it.
+- **The host check on pcsx2-win.**
+  - **The user's data:** `%LOCALAPPDATA%\DesktopGuides` (301 files) was
+    renamed aside for each round and renamed back. Its listing (path,
+    size, write time) matched all three times.
+  - **The method:** each figure is the median of three runs' cold
+    medians, with the builds alternating.
+  - **A first comparison exe was invalid.** It was published with
+    `-p:PublishTrimmed=false` on a stage built for trimming, which dropped
+    `System.Runtime.CompilerServices.Unsafe`, so it crashed at launch. The
+    baseline was rebuilt from a clean stage of main.
+
+| Build | Exe | Extraction | Cold | Warm |
+| --- | --- | --- | --- | --- |
+| Untrimmed (main) | 184.1 MB | 565 files, 173.3 MB | 1.97–2.09 s | 0.72–0.76 s |
+| Trimmed, compressed | 43.7 MB | 437 files, 86.1 MB | 3.51 s | 1.02 s |
+| Trimmed, compressed, ReadyToRun | 59.9 MB | 438 files, 125.6 MB | 3.25 s | 0.52 s |
+| Trimmed, uncompressed | 96.7 MB | 437 files, 86.1 MB | 3.40 s | 1.10 s |
+| Trimmed, uncompressed, ReadyToRun | 135.9 MB | 438 files, 125.6 MB | 3.20 s | 0.56 s |
+
+- **The decision.** The user chose trimmed, compressed and ReadyToRun
+  (see the revised ship condition above). ReadyToRun needs no lock-file
+  change, because Crossgen2 is a pack download.
+- **CI:**
+  - **Dispatch
+    [38517868236](https://github.com/ilya-slalom/desktop-guides/actions/runs/38517868236)**
+    (every portable shard): passed. The gate ran on the shipped publish,
+    with "none new; 3 allowed".
+  - **Release dry run
+    [38517871115](https://github.com/ilya-slalom/desktop-guides/actions/runs/38517871115)**
+    (Public): passed. Zip 54.0 MB, exe 59.9 MB, extraction 440 files
+    (125.6 MB), runner cold 2.32 s and warm 0.64 s, MSIX 52.7 MB.
+- **Rulings:**
+  1. The gate moved onto the shipped publish in CI and in the release, so
+     the separate `portable-trim-analysis` job was removed.
+  2. An extra host round measured trimmed builds without compression
+     before falling back, which showed that compression isn't the cost.
+  3. The ship condition was revised by the user's choice, as above.
 
 ## Out of scope
 

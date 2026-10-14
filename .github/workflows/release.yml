@@ -174,17 +174,19 @@ jobs:
           $publish = "$PWD/artifacts/portable-release-publish"
           dotnet publish src/DesktopGuides.Production/DesktopGuides.Production.csproj `
             -c Release --no-restore -p:Platform=x64 -p:Portable=true -p:PackageLane=Public `
-            -p:PublishDir=$publish/ -p:BundleFileListPath=$PWD/artifacts/portable-release-bundle-files.txt
+            -p:PublishDir=$publish/ -p:BundleFileListPath=$PWD/artifacts/portable-release-bundle-files.txt `
+            "-flp:logfile=$PWD/artifacts/portable-release-publish.log;verbosity=normal"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./tools/p1/package_portable_release.ps1 -Commit $env:COMMIT -Version ($env:VERSION -replace '\.0$', '') `
             -PublishDirectory $publish -OutputDirectory artifacts/release
           # Its build record names the runner; keep it in the run artifact, not the release.
           Move-Item "artifacts/release/DesktopGuides-portable-x64-$($env:VERSION -replace '\.0$', '').json" artifacts/
-      - name: Check the release builds for excluded components
+      - name: Check the release builds for excluded components and trim warnings
         shell: pwsh
         run: |
           ./tools/p1/assert_excluded_components.ps1 -FileList artifacts/portable-release-bundle-files.txt
           ./tools/p1/assert_excluded_components.ps1 -Msix "artifacts/release/DesktopGuides-$env:VERSION-x64.msix"
+          ./tools/p1/assert_trim_warnings.ps1 -Log artifacts/portable-release-publish.log
       - name: Measure the portable release
         shell: pwsh
         run: |

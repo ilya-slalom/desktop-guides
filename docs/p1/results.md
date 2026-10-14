@@ -1535,6 +1535,29 @@ check on every CI and release build fails if any of their files comes back.
   has the features merged since. The bundle lists 650 entries, down from
   716.
 
+## T17.4 PR b2: trimmed, compressed and ReadyToRun — 14 October 2026
+
+The portable exe now ships trimmed (`TrimMode=partial`), compressed and
+ReadyToRun ([design](t17-4-size-pass-design.md#pr-b2-verification-record)).
+
+| Build | Exe | Extraction | Cold / warm launch | Measured on |
+| --- | --- | --- | --- | --- |
+| Untrimmed (PR a, PR b1) | 184.1 MB | 565 files, 173.3 MB | 1.97 s / 0.72 s | host, this session |
+| Trimmed, compressed, ReadyToRun | 59.9 MB | 438 files, 125.6 MB | 3.25 s / 0.52 s | host, this session |
+| Trimmed, compressed, ReadyToRun (Public) | 59.9 MB (zip 54.0 MB) | 440 files, 125.6 MB | 2.32 s / 0.64 s | release dry run [38517871115](https://github.com/ilya-slalom/desktop-guides/actions/runs/38517871115) |
+
+- **The trade.** The first launch of each version, which extracts the
+  bundle, takes about 1.3 s longer than untrimmed. Every later launch is
+  about 0.2 s faster.
+- **Why.** Trimming drops the framework's precompiled code. ReadyToRun
+  restores the warm launch but not the cold one, and dropping compression
+  doesn't help either (3.40 s cold).
+- **The 2.5 s cold limit was revised by the user** to 3.5 s cold, with
+  warm launch no slower than untrimmed.
+- **The trimmed crash's root cause** is in the design's PR b2 record. In
+  short: C#/WinRT wrappers for types that weren't `partial`, and
+  reflection JSON, which trimming turns off. #107 fixed both.
+
 ## Intermittent CI failures — triage, 9 October 2026
 
 A read-only pass over about 200 `windows-ci.yml` runs (5–8 October) found

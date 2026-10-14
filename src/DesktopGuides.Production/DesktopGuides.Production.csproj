@@ -56,6 +56,17 @@
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <!-- T17.4: trimmed, compressed and ReadyToRun. TrimMode=partial trims
+         only assemblies marked trimmable; the app, AngleSharp and the Toolkit
+         stay whole. tools/p1/assert_trim_warnings.ps1 gates the warnings.
+         Trimming drops the framework's precompiled code, so ReadyToRun puts
+         it back: a launch after the first is faster than untrimmed, and the
+         first launch of a version, which extracts the bundle, is slower. -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+    <CsWinRTAotWarningLevel>2</CsWinRTAotWarningLevel>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
   <!-- T17.4: the publish folder holds only the exe, so the excluded-component
        check reads the bundle's own input list, written when asked for. -->

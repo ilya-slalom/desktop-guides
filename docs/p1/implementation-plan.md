@@ -3,8 +3,8 @@
 Status: 52 of the 54 tasks are merged, 14 October 2026. M0 to M4 are
 complete; T11.5 (colorful icons), the last M2 task, merged in #85. M5 has
 T20.1, T20.2, T15.4, T15.1 and T16.1 merged. In M6, T17.2 (release CI) is
-complete. T17.4 (size pass) has PR a merged in #106 and PR b1 in review,
-with PR b2 to follow; T17.3 (release-candidate runs) comes after it. T17.6 (app
+complete. T17.4 (size pass) has PR a (#106) and PR b1 (#107) merged and PR b2
+in review; T17.3 (release-candidate runs) comes after it. T17.6 (app
 icon) merged in #86 and T16.1 (keyboard shortcuts) in #88. The accessibility
 audit (T16.2, T16.3) and the Microsoft Store submission (T17.5) moved out of
 P1 to the [final milestone](../work-breakdown.md#final-milestone--accessibility-audit-and-store-submission)
