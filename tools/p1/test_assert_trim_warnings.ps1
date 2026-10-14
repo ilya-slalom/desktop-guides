@@ -85,6 +85,14 @@ try {
     $ownLog = New-Log 'own.log' @($trimmed, $winrt, $partial)
     Assert-Rejected { & $gate -Log $ownLog -AllowList $ownCode -RepoRoot $root } 'only IL2104' `
         'An entry for the project''s own code should fail.'
+
+    # An assembly-level entry can't cover one of the project's own assemblies.
+    $ownAssembly = Join-Path $scratch 'own-assembly.txt'
+    Set-Content -LiteralPath $ownAssembly -Value @('IL2104 DesktopGuides.Infrastructure  # would hide its IL2026s')
+    $collapsed = New-Log 'collapsed.log' @($trimmed,
+        "ILLink : Trim analysis warning IL2104: Assembly 'DesktopGuides.Infrastructure' produced trim warnings.")
+    Assert-Rejected { & $gate -Log $collapsed -AllowList $ownAssembly -RepoRoot $root } 'the project''s own' `
+        'An IL2104 entry for one of the project''s assemblies should fail.'
 }
 finally {
     Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue

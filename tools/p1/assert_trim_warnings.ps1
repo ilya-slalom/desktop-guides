@@ -52,6 +52,9 @@ foreach ($entry in @(Get-Content -LiteralPath $AllowList)) {
     if ($key -notmatch '^IL2104 \S+$') {
         throw "Allow-list entry '$key' isn't allowed: only IL2104 entries for assemblies the project doesn't own."
     }
+    if ($key -match '^IL2104 DesktopGuides\.') {
+        throw "Allow-list entry '$key' names one of the project's own assemblies; fix its warnings instead."
+    }
     $allowed[$key] = $true
 }
 
