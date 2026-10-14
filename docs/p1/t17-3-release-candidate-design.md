@@ -1,7 +1,9 @@
 # T17.3 release-candidate runs design
 
-Status: design approved, 14 October 2026. Prerequisites T17.1, T17.2 and
-T17.4 are merged (T17.4 in #106, #107 and #108).
+Status: design approved, 14 October 2026. PR 1 (the harness and the docs)
+is implemented on `feat/p1-t17-3-rc`; the candidate run (tag `v1.0.1`)
+follows. Prerequisites T17.1, T17.2 and T17.4 are merged (T17.4 in #106,
+#107 and #108).
 
 ## Intent
 
@@ -185,3 +187,59 @@ match.
   rehearsal in PR 1 finds that before the tag.
 - **The draft's artifact expires.** The run artifact lasts a day, but the
   draft's assets stay until it is published or deleted.
+
+## PR 1 verification record
+
+See the [PR 1 plan](t17-3-rc-plan.md).
+
+- **Script tests:**
+  - **The new tests failed first:** the lane and signer helpers (not
+    defined yet), the parameter mirror (the lists differed) and the
+    evidence lines ("The signer line is missing").
+  - **Then they passed on the host,** under Windows PowerShell 5.1. CI's
+    `core-tests` runs them under pwsh 7.
+- **Two harness bugs, each now caught by `test_windows_scripts_parse.ps1`:**
+  1. **`$lane = Get-ShellLane $Lane` assigned the lane object to the
+     validated `-Lane` parameter.** PowerShell names are
+     case-insensitive. Every installed shard of dispatch 38550598097
+     failed with "cannot be validated". The guard now fails any assignment
+     to a validated parameter. It also found the smoke's `$windowsTheme`,
+     which was latent and is now renamed, with no change in behaviour.
+  2. **Script-relative parameter defaults are empty under Windows
+     PowerShell 5.1 `-File`.** `start_installed_task.ps1` failed on the
+     host without `-Installer`. The guard now flags any parameter default
+     that uses `$PSScriptRoot`. It found three scripts, whose defaults
+     moved into the body.
+- **CI:** dispatch
+  [38552852527](https://github.com/ilya-slalom/desktop-guides/actions/runs/38552852527),
+  after the lane fix, passed all 21 jobs, including all 10 installed
+  shards on both lanes. Preview behaviour is unchanged.
+- **The host rehearsal** on pcsx2-win passed on its third attempt, with
+  the offline block authorized by the user.
+  - **The earlier attempts:** the first failed on bug 2. The second failed
+    because the seed tool wasn't restored on the fresh stage, an
+    environment step that CI does separately; that run still cleaned up
+    fully.
+  - **The packages:** the candidate came from release dry run 38550652711
+    (`DesktopGuides-1.0.1.0-x64.msix`). The previous release was v1.0.0.
+    Both hashes matched their manifests.
+  - **The evidence was all ✓:**
+    - the release signer matches the pin;
+    - the upgrade from 1.0.0.0 to 1.0.1.0 kept the family, and the
+      library was intact;
+    - offline relaunch: the rule was added, there was no connection, and
+      the rule was removed;
+    - the stages: build 11.4 s, read 15.9 s, resume 11.3 s, offline
+      11.8 s, export 4.7 s, restore 15.4 s;
+    - cleanup complete, with 0 crash entries.
+  - **The target:** Windows build 10.0.26200.0 (AMD64), Windows App
+    Runtime 2.5.1.0, WebView2 155.0.4283.45.
+  - **Afterwards:** no package, no certificate trust and no firewall rule
+    remained on the host.
+- **Rulings:**
+  1. The upgrade checks are rewritten in the installer, as
+     `Invoke-RcUpgrade`.
+  2. Offline is a new smoke mode, `workflow-offline`.
+  3. The firewall handshake is shared, as `Invoke-WithFirewallBlock`.
+  4. A release-signed run's cleanup line names the release certificate.
+  5. The two parse-test guards were added to pin the bugs above.
