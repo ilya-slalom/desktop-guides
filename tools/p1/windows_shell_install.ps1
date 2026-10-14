@@ -143,8 +143,14 @@ if ($portable) {
 }
 else {
     $packageName = Split-Path $PackagePath -Leaf
-    if ($packageName -notmatch '^DesktopGuides\.Production_[0-9]+(\.[0-9]+){3}_x64\.msix$') {
+    # Release assets are DesktopGuides-<version>-x64.msix (release.yml).
+    $expectedName = if ($ReleaseSigned) { '^DesktopGuides-[0-9]+(\.[0-9]+){3}-x64\.msix$' }
+        else { '^DesktopGuides\.Production_[0-9]+(\.[0-9]+){3}_x64\.msix$' }
+    if ($packageName -notmatch $expectedName) {
         throw "Expected an x64 production MSIX, got $packageName."
+    }
+    if ($PreviousPackage -and (Split-Path $PreviousPackage -Leaf) -notmatch $expectedName) {
+        throw "Expected the previous release's MSIX, got $(Split-Path $PreviousPackage -Leaf)."
     }
     if (Get-AppxPackage -Name $lanePackage) {
         throw "A $lanePackage package is already installed; refusing to replace it."
@@ -2782,38 +2788,66 @@ try {
     }
     else {
         $report.sourcePackageSha256 = (Get-FileHash $PackagePath -Algorithm SHA256).Hash
-        Copy-Item $PackagePath $signed -Force
+        if ($ReleaseSigned) {
+            # T17.3: the bytes under test are the release's own; nothing is re-signed.
+            $releaseRoot = Join-Path $PSScriptRoot '..\..\docs\p1\release'
+            $releaseThumbprint = Get-ReleasePin (Join-Path $releaseRoot 'release-certificate.json')
+            $releaseCertificate = Join-Path $releaseRoot 'desktop-guides-release.cer'
+            if ((Get-PfxCertificate -FilePath $releaseCertificate).Thumbprint -ne $releaseThumbprint) {
+                throw 'desktop-guides-release.cer does not match the pinned thumbprint.'
+            }
+            foreach ($package in @(@($PackagePath, $PreviousPackage) | Where-Object { $_ })) {
+                Assert-ReleaseSigner $package $releaseThumbprint
+            }
+            $report.releaseSigned = $true
+            $report.certificateThumbprint = $releaseThumbprint
+            $signed = $PackagePath
+            $report.signedPackageSha256 = $report.sourcePackageSha256
+            if ($PreviousPackage) {
+                $report.previousPackageSha256 = (Get-FileHash $PreviousPackage -Algorithm SHA256).Hash
+            }
+            # Trusted only for this run, and only if it wasn't already.
+            if (-not (Test-Path "Cert:\LocalMachine\TrustedPeople\$releaseThumbprint")) {
+                Import-Certificate -FilePath $releaseCertificate `
+                    -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
+                $releaseTrustAdded = $true
+            }
+        }
+        else {
+            Copy-Item $PackagePath $signed -Force
 
-        $certificate = New-SelfSignedCertificate `
-            -Type CodeSigningCert `
-            -Subject 'CN=DesktopGuides Development' `
-            -CertStoreLocation 'Cert:\CurrentUser\My' `
-            -KeyExportPolicy NonExportable `
-            -HashAlgorithm SHA256 `
-            -NotAfter (Get-Date).AddDays(1)
-        $report.certificateThumbprint = $certificate.Thumbprint
-        Export-Certificate -Cert $certificate -FilePath $public | Out-Null
-        Import-Certificate -FilePath $public `
-            -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
-        $imported = $true
+            $certificate = New-SelfSignedCertificate `
+                -Type CodeSigningCert `
+                -Subject 'CN=DesktopGuides Development' `
+                -CertStoreLocation 'Cert:\CurrentUser\My' `
+                -KeyExportPolicy NonExportable `
+                -HashAlgorithm SHA256 `
+                -NotAfter (Get-Date).AddDays(1)
+            $report.certificateThumbprint = $certificate.Thumbprint
+            Export-Certificate -Cert $certificate -FilePath $public | Out-Null
+            Import-Certificate -FilePath $public `
+                -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
+            $imported = $true
 
-        $signTool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' `
-            -Recurse -Filter signtool.exe |
-            Where-Object { $_.FullName -like '*\x64\signtool.exe' } |
-            Sort-Object FullName |
-            Select-Object -Last 1 -ExpandProperty FullName
-        if (-not $signTool) { throw 'Windows SDK SignTool is unavailable.' }
-        & $signTool sign /fd SHA256 /sha1 $certificate.Thumbprint /s My $signed
-        if ($LASTEXITCODE -ne 0) { throw "SignTool failed with exit code $LASTEXITCODE." }
-        & $signTool verify /pa $signed
-        if ($LASTEXITCODE -ne 0) { throw 'Signed MSIX verification failed.' }
-        $report.signedPackageSha256 = (Get-FileHash $signed -Algorithm SHA256).Hash
+            $signTool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' `
+                -Recurse -Filter signtool.exe |
+                Where-Object { $_.FullName -like '*\x64\signtool.exe' } |
+                Sort-Object FullName |
+                Select-Object -Last 1 -ExpandProperty FullName
+            if (-not $signTool) { throw 'Windows SDK SignTool is unavailable.' }
+            & $signTool sign /fd SHA256 /sha1 $certificate.Thumbprint /s My $signed
+            if ($LASTEXITCODE -ne 0) { throw "SignTool failed with exit code $LASTEXITCODE." }
+            & $signTool verify /pa $signed
+            if ($LASTEXITCODE -ne 0) { throw 'Signed MSIX verification failed.' }
+            $report.signedPackageSha256 = (Get-FileHash $signed -Algorithm SHA256).Hash
+        }
 
         if (Get-AppxPackage -Name $lanePackage) {
-            throw 'A production preview package appeared before test install.'
+            throw "A $lanePackage package appeared before test install."
         }
         Assert-FreshPackageProfile $env:LOCALAPPDATA $lanePackage
-        Add-AppxPackage -Path $signed
+        # The rc group installs the previous release first and upgrades later.
+        Add-AppxPackage -Path $(if ($RcOnly) { $PreviousPackage } else { $signed })
         $installed = Get-AppxPackage -Name $lanePackage
         if (-not $installed) { throw 'Production package did not install.' }
         $report.packageFullName = $installed.PackageFullName
@@ -3069,11 +3103,16 @@ finally {
             Remove-Item "Cert:\CurrentUser\My\$($certificate.Thumbprint)" `
                 -ErrorAction SilentlyContinue
         }
+        if ($releaseTrustAdded) {
+            Remove-Item "Cert:\LocalMachine\TrustedPeople\$releaseThumbprint" -ErrorAction SilentlyContinue
+        }
         Remove-Item $public -ErrorAction SilentlyContinue
         $remainingPackages = @(Get-AppxPackage -Name $lanePackage)
         $report.packageStillInstalled = $remainingPackages.Count -gt 0
         $report.certificateStillTrusted = if ($certificate) {
             Test-Path "Cert:\LocalMachine\TrustedPeople\$($certificate.Thumbprint)"
+        } elseif ($releaseTrustAdded) {
+            Test-Path "Cert:\LocalMachine\TrustedPeople\$releaseThumbprint"
         } else { $false }
         if ($report.packageStillInstalled -or $report.certificateStillTrusted) {
             $report.success = $false
