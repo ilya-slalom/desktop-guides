@@ -11,6 +11,9 @@ public sealed partial class ShellWindow
     private IDisposable? findPause;
     private ReaderLocation? findStart;
     private CancellationTokenSource? findCancel;
+    // Set while opening awaits the location and the pause, so a second
+    // Ctrl+F can't take a second pause and leak the first.
+    private bool findOpening;
 
     private void InitializeFind()
     {
@@ -22,6 +25,11 @@ public sealed partial class ShellWindow
 
     private async Task OpenFindAsync()
     {
+        // Still opening: tracking starts only once the place is restored.
+        if (findOpening || readerSession is null || progressTracking is null)
+        {
+            return;
+        }
         if (readerSession is not IFindableReader)
         {
             ShowStatus("Search isn't available for this guide.", InfoBarSeverity.Informational, true, true);
@@ -31,14 +39,22 @@ public sealed partial class ShellWindow
         if (ReaderFind.Visibility != Visibility.Visible)
         {
             IReaderSession session = readerSession;
-            findStart = await session.GetLocationAsync(CancellationToken.None);
-            findPause = progressTracking is null
-                ? null
-                : await progressTracking.PauseAsync(CancellationToken.None);
-            if (!ReferenceEquals(session, readerSession))
+            IProgressTracking tracking = progressTracking;
+            findOpening = true;
+            try
             {
-                findPause?.Dispose();
+                findStart = await session.GetLocationAsync(CancellationToken.None);
+                findPause = await tracking.PauseAsync(CancellationToken.None);
+            }
+            finally
+            {
+                findOpening = false;
+            }
+            if (!ReferenceEquals(session, readerSession) || !ReferenceEquals(tracking, progressTracking))
+            {
+                findPause.Dispose();
                 findPause = null;
+                findStart = null;
                 return;
             }
             ReaderFind.Reset();
