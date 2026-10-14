@@ -21,7 +21,7 @@ public sealed partial class ShellWindow
     // #94: taken when a save failure is first counted, so later saves don't
     // overwrite where the failed write was stuck.
     private int diagnosedFailures;
-    private object? failureContext;
+    private ProgressFailureContext? failureContext;
 
     private void StartProgress(IReadingLocationStore store)
     {
@@ -50,37 +50,33 @@ public sealed partial class ShellWindow
             {
                 diagnosedFailures = counts.Failures;
                 RepositoryWriteTiming? write = repository?.LastWriteTiming;
-                failureContext = new
-                {
-                    gateWaitMs = write?.GateWaitMs,
-                    queueWaitMs = write?.QueueWaitMs,
-                    workMs = write?.WorkMs,
-                    poolThreads = ThreadPool.ThreadCount,
-                    poolPending = ThreadPool.PendingWorkItemCount,
-                };
+                failureContext = new ProgressFailureContext(
+                    write?.GateWaitMs,
+                    write?.QueueWaitMs,
+                    write?.WorkMs,
+                    ThreadPool.ThreadCount,
+                    ThreadPool.PendingWorkItemCount);
             }
             try
             {
                 Directory.CreateDirectory(folder);
                 string temp = path + ".tmp";
-                File.WriteAllText(temp, JsonSerializer.Serialize(new
-                {
-                    saves = counts.Saves,
-                    skippedUnchanged = counts.SkippedUnchanged,
-                    failures = counts.Failures,
-                    opens = counts.Opens,
-                    openFailures = counts.OpenFailures,
-                    lastFailure = lastFailure is null ? null : new
-                    {
-                        stage = lastFailure.Stage,
-                        type = lastFailure.ErrorType,
-                        hresult = lastFailure.HResult,
-                        trigger = lastFailure.Trigger,
-                        captureMs = lastFailure.CaptureMs,
-                        writeMs = lastFailure.WriteMs,
-                    },
-                    failureContext,
-                }));
+                File.WriteAllText(temp, JsonSerializer.Serialize(
+                    new ProgressCountsForTest(
+                        counts.Saves,
+                        counts.SkippedUnchanged,
+                        counts.Failures,
+                        counts.Opens,
+                        counts.OpenFailures,
+                        lastFailure is null ? null : new ProgressFailureForTest(
+                            lastFailure.Stage,
+                            lastFailure.ErrorType,
+                            lastFailure.HResult,
+                            lastFailure.Trigger,
+                            lastFailure.CaptureMs,
+                            lastFailure.WriteMs),
+                        failureContext),
+                    ProductionJsonContext.Default.ProgressCountsForTest));
                 File.Move(temp, path, true);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)

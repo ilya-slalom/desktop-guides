@@ -26,11 +26,11 @@ internal sealed class RecordingExternalLinkLauncher(string path) : IExternalLink
     public async Task<bool> LaunchAsync(Uri uri)
     {
         List<string> launched = File.Exists(path)
-            ? JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(path)) ?? []
+            ? JsonSerializer.Deserialize(await File.ReadAllTextAsync(path), ProductionJsonContext.Default.ListString) ?? []
             : [];
         launched.Add(uri.AbsoluteUri);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(launched));
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(launched, ProductionJsonContext.Default.ListString));
         return true;
     }
 }
