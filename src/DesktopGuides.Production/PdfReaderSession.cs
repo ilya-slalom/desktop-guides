@@ -22,7 +22,7 @@ public readonly record struct PdfZoomState(string Label, bool CanZoomIn, bool Ca
 // current page beside PdfPig's text of the same page. Loads run one at a
 // time and the latest wins, so fast page turns never show one page's text
 // beside another page's preview.
-internal sealed class PdfReaderSession : IReaderSession, IFindableReader
+internal sealed class PdfReaderSession : IReaderSession, IFindableReader, IOutlineReader
 {
     private const int FailuresBeforeStop = 3;
     // ERROR_WRONG_PASSWORD after PdfPig accepted the password (P12): an
@@ -89,7 +89,8 @@ internal sealed class PdfReaderSession : IReaderSession, IFindableReader
     public GuideFormat Format => GuideFormat.Pdf;
     public ReaderCapabilities Capabilities =>
         ReaderCapabilities.PageNavigation | ReaderCapabilities.PageJump |
-        ReaderCapabilities.FitWidth | ReaderCapabilities.Zoom | ReaderCapabilities.Find;
+        ReaderCapabilities.FitWidth | ReaderCapabilities.Zoom | ReaderCapabilities.Find |
+        ReaderCapabilities.Outline;
     public int PageCount => pageCount;
     public PdfZoomState ZoomState
     {
@@ -287,6 +288,29 @@ internal sealed class PdfReaderSession : IReaderSession, IFindableReader
         pendingMatch = null;
         if (!disposed) View.ClearMatch();
     }
+
+    // T18.2: the file's own outline, from the search document, so reading
+    // never waits on it. Each entry opens its page from the top.
+    public async Task<Outline> GetOutlineAsync(CancellationToken token)
+    {
+        if (document is null || disposed) return Outline.Empty;
+        IReadOnlyList<PdfOutlineNode> nodes = await search.GetOutlineAsync(token);
+        List<OutlineItem> items = [];
+        void Add(IReadOnlyList<PdfOutlineNode> level, int depth)
+        {
+            foreach (PdfOutlineNode node in level)
+            {
+                items.Add(new OutlineItem(node.Title, depth,
+                    PdfLocationRules.Capture(contentSha256, node.PageIndex, 0, pageCount), node.PageIndex));
+                Add(node.Children, depth + 1);
+            }
+        }
+        Add(nodes, 1);
+        return OutlineTree.Build(OutlineSource.Document, items);
+    }
+
+    public long OrderOf(ReaderLocation location) =>
+        location.Payload is PdfPosition position ? position.PageIndex : 0;
 
     // The shown page selects now; another page selects when its load shows.
     private void ShowMatch(PdfMatch match)

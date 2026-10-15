@@ -21,7 +21,7 @@ internal sealed class HtmlGuideLoadException(HtmlGuideLoadError error)
 // own origin: every request is answered from the manifest rows, every
 // navigation away from the entry document is cancelled, and a click on a
 // website link is handed to the shell's bar instead of being followed.
-internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
+internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutlineReader
 {
     private static int sessionCounter;
     private readonly HtmlRequestPolicy policy;
@@ -98,7 +98,8 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
     public WebView2 View { get; }
     public GuideFormat Format => GuideFormat.Html;
     public ReaderCapabilities Capabilities =>
-        ReaderCapabilities.Scroll | ReaderCapabilities.TextSize | ReaderCapabilities.Find;
+        ReaderCapabilities.Scroll | ReaderCapabilities.TextSize | ReaderCapabilities.Find |
+        ReaderCapabilities.Outline;
 
     // Capabilities don't change during an HTML session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
@@ -530,6 +531,19 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
         findHighlighted = false;
         WritePositionForTest();
     }
+
+    // T18.2: the page's headings, or its own contents list. Core decides;
+    // a script failure is no outline.
+    public async Task<Outline> GetOutlineAsync(CancellationToken token)
+    {
+        if (!await entryLoad.Task.WaitAsync(token) || disposed || contentSha256 is null) return Outline.Empty;
+        string? reply = await RunScriptAsync(HtmlOutlineScripts.Collect);
+        token.ThrowIfCancellationRequested();
+        return HtmlOutlineRules.Build(reply, contentSha256, policy.Entry.RequestPath);
+    }
+
+    public long OrderOf(ReaderLocation location) =>
+        location.Payload is HtmlPosition position ? position.TextOffset : 0;
 
     private void ResetFind()
     {
