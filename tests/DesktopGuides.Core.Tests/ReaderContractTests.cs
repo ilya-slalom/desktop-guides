@@ -23,6 +23,17 @@ public sealed class ReaderContractTests
         Assert.DoesNotContain(ReaderCommand.Find, ReaderCommandPolicy.VisibleCommands(pdf));
     }
 
+    // T18.2: the toolbar's Contents command needs the Outline capability.
+    [Fact]
+    public void ContentsNeedsTheOutlineCapability()
+    {
+        using FakeReader outlined = new(GuideFormat.Txt, ReaderCapabilities.Outline);
+        using FakeReader findable = new(GuideFormat.Txt, ReaderCapabilities.Find);
+
+        Assert.Contains(ReaderCommand.Contents, ReaderCommandPolicy.VisibleCommands(outlined));
+        Assert.DoesNotContain(ReaderCommand.Contents, ReaderCommandPolicy.VisibleCommands(findable));
+    }
+
     [Fact]
     public async Task DispatchesTypedCommandsOnlyToCapableReader()
     {

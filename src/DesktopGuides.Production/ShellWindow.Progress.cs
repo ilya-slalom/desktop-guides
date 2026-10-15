@@ -207,6 +207,7 @@ public sealed partial class ShellWindow
             return false;
         }
         progressTracking = progress!.Track(guide.Id, session, baseline);
+        StartContents(session);
         return true;
     }
 

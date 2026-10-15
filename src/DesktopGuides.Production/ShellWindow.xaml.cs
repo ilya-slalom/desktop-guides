@@ -161,6 +161,7 @@ public sealed partial class ShellWindow : Window
         ShellRoot.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
         InitializeKeyboard();
         InitializeFind();
+        InitializeContents();
         InitializeShortcutList();
     }
 
@@ -1641,6 +1642,7 @@ public sealed partial class ShellWindow : Window
     private async Task CloseReaderSessionAsync()
     {
         CloseFind();
+        StopContents();
         await DisposeProgressTrackingAsync();
         HideExternalLinkBar();
         HideUnavailableLinkBar();

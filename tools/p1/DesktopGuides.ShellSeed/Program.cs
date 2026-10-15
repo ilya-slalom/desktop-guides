@@ -763,9 +763,18 @@ if (args.Length == 3 && args[0] == "seed-find")
     }
     Guid lines = await findPublisher.PublishAsync(
         linesReady.Manifest, findGame.Id, "Lines PDF Guide", false, null, CancellationToken.None);
+    // T18.2: a TXT guide with search-coded sections, for the contents pane.
+    string sectionsFixture = Path.Combine(Path.GetFullPath(args[2]), "p2", "txt-sections.txt");
+    if (await new GuideImportValidator().InspectAsync(sectionsFixture, CancellationToken.None) is not ImportReady sectionsReady)
+    {
+        throw new InvalidOperationException("The txt-sections fixture failed the import preview.");
+    }
+    Guid sections = await findPublisher.PublishAsync(
+        sectionsReady.Manifest, findGame.Id, "Sections Guide", false, null, CancellationToken.None);
     Console.WriteLine(JsonSerializer.Serialize(new
     {
-        search = search.ToString("N"), scanned = scanned.ToString("N"), lines = lines.ToString("N")
+        search = search.ToString("N"), scanned = scanned.ToString("N"), lines = lines.ToString("N"),
+        sections = sections.ToString("N")
     }));
     return 0;
 }

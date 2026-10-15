@@ -6,7 +6,7 @@ public enum ShortcutCommand
 {
     Back, FocusLibrarySearch, ClearLibrarySearch, ImportGuide, PreviousPage, NextPage,
     PageStart, PageEnd, GoToPage, ZoomIn, ZoomOut, ZoomReset, FindInGuide, FindNext, FindPrevious,
-    CloseDialog
+    ShowContents, CloseDialog
 }
 
 public sealed record KeyboardShortcut(
@@ -36,6 +36,7 @@ public static class KeyboardShortcuts
         new(ShortcutContext.Reader, "Ctrl+F", ShortcutCommand.FindInGuide, "Search in the guide"),
         new(ShortcutContext.Reader, "F3", ShortcutCommand.FindNext, "Next match"),
         new(ShortcutContext.Reader, "Shift+F3", ShortcutCommand.FindPrevious, "Previous match"),
+        new(ShortcutContext.Reader, "Ctrl+Shift+C", ShortcutCommand.ShowContents, "Show contents"),
         new(ShortcutContext.Dialog, "Esc", ShortcutCommand.CloseDialog, "Close the dialog"),
     ];
 

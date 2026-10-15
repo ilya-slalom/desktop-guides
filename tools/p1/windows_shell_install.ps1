@@ -1752,6 +1752,17 @@ function Run-NavigationScenarios {
     Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
     $report.findPdfWait = Invoke-ProgressPass 'find-pdf-wait' 0
     $report.findPdfLines = Invoke-ProgressPass 'find-pdf-lines' 0
+
+    # T18.2: contents for TXT guides.
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.contentsTxt = Invoke-ProgressPass 'contents-txt' 0
+    if ($null -eq (& $estimateOf 'Sections Guide')) {
+        throw 'Following a contents entry stored no place.'
+    }
+    $report.contentsNone = Invoke-ProgressPass 'contents-none' 0
+    # contents-txt left the place at Walkthrough: Castle.
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.contentsNarrow = Invoke-ProgressPass 'contents-narrow' 0
 }
 
 function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $Kill, [string] $resultName = $mode,

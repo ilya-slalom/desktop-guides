@@ -134,6 +134,7 @@ public sealed partial class ReaderToolbar : UserControl
         bool pageJump = supported.Contains(ReaderCommand.PageJump);
         bool fitWidth = supported.Contains(ReaderCommand.FitWidth);
         bool find = supported.Contains(ReaderCommand.Find);
+        bool contents = supported.Contains(ReaderCommand.Contents);
         PageStart.Visibility = Show(edges);
         PreviousPage.Visibility = Show(pages);
         NextPage.Visibility = Show(pages);
@@ -147,9 +148,10 @@ public sealed partial class ReaderToolbar : UserControl
         GoToPage.Visibility = Show(pageJump);
         FitToWidth.Visibility = Show(fitWidth);
         FindInGuide.Visibility = Show(find);
+        ShowContents.Visibility = Show(contents);
         GroupSeparator.Visibility = Show(ReaderCommandPolicy.ShowsGroupSeparator(supported));
         Commands.Visibility = Show(
-            pages || edges || textSize || zoom || pageJump || fitWidth || find);
+            pages || edges || textSize || zoom || pageJump || fitWidth || find || contents);
     }
 
     private static Visibility Show(bool visible) =>
@@ -410,7 +412,7 @@ public sealed partial class ReaderToolbar : UserControl
             foreach (Control command in new Control[]
             {
                 PageStart, PreviousPage, NextPage, PageEnd, SmallerText, LargerText,
-                ZoomOut, ZoomIn, GoToPage, FitToWidth, ResetTextSize, FindInGuide
+                ZoomOut, ZoomIn, GoToPage, FitToWidth, ResetTextSize, ShowContents, FindInGuide
             })
             {
                 if (command.Visibility == Visibility.Visible &&
@@ -489,4 +491,10 @@ public sealed partial class ReaderToolbar : UserControl
 
     private void FindInGuideClicked(object sender, RoutedEventArgs args) =>
         FindRequested?.Invoke(this, EventArgs.Empty);
+
+    // T18.2: the shell opens or closes the Contents pane.
+    public event EventHandler? ContentsRequested;
+
+    private void ShowContentsClicked(object sender, RoutedEventArgs args) =>
+        ContentsRequested?.Invoke(this, EventArgs.Empty);
 }

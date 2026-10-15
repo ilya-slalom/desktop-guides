@@ -340,10 +340,12 @@ try {
     if (Find-More) {
         Open-Overflow
         [void](Wait-HiddenByName 'Find in guide')
+        [void](Wait-HiddenByName 'Contents')
         Close-Overflow
     }
     else {
         [void](Wait-HiddenByName 'Find in guide')
+        [void](Wait-HiddenByName 'Contents')
     }
     $report.phases += 'no-find-without-the-capability'
 
@@ -365,6 +367,12 @@ try {
     Close-Overflow
     Open-Overflow
     Invoke-Command 'Fit to width' 'Fit to width'
+    Open-Overflow
+    # T18.2: Contents asks the shell for the pane; Find follows, so the
+    # later keys-off check still reads 'Find requested'.
+    Invoke-Element (Wait-VisibleByName 'Contents')
+    Wait-Action 'Contents requested'
+    $report.phases += 'contents-requests-the-pane'
     Open-Overflow
     # T18.1: Find no longer opens a prompt; it asks the shell for the find bar.
     Invoke-Element (Wait-VisibleByName 'Find in guide')

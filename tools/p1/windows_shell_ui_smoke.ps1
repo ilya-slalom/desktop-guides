@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -1565,13 +1565,13 @@ try {
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow',
         'workflow-pdf-exit')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
             elseif ($Mode -like 'html-theme-*') { 'Web Theme Game' }
             elseif ($Mode -like 'pdf-*') { 'PDF Reader Game' }
-            elseif ($Mode -like 'progress-*' -or $Mode -like 'completion-*' -or $Mode -like 'find-*') { 'Progress Game' }
+            elseif ($Mode -like 'progress-*' -or $Mode -like 'completion-*' -or $Mode -like 'find-*' -or $Mode -like 'contents-*') { 'Progress Game' }
             elseif ($Mode -like 'text-size-*') { 'Text Size Game' }
             elseif ($Mode -like 'workflow-*') { 'Workflow Game' }
             else { 'Text Reader Game' }
@@ -4307,7 +4307,7 @@ try {
                 $report.phases += 'workflow-restored-places'
             }
         }
-        elseif ($Mode -like 'find-*') {
+        elseif ($Mode -like 'find-*' -or $Mode -like 'contents-*') {
             # T18.1: in-guide search. Searching must never save the reading place.
             function Read-Saves { return [int] (Read-ProgressCounts).saves }
             # The MARK number of the page's top line, within a range.
@@ -4337,6 +4337,54 @@ try {
                 if (-not $box) { return '' }
                 $ranges = $box.GetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern).GetSelection()
                 return (@($ranges) | ForEach-Object { $_.GetText(-1) }) -join ''
+            }
+            $treeItem = New-Object System.Windows.Automation.PropertyCondition(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::TreeItem)
+            function Get-ContentsItems {
+                $tree = Find-ById 'ReaderContentsTree'
+                if (-not $tree) { return @() }
+                return @($tree.FindAll([System.Windows.Automation.TreeScope]::Descendants, $treeItem))
+            }
+            function Wait-ContentsSelected([string] $name) {
+                $deadline = (Get-Date).AddSeconds(10)
+                $seen = 'nothing'
+                do {
+                    foreach ($item in Get-ContentsItems) {
+                        try {
+                            $pattern = $item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)
+                            if ($pattern.Current.IsSelected) {
+                                $seen = $item.Current.Name
+                                if ($seen -eq $name) { return }
+                            }
+                        }
+                        catch { }
+                    }
+                    Start-Sleep -Milliseconds 200
+                } while ((Get-Date) -lt $deadline)
+                throw "Expected the contents entry '$name' selected; saw '$seen'."
+            }
+            # Focus is in the guide's text: the focused element sits inside ReaderTextLines.
+            function Assert-FocusInGuide([string] $step) {
+                $deadline = (Get-Date).AddSeconds(5)
+                do {
+                    $node = [System.Windows.Automation.AutomationElement]::FocusedElement
+                    for ($depth = 0; $node -and $depth -lt 12; $depth++) {
+                        if ($node.Current.AutomationId -eq 'ReaderTextLines') { return }
+                        $node = [System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($node)
+                    }
+                    Start-Sleep -Milliseconds 200
+                } while ((Get-Date) -lt $deadline)
+                throw "After $step the keyboard isn't in the guide's text."
+            }
+            function Wait-TopRowLike([string] $pattern, [string] $step) {
+                $deadline = (Get-Date).AddSeconds(10)
+                do {
+                    $name = Get-TopRowName
+                    if ($name -like $pattern) { return $name }
+                    Start-Sleep -Milliseconds 200
+                } while ((Get-Date) -lt $deadline)
+                throw "After $step the top line was '$name'; expected '$pattern'."
             }
 
             [void](Wait-Name 'LibraryHeading' 'Library')
@@ -4651,6 +4699,79 @@ try {
                 }
                 $report.findPdfLinesScreenshot = Save-WindowScreenshot 'find-pdf-lines'
                 $report.phases += 'find-pdf-lines'
+            }
+            elseif ($Mode -eq 'contents-txt') {
+                Open-TextGuide 'Sections Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Wait-FirstTextRow
+                Start-Sleep -Seconds 2
+                $baseline = Read-Saves
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                $names = @(Get-ContentsItems | ForEach-Object { $_.Current.Name })
+                $report.contentsNames = $names
+                if (($names -join '|') -ne 'Introduction|Walkthrough: Forest|Walkthrough: Castle|Bosses|FAQ') {
+                    throw "The contents read '$($names -join ', ')'."
+                }
+                # At the top of the guide, before every section: the first is selected.
+                Wait-ContentsSelected 'Introduction'
+                [System.Windows.Forms.SendKeys]::SendWait('{DOWN}{DOWN}{ENTER}')
+                $report.contentsTop = Wait-TopRowLike '*Walkthrough: Castle*' 'following Walkthrough: Castle'
+                Assert-FocusInGuide 'following an entry'
+                # A deliberate move: the place saves.
+                $deadline = (Get-Date).AddSeconds(8)
+                do {
+                    Start-Sleep -Milliseconds 250
+                    $afterFollow = Read-Saves
+                } while ($afterFollow -le $baseline -and (Get-Date) -lt $deadline)
+                if ($afterFollow -le $baseline) { throw 'Following a contents entry saved nothing.' }
+                # Wide: the pane stays beside the guide after following. The
+                # shortcut closes it, and opens it again on the current section.
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                Wait-HiddenById 'ReaderContentsTree'
+                Assert-FocusInGuide 'closing the pane with the shortcut'
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                Wait-ContentsSelected 'Walkthrough: Castle'
+                $report.contentsScreenshot = Save-WindowScreenshot 'contents-txt'
+                [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                Wait-HiddenById 'ReaderContentsTree'
+                Assert-FocusInGuide 'closing the pane'
+                $report.phases += 'contents-txt'
+            }
+            elseif ($Mode -eq 'contents-none') {
+                Open-TextGuide 'Numbered Lines Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Wait-FirstTextRow
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                [void](Wait-Name 'ReaderContentsEmpty' 'No sections found in this guide.')
+                $report.contentsNoneScreenshot = Save-WindowScreenshot 'contents-none'
+                Invoke-Element (Wait-VisibleById 'ReaderContentsSearch')
+                [void](Wait-VisibleById 'ReaderFindBar')
+                $report.phases += 'contents-none'
+            }
+            elseif ($Mode -eq 'contents-narrow') {
+                Resize-ShellWindow 700 720
+                Open-TextGuide 'Sections Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Wait-FirstTextRow
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                # Narrow: the pane covers the guide's text rather than sitting beside it.
+                $pane = (Wait-VisibleById 'ReaderContentsPane').Current.BoundingRectangle
+                $text = (Find-ById 'ReaderTextLines').Current.BoundingRectangle
+                if ($pane.Right -le $text.Left) { throw "The pane ($($pane.Left)..$($pane.Right)) sits beside the text ($($text.Left)..)." }
+                $report.contentsNarrowScreenshot = Save-WindowScreenshot 'contents-narrow'
+                Wait-ContentsSelected 'Introduction'
+                [System.Windows.Forms.SendKeys]::SendWait('{DOWN}{DOWN}{ENTER}')
+                Wait-HiddenById 'ReaderContentsTree'
+                [void](Wait-TopRowLike '*Walkthrough: Castle*' 'following an entry in the overlay')
+                Assert-FocusInGuide 'the overlay closing'
+                $report.phases += 'contents-narrow'
             }
             elseif ($Mode -eq 'find-pdf-scan') {
                 Open-TextGuide 'Scanned PDF Guide'

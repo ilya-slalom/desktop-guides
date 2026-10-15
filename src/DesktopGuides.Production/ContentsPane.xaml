@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl x:Class="DesktopGuides.Production.ContentsPane"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.AutomationId="ReaderContentsPane"
+             AutomationProperties.Name="Contents">
+    <Grid RowSpacing="8" Padding="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid>
+            <TextBlock Text="Contents" VerticalAlignment="Center"
+                       AutomationProperties.HeadingLevel="Level2"
+                       Style="{StaticResource DesktopGuidesSectionTitleStyle}" />
+            <Button x:Name="CloseButton" HorizontalAlignment="Right" Click="CloseClicked"
+                    AutomationProperties.AutomationId="ReaderContentsClose"
+                    AutomationProperties.Name="Close contents"
+                    ToolTipService.ToolTip="Close contents (Esc)">
+                <SymbolIcon Symbol="Cancel" />
+            </Button>
+        </Grid>
+        <StackPanel Grid.Row="1" Spacing="8">
+            <TextBlock x:Name="Building" Text="Finding sections…" Visibility="Collapsed"
+                       AutomationProperties.AutomationId="ReaderContentsStatus"
+                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}" />
+            <TextBlock x:Name="Empty" Text="No sections found in this guide." Visibility="Collapsed"
+                       TextWrapping="Wrap"
+                       AutomationProperties.AutomationId="ReaderContentsEmpty"
+                       Style="{StaticResource DesktopGuidesBodyStyle}" />
+            <HyperlinkButton x:Name="SearchLink" Content="Search in the guide" Visibility="Collapsed"
+                             Click="SearchClicked"
+                             AutomationProperties.AutomationId="ReaderContentsSearch" />
+        </StackPanel>
+        <TreeView x:Name="Tree" Grid.Row="2" Visibility="Collapsed" SelectionMode="Single"
+                  ItemInvoked="TreeItemInvoked"
+                  AutomationProperties.AutomationId="ReaderContentsTree"
+                  AutomationProperties.Name="Contents" />
+    </Grid>
+</UserControl>

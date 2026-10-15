@@ -172,6 +172,9 @@ public sealed partial class TextReaderView : UserControl
         Lines.ItemsSource = null;
     }
 
+    // T18.2: following a contents entry gives the keyboard back to the text.
+    public bool FocusLines() => Lines.Focus(FocusState.Programmatic);
+
     private void OnLoaded(object sender, RoutedEventArgs args)
     {
         Loaded -= OnLoaded;

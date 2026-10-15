@@ -32,6 +32,7 @@ public sealed class ToolbarWindow : Window
         toolbar.CommandFailed += message => lastAction.Text = message;
         // T18.1: Find asks the shell for its find bar; there is no action to run.
         toolbar.FindRequested += (_, _) => lastAction.Text = "Find requested";
+        toolbar.ContentsRequested += (_, _) => lastAction.Text = "Contents requested";
         toolbar.SetSession(session);
         // A five-page document, so the dialog's range is 1 to 5.
         toolbar.PageCount = 5;
@@ -58,7 +59,8 @@ public sealed class ToolbarWindow : Window
                     ReaderCapabilities.FitWidth |
                     ReaderCapabilities.Zoom |
                     ReaderCapabilities.TextSize |
-                    ReaderCapabilities.Find);
+                    ReaderCapabilities.Find |
+                    ReaderCapabilities.Outline);
             }));
         controls.Children.Add(ControlButton("No controls", "NoControls",
             async () => await ChangeCapabilitiesAsync(ReaderCapabilities.None)));

@@ -18,6 +18,8 @@ public sealed partial class ShellWindow
         AddShortcut(VirtualKey.F, ShortcutCommand.FocusLibrarySearch, () =>
             navigator.Current is ReaderRoute ? OpenFindFromKeyboard() : FocusLibrarySearch());
         AddShortcut(VirtualKey.O, ShortcutCommand.ImportGuide, ImportFromKeyboard);
+        AddShortcut(VirtualKey.C, ShortcutCommand.ShowContents, ToggleContentsFromKeyboard,
+            VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift);
         // The inner text box marks Esc handled, so this runs on the way down.
         LibrarySearchInput.PreviewKeyDown += LibrarySearchKeyDown;
         ShowShortcut(ImportGuideButton, "Import guide", ShortcutCommand.ImportGuide);
@@ -63,9 +65,10 @@ public sealed partial class ShellWindow
         AutomationProperties.SetAcceleratorKey(control, KeyboardShortcuts.For(command).Keys);
     }
 
-    private void AddShortcut(VirtualKey key, ShortcutCommand command, Func<bool> run)
+    private void AddShortcut(VirtualKey key, ShortcutCommand command, Func<bool> run,
+        VirtualKeyModifiers modifiers = VirtualKeyModifiers.Control)
     {
-        KeyboardAccelerator accelerator = new() { Key = key, Modifiers = VirtualKeyModifiers.Control };
+        KeyboardAccelerator accelerator = new() { Key = key, Modifiers = modifiers };
         accelerator.Invoked += (_, args) =>
         {
             // T18.1: in the reader, Ctrl+F is the guide search, not the library's.

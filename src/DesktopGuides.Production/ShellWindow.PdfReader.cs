@@ -250,6 +250,7 @@ public sealed partial class ShellWindow
             }
             // A failed renderer can't report a place; leave the stored one.
             CloseFind();
+            StopContents();
             progressTracking?.Abandon();
             progressTracking = null;
             IReaderSession failed = readerSession!;
