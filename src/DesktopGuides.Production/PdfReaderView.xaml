@@ -58,6 +58,7 @@
                      TextWrapping="Wrap"
                      AcceptsReturn="True"
                      IsSpellCheckEnabled="False"
+                     SelectionHighlightColorWhenNotFocused="{ThemeResource TextControlSelectionHighlightColor}"
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                      AutomationProperties.AutomationId="PdfDocumentText" />
         </Grid>

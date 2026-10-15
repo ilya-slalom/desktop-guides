@@ -27,6 +27,8 @@ public sealed partial class FindBar : UserControl
     {
         QueryBox.Text = string.Empty;
         Count.Text = string.Empty;
+        Note.Text = string.Empty;
+        Note.Visibility = Visibility.Collapsed;
     }
 
     public void ShowResult(FindResult result, string query)
@@ -37,6 +39,9 @@ public sealed partial class FindBar : UserControl
             FindOutcome.Failed => "Couldn't search this guide",
             _ => "No matches"
         };
+        string? note = FindResultText.Note(result);
+        Note.Text = note ?? string.Empty;
+        Note.Visibility = note is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void QueryKeyDown(object sender, KeyRoutedEventArgs args)

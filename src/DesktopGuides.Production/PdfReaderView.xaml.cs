@@ -1,9 +1,11 @@
+using CommunityToolkit.WinUI;
 using DesktopGuides.Infrastructure.Reading;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Windows.Foundation;
 
 namespace DesktopGuides.Production;
 
@@ -70,6 +72,23 @@ public sealed partial class PdfReaderView : UserControl
             _ => null,
         });
     }
+
+    // T18.1: the current match, selected in the page text without taking
+    // focus from the find box, and scrolled a quarter of the way down.
+    public void ShowMatch(int start, int length)
+    {
+        int end = Math.Min(DocumentText.Text.Length, start + length);
+        if (start < 0 || start >= end) return;
+        DocumentText.Select(start, end - start);
+        if (DocumentText.FindDescendant<ScrollViewer>() is ScrollViewer scroller)
+        {
+            Rect box = DocumentText.GetRectFromCharacterIndex(start, false);
+            scroller.ChangeView(null, Math.Max(0, scroller.VerticalOffset + box.Top - scroller.ViewportHeight / 4),
+                null, disableAnimation: true);
+        }
+    }
+
+    public void ClearMatch() => DocumentText.Select(0, 0);
 
     // Fit (NaN) fills the viewport with no horizontal scroll; a percent sets
     // the image's width and lets the page scroll sideways when it's wider.

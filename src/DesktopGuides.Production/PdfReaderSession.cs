@@ -22,7 +22,7 @@ public readonly record struct PdfZoomState(string Label, bool CanZoomIn, bool Ca
 // current page beside PdfPig's text of the same page. Loads run one at a
 // time and the latest wins, so fast page turns never show one page's text
 // beside another page's preview.
-internal sealed class PdfReaderSession : IReaderSession
+internal sealed class PdfReaderSession : IReaderSession, IFindableReader
 {
     private const int FailuresBeforeStop = 3;
     // ERROR_WRONG_PASSWORD after PdfPig accepted the password (P12): an
@@ -33,6 +33,8 @@ internal sealed class PdfReaderSession : IReaderSession
     private readonly Guide guide;
     private readonly string filePath;
     private readonly PdfPageTextSource text;
+    private readonly PdfPageTextSource search;
+    private PdfPageText? shownText;
     private readonly string contentSha256;
     private readonly string cacheRoot;
     private readonly bool writeDiagnostics;
@@ -66,6 +68,7 @@ internal sealed class PdfReaderSession : IReaderSession
         this.guide = guide;
         filePath = loaded.FilePath;
         text = loaded.Text;
+        search = loaded.Search;
         contentSha256 = loaded.ContentSha256;
         this.cacheRoot = cacheRoot;
         this.writeDiagnostics = writeDiagnostics;
@@ -81,7 +84,7 @@ internal sealed class PdfReaderSession : IReaderSession
     public GuideFormat Format => GuideFormat.Pdf;
     public ReaderCapabilities Capabilities =>
         ReaderCapabilities.PageNavigation | ReaderCapabilities.PageJump |
-        ReaderCapabilities.FitWidth | ReaderCapabilities.Zoom;
+        ReaderCapabilities.FitWidth | ReaderCapabilities.Zoom | ReaderCapabilities.Find;
     public int PageCount => pageCount;
     public PdfZoomState ZoomState
     {
@@ -228,6 +231,88 @@ internal sealed class PdfReaderSession : IReaderSession
         return Task.CompletedTask;
     }
 
+    // T18.1: the last query's scan, on the search source's own document.
+    // A step waits only as far as the scan must go, then shows the match's
+    // page and selects the match in the page text. Progress is paused
+    // while the bar is open, so the page turns save nothing.
+    private PdfTextScan? scan;
+    private string? findText;
+    private int? matchIndex;
+    private PdfMatch? pendingMatch;
+
+    public event EventHandler<FindResult>? ResultUpdated;
+
+    public async Task<FindResult> FindAsync(FindQuery query, FindDirection direction, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (document is null || disposed) return FindResult.Failure;
+        if (query.Text != findText)
+        {
+            ClearFind();
+            PdfTextScan started = new(search, query);
+            started.Finished += OnScanFinished;
+            scan = started;
+            findText = query.Text;
+        }
+        PdfTextScan current = scan!;
+        int? index = await current.StepAsync(matchIndex, target, direction, token);
+        // A newer query, a Close or a dispose came in while the step waited.
+        if (!ReferenceEquals(current, scan) || disposed) throw new OperationCanceledException(token);
+        matchIndex = index;
+        if (index is not int at)
+        {
+            pendingMatch = null;
+            View.ClearMatch();
+            return current.ResultFor(null);
+        }
+        ShowMatch(current.MatchAt(at));
+        return current.ResultFor(at);
+    }
+
+    public void ClearFind()
+    {
+        if (scan is not null)
+        {
+            scan.Finished -= OnScanFinished;
+            scan.Dispose();
+            scan = null;
+        }
+        findText = null;
+        matchIndex = null;
+        pendingMatch = null;
+        if (!disposed) View.ClearMatch();
+    }
+
+    // The shown page selects now; another page selects when its load shows.
+    private void ShowMatch(PdfMatch match)
+    {
+        pendingMatch = match;
+        if (match.PageIndex == target && match.PageIndex == position.Page) ApplyMatch(match, shownText);
+        else GoTo(match.PageIndex, 0);
+    }
+
+    private void ApplyMatch(PdfMatch match, PdfPageText? page)
+    {
+        if (page is not { HasLetters: true }) return;
+        (int start, int length) = TextBoxOffsets.Map(page.Text, new TextMatch(match.Start, match.Length));
+        View.ShowMatch(start, length);
+    }
+
+    // On a worker: the total is final now, so the bar loses its "+".
+    private void OnScanFinished(object? sender, EventArgs args) =>
+        View.DispatcherQueue.TryEnqueue(() =>
+        {
+            if (disposed || !ReferenceEquals(sender, scan) || scan is null) return;
+            try
+            {
+                ResultUpdated?.Invoke(this, scan.ResultFor(matchIndex));
+            }
+            catch (Exception)
+            {
+                // A handler must not escape into the dispatcher.
+            }
+        });
+
     // A new page applies the point when its load is shown. The page already
     // shown has no load coming, so it applies the point now.
     private void GoTo(long index, double fraction)
@@ -366,6 +451,9 @@ internal sealed class PdfReaderSession : IReaderSession
             // Pages differ in size, so a percent gives each its own width.
             View.SetPageWidth(DisplayWidth(View.PreviewWidth, appliedNatural));
             View.ShowPage(index, pageCount, zoom.Label, result.Image, result.Text);
+            shownText = result.Text;
+            // A pending match shows only on its own page.
+            if (pendingMatch is PdfMatch match && match.PageIndex == index) ApplyMatch(match, result.Text);
             // A same-height image raises no SizeChanged, so apply the point
             // here; a new height re-applies it from OnPreviewLayoutChanged.
             ScrollToPoint();
@@ -459,6 +547,10 @@ internal sealed class PdfReaderSession : IReaderSession
         if (disposed) return;
         disposed = true;
         LocationChanged = null;
+        ResultUpdated = null;
+        // The scan's page read honours its token; its document closes when free.
+        scan?.Dispose();
+        scan = null;
         Failed = null;
         ZoomChanged = null;
         View.PreviewSizeChanged -= OnPreviewSizeChanged;
@@ -497,6 +589,15 @@ internal sealed class PdfReaderSession : IReaderSession
         {
             // A faulted text source counts as not closed; the rest still runs.
             closed = false;
+            clean = false;
+        }
+        try
+        {
+            // Never waits: a page still being read closes the document after.
+            await search.CloseAsync(TimeSpan.Zero);
+        }
+        catch (Exception)
+        {
             clean = false;
         }
         PdfSessionDiagnostics counts = new(
