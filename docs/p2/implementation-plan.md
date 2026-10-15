@@ -1,6 +1,6 @@
 # P2 implementation plan and exit gates
 
-Status: M7 complete, 15 October 2026 (T18.1: #113, #116 and #117). M8 in progress: T18.2 PR a (TXT contents and the pane) in review. P1 is complete (54 of 54 tasks; v1.0.1
+Status: M7 complete, 15 October 2026 (T18.1: #113, #116 and #117). M8 in progress: T18.2 PR a merged (#118); PR b (HTML and PDF contents) in review. P1 is complete (54 of 54 tasks; v1.0.1
 published). This plan orders the **3 P2 stories and 6 tasks** in the
 [work breakdown](../work-breakdown.md#p2--reader-depth-and-local-ownership).
 
