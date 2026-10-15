@@ -4,6 +4,7 @@ using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Reading;
 using DesktopGuides.Infrastructure.Reading;
+using DesktopGuides.Infrastructure.Storage;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -1036,9 +1037,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
             string folder = Path.Combine(cacheRoot, "diagnostics");
             Directory.CreateDirectory(folder);
             string path = Path.Combine(folder, $"html-position-{Environment.ProcessId}.json");
-            string temporary = path + ".tmp";
-            File.WriteAllText(temporary, json);
-            File.Move(temporary, path, overwrite: true);
+            DiagnosticFile.Write(path, json);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException)
         {
@@ -1058,9 +1057,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
             string folder = Path.Combine(cacheRoot, "diagnostics");
             Directory.CreateDirectory(folder);
             string path = Path.Combine(folder, $"html-appearance-{Environment.ProcessId}.json");
-            string temporary = path + ".tmp";
-            File.WriteAllText(temporary, json);
-            File.Move(temporary, path, overwrite: true);
+            DiagnosticFile.Write(path, json);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException)
         {

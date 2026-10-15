@@ -1,6 +1,7 @@
 using System.Globalization;
 using DesktopGuides.Core.Reading;
 using DesktopGuides.Core.Text;
+using DesktopGuides.Infrastructure.Storage;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -214,9 +215,7 @@ public sealed partial class TextReaderView : UserControl
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(diagnosticsPath)!);
-            string temporary = diagnosticsPath + ".tmp";
-            File.WriteAllText(temporary, json);
-            File.Move(temporary, diagnosticsPath, overwrite: true);
+            DiagnosticFile.Write(diagnosticsPath, json);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
