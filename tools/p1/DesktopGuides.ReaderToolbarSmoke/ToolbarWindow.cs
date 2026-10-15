@@ -45,8 +45,7 @@ public sealed class ToolbarWindow : Window
             Spacing = 8
         };
         controls.Children.Add(ControlButton("Text controls", "TextControls",
-            async () => await ChangeCapabilitiesAsync(ReaderCapabilities.TextSize |
-                ReaderCapabilities.Find)));
+            async () => await ChangeCapabilitiesAsync(ReaderCapabilities.TextSize)));
         controls.Children.Add(ControlButton("All controls", "AllControls",
             async () =>
             {

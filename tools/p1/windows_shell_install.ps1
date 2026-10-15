@@ -1741,7 +1741,13 @@ function Run-NavigationScenarios {
     $report.findHtmlText = Invoke-ProgressPass 'find-html-text' 0
     $report.findHtmlClose = Invoke-ProgressPass 'find-html-close' 0 -HtmlPosition
 
-    $report.findUnsupported = Invoke-ProgressPass 'find-unsupported' 0
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.findPdf = Invoke-ProgressPass 'find-pdf' 0
+    if ($null -eq (& $estimateOf 'Long PDF Guide')) {
+        throw 'After closing the find bar and turning a page, no PDF place was stored.'
+    }
+
+    $report.findPdfScan = Invoke-ProgressPass 'find-pdf-scan' 0
 }
 
 function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $Kill, [string] $resultName = $mode,

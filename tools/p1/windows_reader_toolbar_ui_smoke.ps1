@@ -336,6 +336,16 @@ try {
     [void](Wait-HiddenByName 'Zoom in')
     Invoke-Command 'Larger text' 'Text size 1.1'
     $report.phases += 'worker-capability-change-text-dispatch'
+    # T18.1: without the Find capability the overflow has no search.
+    if (Find-More) {
+        Open-Overflow
+        [void](Wait-HiddenByName 'Find in guide')
+        Close-Overflow
+    }
+    else {
+        [void](Wait-HiddenByName 'Find in guide')
+    }
+    $report.phases += 'no-find-without-the-capability'
 
     Invoke-Id 'AllControls'
     [void](Wait-VisibleByName 'Next page')
