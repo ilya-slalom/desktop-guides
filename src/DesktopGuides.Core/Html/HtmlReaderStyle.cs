@@ -30,20 +30,30 @@ public static class HtmlReaderStyle
         "a:link, a:visited, a:link *, a:visited * { color: #8AB4F8 !important; }\n" +
         "mark { background-color: #5C4B00 !important; }";
 
+    // T18.1: the find bar's current match, drawn by CSS.highlights. A
+    // custom highlight with no rule draws nothing, so every theme has one.
+    public const string FindHighlight = "dg-find";
+
+    private const string LightFind = "::highlight(dg-find) { background-color: Mark; color: MarkText; }";
+    // The Dark palette's own mark colour, with 8.8:1 contrast for white.
+    private const string DarkFind = "::highlight(dg-find) { background-color: #5C4B00; color: #FFFFFF; }";
+    private const string ContrastFind = "::highlight(dg-find) { background-color: Highlight; color: HighlightText; }";
+
     // A stored scale can predate the range check; a bad one reads as 1.
     public static double ClampScale(double scale) =>
         double.IsFinite(scale) ? Math.Clamp(scale, MinScale, MaxScale) : 1.0;
 
-    // High contrast sets no colors: WebView2 applies Windows' forced colors.
+    // High contrast sets no page colors: WebView2 applies Windows' forced
+    // colors. Its find highlight uses the system colors.
     public static string Css(ReaderTheme theme, double scale)
     {
         string zoom = "html { zoom: " +
             ClampScale(scale).ToString("0.###", CultureInfo.InvariantCulture) + " !important; }";
         return theme switch
         {
-            ReaderTheme.Light => zoom + "\n" + Light,
-            ReaderTheme.Dark => zoom + "\n" + Dark,
-            _ => zoom
+            ReaderTheme.Light => zoom + "\n" + Light + "\n" + LightFind,
+            ReaderTheme.Dark => zoom + "\n" + Dark + "\n" + DarkFind,
+            _ => zoom + "\n" + ContrastFind
         };
     }
 
