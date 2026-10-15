@@ -14,6 +14,8 @@ public sealed partial class ShellWindow
     // Set while opening awaits the location and the pause, so a second
     // Ctrl+F can't take a second pause and leak the first.
     private bool findOpening;
+    // The open bar's reader, for totals that arrive after a step (PDF).
+    private IFindableReader? findUpdates;
 
     private void InitializeFind()
     {
@@ -57,6 +59,11 @@ public sealed partial class ShellWindow
                 findStart = null;
                 return;
             }
+            if (session is IFindableReader updates)
+            {
+                updates.ResultUpdated += OnFindResultUpdated;
+                findUpdates = updates;
+            }
             ReaderFind.Reset();
             ReaderFind.Visibility = Visibility.Visible;
         }
@@ -85,7 +92,9 @@ public sealed partial class ShellWindow
         FindResult result;
         try
         {
-            result = await findable.FindAsync(query, direction, cancel.Token);
+            Task<FindResult> step = findable.FindAsync(query, direction, cancel.Token);
+            if (!step.IsCompleted) ReaderFind.ShowSearching();
+            result = await step;
         }
         catch (OperationCanceledException)
         {
@@ -97,12 +106,13 @@ public sealed partial class ShellWindow
             return;
         }
         ReaderFind.ShowResult(result, query.Text);
-        AnnounceStatus(result.Outcome switch
+        string announcement = result.Outcome switch
         {
             FindOutcome.Found => $"Match {result.Index} of {result.Total}{(result.TotalIsPartial ? " so far" : "")}.",
             FindOutcome.Failed => "Couldn't search this guide.",
             _ => $"No matches for {query.Text}."
-        });
+        };
+        AnnounceStatus(FindResultText.Note(result) is string note ? $"{announcement} {note}." : announcement);
     }
 
     private async Task FindBackAsync()
@@ -113,12 +123,24 @@ public sealed partial class ShellWindow
         }
     }
 
+    // A PDF scan finished after the step returned: the count loses its "+".
+    private void OnFindResultUpdated(object? sender, FindResult result)
+    {
+        if (!ReferenceEquals(sender, readerSession) || ReaderFind.Visibility != Visibility.Visible) return;
+        ReaderFind.ShowResult(result, ReaderFind.Query);
+    }
+
     // Also called when the reader closes; never saves the place.
     private void CloseFind()
     {
         findCancel?.Cancel();
         findCancel = null;
         if (readerSession is IFindableReader findable) findable.ClearFind();
+        if (findUpdates is not null)
+        {
+            findUpdates.ResultUpdated -= OnFindResultUpdated;
+            findUpdates = null;
+        }
         findPause?.Dispose();
         findPause = null;
         findStart = null;

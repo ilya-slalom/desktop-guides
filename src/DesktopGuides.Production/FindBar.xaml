@@ -13,6 +13,10 @@
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
         <TextBox x:Name="QueryBox"
                  PlaceholderText="Search this guide"
                  AutomationProperties.AutomationId="FindQueryInput"
@@ -35,5 +39,9 @@
                 AutomationProperties.Name="Close search" ToolTipService.ToolTip="Close search (Esc)">
             <SymbolIcon Symbol="Cancel" />
         </Button>
+        <TextBlock x:Name="Note" Grid.Row="1" Grid.ColumnSpan="6" Visibility="Collapsed"
+                   TextWrapping="Wrap"
+                   AutomationProperties.AutomationId="FindNote"
+                   Style="{StaticResource DesktopGuidesSecondaryBodyStyle}" />
     </Grid>
 </UserControl>

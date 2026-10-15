@@ -1,8 +1,8 @@
 # T18.1 in-guide search: design
 
 Status: approved, 15 October 2026. PR a (the contract, TXT search and the
-find bar) merged as #113. PR b (HTML) is implemented on
-`feat/p2-t18-1-html-search`. PR c (PDF) follows.
+find bar) merged as #113, and PR b (HTML) as #116. PR c (PDF) is
+implemented on `feat/p2-t18-1-pdf-search`.
 
 ## Intent
 
@@ -73,15 +73,22 @@ Find is already partly built:
     500 ms tracker and the resize re-apply leave the page to it. The
     captured point follows the match, and a step stops when the bar
     closes.
-- **PDF:**
-  - **The scanner:** `PdfTextScanner` (Infrastructure) opens its own PdfPig
-    document over the managed file. It scans pages in order with
-    cancellation, recording each page's `HasLetters`. The reader's
-    display text source, with its 8-page cache and the installed-test
-    assertion on it, isn't touched.
+- **PDF** (as built; see deviation 5):
+  - **Its own document:** the loader opens a second `PdfPageTextSource`
+    ("Search", with a one-page cache) beside the display source, with the
+    same password used once. The display source, with its 8-page cache
+    and the installed-test assertion on it, isn't touched.
+  - **The scan:** `PdfTextScan` (Infrastructure) reads pages in order on a
+    worker through `IPdfPageTextReader`, with cancellation, and matches
+    each page with `TextMatcher`. A page with no letters is image-only,
+    and a page that can't be read is recorded; either way the scan goes
+    on. A step waits only as far as the scan must go to answer it.
   - **A match:** it goes to the page (`GoTo(page, 0)`), and selects the
-    match in the `DocumentText` page-text pane.
-  - **The count:** "N+" while the scan runs. Image-only pages are counted.
+    match in the `DocumentText` page-text pane, mapped through
+    `TextBoxOffsets` and scrolled into view.
+  - **The count:** "Searching…" while a step waits, "N+" while the scan
+    runs, and the final total through `ResultUpdated`. A note under the bar
+    names image-only and unreadable pages.
   - **Highlight rectangles over the page image** are a follow-up task. That
     is a deviation from the P2 design (see below).
 
@@ -140,6 +147,9 @@ Find is already partly built:
    (approved 15 October 2026). Each find step holds the restore turn
    instead, so the point follows the match, and the re-apply after the
    bar closes (a resize) keeps the match in view.
+5. **The PDF search document is opened by the loader, not the scanner.**
+   A locked PDF's password is never stored, so both documents open at
+   load with it, once.
 
 ## PR a verification record
 
@@ -229,3 +239,44 @@ See the [PR b plan](t18-1-html-search-plan.md).
   2. **No HTML-only matching rules.** `<noscript>` text, CSS-generated text
      and a body that is itself the scroller follow the position walk's
      existing limits.
+
+## PR c verification record
+
+See the [PR c plan](t18-1-pdf-search-plan.md).
+
+- **Core,** each test failing first and then passing on the host:
+  `TextBoxOffsetsTests` (4) and `FindResultTextTests` (7). The full Core
+  suite passes, 1221/1221.
+- **Infrastructure:** `PdfTextScanTests` (12: order, image-only and
+  unreadable pages, waiting, wrapping, disposing, cancelling, the cap, a
+  real guide on its own source) and the loader's own-search-source and
+  locked-guide checks. The full suite passes, 803/803.
+- **Production:** it builds with 0 warnings, with warnings as errors.
+- **Installed:** the `navigation` shard passes on both lanes, with
+  `find-pdf`, `find-pdf-scan`, `find-pdf-wait` and `find-pdf-lines`
+  beside PR a's and PR b's modes. Dispatches:
+  [38691334117](https://github.com/ilya-slalom/desktop-guides/actions/runs/38691334117)
+  and, after the review,
+  [38698633489](https://github.com/ilya-slalom/desktop-guides/actions/runs/38698633489).
+  Screenshots: [find-pdf](evidence/ci/t18-1/find-pdf.png),
+  [find-pdf-scan](evidence/ci/t18-1/find-pdf-scan.png) and
+  [find-pdf-lines](evidence/ci/t18-1/find-pdf-lines.png).
+- **`find-unsupported` retired.** Every format now supports search, so
+  the toolbar smoke's `no-find-without-the-capability` keeps TR18.1. Its
+  `TextControls` set no longer includes Find.
+- **Final review:** 0 Critical, 3 Important, 9 Minor.
+  1. **Fixed:** a step that waited on the scan showed the last query's
+     count. The bar now says "Searching…". `find-pdf-wait`, with a test gate
+     slowing each page by 40 ms, failed in
+     [38696720812](https://github.com/ilya-slalom/desktop-guides/actions/runs/38696720812)
+     and passes after the fix.
+  2. **Covered:** the installed test couldn't see line-break or scrolling
+     faults. `find-pdf-lines`, on a new generated `pdf-lines` fixture with
+     the target on line 78, checks the exact selection and that it is on
+     screen. It passed without a code change, so the suspected faults
+     don't reproduce.
+  3. **Measured, not a fault:** PdfPig might keep a scanned document's
+     objects. A full scan of a 200 MiB, 200-page image PDF left managed
+     memory at 11 MiB and the working set at about 122 MiB.
+
+  The minors are deferred and listed in the PR.

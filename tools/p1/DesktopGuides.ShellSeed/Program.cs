@@ -744,9 +744,29 @@ if (args.Length == 3 && args[0] == "seed-find")
     {
         throw new InvalidOperationException($"The html-find fixture failed the import preview: {inspection}.");
     }
-    Guid search = await new GuideImportPublisher(findRepository, findPaths).PublishAsync(
+    GuideImportPublisher findPublisher = new(findRepository, findPaths);
+    Guid search = await findPublisher.PublishAsync(
         ready.Manifest, findGame.Id, "Search Web Guide", false, null, CancellationToken.None);
-    Console.WriteLine(JsonSerializer.Serialize(new { search = search.ToString("N") }));
+    // T18.1 PR c: one image-only page, for the find bar's note.
+    string scannedFixture = Path.Combine(Path.GetFullPath(args[2]), "p0", "pdf-scan.pdf");
+    if (await new GuideImportValidator().InspectAsync(scannedFixture, CancellationToken.None) is not ImportReady scannedReady)
+    {
+        throw new InvalidOperationException("The pdf-scan fixture failed the import preview.");
+    }
+    Guid scanned = await findPublisher.PublishAsync(
+        scannedReady.Manifest, findGame.Id, "Scanned PDF Guide", false, null, CancellationToken.None);
+    // A match far below the page-text fold, after many line breaks.
+    string linesFixture = Path.Combine(Path.GetFullPath(args[2]), "p0", "generated", "pdf-lines.pdf");
+    if (await new GuideImportValidator().InspectAsync(linesFixture, CancellationToken.None) is not ImportReady linesReady)
+    {
+        throw new InvalidOperationException("The pdf-lines fixture failed the import preview.");
+    }
+    Guid lines = await findPublisher.PublishAsync(
+        linesReady.Manifest, findGame.Id, "Lines PDF Guide", false, null, CancellationToken.None);
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        search = search.ToString("N"), scanned = scanned.ToString("N"), lines = lines.ToString("N")
+    }));
     return 0;
 }
 
