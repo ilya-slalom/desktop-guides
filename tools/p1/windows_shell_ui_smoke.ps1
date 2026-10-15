@@ -4451,15 +4451,27 @@ try {
                     throw "Searching saved the place: saves went from $baseline to $afterSearch."
                 }
                 $report.findHtmlSavedNothing = $true
-                # Into the page, on the line on top, then a real scroll.
-                Click-Element (Wait-PageVisible (Get-PageTopLine))
+                # Into the page through its left padding, clear of text and of
+                # the links on MARK-0425 and MARK-0426, then a real scroll.
+                $page = @(Get-PageRoots | Where-Object { -not $_.Current.IsOffscreen })[0]
+                $pageBox = $page.Current.BoundingRectangle
+                [DesktopGuidesForegroundProbe]::Click(
+                    [int]($pageBox.Left + 4), [int]($pageBox.Top + $pageBox.Height / 2))
+                Start-Sleep -Milliseconds 300
+                $topBeforeMove = Get-PageTopLine
+                $offsetBeforeMove = (Read-HtmlPosition).offset
                 [System.Windows.Forms.SendKeys]::SendWait('{PGDN}')
                 $deadline = (Get-Date).AddSeconds(8)
                 do {
                     Start-Sleep -Milliseconds 250
                     $afterMove = Read-Saves
                 } while ($afterMove -le $baseline -and (Get-Date) -lt $deadline)
-                if ($afterMove -le $baseline) { throw 'After closing the find bar, scrolling saved nothing.' }
+                if ($afterMove -le $baseline) {
+                    $counts = Read-ProgressCounts
+                    throw ("After closing the find bar, scrolling saved nothing. Top line '$topBeforeMove' then " +
+                        "'$(Get-PageTopLine)'; position offset $offsetBeforeMove then $((Read-HtmlPosition).offset); " +
+                        "saves $($counts.saves), skipped unchanged $($counts.skippedUnchanged), failures $($counts.failures).")
+                }
                 $report.phases += 'find-html'
             }
             elseif ($Mode -eq 'find-html-text') {
