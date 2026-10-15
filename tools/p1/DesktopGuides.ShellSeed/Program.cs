@@ -755,7 +755,18 @@ if (args.Length == 3 && args[0] == "seed-find")
     }
     Guid scanned = await findPublisher.PublishAsync(
         scannedReady.Manifest, findGame.Id, "Scanned PDF Guide", false, null, CancellationToken.None);
-    Console.WriteLine(JsonSerializer.Serialize(new { search = search.ToString("N"), scanned = scanned.ToString("N") }));
+    // A match far below the page-text fold, after many line breaks.
+    string linesFixture = Path.Combine(Path.GetFullPath(args[2]), "p0", "generated", "pdf-lines.pdf");
+    if (await new GuideImportValidator().InspectAsync(linesFixture, CancellationToken.None) is not ImportReady linesReady)
+    {
+        throw new InvalidOperationException("The pdf-lines fixture failed the import preview.");
+    }
+    Guid lines = await findPublisher.PublishAsync(
+        linesReady.Manifest, findGame.Id, "Lines PDF Guide", false, null, CancellationToken.None);
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        search = search.ToString("N"), scanned = scanned.ToString("N"), lines = lines.ToString("N")
+    }));
     return 0;
 }
 

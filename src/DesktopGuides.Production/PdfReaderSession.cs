@@ -34,6 +34,8 @@ internal sealed class PdfReaderSession : IReaderSession, IFindableReader
     private readonly string filePath;
     private readonly PdfPageTextSource text;
     private readonly PdfPageTextSource search;
+    // What a scan reads: the search source, slowed per page under a test gate.
+    private readonly IPdfPageTextReader scanPages;
     private PdfPageText? shownText;
     private readonly string contentSha256;
     private readonly string cacheRoot;
@@ -69,6 +71,9 @@ internal sealed class PdfReaderSession : IReaderSession, IFindableReader
         filePath = loaded.FilePath;
         text = loaded.Text;
         search = loaded.Search;
+        scanPages = TestGate.IsOpen(AppLane.Current.LocalEvent("PdfScanDelay", Environment.ProcessId))
+            ? new DelayedPages(search)
+            : search;
         contentSha256 = loaded.ContentSha256;
         this.cacheRoot = cacheRoot;
         this.writeDiagnostics = writeDiagnostics;
@@ -249,7 +254,7 @@ internal sealed class PdfReaderSession : IReaderSession, IFindableReader
         if (query.Text != findText)
         {
             ClearFind();
-            PdfTextScan started = new(search, query);
+            PdfTextScan started = new(scanPages, query);
             started.Finished += OnScanFinished;
             scan = started;
             findText = query.Text;
@@ -644,6 +649,18 @@ internal sealed class PdfReaderSession : IReaderSession, IFindableReader
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
             // Test diagnostics must never affect closing a guide.
+        }
+    }
+
+    // Test gate only: each scanned page waits 40 ms, so a step's wait shows.
+    private sealed class DelayedPages(IPdfPageTextReader pages) : IPdfPageTextReader
+    {
+        public int PageCount => pages.PageCount;
+
+        public async Task<PdfPageText> GetPageTextAsync(int pageIndex, CancellationToken token)
+        {
+            await Task.Delay(40, token);
+            return await pages.GetPageTextAsync(pageIndex, token);
         }
     }
 

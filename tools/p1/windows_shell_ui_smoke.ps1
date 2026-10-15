@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -1565,7 +1565,7 @@ try {
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines',
         'workflow-pdf-exit')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
@@ -4592,6 +4592,65 @@ try {
                 } while ($afterMove -le $baseline -and (Get-Date) -lt $deadline)
                 if ($afterMove -le $baseline) { throw 'After closing the find bar, a page turn saved nothing.' }
                 $report.phases += 'find-pdf'
+            }
+            elseif ($Mode -eq 'find-pdf-wait') {
+                # Each scanned page waits 40 ms, so the step for page 150
+                # waits about 6 s: the bar must say it is searching.
+                $delay = [System.Threading.EventWaitHandle]::new(
+                    $false, [System.Threading.EventResetMode]::ManualReset,
+                    "Local\$EventPrefix.PdfScanDelay.$ProcessId")
+                try {
+                    Open-TextGuide 'Long PDF Guide'
+                    [void](Wait-Status 'Guide ready.')
+                    Wait-StatusClosed
+                    [void](Wait-PdfPage 1 200 'page 1 of 200')
+                    [System.Windows.Forms.SendKeys]::SendWait('^f')
+                    [void](Wait-VisibleById 'ReaderFindBar')
+                    Wait-FocusedId 'FindQueryInput'
+                    [System.Windows.Forms.SendKeys]::SendWait('page 150 of 200{ENTER}')
+                    [void](Wait-Name 'FindCount' ('Searching' + [char]0x2026))
+                    [void](Wait-Name 'FindCount' '1 of 1')
+                    [void](Wait-PdfPage 150 200 'page 150 of 200')
+                    $report.phases += 'find-pdf-wait'
+                }
+                finally {
+                    $delay.Dispose()
+                }
+            }
+            elseif ($Mode -eq 'find-pdf-lines') {
+                Open-TextGuide 'Lines PDF Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-PdfPage 1 2 'page 1 of 2')
+                [System.Windows.Forms.SendKeys]::SendWait('^f')
+                [void](Wait-VisibleById 'ReaderFindBar')
+                Find-Count 'the hidden key' '1 of 1'
+                [void](Wait-PdfPage 2 2 'Line 01')
+                # Line 78 sits after 77 line breaks: offsets must map into the box.
+                $selected = Get-PdfSelection
+                $report.findPdfLinesSelection = $selected
+                if ($selected -ne 'the hidden key') { throw "The page text selected '$selected'." }
+                # Far below the fold: the pane must have scrolled the match on screen.
+                $deadline = (Get-Date).AddSeconds(5)
+                $seen = 'no selection boxes'
+                do {
+                    $box = Find-ById 'PdfDocumentText'
+                    $pane = $box.Current.BoundingRectangle
+                    $ranges = @($box.GetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern).GetSelection())
+                    $rects = if ($ranges.Count -gt 0) { @($ranges[0].GetBoundingRectangles()) } else { @() }
+                    $inside = $rects.Count -gt 0 -and
+                        @($rects | Where-Object { $_.Top -lt $pane.Top -or $_.Bottom -gt $pane.Bottom }).Count -eq 0
+                    if ($rects.Count -gt 0) { $seen = "selection at $($rects[0].Top)..$($rects[0].Bottom), pane $($pane.Top)..$($pane.Bottom)" }
+                    if ($inside) { break }
+                    Start-Sleep -Milliseconds 200
+                } while ((Get-Date) -lt $deadline)
+                $report.findPdfLinesBounds = $seen
+                if (-not $inside) {
+                    [void](Save-WindowScreenshot 'find-pdf-lines-offscreen')
+                    throw "The match on line 78 isn't on screen in the page text: $seen."
+                }
+                $report.findPdfLinesScreenshot = Save-WindowScreenshot 'find-pdf-lines'
+                $report.phases += 'find-pdf-lines'
             }
             elseif ($Mode -eq 'find-pdf-scan') {
                 Open-TextGuide 'Scanned PDF Guide'

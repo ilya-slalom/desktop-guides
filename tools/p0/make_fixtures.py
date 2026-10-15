@@ -106,6 +106,35 @@ def pdf(page_count: int) -> bytes:
     return write_pdf(objects)
 
 
+def lines_pdf() -> bytes:
+    """T18.1: page 2 has 80 text lines; the search target sits far below the
+    page-text pane's fold, after many line breaks."""
+    objects: list[bytes] = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Count 2 /Kids [4 0 R 6 0 R] >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    first = b"BT /F1 20 Tf 72 720 Td (Lines guide - page 1 of 2) Tj ET"
+    lines = [
+        f"Line {n:02} - the hidden key is in the well." if n == 78 else f"Line {n:02} - walkthrough text for this step."
+        for n in range(1, 81)
+    ]
+    second = (
+        b"BT /F1 9 Tf 9.5 TL 72 770 Td "
+        + b" T* ".join(f"({line}) Tj".encode() for line in lines)
+        + b" ET"
+    )
+    for page_ref, commands in ((4, first), (6, second)):
+        objects.append(
+            (
+                f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+                f"/Resources << /Font << /F1 3 0 R >> >> /Contents {page_ref + 1} 0 R >>"
+            ).encode()
+        )
+        objects.append(f"<< /Length {len(commands)} >>\nstream\n".encode() + commands + b"\nendstream")
+    return write_pdf(objects)
+
+
 def tagged_pdf() -> bytes:
     """One text page with a paragraph structure element and parent tree."""
     commands = (
@@ -361,6 +390,12 @@ def main() -> None:
         pdf(200),
         "pdf",
         "Many-page rendering, cache bounds, mixed page dimensions",
+    )
+    add(
+        "generated/pdf-lines.pdf",
+        lines_pdf(),
+        "pdf",
+        "In-guide search: a match far below the page-text fold, after many line breaks",
     )
     add(
         "pdf-access.pdf",

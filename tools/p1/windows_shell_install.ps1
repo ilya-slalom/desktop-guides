@@ -1748,6 +1748,8 @@ function Run-NavigationScenarios {
     }
 
     $report.findPdfScan = Invoke-ProgressPass 'find-pdf-scan' 0
+    $report.findPdfWait = Invoke-ProgressPass 'find-pdf-wait' 0
+    $report.findPdfLines = Invoke-ProgressPass 'find-pdf-lines' 0
 }
 
 function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $Kill, [string] $resultName = $mode,
