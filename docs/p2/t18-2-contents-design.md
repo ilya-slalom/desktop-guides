@@ -1,8 +1,8 @@
 # T18.2 table of contents: design
 
 Status: approved in conversation, 15 October 2026. PR a (the contract, the
-TXT detector, the pane and its keys) and PR b (HTML and PDF sources)
-follow.
+TXT detector, the pane and its keys) is implemented on
+`feat/p2-t18-2-contents`. PR b (HTML and PDF sources) follows.
 
 ## Intent
 
@@ -30,7 +30,9 @@ P2 design.
 
 ### The contract (Core)
 
-- **The interface:** `IOutlineReader { Task<Outline> GetOutlineAsync(CancellationToken token); }`.
+- **The interface:** `IOutlineReader { Task<Outline> GetOutlineAsync(CancellationToken token); long OrderOf(ReaderLocation location); }`.
+  `OrderOf` gives the current place's `Order`, so the pane can select the
+  entry it falls in.
   A session that implements it declares a new
   `ReaderCapabilities.Outline` flag.
 - **The data:**
@@ -56,10 +58,16 @@ P2 design.
   text.
   - **Its signals, strongest first:**
     1. **Search codes.** Codes such as `[WLK01]`, listed in the guide's own
-       contents block, map to their later occurrence. The contents block
-       itself is skipped.
-    2. **Underlined headings.** A line followed by a line of `====` or
-       `----` of about its own length.
+       contents block (the 60-line window holding the most distinct codes,
+       at least three), map to a later heading. A heading is underlined or
+       boxed, or has its code first or last on a short line. A code with no
+       heading, and a code the contents block doesn't list (button names
+       such as `[L1]`), gives no entry.
+    2. **Underlined and boxed headings.** A line followed by a rule of
+       `====` or `----` of about its own length, or a line between two
+       rules. It must follow a blank line or the file's start, be at most 50
+       characters, and not be column-aligned, so table rows and a
+       paragraph's last line over a rule aren't headings.
     3. **Numbered headings.** `1.0`, `1.1`, `2.` and similar, at the start
        of a short line, nested by depth.
   - **When it finds nothing:** it returns `None` with fewer than three
@@ -151,3 +159,43 @@ P2 design.
 1. **The fallback links only to Search** until T19.1 adds bookmarks.
 2. **Narrow windows show the pane as an overlay** (the user's choice). The
    P2 design describes only the fixed side pane.
+
+## PR a verification record
+
+See the [PR a plan](t18-2-contents-plan.md).
+
+- **Core,** each test failing first and then passing on the host:
+  - `OutlineTreeTests` (7);
+  - `TextSectionDetectorTests` (20, including the installed fixture and the
+    six review cases);
+  - the Contents capability in `ReaderContractTests`;
+  - the Ctrl+Shift+C table row and its routing test.
+
+  The full Core suite passes, 1250/1250.
+- **Production:** it builds with 0 warnings, with warnings as errors.
+- **Installed:** the `navigation` shard passes on both lanes, with
+  `contents-txt`, `contents-none` and `contents-narrow` beside the find
+  modes, and `reader-toolbar-ui` checks the Contents command. Dispatches:
+  [38730009630](https://github.com/ilya-slalom/desktop-guides/actions/runs/38730009630)
+  and, after the review,
+  [38733785829](https://github.com/ilya-slalom/desktop-guides/actions/runs/38733785829).
+  Screenshots: [contents-txt](evidence/ci/t18-2/contents-txt.png),
+  [contents-none](evidence/ci/t18-2/contents-none.png) and
+  [contents-narrow](evidence/ci/t18-2/contents-narrow.png).
+- **Found on the way:**
+  1. **The narrow overlay was see-through.** The elevated card fill is
+     translucent, so the guide's text showed through the entries. The
+     `contents-narrow` screenshot showed it, although the bounds check
+     passed. The pane now uses the reading card's opaque fill.
+  2. **Two test setup faults, fixed in the tests:**
+     - in a wide window the pane stays open after an entry is followed,
+       so the reopen step first closes it;
+     - `contents-narrow` clears the place `contents-txt` saved.
+- **Final review:** 0 Critical, 3 Important and 16 Minor. All three
+  Important findings were in the detector, and all are fixed with failing
+  tests first:
+  1. bracketed button names became search codes;
+  2. cross-references took entries;
+  3. table rows and a paragraph's last line over a rule became headings.
+
+  The minors are deferred and listed in the PR.
