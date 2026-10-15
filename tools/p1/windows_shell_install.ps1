@@ -1748,6 +1748,8 @@ function Run-NavigationScenarios {
     }
 
     $report.findPdfScan = Invoke-ProgressPass 'find-pdf-scan' 0
+    # find-pdf left the place on page 199.
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
     $report.findPdfWait = Invoke-ProgressPass 'find-pdf-wait' 0
     $report.findPdfLines = Invoke-ProgressPass 'find-pdf-lines' 0
 }
