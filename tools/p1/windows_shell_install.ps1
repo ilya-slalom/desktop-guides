@@ -1739,6 +1739,7 @@ function Run-NavigationScenarios {
     }
 
     $report.findHtmlText = Invoke-ProgressPass 'find-html-text' 0
+    $report.findHtmlClose = Invoke-ProgressPass 'find-html-close' 0 -HtmlPosition
 
     $report.findUnsupported = Invoke-ProgressPass 'find-unsupported' 0
 }

@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-unsupported', 'find-html', 'find-html-text',
+        'find-txt', 'find-back', 'find-unsupported', 'find-html', 'find-html-text', 'find-html-close',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -1565,7 +1565,7 @@ try {
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-unsupported', 'find-html', 'find-html-text',
+        'find-txt', 'find-back', 'find-unsupported', 'find-html', 'find-html-text', 'find-html-close',
         'workflow-pdf-exit')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
@@ -1769,6 +1769,7 @@ try {
                 appearanceKind = $file.appearanceKind; appearanceStep = $file.appearanceStep
                 appearanceScale = $file.appearanceScale
                 appearanceRestores = [int] $file.appearanceRestores
+                findHighlighted = [bool] $file.findHighlighted
             }
             if ($file.locator) {
                 $payload = ($file.locator | ConvertFrom-Json).payload
@@ -4498,6 +4499,41 @@ try {
                 [void](Wait-PageVisible 'Deep in the scroll box lies the moon key.')
                 $report.findHtmlTextScreenshot = Save-WindowScreenshot 'find-html-text'
                 $report.phases += 'find-html-text'
+            }
+            elseif ($Mode -eq 'find-html-close') {
+                # A step still running when the bar closes must draw nothing
+                # and move nothing. Each step waits 1 s before it shows its
+                # match, so Escape lands inside it.
+                $delay = [System.Threading.EventWaitHandle]::new(
+                    $false, [System.Threading.EventResetMode]::ManualReset,
+                    "Local\$EventPrefix.HtmlFindDelay.$ProcessId")
+                try {
+                    Open-TextGuide 'Long Web Guide'
+                    [void](Wait-Status 'Guide ready.')
+                    Wait-StatusClosed
+                    [void](Wait-PageName 'Long Web Guide')
+                    $start = Wait-HtmlPosition { param($p) $p.locator } 'a first capture'
+                    [System.Windows.Forms.SendKeys]::SendWait('^f')
+                    [void](Wait-VisibleById 'ReaderFindBar')
+                    Wait-FocusedId 'FindQueryInput'
+                    [System.Windows.Forms.SendKeys]::SendWait('mark-1500 step{ENTER}{ESC}')
+                    Wait-HiddenById 'ReaderFindBar'
+                    # Past the delay, the show, and a re-show after the closing resize.
+                    Start-Sleep -Seconds 3
+                    $after = Wait-HtmlPosition { param($p) $p.locator } 'the place after closing mid-step'
+                    $report.findHtmlCloseHighlighted = $after.findHighlighted
+                    $report.findHtmlCloseOffsets = @($start.offset, $after.offset)
+                    if ($after.findHighlighted) {
+                        throw 'A find step still running when the bar closed drew its match.'
+                    }
+                    if ($after.offset -ne $start.offset) {
+                        throw "A find step still running when the bar closed moved the place from $($start.offset) to $($after.offset)."
+                    }
+                    $report.phases += 'find-html-close'
+                }
+                finally {
+                    $delay.Dispose()
+                }
             }
             elseif ($Mode -eq 'find-unsupported') {
                 # PDF search arrives in T18.1 PR c; until then Ctrl+F says so.

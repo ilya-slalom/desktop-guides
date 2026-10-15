@@ -54,6 +54,8 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
     private readonly TaskCompletionSource<bool> entryLoad = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly SemaphoreSlim restoreTurn = new(1, 1);
     private readonly bool delayImagesForTest;
+    // Test gate only: each find step waits 1 s before it shows its match.
+    private readonly bool delayFindForTest;
     private bool restoring;
     private RestoreOutcome? lastOutcome;
     private HtmlRestoreStep? lastStep;
@@ -85,6 +87,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
         defaultPageColor = View.DefaultBackgroundColor;
         positionForTest = TestGate.IsOpen(AppLane.Current.LocalEvent("HtmlPosition", Environment.ProcessId));
         delayImagesForTest = TestGate.IsOpen(AppLane.Current.LocalEvent("HtmlAssetDelay", Environment.ProcessId));
+        delayFindForTest = TestGate.IsOpen(AppLane.Current.LocalEvent("HtmlFindDelay", Environment.ProcessId));
         tracker = View.DispatcherQueue.CreateTimer();
         tracker.Interval = TimeSpan.FromMilliseconds(500);
         tracker.IsRepeating = true;
@@ -435,6 +438,8 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
     private string? findText;
     private IReadOnlyList<TextMatch> matches = [];
     private int? matchIndex;
+    // Test diagnostics: whether the last find script drew a match.
+    private bool findHighlighted;
 
     public async Task<FindResult> FindAsync(FindQuery query, FindDirection direction, CancellationToken token)
     {
@@ -480,8 +485,10 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
     private async Task<bool> ShowMatchAsync(TextMatch match)
     {
         string script = HtmlFindScripts.Show(match.Start, match.Length);
+        if (delayFindForTest) await Task.Delay(TimeSpan.FromSeconds(1));
         int started = generation;
         if (await RunScriptAsync(script) != "true") return false;
+        findHighlighted = true;
         while (started != generation && !disposed)
         {
             started = generation;
@@ -504,6 +511,8 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
     {
         ResetFind();
         _ = RunScriptAsync(HtmlFindScripts.Clear);
+        findHighlighted = false;
+        WritePositionForTest();
     }
 
     private void ResetFind()
@@ -991,7 +1000,8 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
                     appearanceOutcome?.Kind.ToString(),
                     appearanceStep?.ToString(),
                     appearanceScale,
-                    appearanceRestores),
+                    appearanceRestores,
+                    findHighlighted),
                 ProductionJsonContext.Default.HtmlPositionForTest);
             string folder = Path.Combine(cacheRoot, "diagnostics");
             Directory.CreateDirectory(folder);
