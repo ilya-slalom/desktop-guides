@@ -91,9 +91,12 @@ public sealed partial class ShellWindow
             return;
         }
         ReaderFind.ShowResult(result, query.Text);
-        AnnounceStatus(result.Outcome == FindOutcome.Found
-            ? $"Match {result.Index} of {result.Total}{(result.TotalIsPartial ? " so far" : "")}."
-            : $"No matches for {query.Text}.");
+        AnnounceStatus(result.Outcome switch
+        {
+            FindOutcome.Found => $"Match {result.Index} of {result.Total}{(result.TotalIsPartial ? " so far" : "")}.",
+            FindOutcome.Failed => "Couldn't search this guide.",
+            _ => $"No matches for {query.Text}."
+        });
     }
 
     private async Task FindBackAsync()

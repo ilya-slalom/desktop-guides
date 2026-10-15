@@ -11,7 +11,8 @@ internal static class HtmlPositionScripts
 {
     // The text walk: the body's text nodes in document order, skipping
     // script, style, template and noscript. Offsets count UTF-16 code units.
-    private const string Prelude = """
+    // HtmlFindScripts uses the same walk, so find offsets are locator offsets.
+    internal const string Prelude = """
         'use strict';
         const getter = (proto, name) => Object.getOwnPropertyDescriptor(proto, name).get;
         const bodyOf = getter(Document.prototype, 'body');

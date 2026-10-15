@@ -7,6 +7,7 @@ namespace DesktopGuides.Production;
 // WebView2 DevTools parameters and the test gate's diagnostics files.
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(List<string>))]
+[JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(int))]
 [JsonSerializable(typeof(double))]
 [JsonSerializable(typeof(DevToolsEvaluateParams))]

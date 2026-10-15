@@ -21,7 +21,7 @@ internal sealed class HtmlGuideLoadException(HtmlGuideLoadError error)
 // own origin: every request is answered from the manifest rows, every
 // navigation away from the entry document is cancelled, and a click on a
 // website link is handed to the shell's bar instead of being followed.
-internal sealed class HtmlReaderSession : IReaderSession
+internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
 {
     private static int sessionCounter;
     private readonly HtmlRequestPolicy policy;
@@ -94,7 +94,8 @@ internal sealed class HtmlReaderSession : IReaderSession
 
     public WebView2 View { get; }
     public GuideFormat Format => GuideFormat.Html;
-    public ReaderCapabilities Capabilities => ReaderCapabilities.Scroll | ReaderCapabilities.TextSize;
+    public ReaderCapabilities Capabilities =>
+        ReaderCapabilities.Scroll | ReaderCapabilities.TextSize | ReaderCapabilities.Find;
 
     // Capabilities don't change during an HTML session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
@@ -425,6 +426,91 @@ internal sealed class HtmlReaderSession : IReaderSession
         return action is TextSizeAction size
             ? ApplyAppearanceAsync(appearance with { TextScale = size.Scale }, token)
             : throw new NotSupportedException($"HTML guides don't support {action.Command}.");
+    }
+
+    // T18.1: the last query's matches over the walk's text. A find step is
+    // a restore to the match: it takes the restore turn, so the tracker and
+    // the re-apply leave the page to it, and the point follows the match.
+    // Progress is paused while the bar is open, so nothing is raised.
+    private string? findText;
+    private IReadOnlyList<TextMatch> matches = [];
+    private int? matchIndex;
+
+    public async Task<FindResult> FindAsync(FindQuery query, FindDirection direction, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (!await entryLoad.Task.WaitAsync(token) || disposed) return FindResult.Failure;
+        await restoreTurn.WaitAsync(token);
+        restoring = true;
+        try
+        {
+            if (query.Text != findText)
+            {
+                HtmlFindText? text = HtmlFindText.Parse(await RunScriptAsync(HtmlFindScripts.ReadText));
+                if (text is null)
+                {
+                    ResetFind();
+                    return FindResult.Failure;
+                }
+                matches = await Task.Run(
+                    () => TextMatcher.FindAll(text.Text, query, TextMatcher.MaxMatches, text.Breaks), token);
+                findText = query.Text;
+                matchIndex = null;
+            }
+            token.ThrowIfCancellationRequested();
+            matchIndex = TextMatcher.Step(matches, matchIndex, current?.Offset ?? 0, direction);
+            if (matchIndex is not int index)
+            {
+                await RunScriptAsync(HtmlFindScripts.Clear);
+                return FindResult.None;
+            }
+            return await ShowMatchAsync(matches[index])
+                ? new FindResult(FindOutcome.Found, index + 1, matches.Count, false, 0)
+                : FindResult.Failure;
+        }
+        finally
+        {
+            restoring = false;
+            restoreTurn.Release();
+        }
+    }
+
+    // A resize or a restyle during the step reflowed the page: show the
+    // match again once it settles, as a restore does.
+    private async Task<bool> ShowMatchAsync(TextMatch match)
+    {
+        string script = HtmlFindScripts.Show(match.Start, match.Length);
+        int started = generation;
+        if (await RunScriptAsync(script) != "true") return false;
+        while (started != generation && !disposed)
+        {
+            started = generation;
+            await Task.Delay(ResizeSettle);
+            if (await RunScriptAsync(script) != "true") return false;
+        }
+        HtmlScroll? scroll = HtmlLocationRules.ParseScroll(await RunScriptAsync(HtmlPositionScripts.ReadScroll));
+        HtmlCapture? capture = await CaptureAsync();
+        if (disposed) return false;
+        if (scroll is not null && started == generation) lastScroll = scroll;
+        if (capture is not null && capture != current)
+        {
+            current = capture;
+            WritePositionForTest();
+        }
+        return true;
+    }
+
+    public void ClearFind()
+    {
+        ResetFind();
+        _ = RunScriptAsync(HtmlFindScripts.Clear);
+    }
+
+    private void ResetFind()
+    {
+        findText = null;
+        matches = [];
+        matchIndex = null;
     }
 
     // Runs a fixed host script in the entry document only. Any failure,
