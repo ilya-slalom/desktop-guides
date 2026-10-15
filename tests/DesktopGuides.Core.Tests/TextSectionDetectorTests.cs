@@ -69,9 +69,9 @@ public sealed class TextSectionDetectorTests
     public void UnderlinedHeadingsAreFound()
     {
         string text = "Intro text.\n" + Filler(5) +
-            "Walkthrough\n===========\n" + Filler(30) +
-            "The forest\n----------\n" + Filler(30) +
-            "Bosses\n======\n" + Filler(30);
+            "\nWalkthrough\n===========\n" + Filler(30) +
+            "\nThe forest\n----------\n" + Filler(30) +
+            "\nBosses\n======\n" + Filler(30);
 
         IReadOnlyList<DetectedSection> sections = Detect(text);
 
@@ -84,8 +84,8 @@ public sealed class TextSectionDetectorTests
     public void BoxedHeadingsAreFoundWhateverTheRuleLength()
     {
         string rule = new string('=', 70) + "\n";
-        string text = Filler(5) + rule + " WALKTHROUGH\n" + rule + Filler(30) +
-            rule + " BOSSES\n" + rule + Filler(30) + rule + " SECRETS\n" + rule + Filler(30);
+        string text = Filler(5) + "\n" + rule + " WALKTHROUGH\n" + rule + Filler(30) +
+            "\n" + rule + " BOSSES\n" + rule + Filler(30) + "\n" + rule + " SECRETS\n" + rule + Filler(30);
 
         Assert.Equal(["WALKTHROUGH", "BOSSES", "SECRETS"], Detect(text).Select(s => s.Title));
     }
@@ -134,7 +134,7 @@ public sealed class TextSectionDetectorTests
 
     [Fact]
     public void SectionsOnlyInTheFirstTenthAreNotAnOutline() =>
-        Assert.Empty(Detect("Aaa\n===\n" + "Bbb\n===\n" + "Ccc\n===\n" + "Ddd\n===\n" + Filler(400)));
+        Assert.Empty(Detect("Aaa\n===\n\n" + "Bbb\n===\n\n" + "Ccc\n===\n\n" + "Ddd\n===\n\n" + Filler(400)));
 
     [Fact]
     public void ACancelledDetectionFindsNothing()
@@ -169,4 +169,80 @@ public sealed class TextSectionDetectorTests
     public void TheInstalledFixtureHasFiveSections() =>
         Assert.Equal(["Introduction", "Walkthrough: Forest", "Walkthrough: Castle", "Bosses", "FAQ"],
             Detect(SectionsFixture()).Select(s => s.Title));
+
+    // Final review: button names in brackets aren't search codes; the
+    // underlined headings beside them still make the outline.
+    [Fact]
+    public void ButtonNamesAreNotSearchCodes()
+    {
+        string text = "\nControls\n========\n" + "[L1] Dash\n[R1] Jump\n[L2] Menu\n[R2] Map\n\n" + Filler(20) +
+            "\nForest\n======\n" +
+            "Hold [L1] and press [R1] to dash around the first enemy, then use\n[L2] to open the menu when you need it.\n" +
+            Filler(30) +
+            "\nCastle\n======\n" + "Use [R2] to check the map and [L1] to dash past the guards.\n" + Filler(30);
+
+        Assert.Equal(["Controls", "Forest", "Castle"], Detect(text).Select(s => s.Title));
+    }
+
+    [Fact]
+    public void AParentheticalCrossReferenceIsSkipped()
+    {
+        string text = Contents +
+            Boxed("Introduction", "INT00") + "The castle comes later (see [WLK02])\n" + Filler(40) +
+            Boxed("Forest", "WLK01") + Filler(40) +
+            Boxed("Castle", "WLK02") + Filler(40) +
+            Boxed("Bosses", "BOS00") + Filler(40);
+
+        Assert.Equal(text.LastIndexOf(" Castle", StringComparison.Ordinal), Detect(text).Single(s => s.Title == "Castle").Offset);
+    }
+
+    [Fact]
+    public void AWrappedCrossReferenceIsSkipped()
+    {
+        string text = Contents +
+            Boxed("Introduction", "INT00") + "If you get lost, check [WLK02] for the route through the\ngate before nightfall.\n" +
+            Filler(40) +
+            Boxed("Forest", "WLK01") + Filler(40) +
+            Boxed("Castle", "WLK02") + Filler(40) +
+            Boxed("Bosses", "BOS00") + Filler(40);
+
+        Assert.Equal(text.LastIndexOf(" Castle", StringComparison.Ordinal), Detect(text).Single(s => s.Title == "Castle").Offset);
+    }
+
+    [Fact]
+    public void ASearchNoteAboveTheContentsIsSkipped()
+    {
+        string text = "To jump to a section, press Ctrl+F and type its code, e.g. [WLK01]\n\n" + Contents +
+            Boxed("Introduction", "INT00") + Filler(40) +
+            Boxed("Forest", "WLK01") + Filler(40) +
+            Boxed("Castle", "WLK02") + Filler(40) +
+            Boxed("Bosses", "BOS00") + Filler(40);
+
+        IReadOnlyList<DetectedSection> sections = Detect(text);
+
+        Assert.Equal(["Introduction", "Forest", "Castle", "Bosses"], sections.Select(s => s.Title));
+        Assert.Equal(text.LastIndexOf(" Forest", StringComparison.Ordinal), sections[1].Offset);
+    }
+
+    [Fact]
+    public void TableRowsBetweenRulesAreNotHeadings()
+    {
+        string table = "\nEnemies\n=======\n\n" +
+            "Name      HP   EXP\n------------------\nSlime     10   5\n------------------\n" +
+            "Goblin    20   8\n------------------\nOrc       50   20\n------------------\n";
+        string text = Filler(5) + "\nForest\n======\n" + Filler(30) + table + Filler(30) + "\nCastle\n======\n" + Filler(30);
+
+        Assert.Equal(["Forest", "Enemies", "Castle"], Detect(text).Select(s => s.Title));
+    }
+
+    [Fact]
+    public void AParagraphOverAFullWidthRuleIsNotAHeading()
+    {
+        string rule = new string('=', 78) + "\n";
+        string text = "\nForest\n======\n" + Filler(30) +
+            "The path splits here, and the left fork leads to the hidden spring today\n" + rule + Filler(30) +
+            "\nCastle\n======\n" + Filler(30) + "\nBosses\n======\n" + Filler(20);
+
+        Assert.Equal(["Forest", "Castle", "Bosses"], Detect(text).Select(s => s.Title));
+    }
 }
