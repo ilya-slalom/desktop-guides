@@ -6,7 +6,7 @@ namespace DesktopGuides.Production;
 
 // The Reader's session for one loaded TXT guide. The shell builds it from a
 // document T08.1's loader returned.
-internal sealed class TextReaderSession : IReaderSession
+internal sealed class TextReaderSession : IReaderSession, IFindableReader
 {
     private readonly TextGuideDocument document;
     private bool disposed;
@@ -34,13 +34,69 @@ internal sealed class TextReaderSession : IReaderSession
     public TextReaderView View { get; }
     public GuideFormat Format => GuideFormat.Txt;
     public ReaderCapabilities Capabilities =>
-        ReaderCapabilities.Scroll | ReaderCapabilities.PageNavigation | ReaderCapabilities.TextSize;
+        ReaderCapabilities.Scroll | ReaderCapabilities.PageNavigation | ReaderCapabilities.TextSize |
+        ReaderCapabilities.Find;
 
     // Capabilities don't change during a TXT session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
     // T14.3: their layout keeps its own place; nothing to report.
     public event EventHandler<AppearanceRestoredEventArgs>? AppearanceRestored { add { } remove { } }
     public event EventHandler<LocationChangedEventArgs>? LocationChanged;
+
+    // T18.1: the last query's matches, so Next and Previous step through them.
+    private string? findText;
+    private IReadOnlyList<TextMatch> matches = [];
+    private int? current;
+
+    public async Task<FindResult> FindAsync(FindQuery query, FindDirection direction, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (query.Text != findText)
+        {
+            string text = document.Text;
+            matches = await Task.Run(() => TextMatcher.FindAll(text, query), token);
+            findText = query.Text;
+            current = null;
+        }
+        token.ThrowIfCancellationRequested();
+        int top = document.LineStarts[Math.Clamp(View.FirstVisibleIndex, 0, document.LineStarts.Count - 1)];
+        current = TextMatcher.Step(matches, current, top, direction);
+        if (current is not int index)
+        {
+            View.ClearMatch();
+            return FindResult.None;
+        }
+        TextMatch match = matches[index];
+        View.ShowMatch(Segments(match));
+        // A little context above the match, as a reader expects.
+        View.ScrollToLine(Math.Max(0, document.LineAtOffset(match.Start) - 3));
+        return new FindResult(FindOutcome.Found, index + 1, matches.Count, false, 0);
+    }
+
+    public void ClearFind()
+    {
+        findText = null;
+        matches = [];
+        current = null;
+        View.ClearMatch();
+    }
+
+    private IReadOnlyList<(int Line, int Column, int Length)> Segments(TextMatch match)
+    {
+        int first = document.LineAtOffset(match.Start);
+        int last = document.LineAtOffset(match.Start + match.Length - 1);
+        List<(int Line, int Column, int Length)> segments = [];
+        for (int line = first; line <= last; line++)
+        {
+            int lineStart = document.LineStarts[line];
+            int from = Math.Max(match.Start, lineStart);
+            int to = match.Start + match.Length;
+            int column = TextLineView.ColumnOf(document, line, from);
+            int endColumn = TextLineView.ColumnOf(document, line, to);
+            segments.Add((line, column, Math.Max(0, endColumn - column)));
+        }
+        return segments;
+    }
 
     public Task OpenAsync(ManagedGuideSource source, CancellationToken token) =>
         throw new NotSupportedException("A TXT session is built from a loaded document.");

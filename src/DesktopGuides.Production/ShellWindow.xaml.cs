@@ -160,6 +160,7 @@ public sealed partial class ShellWindow : Window
         ShellRoot.KeyboardAccelerators.Add(back);
         ShellRoot.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
         InitializeKeyboard();
+        InitializeFind();
         InitializeShortcutList();
     }
 
@@ -1639,6 +1640,7 @@ public sealed partial class ShellWindow : Window
     // toolbar and surface drop the old session before it is disposed.
     private async Task CloseReaderSessionAsync()
     {
+        CloseFind();
         await DisposeProgressTrackingAsync();
         HideExternalLinkBar();
         HideUnavailableLinkBar();

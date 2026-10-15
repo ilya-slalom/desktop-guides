@@ -5,6 +5,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
 
@@ -93,6 +94,47 @@ public sealed partial class TextReaderView : UserControl
         // Pages from the real top, not the anchor, which can sit below it after Go to end.
         long target = (long)FirstVisibleIndex + (long)delta * rows;
         ScrollToLine((int)Math.Clamp(target, 0, Math.Max(lines.Count - 1, 0)));
+    }
+
+    // T18.1: the current match, as segments per line (a match can span
+    // lines when whitespace runs collapse).
+    private IReadOnlyDictionary<int, (int Column, int Length)> matchSegments =
+        new Dictionary<int, (int Column, int Length)>();
+
+    public void ShowMatch(IReadOnlyList<(int Line, int Column, int Length)> segments)
+    {
+        matchSegments = segments.ToDictionary(s => s.Line, s => (s.Column, s.Length));
+        RefreshRealizedHighlights();
+    }
+
+    public void ClearMatch()
+    {
+        matchSegments = new Dictionary<int, (int Column, int Length)>();
+        RefreshRealizedHighlights();
+    }
+
+    private void RefreshRealizedHighlights()
+    {
+        for (int index = 0; index < lines.Count; index++)
+        {
+            if (Lines.ContainerFromIndex(index) is ListViewItem { ContentTemplateRoot: TextBlock text })
+            {
+                ApplyHighlight(text, index);
+            }
+        }
+    }
+
+    private void ApplyHighlight(TextBlock text, int line)
+    {
+        text.TextHighlighters.Clear();
+        if (matchSegments.TryGetValue(line, out (int Column, int Length) segment) && segment.Length > 0)
+        {
+            // The default colours are the system highlight: they follow the
+            // theme and high contrast.
+            TextHighlighter highlighter = new();
+            highlighter.Ranges.Add(new TextRange { StartIndex = segment.Column, Length = segment.Length });
+            text.TextHighlighters.Add(highlighter);
+        }
     }
 
     public void ScrollToEdge(ReaderEdge edge) =>
@@ -290,6 +332,7 @@ public sealed partial class TextReaderView : UserControl
         {
             text.Text = line.Text;
             ApplyRowSize(text);
+            ApplyHighlight(text, line.Index);
         }
         AutomationProperties.SetName(
             args.ItemContainer, string.IsNullOrWhiteSpace(line.Text) ? "Blank line" : line.Text);

@@ -59,8 +59,6 @@ public sealed record TextSizeAction(double Scale)
             : throw new ArgumentOutOfRangeException(
                 nameof(Scale), Scale, "A text size must be between 75% and 200%.");
 }
-public sealed record FindAction(string Query)
-    : ReaderAction(ReaderCommand.Find);
 
 public static class ReaderCommandPolicy
 {

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl x:Class="DesktopGuides.Production.FindBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.AutomationId="ReaderFindBar"
+             AutomationProperties.Name="Search in the guide">
+    <Grid ColumnSpacing="8" Margin="{StaticResource DesktopGuidesReaderGapAbove}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" MaxWidth="420" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBox x:Name="QueryBox"
+                 PlaceholderText="Search this guide"
+                 AutomationProperties.AutomationId="FindQueryInput"
+                 AutomationProperties.Name="Search this guide"
+                 KeyDown="QueryKeyDown" />
+        <TextBlock x:Name="Count" Grid.Column="1" VerticalAlignment="Center"
+                   AutomationProperties.AutomationId="FindCount"
+                   AutomationProperties.LiveSetting="Polite" />
+        <Button Grid.Column="2" Click="PreviousClicked" AutomationProperties.AutomationId="FindPreviousButton"
+                AutomationProperties.Name="Previous match" ToolTipService.ToolTip="Previous match (Shift+F3)">
+            <SymbolIcon Symbol="Up" />
+        </Button>
+        <Button Grid.Column="3" Click="NextClicked" AutomationProperties.AutomationId="FindNextButton"
+                AutomationProperties.Name="Next match" ToolTipService.ToolTip="Next match (F3)">
+            <SymbolIcon Symbol="Download" />
+        </Button>
+        <Button Grid.Column="4" Content="Back to my place" Click="BackClicked"
+                AutomationProperties.AutomationId="FindBackButton" />
+        <Button Grid.Column="5" Click="CloseClicked" AutomationProperties.AutomationId="FindCloseButton"
+                AutomationProperties.Name="Close search" ToolTipService.ToolTip="Close search (Esc)">
+            <SymbolIcon Symbol="Cancel" />
+        </Button>
+    </Grid>
+</UserControl>
