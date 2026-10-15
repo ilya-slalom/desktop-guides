@@ -10,7 +10,9 @@ public static class TextMatcher
 {
     public const int MaxMatches = 10_000;
 
-    public static IReadOnlyList<TextMatch> FindAll(string text, FindQuery query, int maxMatches = MaxMatches)
+    // breaks: ascending offsets of block edges (HTML cells, <br>), read as spaces.
+    public static IReadOnlyList<TextMatch> FindAll(
+        string text, FindQuery query, int maxMatches = MaxMatches, IReadOnlyList<int>? breaks = null)
     {
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(query);
@@ -19,8 +21,22 @@ public static class TextMatcher
         List<int> starts = new(text.Length);
         List<int> ends = new(text.Length);
         int index = 0;
+        int nextBreak = 0;
         while (index < text.Length)
         {
+            // A block edge reads as a space, so two cells never join into
+            // one word. The query is trimmed, so no match starts or ends on it.
+            while (breaks is not null && nextBreak < breaks.Count && breaks[nextBreak] <= index)
+            {
+                if (breaks[nextBreak] == index && folded.Length > 0 && folded[^1] != ' ' &&
+                    !char.IsWhiteSpace(text[index]))
+                {
+                    folded.Append(' ');
+                    starts.Add(index);
+                    ends.Add(index);
+                }
+                nextBreak++;
+            }
             if (char.IsWhiteSpace(text[index]))
             {
                 int runStart = index;

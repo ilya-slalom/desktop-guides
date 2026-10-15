@@ -28,6 +28,7 @@ public sealed record FindResult(
     FindOutcome Outcome, int? Index, int? Total, bool TotalIsPartial, int UnsearchablePages)
 {
     public static FindResult None { get; } = new(FindOutcome.NotFound, null, 0, false, 0);
+    public static FindResult Failure { get; } = new(FindOutcome.Failed, null, null, false, 0);
 }
 
 public interface IFindableReader

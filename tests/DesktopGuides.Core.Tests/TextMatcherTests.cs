@@ -77,4 +77,35 @@ public sealed class TextMatcherTests
         Assert.Equal(2, TextMatcher.Step(matches, current: 0, fromOffset: 0, FindDirection.Previous));
         Assert.Null(TextMatcher.Step([], current: null, fromOffset: 0, FindDirection.Next));
     }
+
+    [Fact]
+    public void ABlockEdgeMatchesASpace()
+    {
+        // Two table cells, "Boss" and "Hydra", with no whitespace between.
+        TextMatch match = Assert.Single(TextMatcher.FindAll("BossHydra", new FindQuery("boss hydra"), breaks: [4]));
+
+        Assert.Equal(new TextMatch(0, 9), match);
+    }
+
+    [Fact]
+    public void ABlockEdgeSplitsWords() =>
+        Assert.Empty(TextMatcher.FindAll("BossHydra", new FindQuery("sshy"), breaks: [4]));
+
+    [Fact]
+    public void ABlockEdgeBesideWhitespaceIsOneSpace()
+    {
+        Assert.Single(TextMatcher.FindAll("Boss\nHydra", new FindQuery("boss hydra"), breaks: [4]));
+        Assert.Single(TextMatcher.FindAll("Boss\nHydra", new FindQuery("boss hydra"), breaks: [5]));
+        Assert.Single(TextMatcher.FindAll("Boss\nHydra", new FindQuery("boss hydra"), breaks: [4, 5]));
+    }
+
+    [Fact]
+    public void BreaksAtTheEdgesChangeNothing() =>
+        Assert.Equal(
+            [new TextMatch(0, 4)],
+            TextMatcher.FindAll("Boss", new FindQuery("boss"), breaks: [0, 4]));
+
+    [Fact]
+    public void MaskedTextNeverMatches() =>
+        Assert.Empty(TextMatcher.FindAll("A\0\0\0\0\0\0B", new FindQuery("a b")));
 }
