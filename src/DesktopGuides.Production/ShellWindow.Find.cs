@@ -92,7 +92,9 @@ public sealed partial class ShellWindow
         FindResult result;
         try
         {
-            result = await findable.FindAsync(query, direction, cancel.Token);
+            Task<FindResult> step = findable.FindAsync(query, direction, cancel.Token);
+            if (!step.IsCompleted) ReaderFind.ShowSearching();
+            result = await step;
         }
         catch (OperationCanceledException)
         {

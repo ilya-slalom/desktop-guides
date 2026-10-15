@@ -31,6 +31,15 @@ public sealed partial class FindBar : UserControl
         Note.Visibility = Visibility.Collapsed;
     }
 
+    // A step that waits (a PDF scan still reaching its match) says so, so
+    // the last query's count never stands in for the new one's.
+    public void ShowSearching()
+    {
+        Count.Text = "Searching\u2026";
+        Note.Text = string.Empty;
+        Note.Visibility = Visibility.Collapsed;
+    }
+
     public void ShowResult(FindResult result, string query)
     {
         Count.Text = result.Outcome switch
