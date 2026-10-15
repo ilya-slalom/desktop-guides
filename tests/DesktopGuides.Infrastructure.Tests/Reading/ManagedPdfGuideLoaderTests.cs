@@ -44,11 +44,31 @@ public sealed class ManagedPdfGuideLoaderTests
 
         PdfGuideLoaded loaded = Assert.IsType<PdfGuideLoaded>(await LoadAsync(harness, guide));
         using PdfPageTextSource text = loaded.Text;
+        using PdfPageTextSource search = loaded.Search;
 
         Assert.Equal(ManagedFile(harness, guide), loaded.FilePath);
         Assert.Equal(1, text.PageCount);
         Assert.Contains("Tagged guide paragraph for Narrator",
             (await text.GetPageTextAsync(0, CancellationToken.None)).Text);
+    }
+
+    // T18.1: search reads its own document, so scanning never touches the
+    // display source's cache.
+    [Fact]
+    public async Task ALoadedGuideHasItsOwnSearchSource()
+    {
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        (Guide guide, _) = await PublishAsync(harness, "generated/pdf-long.pdf");
+
+        PdfGuideLoaded loaded = Assert.IsType<PdfGuideLoaded>(await LoadAsync(harness, guide));
+        using PdfPageTextSource text = loaded.Text;
+        using PdfPageTextSource search = loaded.Search;
+
+        Assert.NotSame(text, search);
+        Assert.Equal(text.PageCount, search.PageCount);
+        for (int page = 0; page < search.PageCount; page++) await search.GetPageTextAsync(page, CancellationToken.None);
+        Assert.Equal(0, text.PeakPages);
+        Assert.Equal(1, search.PeakPages);
     }
 
     [Fact]
@@ -60,6 +80,7 @@ public sealed class ManagedPdfGuideLoaderTests
 
         PdfGuideLoaded loaded = Assert.IsType<PdfGuideLoaded>(await LoadAsync(harness, guide));
         loaded.Text.Dispose();
+        loaded.Search.Dispose();
     }
 
     [Fact]
@@ -72,6 +93,7 @@ public sealed class ManagedPdfGuideLoaderTests
         Assert.Throws<IOException>(() => File.Delete(loaded.FilePath));
 
         loaded.Text.Dispose();
+        loaded.Search.Dispose();
 
         File.Delete(loaded.FilePath);
     }
@@ -208,9 +230,11 @@ public sealed class ManagedPdfGuideLoaderTests
         PdfGuideLoaded loaded = Assert.IsType<PdfGuideLoaded>(
             await Loader(harness).LoadAsync(guide, "guide", CancellationToken.None));
         using PdfPageTextSource text = loaded.Text;
+        using PdfPageTextSource search = loaded.Search;
 
         Assert.Equal(1, text.PageCount);
         Assert.Contains("Locked guide secret page", (await text.GetPageTextAsync(0, CancellationToken.None)).Text);
+        Assert.Contains("Locked guide secret page", (await search.GetPageTextAsync(0, CancellationToken.None)).Text);
     }
 
     [Fact]
@@ -271,6 +295,7 @@ public sealed class ManagedPdfGuideLoaderTests
 
         PdfGuideLoaded loaded = Assert.IsType<PdfGuideLoaded>(await LoadAsync(harness, guide));
         using PdfPageTextSource text = loaded.Text;
+        using PdfPageTextSource search = loaded.Search;
 
         string expected = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(ManagedFile(harness, guide))));
         Assert.Equal(expected, loaded.ContentSha256);
@@ -288,6 +313,7 @@ public sealed class ManagedPdfGuideLoaderTests
 
         PdfGuideLoaded loaded = Assert.IsType<PdfGuideLoaded>(await LoadAsync(harness, guide));
         using PdfPageTextSource text = loaded.Text;
+        using PdfPageTextSource search = loaded.Search;
 
         Assert.NotEqual(guide.ContentSha256, loaded.ContentSha256, StringComparer.OrdinalIgnoreCase);
         Assert.Equal(1, text.PageCount);

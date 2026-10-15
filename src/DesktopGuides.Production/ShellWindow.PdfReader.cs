@@ -40,8 +40,12 @@ public sealed partial class ShellWindow
         }
         if (generation != renderGeneration)
         {
-            // No session owns the text source yet.
-            (load as PdfGuideLoaded)?.Text.Dispose();
+            // No session owns the text sources yet.
+            if (load is PdfGuideLoaded abandoned)
+            {
+                abandoned.Text.Dispose();
+                abandoned.Search.Dispose();
+            }
             return false;
         }
         if (load is PdfGuideLoadFailed failed)

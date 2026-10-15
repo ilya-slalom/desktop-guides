@@ -8,7 +8,10 @@ using UglyToad.PdfPig.Exceptions;
 namespace DesktopGuides.Infrastructure.Reading;
 
 public abstract record PdfGuideLoad;
-public sealed record PdfGuideLoaded(string FilePath, PdfPageTextSource Text, string ContentSha256) : PdfGuideLoad;
+// T18.1: Search reads its own document, so a scan never competes with the
+// page shown or evicts its cache.
+public sealed record PdfGuideLoaded(
+    string FilePath, PdfPageTextSource Text, PdfPageTextSource Search, string ContentSha256) : PdfGuideLoad;
 public sealed record PdfGuideLoadFailed(PdfGuideLoadError Error) : PdfGuideLoad;
 
 /// <summary>
@@ -97,7 +100,28 @@ public sealed class ManagedPdfGuideLoader(ManagedPathResolver paths)
                 text.Dispose();
                 return Failed(PdfGuideLoadError.Damaged);
             }
-            return new PdfGuideLoaded(path, text, contentSha256);
+            // The password opens both documents now and isn't kept.
+            PdfPageTextSource search;
+            try
+            {
+                FileStream searchFile = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+                try
+                {
+                    search = PdfPageTextSource.Open(searchFile, token, password, maxPages: 1);
+                }
+                catch
+                {
+                    searchFile.Dispose();
+                    throw;
+                }
+            }
+            catch
+            {
+                // Disposes file too; the catches below dispose it again, which is harmless.
+                text.Dispose();
+                throw;
+            }
+            return new PdfGuideLoaded(path, text, search, contentSha256);
         }
         catch (PdfDocumentEncryptedException)
         {

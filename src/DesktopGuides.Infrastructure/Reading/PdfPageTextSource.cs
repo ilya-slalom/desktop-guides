@@ -17,7 +17,7 @@ public sealed class PdfPageTextException(int pageIndex, Exception inner)
 /// thread-safe, so one extraction runs at a time; recently read pages are
 /// kept within page and character limits.
 /// </summary>
-public sealed class PdfPageTextSource : IDisposable
+public sealed class PdfPageTextSource : IPdfPageTextReader, IDisposable
 {
     public const int DefaultMaxPageCharacters = 1_048_576;
     public const int DefaultMaxPages = 8;
