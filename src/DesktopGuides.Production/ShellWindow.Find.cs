@@ -80,13 +80,19 @@ public sealed partial class ShellWindow
             return;
         }
         findCancel?.Cancel();
-        findCancel = new CancellationTokenSource();
+        CancellationTokenSource cancel = new();
+        findCancel = cancel;
         FindResult result;
         try
         {
-            result = await findable.FindAsync(query, direction, findCancel.Token);
+            result = await findable.FindAsync(query, direction, cancel.Token);
         }
         catch (OperationCanceledException)
+        {
+            return;
+        }
+        // Closed, superseded or left while the step ran: its result is stale.
+        if (!ReferenceEquals(cancel, findCancel) || !ReferenceEquals(findable, readerSession))
         {
             return;
         }

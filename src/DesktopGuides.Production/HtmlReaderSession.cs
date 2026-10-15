@@ -469,7 +469,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
                 await RunScriptAsync(HtmlFindScripts.Clear);
                 return FindResult.None;
             }
-            return await ShowMatchAsync(matches[index])
+            return await ShowMatchAsync(matches[index], token)
                 ? new FindResult(FindOutcome.Found, index + 1, matches.Count, false, 0)
                 : FindResult.Failure;
         }
@@ -481,19 +481,19 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
     }
 
     // A resize or a restyle during the step reflowed the page: show the
-    // match again once it settles, as a restore does.
-    private async Task<bool> ShowMatchAsync(TextMatch match)
+    // match again once it settles, as a restore does. Closing the bar is
+    // itself a resize, so a cancelled step never shows its match again.
+    private async Task<bool> ShowMatchAsync(TextMatch match, CancellationToken token)
     {
         string script = HtmlFindScripts.Show(match.Start, match.Length);
-        if (delayFindForTest) await Task.Delay(TimeSpan.FromSeconds(2));
+        if (delayFindForTest) await Task.Delay(TimeSpan.FromSeconds(2), token);
         int started = generation;
-        if (await RunScriptAsync(script) != "true") return false;
-        findHighlighted = true;
+        if (!await ShowOnceAsync(script, token)) return false;
         while (started != generation && !disposed)
         {
             started = generation;
-            await Task.Delay(ResizeSettle);
-            if (await RunScriptAsync(script) != "true") return false;
+            await Task.Delay(ResizeSettle, token);
+            if (!await ShowOnceAsync(script, token)) return false;
         }
         HtmlScroll? scroll = HtmlLocationRules.ParseScroll(await RunScriptAsync(HtmlPositionScripts.ReadScroll));
         HtmlCapture? capture = await CaptureAsync();
@@ -504,6 +504,20 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
             current = capture;
             WritePositionForTest();
         }
+        return true;
+    }
+
+    // A bar closed while the script ran takes the highlight back off.
+    private async Task<bool> ShowOnceAsync(string script, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (await RunScriptAsync(script) != "true") return false;
+        if (token.IsCancellationRequested)
+        {
+            await RunScriptAsync(HtmlFindScripts.Clear);
+            token.ThrowIfCancellationRequested();
+        }
+        findHighlighted = true;
         return true;
     }
 
