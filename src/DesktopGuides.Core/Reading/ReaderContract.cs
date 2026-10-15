@@ -13,7 +13,8 @@ public enum ReaderCapabilities
     Zoom = 16,
     TextSize = 32,
     Find = 64,
-    SelectableText = 128
+    SelectableText = 128,
+    Outline = 256
 }
 
 public enum ReaderCommand
@@ -25,7 +26,8 @@ public enum ReaderCommand
     FitWidth,
     Zoom,
     TextSize,
-    Find
+    Find,
+    Contents
 }
 
 public abstract record ReaderAction(ReaderCommand Command);
@@ -71,7 +73,8 @@ public static class ReaderCommandPolicy
         (ReaderCommand.FitWidth, ReaderCapabilities.FitWidth),
         (ReaderCommand.Zoom, ReaderCapabilities.Zoom),
         (ReaderCommand.TextSize, ReaderCapabilities.TextSize),
-        (ReaderCommand.Find, ReaderCapabilities.Find)
+        (ReaderCommand.Find, ReaderCapabilities.Find),
+        (ReaderCommand.Contents, ReaderCapabilities.Outline)
     ];
 
     public static IReadOnlyList<ReaderCommand> VisibleCommands(IReaderSession session) =>
