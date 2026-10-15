@@ -4407,9 +4407,9 @@ try {
                 $start = Wait-HtmlPosition { param($p) $p.locator } 'a first capture'
                 Start-Sleep -Seconds 2
                 $baseline = Read-Saves
-                # The keyboard in the page: Ctrl+F must still reach the shell.
-                Click-Element (Wait-PageVisible 'Form-wrapped introduction text.')
-                [System.Windows.Forms.SendKeys]::SendWait('^f')
+                # The toolbar's menu item. Ctrl+F from inside the page never
+                # reaches the shell (#115); find-html-text uses Ctrl+F.
+                Invoke-OverflowCommand 'Find in guide'
                 [void](Wait-VisibleById 'ReaderFindBar')
                 Wait-FocusedId 'FindQueryInput'
                 # Typed and sent at once: the step lands inside the bar's own resize.
