@@ -25,13 +25,18 @@ internal static class HtmlOutlineScripts
             firstText.set(p, w.starts[i] + lead);
           }
         }
-        // An empty anchor (<a id="forest"></a>) leads to the text after it.
+        // An empty anchor (<a name="forest"></a>) leads to the text after it.
+        // The walk is in document order, so a binary search finds the first
+        // node after the anchor; a scan per anchor would be quadratic.
         const followingText = (element) => {
-          for (let i = 0; i < w.nodes.length; i++) {
+          let lo = 0, hi = w.nodes.length;
+          while (lo < hi) {
+            const mid = (lo + hi) >> 1;
+            if (positionOf.call(element, w.nodes[mid]) & Node.DOCUMENT_POSITION_FOLLOWING) hi = mid; else lo = mid + 1;
+          }
+          for (let i = lo; i < w.nodes.length; i++) {
             const lead = dataOf.call(w.nodes[i]).search(/\S/);
-            if (lead >= 0 && (positionOf.call(element, w.nodes[i]) & Node.DOCUMENT_POSITION_FOLLOWING)) {
-              return w.starts[i] + lead;
-            }
+            if (lead >= 0) return w.starts[i] + lead;
           }
           return -1;
         };
@@ -46,9 +51,17 @@ internal static class HtmlOutlineScripts
           const height = heightOf.call(scrollingOf.call(document));
           return height > 0 ? Math.min(1, Math.max(0, (elementRect.call(element).top + scrollY) / height)) : 0;
         };
+        const offsetOf = (element) => firstText.has(element) ? firstText.get(element) : followingText(element);
+        // The cut must not leave half a surrogate pair.
+        const quoteAt = (offset) => {
+          let quote = slice(w, offset, 160);
+          const last = quote.charCodeAt(quote.length - 1);
+          if (last >= 0xD800 && last <= 0xDBFF) quote = quote.substring(0, quote.length - 1);
+          return quote;
+        };
         const place = (element) => {
-          const offset = firstText.has(element) ? firstText.get(element) : followingText(element);
-          return offset < 0 ? null : { offset, quote: slice(w, offset, 160), id: idNear(element), fraction: fractionOf(element) };
+          const offset = offsetOf(element);
+          return offset < 0 ? null : { offset, quote: quoteAt(offset), id: idNear(element), fraction: fractionOf(element) };
         };
         const headings = [];
         for (const heading of all('h1,h2,h3,h4,h5,h6')) {
@@ -75,7 +88,8 @@ internal static class HtmlOutlineScripts
           if (!containers.has(container)) containers.set(container, containers.size);
           const target = Document.prototype.getElementById.call(document, id) ||
             all('a[name="' + CSS.escape(id) + '"]')[0] || null;
-          links.push({ text: String(textOf.call(link)), container: containers.get(container),
+          // The link's own place: a contents list leads further down the page.
+          links.push({ text: String(textOf.call(link)), offset: offsetOf(link), container: containers.get(container),
             depth: Math.max(1, depth), target: target ? place(target) : null });
         }
         return { headings, links };

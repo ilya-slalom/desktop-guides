@@ -16,8 +16,9 @@ public sealed class HtmlOutlineRulesTests
     private static object Heading(int level, string text, int offset) =>
         new { level, text, offset, quote = $"{text} text", id = text.ToLowerInvariant(), fraction = offset / 10_000.0 };
 
-    private static object Link(string text, int container, int depth, int? target) =>
-        new { text, container, depth, target = target is int at ? Place(at, text.ToLowerInvariant()) : null };
+    // A contents list sits before what it links to: offset 0 unless given.
+    private static object Link(string text, int container, int depth, int? target, int offset = 0) =>
+        new { text, offset, container, depth, target = target is int at ? Place(at, text.ToLowerInvariant()) : null };
 
     private static Outline Build(object[] headings, object[] links) =>
         HtmlOutlineRules.Build(JsonSerializer.Serialize(new { headings, links }, TestJson.Options), Sha, Path);
@@ -81,4 +82,28 @@ public sealed class HtmlOutlineRulesTests
 
     [Fact]
     public void NothingFoundIsNoOutline() => Assert.Same(Outline.Empty, Build([], []));
+
+    // Final review: a references or footnote list points back up to its
+    // citations, so it never stands in for the contents.
+    [Fact]
+    public void AListAfterItsTargetsIsNotTheContents() =>
+        Assert.Equal(["Forest", "Castle"], Build([Heading(2, "Forest", 100), Heading(2, "Castle", 200)],
+            [Link("^", 0, 1, 110, offset: 9000), Link("^", 0, 1, 120, offset: 9010),
+             Link("^", 0, 1, 130, offset: 9020), Link("^", 0, 1, 140, offset: 9030)]).Entries.Select(e => e.Title));
+
+    [Fact]
+    public void LinksToOneTargetCountOnce() =>
+        Assert.Equal(["Forest", "Castle"], Build([Heading(2, "Forest", 100), Heading(2, "Castle", 200)],
+            [Link("Next", 0, 1, 500), Link("Next", 0, 1, 500), Link("Next", 0, 1, 500)]).Entries.Select(e => e.Title));
+
+    [Fact]
+    public void AQuoteCutThroughASurrogateKeepsTheEntry()
+    {
+        const string json = """{"headings":[{"level":2,"text":"Forest","offset":100,"quote":"Forest \ud83d","id":"forest","fraction":0.1}],"links":[]}""";
+
+        OutlineEntry entry = Assert.Single(HtmlOutlineRules.Build(json, Sha, Path).Entries);
+
+        Assert.Equal("Forest", entry.Title);
+        Assert.Equal(100, Assert.IsType<HtmlPosition>(entry.Location.Payload).TextOffset);
+    }
 }
