@@ -54,7 +54,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
     private readonly TaskCompletionSource<bool> entryLoad = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly SemaphoreSlim restoreTurn = new(1, 1);
     private readonly bool delayImagesForTest;
-    // Test gate only: each find step waits 1 s before it shows its match.
+    // Test gate only: each find step waits 2 s before it shows its match.
     private readonly bool delayFindForTest;
     private bool restoring;
     private RestoreOutcome? lastOutcome;
@@ -485,7 +485,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
     private async Task<bool> ShowMatchAsync(TextMatch match)
     {
         string script = HtmlFindScripts.Show(match.Start, match.Length);
-        if (delayFindForTest) await Task.Delay(TimeSpan.FromSeconds(1));
+        if (delayFindForTest) await Task.Delay(TimeSpan.FromSeconds(2));
         int started = generation;
         if (await RunScriptAsync(script) != "true") return false;
         findHighlighted = true;

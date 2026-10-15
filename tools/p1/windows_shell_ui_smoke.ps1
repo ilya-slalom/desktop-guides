@@ -4502,8 +4502,9 @@ try {
             }
             elseif ($Mode -eq 'find-html-close') {
                 # A step still running when the bar closes must draw nothing
-                # and move nothing. Each step waits 1 s before it shows its
-                # match, so Escape lands inside it.
+                # and move nothing. Each step waits 2 s before it shows its
+                # match; Escape 1 s after Enter lands inside that wait, after
+                # the text read and the matching.
                 $delay = [System.Threading.EventWaitHandle]::new(
                     $false, [System.Threading.EventResetMode]::ManualReset,
                     "Local\$EventPrefix.HtmlFindDelay.$ProcessId")
@@ -4516,9 +4517,11 @@ try {
                     [System.Windows.Forms.SendKeys]::SendWait('^f')
                     [void](Wait-VisibleById 'ReaderFindBar')
                     Wait-FocusedId 'FindQueryInput'
-                    [System.Windows.Forms.SendKeys]::SendWait('mark-1500 step{ENTER}{ESC}')
+                    [System.Windows.Forms.SendKeys]::SendWait('mark-1500 step{ENTER}')
+                    Start-Sleep -Seconds 1
+                    [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
                     Wait-HiddenById 'ReaderFindBar'
-                    # Past the delay, the show, and a re-show after the closing resize.
+                    # Past the wait, the show, and a re-show after the closing resize.
                     Start-Sleep -Seconds 3
                     $after = Wait-HtmlPosition { param($p) $p.locator } 'the place after closing mid-step'
                     $report.findHtmlCloseHighlighted = $after.findHighlighted
