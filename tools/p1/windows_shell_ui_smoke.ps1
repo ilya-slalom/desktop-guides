@@ -222,8 +222,12 @@ try {
 
     function Wait-Name([string] $id, [string] $expected) {
         $deadline = (Get-Date).AddSeconds(15)
+        $seen = 'no element'
         do {
             $element = Find-ById $id
+            if ($element) {
+                try { $seen = "'$($element.Current.Name)'" } catch { $seen = 'an element that went away' }
+            }
             if ($element -and $element.Current.Name -eq $expected -and
                 -not $element.Current.IsOffscreen) {
                 return $element
@@ -233,7 +237,11 @@ try {
             }
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
-        throw "Expected visible '$id' named '$expected'."
+        $focus = try {
+            $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+            "'$($focused.Current.AutomationId)' ($($focused.Current.ControlType.ProgrammaticName), '$($focused.Current.Name)')"
+        } catch { 'unreadable' }
+        throw "Expected visible '$id' named '$expected'; last saw $seen, with focus on $focus."
     }
 
     # A transient status takes rows from the content until it closes itself,
