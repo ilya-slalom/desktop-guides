@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-unsupported',
+        'find-txt', 'find-back', 'find-unsupported', 'find-html', 'find-html-text',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -1557,7 +1557,7 @@ try {
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-unsupported',
+        'find-txt', 'find-back', 'find-unsupported', 'find-html', 'find-html-text',
         'workflow-pdf-exit')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
@@ -4301,6 +4301,28 @@ try {
         elseif ($Mode -like 'find-*') {
             # T18.1: in-guide search. Searching must never save the reading place.
             function Read-Saves { return [int] (Read-ProgressCounts).saves }
+            # The MARK number of the page's top line, within a range.
+            function Wait-TopMarkBetween([int] $low, [int] $high, [string] $step) {
+                $deadline = (Get-Date).AddSeconds(10)
+                $seen = 'nothing'
+                do {
+                    $line = Get-PageTopLine
+                    if ($line -match '^MARK-(\d{4})\b') {
+                        $seen = [int] $Matches[1]
+                        if ($seen -ge $low -and $seen -le $high) { return $seen }
+                    }
+                    Start-Sleep -Milliseconds 250
+                } while ((Get-Date) -lt $deadline)
+                [void](Save-WindowScreenshot 'find-top-mark')
+                throw "After $step the top line was MARK-$seen; expected MARK-$low to MARK-$high."
+            }
+            function Find-Count([string] $query, [string] $expected) {
+                (Get-SearchPattern 'FindQueryInput').SetValue($query)
+                (Wait-VisibleById 'FindQueryInput').SetFocus()
+                Wait-FocusedId 'FindQueryInput'
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                [void](Wait-Name 'FindCount' $expected)
+            }
 
             [void](Wait-Name 'LibraryHeading' 'Library')
             Resize-ShellWindow 1500 720
@@ -4377,9 +4399,89 @@ try {
                 [void](Wait-Name 'GameHeading' $textGame)
                 $report.phases += 'find-back'
             }
-            elseif ($Mode -eq 'find-unsupported') {
-                # HTML search arrives in T18.1 PR b; until then Ctrl+F says so.
+            elseif ($Mode -eq 'find-html') {
                 Open-TextGuide 'Long Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-PageName 'Long Web Guide')
+                $start = Wait-HtmlPosition { param($p) $p.locator } 'a first capture'
+                Start-Sleep -Seconds 2
+                $baseline = Read-Saves
+                # The keyboard in the page: Ctrl+F must still reach the shell.
+                Click-Element (Wait-PageVisible 'Form-wrapped introduction text.')
+                [System.Windows.Forms.SendKeys]::SendWait('^f')
+                [void](Wait-VisibleById 'ReaderFindBar')
+                Wait-FocusedId 'FindQueryInput'
+                # Typed and sent at once: the step lands inside the bar's own resize.
+                [System.Windows.Forms.SendKeys]::SendWait('mark-1500 step{ENTER}')
+                [void](Wait-Name 'FindCount' '1 of 1')
+                $report.findHtmlTopMark = Wait-TopMarkBetween 1480 1500 'finding MARK-1500'
+                [void](Wait-HtmlPosition { param($p) $p.offset -gt $start.offset } 'the point following the match')
+                Invoke-Element (Wait-VisibleById 'FindBackButton')
+                [void](Wait-HtmlPosition { param($p) $p.offset -eq $start.offset } 'the place the bar opened at')
+                Find-Count 'keep left at the fork' '1 of 2997'
+                [System.Windows.Forms.SendKeys]::SendWait('{F3}')
+                [void](Wait-Name 'FindCount' '2 of 2997')
+                [System.Windows.Forms.SendKeys]::SendWait('+{F3}')
+                [void](Wait-Name 'FindCount' '1 of 2997')
+                [System.Windows.Forms.SendKeys]::SendWait('+{F3}')
+                [void](Wait-Name 'FindCount' '2997 of 2997')
+                [void](Wait-TopMarkBetween 2950 3000 'wrapping to the last match')
+                # Across nested spans and a line break: MARK-0420 is "the target line."
+                Find-Count 'TARGET LINE.   mark-0421 step' '1 of 1'
+                $beforeClose = Wait-TopMarkBetween 400 421 'finding MARK-0421 across lines'
+                $report.findHtmlScreenshot = Save-WindowScreenshot 'find-html'
+                [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                Wait-HiddenById 'ReaderFindBar'
+                # Past the 300 ms settle and the re-apply: the match stays in view.
+                Start-Sleep -Seconds 1
+                [void](Wait-TopMarkBetween ($beforeClose - 2) ($beforeClose + 2) 'closing the find bar')
+                # Longer than the 1 s quiet timer and the 4 s deadline.
+                Start-Sleep -Seconds 5
+                $afterSearch = Read-Saves
+                if ($afterSearch -ne $baseline) {
+                    throw "Searching saved the place: saves went from $baseline to $afterSearch."
+                }
+                $report.findHtmlSavedNothing = $true
+                # Into the page, on the line on top, then a real scroll.
+                Click-Element (Wait-PageVisible (Get-PageTopLine))
+                [System.Windows.Forms.SendKeys]::SendWait('{PGDN}')
+                $deadline = (Get-Date).AddSeconds(8)
+                do {
+                    Start-Sleep -Milliseconds 250
+                    $afterMove = Read-Saves
+                } while ($afterMove -le $baseline -and (Get-Date) -lt $deadline)
+                if ($afterMove -le $baseline) { throw 'After closing the find bar, scrolling saved nothing.' }
+                $report.phases += 'find-html'
+            }
+            elseif ($Mode -eq 'find-html-text') {
+                Open-TextGuide 'Search Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-PageName 'Search Web Guide')
+                [System.Windows.Forms.SendKeys]::SendWait('^f')
+                [void](Wait-VisibleById 'ReaderFindBar')
+                $report.findHtmlText = [ordered]@{}
+                foreach ($case in @(
+                    @{ query = 'boss hydra'; count = '1 of 1'; rule = 'table cells read as separate words' },
+                    @{ query = 'sshy'; count = 'No matches'; rule = 'cells never join into one word' },
+                    @{ query = 'line one line two'; count = '1 of 1'; rule = 'a <br> reads as a space' },
+                    @{ query = 'HYDRA'; count = '1 of 2'; rule = 'case, and a word split by <b>' },
+                    @{ query = 'secret phrase'; count = 'No matches'; rule = 'display:none text' },
+                    @{ query = 'ghost words'; count = 'No matches'; rule = 'visibility:hidden text' },
+                    @{ query = 'iron key'; count = '1 of 1'; rule = 'a no-break space' },
+                    @{ query = 'moon key'; count = '1 of 1'; rule = 'a match inside a scrolling form' })) {
+                    Find-Count $case.query $case.count
+                    $report.findHtmlText[$case.query] = $case.count
+                }
+                # The scroll box scrolled to the match, through the shadowed scrollTop.
+                [void](Wait-PageVisible 'Deep in the scroll box lies the moon key.')
+                $report.findHtmlTextScreenshot = Save-WindowScreenshot 'find-html-text'
+                $report.phases += 'find-html-text'
+            }
+            elseif ($Mode -eq 'find-unsupported') {
+                # PDF search arrives in T18.1 PR c; until then Ctrl+F says so.
+                Open-TextGuide 'Long PDF Guide'
                 [void](Wait-Status 'Guide ready.')
                 [System.Windows.Forms.SendKeys]::SendWait('^f')
                 [void](Wait-Status "Search isn't available for this guide.")

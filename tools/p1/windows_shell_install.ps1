@@ -1714,6 +1714,7 @@ function Run-PdfReaderScenarios {
 function Run-NavigationScenarios {
     $fixtureRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
     Invoke-ShellSeed @('seed-progress', $dataRoot, $fixtureRoot) | Out-Null
+    Invoke-ShellSeed @('seed-find', $dataRoot, $fixtureRoot) | Out-Null
     $estimateOf = {
         param([string] $title)
         @(Invoke-ShellSeed @('describe-progress', $dataRoot) | ConvertFrom-Json |
@@ -1731,14 +1732,25 @@ function Run-NavigationScenarios {
         throw 'Leaving the guide with the find bar open stored a place.'
     }
 
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.findHtml = Invoke-ProgressPass 'find-html' 0 -HtmlPosition
+    if ($null -eq (& $estimateOf 'Long Web Guide')) {
+        throw 'After closing the find bar and scrolling, no HTML place was stored.'
+    }
+
+    $report.findHtmlText = Invoke-ProgressPass 'find-html-text' 0
+
     $report.findUnsupported = Invoke-ProgressPass 'find-unsupported' 0
 }
 
-function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $Kill, [string] $resultName = $mode) {
+function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $Kill, [string] $resultName = $mode,
+    [switch] $HtmlPosition) {
     Start-InstalledShell
     $processId = $report.launchedProcessId
+    $names = @('ProgressDiagnostics', 'ProgressOverride')
+    if ($HtmlPosition) { $names += 'HtmlPosition' }
     $gates = @(
-        foreach ($name in @('ProgressDiagnostics', 'ProgressOverride')) {
+        foreach ($name in $names) {
             [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::ManualReset,
                 "Local\$eventPrefix.$name.$processId")

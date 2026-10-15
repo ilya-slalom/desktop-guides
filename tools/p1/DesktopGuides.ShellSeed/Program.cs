@@ -731,6 +731,25 @@ if (args.Length == 3 && args[0] == "seed-progress")
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "seed-find")
+{
+    // T18.1 PR b: the HTML search fixture, in seed-progress's game.
+    ManagedPathResolver findPaths = new(args[1]);
+    await using SqliteLibraryRepository findRepository = new(findPaths);
+    await findRepository.InitializeAsync();
+    Game findGame = (await findRepository.ListGamesAsync()).Single(game => game.Title == "Progress Game");
+    string fixture = Path.Combine(Path.GetFullPath(args[2]), "p2", "html-find", "guide.html");
+    ImportInspection inspection = await new GuideImportValidator().InspectAsync(fixture, CancellationToken.None);
+    if (inspection is not ImportReady ready)
+    {
+        throw new InvalidOperationException($"The html-find fixture failed the import preview: {inspection}.");
+    }
+    Guid search = await new GuideImportPublisher(findRepository, findPaths).PublishAsync(
+        ready.Manifest, findGame.Id, "Search Web Guide", false, null, CancellationToken.None);
+    Console.WriteLine(JsonSerializer.Serialize(new { search = search.ToString("N") }));
+    return 0;
+}
+
 if (args.Length == 3 && args[0] == "seed-text-size")
 {
     // T14.1: two TXT guides, an HTML guide and a PDF guide in one game.
@@ -1045,7 +1064,7 @@ if (args.Length != 2 ||
         "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-search|seed-import|seed-actions|seed-navigation " +
         "<app-data-root> " +
         "or seed-linked-game|describe-providers|describe-import|describe-actions|describe-progress|describe-theme <app-data-root> " +
-        "or seed-txt-reader|seed-html-reader|seed-html-position|seed-html-theme|seed-pdf-reader|seed-progress <app-data-root> <fixtures-root> " +
+        "or seed-txt-reader|seed-html-reader|seed-html-position|seed-html-theme|seed-pdf-reader|seed-progress|seed-find <app-data-root> <fixtures-root> " +
         "or set-html-appearance <app-data-root> <guide-id> <System|Light|Dark> <scale|default> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
         "or invalidate-blocked-guide <app-data-root> " +
