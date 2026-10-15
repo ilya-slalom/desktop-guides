@@ -771,10 +771,22 @@ if (args.Length == 3 && args[0] == "seed-find")
     }
     Guid sections = await findPublisher.PublishAsync(
         sectionsReady.Manifest, findGame.Id, "Sections Guide", false, null, CancellationToken.None);
+    // T18.2 PR b: a page whose own contents list wins, and a PDF outline.
+    async Task<Guid> PublishFindAsync(string relative, string title)
+    {
+        string path = Path.Combine(Path.GetFullPath(args[2]), relative);
+        if (await new GuideImportValidator().InspectAsync(path, CancellationToken.None) is not ImportReady found)
+        {
+            throw new InvalidOperationException($"The {relative} fixture failed the import preview.");
+        }
+        return await findPublisher.PublishAsync(found.Manifest, findGame.Id, title, false, null, CancellationToken.None);
+    }
+    Guid contentsWeb = await PublishFindAsync(Path.Combine("p2", "html-contents", "guide.html"), "Contents Web Guide");
+    Guid outlinePdf = await PublishFindAsync(Path.Combine("p0", "generated", "pdf-outline.pdf"), "Outline PDF Guide");
     Console.WriteLine(JsonSerializer.Serialize(new
     {
         search = search.ToString("N"), scanned = scanned.ToString("N"), lines = lines.ToString("N"),
-        sections = sections.ToString("N")
+        sections = sections.ToString("N"), contentsWeb = contentsWeb.ToString("N"), outlinePdf = outlinePdf.ToString("N")
     }));
     return 0;
 }
