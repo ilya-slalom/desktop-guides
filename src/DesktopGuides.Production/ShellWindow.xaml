@@ -556,8 +556,24 @@
                              AutomationProperties.AutomationId="ReaderUnavailableLinkBar" />
                 </StackPanel>
 
+                <!-- T18.2: the Contents pane beside the guide; below 720 px it
+                     covers the guide instead (ShellWindow.Contents.cs). -->
+                <Grid x:Name="ReaderBody" Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                <Border x:Name="ReaderContentsHost"
+                        Width="300"
+                        Margin="0,0,12,0"
+                        HorizontalAlignment="Left"
+                        Visibility="Collapsed"
+                        Style="{StaticResource DesktopGuidesElevatedSurfaceStyle}"
+                        AutomationProperties.AutomationId="ReaderContentsHost">
+                    <local:ContentsPane x:Name="ReaderContents" />
+                </Border>
                 <Border x:Name="ReaderSurfaceCard"
-                        Grid.Row="2"
+                        Grid.Column="1"
                         Style="{StaticResource DesktopGuidesElevatedSurfaceStyle}"
                         Background="{ThemeResource DesktopGuidesReadingSurfaceBrush}">
                     <Grid>
@@ -648,6 +664,7 @@
                                         VerticalContentAlignment="Stretch" />
                     </Grid>
                 </Border>
+                </Grid>
             </Grid>
 
             <Grid x:Name="SettingsPanel"
