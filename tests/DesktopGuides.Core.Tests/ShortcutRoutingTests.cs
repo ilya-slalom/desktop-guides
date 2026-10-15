@@ -136,4 +136,15 @@ public sealed class ShortcutRoutingTests
         Assert.Equal(ShortcutDecision.Ignore,
             ShortcutRouting.Resolve(ShortcutCommand.FocusLibrarySearch, Reader, false, false));
     }
+
+    [Fact]
+    public void ShowContentsRunsOnlyInTheReader()
+    {
+        Assert.Equal(ShortcutDecision.Run,
+            ShortcutRouting.Resolve(ShortcutCommand.ShowContents, Reader, textInputFocused: true, dialogOpen: false));
+        Assert.Equal(ShortcutDecision.Ignore,
+            ShortcutRouting.Resolve(ShortcutCommand.ShowContents, Library, textInputFocused: false, dialogOpen: false));
+        Assert.Equal(ShortcutDecision.Ignore,
+            ShortcutRouting.Resolve(ShortcutCommand.ShowContents, Reader, textInputFocused: false, dialogOpen: true));
+    }
 }

@@ -25,6 +25,7 @@ public sealed class KeyboardShortcutsTests
                 (ShortcutContext.Reader, "Ctrl+F", ShortcutCommand.FindInGuide, "Search in the guide"),
                 (ShortcutContext.Reader, "F3", ShortcutCommand.FindNext, "Next match"),
                 (ShortcutContext.Reader, "Shift+F3", ShortcutCommand.FindPrevious, "Previous match"),
+                (ShortcutContext.Reader, "Ctrl+Shift+C", ShortcutCommand.ShowContents, "Show contents"),
                 (ShortcutContext.Dialog, "Esc", ShortcutCommand.CloseDialog, "Close the dialog"),
             ],
             KeyboardShortcuts.All.Select(s => (s.Context, s.Keys, s.Command, s.Description)));
