@@ -1,11 +1,12 @@
 using System.Text.Json;
+using DesktopGuides.Core.Reading;
 
 namespace DesktopGuides.Core.Html;
 
 /// <summary>
 /// T18.1: an HTML page's searchable text, as the find script reads it: the
 /// position walk's text, so offsets are locator offsets. Hidden text is
-/// masked with NUL, which no query contains; breaks are block edges.
+/// masked, and the matcher skips it, as it renders; breaks are block edges.
 /// </summary>
 public sealed record HtmlFindText(string Text, IReadOnlyList<int> Breaks)
 {
@@ -43,7 +44,7 @@ public sealed record HtmlFindText(string Text, IReadOnlyList<int> Breaks)
                 {
                     return null;
                 }
-                Array.Fill(text, '\0', start, end - start);
+                Array.Fill(text, TextMatcher.Masked, start, end - start);
             }
             return new HtmlFindText(new string(text), breaks);
         }

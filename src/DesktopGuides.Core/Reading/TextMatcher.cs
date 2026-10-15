@@ -9,6 +9,9 @@ public readonly record struct TextMatch(int Start, int Length);
 public static class TextMatcher
 {
     public const int MaxMatches = 10_000;
+    // Hidden HTML text is masked with this; it renders as nothing, so the
+    // matcher skips it and the text either side joins.
+    public const char Masked = '\0';
 
     // breaks: ascending offsets of block edges (HTML cells, <br>), read as spaces.
     public static IReadOnlyList<TextMatch> FindAll(
@@ -37,13 +40,22 @@ public static class TextMatcher
                 }
                 nextBreak++;
             }
+            if (text[index] == Masked)
+            {
+                index++;
+                continue;
+            }
             if (char.IsWhiteSpace(text[index]))
             {
                 int runStart = index;
                 while (index < text.Length && char.IsWhiteSpace(text[index])) index++;
-                folded.Append(' ');
-                starts.Add(runStart);
-                ends.Add(index);
+                // Whitespace either side of masked text is still one space.
+                if (folded.Length == 0 || folded[^1] != ' ')
+                {
+                    folded.Append(' ');
+                    starts.Add(runStart);
+                    ends.Add(index);
+                }
             }
             else
             {

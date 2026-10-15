@@ -108,4 +108,19 @@ public sealed class TextMatcherTests
     [Fact]
     public void MaskedTextNeverMatches() =>
         Assert.Empty(TextMatcher.FindAll("A\0\0\0\0\0\0B", new FindQuery("a b")));
+
+    // Hidden HTML text is masked with NUL; it renders as nothing, so the
+    // text either side of it joins.
+    [Fact]
+    public void MaskedTextIsSkippedSoTheTextAroundItJoins()
+    {
+        const string text = "the target line.\n\0\0\0\0\0\0MARK-0421  Step";
+        TextMatch match = Assert.Single(TextMatcher.FindAll(text, new FindQuery("target line. mark-0421 step")));
+
+        Assert.Equal(new TextMatch(4, text.Length - 4), match);
+    }
+
+    [Fact]
+    public void WhitespaceEitherSideOfMaskedTextIsOneSpace() =>
+        Assert.Single(TextMatcher.FindAll("open \0\0\0 door", new FindQuery("open door")));
 }
