@@ -4726,6 +4726,12 @@ try {
                     $afterFollow = Read-Saves
                 } while ($afterFollow -le $baseline -and (Get-Date) -lt $deadline)
                 if ($afterFollow -le $baseline) { throw 'Following a contents entry saved nothing.' }
+                # Wide: the pane stays beside the guide after following. The
+                # shortcut closes it, and opens it again on the current section.
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                Wait-HiddenById 'ReaderContentsTree'
+                Assert-FocusInGuide 'closing the pane with the shortcut'
                 [System.Windows.Forms.SendKeys]::SendWait('^+c')
                 [void](Wait-VisibleById 'ReaderContentsTree')
                 Wait-ContentsSelected 'Walkthrough: Castle'
