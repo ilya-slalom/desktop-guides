@@ -1,8 +1,8 @@
 # T18.1 in-guide search: design
 
 Status: approved, 15 October 2026. PR a (the contract, TXT search and the
-find bar) is implemented on `feat/p2-t18-1-search`. PR b (HTML) and PR c
-(PDF) follow.
+find bar) merged as #113. PR b (HTML) is implemented on
+`feat/p2-t18-1-html-search`. PR c (PDF) follows.
 
 ## Intent
 
@@ -55,14 +55,24 @@ Find is already partly built:
   - **The highlight:** a `TextHighlighter` on the row's `TextBlock`,
     applied in `LineContainerChanging`. A new `TextLineView.ColumnOf(offset)`
     turns the source offset into a column, accounting for tab expansion.
-- **HTML:**
-  - **The script:** `HtmlFindScripts` reuses the Prelude's `walk()` through
-    the existing DevTools `Runtime.evaluate`. It matches the page text,
-    sets `CSS.highlights.set('dg-find', …)` without changing the DOM, and
-    scrolls the match into view, returning `{index, total}`.
-  - **The style:** `HtmlReaderStyle` gains a constant `::highlight(dg-find)`
-    rule, with a dark-theme colour.
-  - **While searching,** the 500 ms location tracker is paused.
+- **HTML** (as built; see deviations 3 and 4):
+  - **Reading the text:** `HtmlFindScripts.ReadText` reuses the Prelude's
+    `walk()` through the existing DevTools `Runtime.evaluate`. It returns
+    the walk's text, the ranges of hidden text (no box, or not
+    `visibility: visible`), and the offsets where a new block or a `<br>`
+    starts. Core's `HtmlFindText` masks the hidden text, and `TextMatcher`
+    skips it and reads each block edge as a space.
+  - **Showing a match:** `HtmlFindScripts.Show` sets
+    `CSS.highlights.set('dg-find', …)` without changing the DOM, and
+    scrolls the match a quarter of the way down, inside any scrolling box
+    first.
+  - **The style:** `HtmlReaderStyle` gains a `::highlight(dg-find)` rule for
+    each theme: `Mark` in Light, the Dark palette's mark colour in Dark,
+    and the system `Highlight` colours in High Contrast.
+  - **While a step runs,** it holds the session's restore turn, so the
+    500 ms tracker and the resize re-apply leave the page to it. The
+    captured point follows the match, and a step stops when the bar
+    closes.
 - **PDF:**
   - **The scanner:** `PdfTextScanner` (Infrastructure) opens its own PdfPig
     document over the managed file. It scans pages in order with
@@ -123,6 +133,13 @@ Find is already partly built:
    is planned as a follow-up.
 2. **The existing `FindAction` command and its prompt dialog are replaced**
    by `IFindableReader` and the find bar, rather than kept alongside them.
+3. **HTML matching runs in Core, not in the page script** (approved 15
+   October 2026). The script returns the walk's text with its block edges
+   and hidden ranges, so TXT and HTML share one matcher and its tests.
+4. **The tracker isn't paused for the whole time the bar is open**
+   (approved 15 October 2026). Each find step holds the restore turn
+   instead, so the point follows the match, and the re-apply after the
+   bar closes (a resize) keeps the match in view.
 
 ## PR a verification record
 
@@ -167,3 +184,48 @@ See the [PR a plan](t18-1-search-plan.md).
   5. **The open-twice fix has no failing test first.** The race needs two
      key presses inside the pause's await, which the installed smoke can't
      time reliably.
+
+## PR b verification record
+
+See the [PR b plan](t18-1-html-search-plan.md).
+
+- **Core,** each test failing first and then passing on the host:
+  - `TextMatcherTests`: block edges as spaces, masked text skipped, and
+    whitespace either side of masked text as one space (17 in all);
+  - `HtmlFindTextTests` (13);
+  - `HtmlReaderStyleTests`: the find rule for each theme.
+
+  The full Core suite passes, 1210/1210.
+- **Production:** it builds with 0 errors and 0 warnings, with warnings as
+  errors.
+- **Installed:** the `navigation` shard passes on both lanes, in dispatch
+  [38676788492](https://github.com/ilya-slalom/desktop-guides/actions/runs/38676788492)
+  and again after the review fix. Its modes are `find-txt`, `find-back`,
+  `find-html`, `find-html-text`, `find-html-close` and `find-unsupported`.
+  Screenshots: [find-html](evidence/ci/t18-1/find-html.png) and
+  [find-html-text](evidence/ci/t18-1/find-html-text.png).
+- **Found on the way:**
+  1. **Keys typed inside an HTML page never reach the shell.** This covers
+     Ctrl+F, F3, Escape and Alt+Left, and has been true since P1. Three
+     spike runs logged no key events at all at `ShellRoot`. It's tracked
+     as [#115](https://github.com/ilya-slalom/desktop-guides/issues/115).
+     `find-html` opens the bar from the toolbar's *Find in guide*, and
+     `find-html-text` uses Ctrl+F with the keyboard outside the page.
+  2. **Hidden text blocked a match across it.** `html-long` has a hidden
+     panel between two lines, so the matcher now skips masked text. This
+     was reproduced offline by running `ReadText` in headless Chrome with
+     scripts disabled, and feeding its reply to the C# matcher.
+- **Final review:** one Important finding, fixed. A find step still
+  running when the bar closed re-drew the highlight, could scroll the
+  page, and announced a stale result. `find-html-close`, with a test gate
+  holding the step 2 s, failed in
+  [38681152873](https://github.com/ilya-slalom/desktop-guides/actions/runs/38681152873)
+  and passes after the fix. Eleven minors are deferred and listed in the
+  PR.
+- **Rulings:**
+  1. **The click before the real scroll.** The find-html click into the page goes
+     through its left padding, because the top line's centre can sit under
+     the toolbar.
+  2. **No HTML-only matching rules.** `<noscript>` text, CSS-generated text
+     and a body that is itself the scroller follow the position walk's
+     existing limits.

@@ -7,6 +7,7 @@ namespace DesktopGuides.Production;
 // WebView2 DevTools parameters and the test gate's diagnostics files.
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(List<string>))]
+[JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(int))]
 [JsonSerializable(typeof(double))]
 [JsonSerializable(typeof(DevToolsEvaluateParams))]
@@ -18,7 +19,8 @@ internal sealed record DevToolsEvaluateParams(string Expression, bool ReturnByVa
 
 internal sealed record HtmlPositionForTest(
     string? Locator, string? Kind, string? Step, string? Reason,
-    string? AppearanceKind, string? AppearanceStep, double? AppearanceScale, int AppearanceRestores);
+    string? AppearanceKind, string? AppearanceStep, double? AppearanceScale, int AppearanceRestores,
+    bool FindHighlighted);
 
 internal sealed record ProgressCountsForTest(
     int Saves, int SkippedUnchanged, int Failures, int Opens, int OpenFailures,

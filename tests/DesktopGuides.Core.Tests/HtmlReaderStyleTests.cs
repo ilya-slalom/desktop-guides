@@ -28,7 +28,8 @@ public sealed class HtmlReaderStyleTests
     public void LightOnlySetsZeroSpecificityDefaults() =>
         Assert.Equal(
             "html { zoom: 1 !important; }\n" +
-            ":where(html) { color-scheme: light; color: #000000; }",
+            ":where(html) { color-scheme: light; color: #000000; }\n" +
+            "::highlight(dg-find) { background-color: Mark; color: MarkText; }",
             HtmlReaderStyle.Css(ReaderTheme.Light, 1.0));
 
     [Fact]
@@ -40,12 +41,16 @@ public sealed class HtmlReaderStyleTests
             "body * { background-color: transparent !important; color: inherit !important; " +
             "border-color: #5A5A5A !important; text-shadow: none !important; }\n" +
             "a:link, a:visited, a:link *, a:visited * { color: #8AB4F8 !important; }\n" +
-            "mark { background-color: #5C4B00 !important; }",
+            "mark { background-color: #5C4B00 !important; }\n" +
+            "::highlight(dg-find) { background-color: #5C4B00; color: #FFFFFF; }",
             HtmlReaderStyle.Css(ReaderTheme.Dark, 1.5));
 
     [Fact]
-    public void HighContrastOnlyScales() =>
-        Assert.Equal("html { zoom: 0.75 !important; }", HtmlReaderStyle.Css(ReaderTheme.HighContrast, 0.75));
+    public void HighContrastScalesAndUsesSystemHighlightColours() =>
+        Assert.Equal(
+            "html { zoom: 0.75 !important; }\n" +
+            "::highlight(dg-find) { background-color: Highlight; color: HighlightText; }",
+            HtmlReaderStyle.Css(ReaderTheme.HighContrast, 0.75));
 
     [Fact]
     public void CssClampsTheScale() =>

@@ -80,20 +80,29 @@ public sealed partial class ShellWindow
             return;
         }
         findCancel?.Cancel();
-        findCancel = new CancellationTokenSource();
+        CancellationTokenSource cancel = new();
+        findCancel = cancel;
         FindResult result;
         try
         {
-            result = await findable.FindAsync(query, direction, findCancel.Token);
+            result = await findable.FindAsync(query, direction, cancel.Token);
         }
         catch (OperationCanceledException)
         {
             return;
         }
+        // Closed, superseded or left while the step ran: its result is stale.
+        if (!ReferenceEquals(cancel, findCancel) || !ReferenceEquals(findable, readerSession))
+        {
+            return;
+        }
         ReaderFind.ShowResult(result, query.Text);
-        AnnounceStatus(result.Outcome == FindOutcome.Found
-            ? $"Match {result.Index} of {result.Total}{(result.TotalIsPartial ? " so far" : "")}."
-            : $"No matches for {query.Text}.");
+        AnnounceStatus(result.Outcome switch
+        {
+            FindOutcome.Found => $"Match {result.Index} of {result.Total}{(result.TotalIsPartial ? " so far" : "")}.",
+            FindOutcome.Failed => "Couldn't search this guide.",
+            _ => $"No matches for {query.Text}."
+        });
     }
 
     private async Task FindBackAsync()

@@ -31,9 +31,12 @@ public sealed partial class FindBar : UserControl
 
     public void ShowResult(FindResult result, string query)
     {
-        Count.Text = result.Outcome == FindOutcome.Found
-            ? $"{result.Index} of {result.Total}{(result.TotalIsPartial ? "+" : "")}"
-            : "No matches";
+        Count.Text = result.Outcome switch
+        {
+            FindOutcome.Found => $"{result.Index} of {result.Total}{(result.TotalIsPartial ? "+" : "")}",
+            FindOutcome.Failed => "Couldn't search this guide",
+            _ => "No matches"
+        };
     }
 
     private void QueryKeyDown(object sender, KeyRoutedEventArgs args)

@@ -9,8 +9,13 @@ public readonly record struct TextMatch(int Start, int Length);
 public static class TextMatcher
 {
     public const int MaxMatches = 10_000;
+    // Hidden HTML text is masked with this; it renders as nothing, so the
+    // matcher skips it and the text either side joins.
+    public const char Masked = '\0';
 
-    public static IReadOnlyList<TextMatch> FindAll(string text, FindQuery query, int maxMatches = MaxMatches)
+    // breaks: ascending offsets of block edges (HTML cells, <br>), read as spaces.
+    public static IReadOnlyList<TextMatch> FindAll(
+        string text, FindQuery query, int maxMatches = MaxMatches, IReadOnlyList<int>? breaks = null)
     {
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(query);
@@ -19,15 +24,38 @@ public static class TextMatcher
         List<int> starts = new(text.Length);
         List<int> ends = new(text.Length);
         int index = 0;
+        int nextBreak = 0;
         while (index < text.Length)
         {
+            // A block edge reads as a space, so two cells never join into
+            // one word. The query is trimmed, so no match starts or ends on it.
+            while (breaks is not null && nextBreak < breaks.Count && breaks[nextBreak] <= index)
+            {
+                if (breaks[nextBreak] == index && folded.Length > 0 && folded[^1] != ' ' &&
+                    !char.IsWhiteSpace(text[index]))
+                {
+                    folded.Append(' ');
+                    starts.Add(index);
+                    ends.Add(index);
+                }
+                nextBreak++;
+            }
+            if (text[index] == Masked)
+            {
+                index++;
+                continue;
+            }
             if (char.IsWhiteSpace(text[index]))
             {
                 int runStart = index;
                 while (index < text.Length && char.IsWhiteSpace(text[index])) index++;
-                folded.Append(' ');
-                starts.Add(runStart);
-                ends.Add(index);
+                // Whitespace either side of masked text is still one space.
+                if (folded.Length == 0 || folded[^1] != ' ')
+                {
+                    folded.Append(' ');
+                    starts.Add(runStart);
+                    ends.Add(index);
+                }
             }
             else
             {

@@ -21,7 +21,7 @@ internal sealed class HtmlGuideLoadException(HtmlGuideLoadError error)
 // own origin: every request is answered from the manifest rows, every
 // navigation away from the entry document is cancelled, and a click on a
 // website link is handed to the shell's bar instead of being followed.
-internal sealed class HtmlReaderSession : IReaderSession
+internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
 {
     private static int sessionCounter;
     private readonly HtmlRequestPolicy policy;
@@ -54,6 +54,8 @@ internal sealed class HtmlReaderSession : IReaderSession
     private readonly TaskCompletionSource<bool> entryLoad = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly SemaphoreSlim restoreTurn = new(1, 1);
     private readonly bool delayImagesForTest;
+    // Test gate only: each find step waits 2 s before it shows its match.
+    private readonly bool delayFindForTest;
     private bool restoring;
     private RestoreOutcome? lastOutcome;
     private HtmlRestoreStep? lastStep;
@@ -85,6 +87,7 @@ internal sealed class HtmlReaderSession : IReaderSession
         defaultPageColor = View.DefaultBackgroundColor;
         positionForTest = TestGate.IsOpen(AppLane.Current.LocalEvent("HtmlPosition", Environment.ProcessId));
         delayImagesForTest = TestGate.IsOpen(AppLane.Current.LocalEvent("HtmlAssetDelay", Environment.ProcessId));
+        delayFindForTest = TestGate.IsOpen(AppLane.Current.LocalEvent("HtmlFindDelay", Environment.ProcessId));
         tracker = View.DispatcherQueue.CreateTimer();
         tracker.Interval = TimeSpan.FromMilliseconds(500);
         tracker.IsRepeating = true;
@@ -94,7 +97,8 @@ internal sealed class HtmlReaderSession : IReaderSession
 
     public WebView2 View { get; }
     public GuideFormat Format => GuideFormat.Html;
-    public ReaderCapabilities Capabilities => ReaderCapabilities.Scroll | ReaderCapabilities.TextSize;
+    public ReaderCapabilities Capabilities =>
+        ReaderCapabilities.Scroll | ReaderCapabilities.TextSize | ReaderCapabilities.Find;
 
     // Capabilities don't change during an HTML session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
@@ -425,6 +429,111 @@ internal sealed class HtmlReaderSession : IReaderSession
         return action is TextSizeAction size
             ? ApplyAppearanceAsync(appearance with { TextScale = size.Scale }, token)
             : throw new NotSupportedException($"HTML guides don't support {action.Command}.");
+    }
+
+    // T18.1: the last query's matches over the walk's text. A find step is
+    // a restore to the match: it takes the restore turn, so the tracker and
+    // the re-apply leave the page to it, and the point follows the match.
+    // Progress is paused while the bar is open, so nothing is raised.
+    private string? findText;
+    private IReadOnlyList<TextMatch> matches = [];
+    private int? matchIndex;
+    // Test diagnostics: whether the last find script drew a match.
+    private bool findHighlighted;
+
+    public async Task<FindResult> FindAsync(FindQuery query, FindDirection direction, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (!await entryLoad.Task.WaitAsync(token) || disposed) return FindResult.Failure;
+        await restoreTurn.WaitAsync(token);
+        restoring = true;
+        try
+        {
+            if (query.Text != findText)
+            {
+                HtmlFindText? text = HtmlFindText.Parse(await RunScriptAsync(HtmlFindScripts.ReadText));
+                if (text is null)
+                {
+                    ResetFind();
+                    return FindResult.Failure;
+                }
+                matches = await Task.Run(
+                    () => TextMatcher.FindAll(text.Text, query, TextMatcher.MaxMatches, text.Breaks), token);
+                findText = query.Text;
+                matchIndex = null;
+            }
+            token.ThrowIfCancellationRequested();
+            matchIndex = TextMatcher.Step(matches, matchIndex, current?.Offset ?? 0, direction);
+            if (matchIndex is not int index)
+            {
+                await RunScriptAsync(HtmlFindScripts.Clear);
+                return FindResult.None;
+            }
+            return await ShowMatchAsync(matches[index], token)
+                ? new FindResult(FindOutcome.Found, index + 1, matches.Count, false, 0)
+                : FindResult.Failure;
+        }
+        finally
+        {
+            restoring = false;
+            restoreTurn.Release();
+        }
+    }
+
+    // A resize or a restyle during the step reflowed the page: show the
+    // match again once it settles, as a restore does. Closing the bar is
+    // itself a resize, so a cancelled step never shows its match again.
+    private async Task<bool> ShowMatchAsync(TextMatch match, CancellationToken token)
+    {
+        string script = HtmlFindScripts.Show(match.Start, match.Length);
+        if (delayFindForTest) await Task.Delay(TimeSpan.FromSeconds(2), token);
+        int started = generation;
+        if (!await ShowOnceAsync(script, token)) return false;
+        while (started != generation && !disposed)
+        {
+            started = generation;
+            await Task.Delay(ResizeSettle, token);
+            if (!await ShowOnceAsync(script, token)) return false;
+        }
+        HtmlScroll? scroll = HtmlLocationRules.ParseScroll(await RunScriptAsync(HtmlPositionScripts.ReadScroll));
+        HtmlCapture? capture = await CaptureAsync();
+        if (disposed) return false;
+        if (scroll is not null && started == generation) lastScroll = scroll;
+        if (capture is not null && capture != current)
+        {
+            current = capture;
+            WritePositionForTest();
+        }
+        return true;
+    }
+
+    // A bar closed while the script ran takes the highlight back off.
+    private async Task<bool> ShowOnceAsync(string script, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (await RunScriptAsync(script) != "true") return false;
+        if (token.IsCancellationRequested)
+        {
+            await RunScriptAsync(HtmlFindScripts.Clear);
+            token.ThrowIfCancellationRequested();
+        }
+        findHighlighted = true;
+        return true;
+    }
+
+    public void ClearFind()
+    {
+        ResetFind();
+        _ = RunScriptAsync(HtmlFindScripts.Clear);
+        findHighlighted = false;
+        WritePositionForTest();
+    }
+
+    private void ResetFind()
+    {
+        findText = null;
+        matches = [];
+        matchIndex = null;
     }
 
     // Runs a fixed host script in the entry document only. Any failure,
@@ -905,7 +1014,8 @@ internal sealed class HtmlReaderSession : IReaderSession
                     appearanceOutcome?.Kind.ToString(),
                     appearanceStep?.ToString(),
                     appearanceScale,
-                    appearanceRestores),
+                    appearanceRestores,
+                    findHighlighted),
                 ProductionJsonContext.Default.HtmlPositionForTest);
             string folder = Path.Combine(cacheRoot, "diagnostics");
             Directory.CreateDirectory(folder);

@@ -77,4 +77,50 @@ public sealed class TextMatcherTests
         Assert.Equal(2, TextMatcher.Step(matches, current: 0, fromOffset: 0, FindDirection.Previous));
         Assert.Null(TextMatcher.Step([], current: null, fromOffset: 0, FindDirection.Next));
     }
+
+    [Fact]
+    public void ABlockEdgeMatchesASpace()
+    {
+        // Two table cells, "Boss" and "Hydra", with no whitespace between.
+        TextMatch match = Assert.Single(TextMatcher.FindAll("BossHydra", new FindQuery("boss hydra"), breaks: [4]));
+
+        Assert.Equal(new TextMatch(0, 9), match);
+    }
+
+    [Fact]
+    public void ABlockEdgeSplitsWords() =>
+        Assert.Empty(TextMatcher.FindAll("BossHydra", new FindQuery("sshy"), breaks: [4]));
+
+    [Fact]
+    public void ABlockEdgeBesideWhitespaceIsOneSpace()
+    {
+        Assert.Single(TextMatcher.FindAll("Boss\nHydra", new FindQuery("boss hydra"), breaks: [4]));
+        Assert.Single(TextMatcher.FindAll("Boss\nHydra", new FindQuery("boss hydra"), breaks: [5]));
+        Assert.Single(TextMatcher.FindAll("Boss\nHydra", new FindQuery("boss hydra"), breaks: [4, 5]));
+    }
+
+    [Fact]
+    public void BreaksAtTheEdgesChangeNothing() =>
+        Assert.Equal(
+            [new TextMatch(0, 4)],
+            TextMatcher.FindAll("Boss", new FindQuery("boss"), breaks: [0, 4]));
+
+    [Fact]
+    public void MaskedTextNeverMatches() =>
+        Assert.Empty(TextMatcher.FindAll("A\0\0\0\0\0\0B", new FindQuery("a b")));
+
+    // Hidden HTML text is masked with NUL; it renders as nothing, so the
+    // text either side of it joins.
+    [Fact]
+    public void MaskedTextIsSkippedSoTheTextAroundItJoins()
+    {
+        const string text = "the target line.\n\0\0\0\0\0\0MARK-0421  Step";
+        TextMatch match = Assert.Single(TextMatcher.FindAll(text, new FindQuery("target line. mark-0421 step")));
+
+        Assert.Equal(new TextMatch(4, text.Length - 4), match);
+    }
+
+    [Fact]
+    public void WhitespaceEitherSideOfMaskedTextIsOneSpace() =>
+        Assert.Single(TextMatcher.FindAll("open \0\0\0 door", new FindQuery("open door")));
 }
