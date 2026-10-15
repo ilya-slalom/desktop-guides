@@ -557,7 +557,8 @@
                 </StackPanel>
 
                 <!-- T18.2: the Contents pane beside the guide; below 720 px it
-                     covers the guide instead (ShellWindow.Contents.cs). -->
+                     covers the guide instead (ShellWindow.Contents.cs), so its
+                     fill is the reading card's opaque one, not the translucent card fill. -->
                 <Grid x:Name="ReaderBody" Grid.Row="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -569,6 +570,7 @@
                         HorizontalAlignment="Left"
                         Visibility="Collapsed"
                         Style="{StaticResource DesktopGuidesElevatedSurfaceStyle}"
+                        Background="{ThemeResource DesktopGuidesReadingSurfaceBrush}"
                         AutomationProperties.AutomationId="ReaderContentsHost">
                     <local:ContentsPane x:Name="ReaderContents" />
                 </Border>
