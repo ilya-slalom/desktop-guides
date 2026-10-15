@@ -1760,6 +1760,8 @@ function Run-NavigationScenarios {
         throw 'Following a contents entry stored no place.'
     }
     $report.contentsNone = Invoke-ProgressPass 'contents-none' 0
+    # contents-txt left the place at Walkthrough: Castle.
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
     $report.contentsNarrow = Invoke-ProgressPass 'contents-narrow' 0
 }
 
