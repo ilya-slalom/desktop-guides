@@ -103,6 +103,8 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader
     // Capabilities don't change during an HTML session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
     public event EventHandler<LocationChangedEventArgs>? LocationChanged;
+    // T18.1: a step's result is final when it returns.
+    public event EventHandler<FindResult>? ResultUpdated { add { } remove { } }
     // T14.3: raised after a text-size change scrolled back to the place.
     public event EventHandler<AppearanceRestoredEventArgs>? AppearanceRestored;
     public event EventHandler<Uri>? ExternalLinkRequested;

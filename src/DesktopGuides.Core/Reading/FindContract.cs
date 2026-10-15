@@ -29,10 +29,17 @@ public sealed record FindResult(
 {
     public static FindResult None { get; } = new(FindOutcome.NotFound, null, 0, false, 0);
     public static FindResult Failure { get; } = new(FindOutcome.Failed, null, null, false, 0);
+
+    // 1-based numbers of pages that couldn't be read (PDF); the scan goes on.
+    public IReadOnlyList<int> UnreadablePages { get; init; } = [];
 }
 
 public interface IFindableReader
 {
     Task<FindResult> FindAsync(FindQuery query, FindDirection direction, CancellationToken token);
     void ClearFind();
+
+    // Raised when a result's totals change after the step returned, as
+    // when a PDF scan finishes.
+    event EventHandler<FindResult>? ResultUpdated;
 }

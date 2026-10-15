@@ -42,6 +42,8 @@ internal sealed class TextReaderSession : IReaderSession, IFindableReader
     // T14.3: their layout keeps its own place; nothing to report.
     public event EventHandler<AppearanceRestoredEventArgs>? AppearanceRestored { add { } remove { } }
     public event EventHandler<LocationChangedEventArgs>? LocationChanged;
+    // T18.1: a step's result is final when it returns.
+    public event EventHandler<FindResult>? ResultUpdated { add { } remove { } }
 
     // T18.1: the last query's matches, so Next and Previous step through them.
     private string? findText;
