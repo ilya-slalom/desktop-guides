@@ -6,7 +6,7 @@ namespace DesktopGuides.Production;
 
 // The Reader's session for one loaded TXT guide. The shell builds it from a
 // document T08.1's loader returned.
-internal sealed class TextReaderSession : IReaderSession, IFindableReader
+internal sealed class TextReaderSession : IReaderSession, IFindableReader, IOutlineReader
 {
     private readonly TextGuideDocument document;
     private bool disposed;
@@ -35,7 +35,7 @@ internal sealed class TextReaderSession : IReaderSession, IFindableReader
     public GuideFormat Format => GuideFormat.Txt;
     public ReaderCapabilities Capabilities =>
         ReaderCapabilities.Scroll | ReaderCapabilities.PageNavigation | ReaderCapabilities.TextSize |
-        ReaderCapabilities.Find;
+        ReaderCapabilities.Find | ReaderCapabilities.Outline;
 
     // Capabilities don't change during a TXT session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
@@ -82,6 +82,26 @@ internal sealed class TextReaderSession : IReaderSession, IFindableReader
         current = null;
         View.ClearMatch();
     }
+
+    // T18.2: sections from the guide's own markup, found off the UI thread
+    // within the detector's budget. None found, or out of time, is no outline.
+    public async Task<Outline> GetOutlineAsync(CancellationToken token)
+    {
+        using CancellationTokenSource budget = CancellationTokenSource.CreateLinkedTokenSource(token);
+        budget.CancelAfter(TextSectionDetector.Budget);
+        TextGuideDocument source = document;
+        IReadOnlyList<DetectedSection> sections =
+            await Task.Run(() => TextSectionDetector.Detect(source.Text, budget.Token), CancellationToken.None);
+        token.ThrowIfCancellationRequested();
+        return OutlineTree.Build(OutlineSource.Detected, sections.Select(section =>
+        {
+            int line = source.LineAtOffset(section.Offset);
+            return new OutlineItem(section.Title, section.Level, TextLocator.Capture(source, line), source.LineStarts[line]);
+        }));
+    }
+
+    public long OrderOf(ReaderLocation location) =>
+        location.Payload is TextPosition position ? position.CharacterOffset : 0;
 
     private IReadOnlyList<(int Line, int Column, int Length)> Segments(TextMatch match)
     {

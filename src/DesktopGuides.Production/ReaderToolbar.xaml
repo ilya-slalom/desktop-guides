@@ -121,6 +121,17 @@
                           Visibility="Collapsed"
                           IsEnabled="False"
                           Click="ResetTextSizeClicked" />
+            <AppBarButton x:Name="ShowContents"
+                          Label="Contents"
+                          ToolTipService.ToolTip="Contents (Ctrl+Shift+C)"
+                          AutomationProperties.AcceleratorKey="Ctrl+Shift+C"
+                          Visibility="Collapsed"
+                          Click="ShowContentsClicked">
+                <AppBarButton.Icon>
+                    <!-- BulletedList. -->
+                    <FontIcon Glyph="&#xE8FD;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
             <AppBarButton x:Name="FindInGuide"
                           Icon="Find"
                           Label="Find in guide"
