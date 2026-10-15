@@ -144,4 +144,29 @@ public sealed class TextSectionDetectorTests
 
         Assert.Empty(TextSectionDetector.Detect(CodedGuide(), cancelled.Token));
     }
+
+    // The same text as tests/fixtures/p2/txt-sections.txt, the installed fixture.
+    private static string SectionsFixture()
+    {
+        (string Title, string Code)[] sections =
+            [("Introduction", "INT00"), ("Walkthrough: Forest", "WLK01"), ("Walkthrough: Castle", "WLK02"),
+             ("Bosses", "BOS00"), ("FAQ", "FAQ00")];
+        List<string> lines = ["SECTIONS GUIDE", "An authored fixture for the contents pane.", "", "CONTENTS"];
+        lines.AddRange(sections.Select(s => $"  {s.Title} {new string('.', 26 - s.Title.Length)} [{s.Code}]"));
+        lines.Add("");
+        foreach ((string title, string code) in sections)
+        {
+            lines.Add(new string('=', 44));
+            lines.Add($" {title,-30} [{code}]");
+            lines.Add(new string('=', 44));
+            lines.AddRange(Enumerable.Range(1, 60).Select(n => $"Step {n:000} - {title.ToLowerInvariant()} notes for this step."));
+            lines.Add("");
+        }
+        return string.Join("\n", lines) + "\n";
+    }
+
+    [Fact]
+    public void TheInstalledFixtureHasFiveSections() =>
+        Assert.Equal(["Introduction", "Walkthrough: Forest", "Walkthrough: Castle", "Bosses", "FAQ"],
+            Detect(SectionsFixture()).Select(s => s.Title));
 }
