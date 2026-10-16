@@ -3,7 +3,7 @@ using DesktopGuides.Core.Reading;
 
 namespace DesktopGuides.Core.Library;
 
-public interface ILibraryRepository : IReadingLocationStore, IGuideCompletionStore, IAsyncDisposable
+public interface ILibraryRepository : IReadingLocationStore, IGuideCompletionStore, IBookmarkStore, IAsyncDisposable
 {
     StartupReconciliationReport? LastStartupReconciliation { get; }
     Task InitializeAsync(CancellationToken token = default);

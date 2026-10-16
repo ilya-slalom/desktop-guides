@@ -61,6 +61,11 @@ internal sealed class FakeRepository : ILibraryRepository
     public Task SaveReadingLocationAsync(Guid guideId, string locatorJson, double? estimatedFraction, CancellationToken token = default) => throw new NotSupportedException();
     public Task RecordGuideOpenedAsync(Guid guideId, DateTimeOffset openedUtc, CancellationToken token = default) => throw new NotSupportedException();
     public Task<DateTimeOffset?> SetGuideCompletionAsync(Guid guideId, DateTimeOffset? completedUtc, CancellationToken token = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<Bookmark>> ListBookmarksAsync(Guid guideId, CancellationToken token = default) => throw new NotSupportedException();
+    public Task<Bookmark> AddBookmarkAsync(Guid guideId, string locatorJson, string label, CancellationToken token = default) => throw new NotSupportedException();
+    public Task<Bookmark?> RenameBookmarkAsync(Guid bookmarkId, string label, CancellationToken token = default) => throw new NotSupportedException();
+    public Task<bool> DeleteBookmarkAsync(Guid bookmarkId, CancellationToken token = default) => throw new NotSupportedException();
+    public Task RestoreBookmarkAsync(Bookmark bookmark, CancellationToken token = default) => throw new NotSupportedException();
     public Task<ReaderPreferences?> GetReaderPreferencesAsync(Guid guideId, CancellationToken token = default) => throw new NotSupportedException();
     public Task SaveReaderPreferencesAsync(Guid guideId, double? textScale, CancellationToken token = default) => throw new NotSupportedException();
     public Task<AppSettings> GetSettingsAsync(CancellationToken token = default) => throw new NotSupportedException();

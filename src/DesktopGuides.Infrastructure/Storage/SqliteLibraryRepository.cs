@@ -524,6 +524,13 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         }, token);
     }
 
+    // T19.1 bookmarks
+    public Task<IReadOnlyList<Bookmark>> ListBookmarksAsync(Guid guideId, CancellationToken token = default) => throw new NotSupportedException();
+    public Task<Bookmark> AddBookmarkAsync(Guid guideId, string locatorJson, string label, CancellationToken token = default) => throw new NotSupportedException();
+    public Task<Bookmark?> RenameBookmarkAsync(Guid bookmarkId, string label, CancellationToken token = default) => throw new NotSupportedException();
+    public Task<bool> DeleteBookmarkAsync(Guid bookmarkId, CancellationToken token = default) => throw new NotSupportedException();
+    public Task RestoreBookmarkAsync(Bookmark bookmark, CancellationToken token = default) => throw new NotSupportedException();
+
     public Task<ReaderPreferences?> GetReaderPreferencesAsync(
         Guid guideId, CancellationToken token = default) =>
         ReadAsync<ReaderPreferences?>(() =>
