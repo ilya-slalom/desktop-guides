@@ -147,4 +147,17 @@ public sealed class ShortcutRoutingTests
         Assert.Equal(ShortcutDecision.Ignore,
             ShortcutRouting.Resolve(ShortcutCommand.ShowContents, Reader, textInputFocused: false, dialogOpen: true));
     }
+
+    [Theory]
+    [InlineData(ShortcutCommand.AddBookmark)]
+    [InlineData(ShortcutCommand.ShowBookmarks)]
+    public void BookmarkKeysRunOnlyInTheReader(ShortcutCommand command)
+    {
+        Assert.Equal(ShortcutDecision.Run,
+            ShortcutRouting.Resolve(command, Reader, textInputFocused: false, dialogOpen: false));
+        Assert.Equal(ShortcutDecision.Ignore,
+            ShortcutRouting.Resolve(command, Library, textInputFocused: false, dialogOpen: false));
+        Assert.Equal(ShortcutDecision.Ignore,
+            ShortcutRouting.Resolve(command, Reader, textInputFocused: false, dialogOpen: true));
+    }
 }

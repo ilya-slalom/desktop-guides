@@ -34,6 +34,19 @@ public sealed class ReaderContractTests
         Assert.DoesNotContain(ReaderCommand.Contents, ReaderCommandPolicy.VisibleCommands(findable));
     }
 
+    // T19.1: bookmarks order their places with the Outline capability's OrderOf.
+    [Fact]
+    public void BookmarksNeedTheOutlineCapability()
+    {
+        using FakeReader outlined = new(GuideFormat.Txt, ReaderCapabilities.Outline);
+        using FakeReader findable = new(GuideFormat.Txt, ReaderCapabilities.Find);
+
+        Assert.Contains(ReaderCommand.Bookmarks, ReaderCommandPolicy.VisibleCommands(outlined));
+        Assert.Contains(ReaderCommand.AddBookmark, ReaderCommandPolicy.VisibleCommands(outlined));
+        Assert.DoesNotContain(ReaderCommand.Bookmarks, ReaderCommandPolicy.VisibleCommands(findable));
+        Assert.DoesNotContain(ReaderCommand.AddBookmark, ReaderCommandPolicy.VisibleCommands(findable));
+    }
+
     [Fact]
     public async Task DispatchesTypedCommandsOnlyToCapableReader()
     {

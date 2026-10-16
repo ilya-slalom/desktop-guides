@@ -26,9 +26,32 @@ public sealed class KeyboardShortcutsTests
                 (ShortcutContext.Reader, "F3", ShortcutCommand.FindNext, "Next match"),
                 (ShortcutContext.Reader, "Shift+F3", ShortcutCommand.FindPrevious, "Previous match"),
                 (ShortcutContext.Reader, "Ctrl+Shift+C", ShortcutCommand.ShowContents, "Show contents"),
+                (ShortcutContext.Reader, "Ctrl+D", ShortcutCommand.AddBookmark, "Add bookmark"),
+                (ShortcutContext.Reader, "Ctrl+Shift+B", ShortcutCommand.ShowBookmarks, "Show bookmarks"),
                 (ShortcutContext.Dialog, "Esc", ShortcutCommand.CloseDialog, "Close the dialog"),
             ],
             KeyboardShortcuts.All.Select(s => (s.Context, s.Keys, s.Command, s.Description)));
+    }
+
+    // T19.1: two shortcuts that can run at the same moment never share keys.
+    [Fact]
+    public void NoTwoShortcutsShareKeysWhereBothCanRun()
+    {
+        static bool Overlap(ShortcutContext a, ShortcutContext b) =>
+            a == b || a == ShortcutContext.Everywhere || b == ShortcutContext.Everywhere ||
+            (a, b) is (ShortcutContext.Library, ShortcutContext.LibrarySearch)
+                or (ShortcutContext.LibrarySearch, ShortcutContext.Library);
+
+        string[] clashes =
+        [
+            .. from first in KeyboardShortcuts.All
+               from second in KeyboardShortcuts.All
+               where first.Command < second.Command && first.Keys == second.Keys &&
+                     Overlap(first.Context, second.Context)
+               select $"{first.Command} and {second.Command} on {first.Keys}"
+        ];
+
+        Assert.Empty(clashes);
     }
 
     [Fact]

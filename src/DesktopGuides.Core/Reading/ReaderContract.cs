@@ -27,7 +27,9 @@ public enum ReaderCommand
     Zoom,
     TextSize,
     Find,
-    Contents
+    Contents,
+    Bookmarks,
+    AddBookmark
 }
 
 public abstract record ReaderAction(ReaderCommand Command);
@@ -74,7 +76,9 @@ public static class ReaderCommandPolicy
         (ReaderCommand.Zoom, ReaderCapabilities.Zoom),
         (ReaderCommand.TextSize, ReaderCapabilities.TextSize),
         (ReaderCommand.Find, ReaderCapabilities.Find),
-        (ReaderCommand.Contents, ReaderCapabilities.Outline)
+        (ReaderCommand.Contents, ReaderCapabilities.Outline),
+        (ReaderCommand.Bookmarks, ReaderCapabilities.Outline),
+        (ReaderCommand.AddBookmark, ReaderCapabilities.Outline)
     ];
 
     public static IReadOnlyList<ReaderCommand> VisibleCommands(IReaderSession session) =>
