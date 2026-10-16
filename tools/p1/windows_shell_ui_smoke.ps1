@@ -4496,22 +4496,45 @@ try {
                 if (-not $item) { throw 'The Reflow view shows no block to focus.' }
                 $item.SetFocus()
             }
-            # A row of the seeded table is inside the visible part of the Reflow list.
-            # The table's rows are monospace and never wrap, so row N sits N/120 down its item.
+            # A row of the seeded table is inside the visible part of the Reflow list,
+            # by the row's own text range. Item bounds are clipped to the list.
             $listItem = New-Object System.Windows.Automation.PropertyCondition(
                 [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
                 [System.Windows.Automation.ControlType]::ListItem)
+            $textBlock = New-Object System.Windows.Automation.PropertyCondition(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::Text)
             function Test-ReflowRowVisible([int] $row) {
                 $list = Find-ById 'ReaderReflowBlocks'
                 if (-not $list) { return $false }
                 $bounds = $list.Current.BoundingRectangle
                 foreach ($item in @($list.FindAll([System.Windows.Automation.TreeScope]::Descendants, $listItem))) {
                     if (-not $item.Current.Name.StartsWith('Row 001')) { continue }
-                    $rect = $item.Current.BoundingRectangle
-                    if ($rect.Height -le 0) { return $false }
-                    $y = $rect.Top + $rect.Height * ($row - 0.5) / 120
-                    $script:reflowRowProbe = "item $($rect.Top),$($rect.Height) list $($bounds.Top),$($bounds.Height) row $y"
-                    return ($y -ge $bounds.Top -and $y -le $bounds.Bottom)
+                    $text = $item.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $textBlock)
+                    $pattern = $null
+                    if (-not $text -or -not $text.TryGetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern, [ref] $pattern)) {
+                        $script:reflowRowProbe = 'no text pattern'
+                        return $false
+                    }
+                    $label = 'Row {0:000}' -f $row
+                    $visible = try {
+                        (@($pattern.GetVisibleRanges() | ForEach-Object { $_.GetText(-1) }) -join '').Contains($label)
+                    } catch { "error: $($_.Exception.Message)" }
+                    $document = $pattern.DocumentRange
+                    $index = $document.GetText(-1).IndexOf($label)
+                    $range = $document.Clone()
+                    [void]$range.MoveEndpointByUnit([System.Windows.Automation.Text.TextPatternRangeEndpoint]::Start,
+                        [System.Windows.Automation.Text.TextUnit]::Character, $index)
+                    $range.MoveEndpointByRange([System.Windows.Automation.Text.TextPatternRangeEndpoint]::End, $range,
+                        [System.Windows.Automation.Text.TextPatternRangeEndpoint]::Start)
+                    [void]$range.MoveEndpointByUnit([System.Windows.Automation.Text.TextPatternRangeEndpoint]::End,
+                        [System.Windows.Automation.Text.TextUnit]::Character, $label.Length)
+                    $rects = @($range.GetBoundingRectangles())
+                    $script:reflowRowProbe = "range '$($range.GetText(-1))' rects $(@($rects | ForEach-Object { "$($_.Top),$($_.Height)" }) -join ';') list $($bounds.Top),$($bounds.Height) visibleRanges $visible"
+                    foreach ($rect in $rects) {
+                        if ($rect.Height -gt 0 -and $rect.Top -ge $bounds.Top -and $rect.Bottom -le $bounds.Bottom) { return $true }
+                    }
+                    return $false
                 }
                 return $false
             }
@@ -4522,7 +4545,7 @@ try {
                     Start-Sleep -Milliseconds 250
                 } while ((Get-Date) -lt $deadline)
                 [void](Save-WindowScreenshot 'reflow-row-hidden')
-                throw "After $step row $row isn't on screen in the Reflow view."
+                throw "After $step row $row isn't on screen in the Reflow view ($script:reflowRowProbe)."
             }
             function Find-Next([string] $query, [string] $count) {
                 [System.Windows.Forms.SendKeys]::SendWait('^f')
