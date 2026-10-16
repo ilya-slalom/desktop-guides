@@ -51,6 +51,19 @@ public sealed class LibraryRestorerValidationTests : IAsyncLifetime
             LibraryRestoreIssue.DatabaseInvalid);
 
     [Fact]
+    public async Task ADanglingBookmarkIsInvalid() =>
+        await Refused(fixture.RewriteDatabase(
+                $"PRAGMA foreign_keys = OFF; INSERT INTO Bookmarks (Id, GuideId, LocatorJson, Label, CreatedUtcMs, UpdatedUtcMs) VALUES ('{Guid.NewGuid():N}', '{Guid.NewGuid():N}', '{{}}', 'Lost', 0, 0);"),
+            LibraryRestoreIssue.DatabaseInvalid);
+
+    // A hand-edited backup can bypass the CHECK; integrity_check reports it.
+    [Fact]
+    public async Task AnOversizedBookmarkIsInvalid() =>
+        await Refused(fixture.RewriteDatabase(
+                "PRAGMA ignore_check_constraints = ON; UPDATE Bookmarks SET Label = printf('%.90c', 'x');"),
+            LibraryRestoreIssue.DatabaseInvalid);
+
+    [Fact]
     public async Task AnAlteredSchemaIsInvalid() =>
         await Refused(fixture.RewriteDatabase("CREATE TABLE Extra (Id INTEGER);"), LibraryRestoreIssue.DatabaseInvalid);
 

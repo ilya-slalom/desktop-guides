@@ -64,6 +64,7 @@ internal sealed class ExportFixture : IAsyncDisposable
             UPDATE ReaderPreferences SET TextScale = 1.25 WHERE GuideId = '{{HtmlGuide:N}}';
             INSERT OR REPLACE INTO Settings (Key, Value) VALUES ('Theme', 'Dark');
             """);
+        await Library.Repository.AddBookmarkAsync(TxtGuide, "{\"format\":\"Txt\"}", "Boss fight");
     }
 
     public string Content(Guid guide) => Library.Paths.GetGuideRoot(guide);
