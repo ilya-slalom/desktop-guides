@@ -30,6 +30,36 @@ public sealed class TextLocatorTests
         Assert.Equal(6.0 / 17, location.EstimatedFraction);
     }
 
+    // T19.2: the reflow view captures at a block's start, which may be mid-line.
+    [Fact]
+    public void CaptureAtUsesTheOffsetAndFollowingText()
+    {
+        TextGuideDocument document = Doc("alpha\nbeta\ngamma\n");
+
+        ReaderLocation location = TextLocator.CaptureAt(document, 8);
+
+        Assert.Equal(new TextPosition(8, "ta\ngamma\n"), location.Payload);
+        Assert.Equal(8.0 / 17, location.EstimatedFraction);
+    }
+
+    [Theory]
+    [InlineData(-5, 0)]
+    [InlineData(99, 17)]
+    public void CaptureAtClampsToTheText(int offset, int expected)
+    {
+        ReaderLocation location = TextLocator.CaptureAt(Doc("alpha\nbeta\ngamma\n"), offset);
+
+        Assert.Equal(expected, ((TextPosition)location.Payload).CharacterOffset);
+    }
+
+    [Fact]
+    public void CaptureByLineIsCaptureAtItsStart()
+    {
+        TextGuideDocument document = Doc("alpha\nbeta\ngamma\n");
+
+        Assert.Equal(TextLocator.CaptureAt(document, 6), TextLocator.Capture(document, 1));
+    }
+
     [Fact]
     public void CaptureLowerCasesTheDocumentHash()
     {
