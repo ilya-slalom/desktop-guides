@@ -4433,6 +4433,19 @@ try {
                 $item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
                 $item.SetFocus()
             }
+            # After an add, the keyboard is on a bookmark in the list.
+            function Wait-FocusOnBookmark([string] $step) {
+                $deadline = (Get-Date).AddSeconds(5)
+                do {
+                    $node = [System.Windows.Automation.AutomationElement]::FocusedElement
+                    for ($depth = 0; $node -and $depth -lt 6; $depth++) {
+                        if ($node.Current.AutomationId -eq 'ReaderBookmarksList') { return }
+                        $node = [System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($node)
+                    }
+                    Start-Sleep -Milliseconds 200
+                } while ((Get-Date) -lt $deadline)
+                throw "After $step the keyboard isn't in the bookmarks list."
+            }
             function Wait-SavedAfter([int] $baseline, [string] $step) {
                 $deadline = (Get-Date).AddSeconds(8)
                 do {
@@ -4938,10 +4951,12 @@ try {
                 [System.Windows.Forms.SendKeys]::SendWait('^d')
                 [void](Wait-Status 'Bookmark added.')
                 [void](Wait-BookmarkNames @('Walkthrough: Castle, *% through') 'adding a bookmark')
+                Wait-FocusOnBookmark 'adding a bookmark'
                 # One place, one bookmark.
                 [System.Windows.Forms.SendKeys]::SendWait('^d')
                 [void](Wait-Status 'This place is already bookmarked.')
                 [void](Wait-BookmarkNames @('Walkthrough: Castle, *% through') 'adding at the same place')
+                Wait-FocusOnBookmark 'adding at the same place'
                 # F2 edits in place; Escape cancels without closing the pane.
                 [System.Windows.Forms.SendKeys]::SendWait('{F2}')
                 [void](Wait-VisibleById 'ReaderBookmarkEditor')

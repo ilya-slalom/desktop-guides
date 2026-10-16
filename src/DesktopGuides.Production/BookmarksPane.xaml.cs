@@ -72,17 +72,25 @@ public sealed partial class BookmarksPane : UserControl
         List.Visibility = Visibility.Collapsed;
     }
 
-    // After layout, so the selected item's container exists.
-    public void FocusContent() =>
-        DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+    public void FocusContent() => _ = FocusContentAsync();
+
+    // After layout, so the selected item's container exists. Completes once
+    // focus is set, so a status announced after it finds the list ready.
+    public Task FocusContentAsync()
+    {
+        TaskCompletionSource done = new();
+        bool queued = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
         {
-            if (List.SelectedItem is BookmarkRow row && List.ContainerFromItem(row) is ListViewItem item &&
-                item.Focus(FocusState.Programmatic))
+            if (!(List.SelectedItem is BookmarkRow row && List.ContainerFromItem(row) is ListViewItem item &&
+                item.Focus(FocusState.Programmatic)))
             {
-                return;
+                AddButton.Focus(FocusState.Programmatic);
             }
-            AddButton.Focus(FocusState.Programmatic);
+            done.TrySetResult();
         });
+        if (!queued) done.TrySetResult();
+        return done.Task;
+    }
 
     private void AddClicked(object sender, RoutedEventArgs args) => AddRequested?.Invoke(this, EventArgs.Empty);
 

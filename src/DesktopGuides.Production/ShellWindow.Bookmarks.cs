@@ -119,7 +119,7 @@ public sealed partial class ShellWindow
     {
         if (await LoadBookmarksAsync() is not IReadOnlyList<BookmarkItem> items) return;
         ReaderContents.BookmarksTab.ShowItems(items, select);
-        if (focus) ReaderContents.BookmarksTab.FocusContent();
+        if (focus) await ReaderContents.BookmarksTab.FocusContentAsync();
     }
 
     private async Task AddBookmarkAsync()
