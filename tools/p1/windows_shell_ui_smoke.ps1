@@ -4993,7 +4993,13 @@ try {
                 [System.Windows.Forms.SendKeys]::SendWait('{DELETE}')
                 [void](Wait-Status 'Bookmark deleted.')
                 [void](Wait-VisibleById 'ReaderBookmarksEmpty')
-                Invoke-Element (Wait-VisibleById 'ShellStatusAction')
+                # Undo with the pane closed: the keyboard goes back to the guide.
+                [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                Wait-HiddenById 'ReaderBookmarksEmpty'
+                (Wait-VisibleById 'ShellStatusAction').SetFocus()
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                Assert-FocusInGuide 'undoing with the pane closed'
+                [System.Windows.Forms.SendKeys]::SendWait('^+b')
                 [void](Wait-BookmarkNames @('Castle gate, *% through') 'undoing the delete')
                 $report.bookmarkTxtScreenshot = Save-WindowScreenshot 'bookmark-txt'
                 $report.phases += 'bookmark-txt'
@@ -5053,6 +5059,23 @@ try {
                 [System.Windows.Forms.SendKeys]::SendWait('^d')
                 [void](Wait-Status 'Bookmark added.')
                 [void](Wait-BookmarkNames @('Page 3, page 3') 'adding in a PDF')
+                # The pane opened on Bookmarks; the Contents tab still shows this guide's contents.
+                (Find-ById 'ReaderPaneContentsTab').GetCurrentPattern(
+                    [System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+                [void](Wait-Name 'ReaderContentsEmpty' 'No sections found in this guide.')
+                # A double click on Add makes one bookmark.
+                [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                Wait-HiddenById 'ReaderContentsEmpty'
+                [System.Windows.Forms.SendKeys]::SendWait('{PGDN}')
+                [void](Wait-PdfPage 4 200 'page 4 of 200')
+                [System.Windows.Forms.SendKeys]::SendWait('^+b')
+                $add = (Wait-VisibleById 'ReaderBookmarksAdd').GetCurrentPattern(
+                    [System.Windows.Automation.InvokePattern]::Pattern)
+                $add.Invoke()
+                $add.Invoke()
+                [void](Wait-Status 'Bookmark added.')
+                Start-Sleep -Seconds 2
+                [void](Wait-BookmarkNames @('Page 3, page 3', 'Page 4, page 4') 'a double click on Add')
                 $report.phases += 'bookmark-pdf'
             }
             elseif ($Mode -eq 'bookmark-changed') {
