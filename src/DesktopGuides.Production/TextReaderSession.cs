@@ -49,9 +49,17 @@ internal sealed class TextReaderSession : IReaderSession, IFindableReader, IOutl
                 TextGuideDocument source = document;
                 using CancellationTokenSource budget = CancellationTokenSource.CreateLinkedTokenSource(token);
                 budget.CancelAfter(TextReflowPlanner.Budget);
-                plan = await Task.Run(
-                    () => TextReflowPlanner.Plan(source, TextSectionDetector.Detect(source.Text, budget.Token), budget.Token),
-                    CancellationToken.None);
+                try
+                {
+                    plan = await Task.Run(
+                        () => TextReflowPlanner.Plan(source, TextSectionDetector.Detect(source.Text, budget.Token), budget.Token),
+                        CancellationToken.None);
+                }
+                catch (Exception)
+                {
+                    // A planning failure is no plan; the guide stays readable in Original.
+                    plan = null;
+                }
                 token.ThrowIfCancellationRequested();
             }
             if (disposed || plan is null) return false;

@@ -10,7 +10,10 @@ public sealed partial class ShellWindow
     // T19.2: a TXT guide's Original or Reflow view, chosen and saved per guide.
     private const string TextViewSaveFailed = "Couldn't save the view for this guide.";
     private bool settingTextView;
-    private bool switchingTextView;
+    // The session a switch is running for, and the view last chosen: a
+    // choice made during a switch is applied when the switch ends.
+    private TextReaderSession? switchingTextView;
+    private TextViewMode chosenTextView;
     private Guid? textViewGuide;
 
     private void InitializeTextView()
@@ -79,35 +82,43 @@ public sealed partial class ShellWindow
 
     private async Task ChooseTextViewAsync(TextViewMode mode)
     {
-        if (readerSession is not TextReaderSession session || textViewGuide is not Guid guide || switchingTextView)
-        {
-            return;
-        }
-        switchingTextView = true;
+        if (readerSession is not TextReaderSession session || textViewGuide is not Guid guide) return;
+        chosenTextView = mode;
+        if (ReferenceEquals(switchingTextView, session)) return;
+        switchingTextView = session;
         try
         {
-            bool shown = await session.SetViewAsync(mode, CancellationToken.None);
-            if (!ReferenceEquals(session, readerSession)) return;
-            if (!shown)
+            while (true)
             {
-                ShowTextViewChoice(TextViewMode.Original);
-                ShowWarningStatus(TextViewMessages.NoProse);
+                mode = chosenTextView;
+                bool shown = await session.SetViewAsync(mode, CancellationToken.None);
+                if (!ReferenceEquals(session, readerSession)) return;
+                if (!shown)
+                {
+                    ShowTextViewChoice(TextViewMode.Original);
+                    ShowWarningStatus(TextViewMessages.NoProse);
+                    return;
+                }
+                if (chosenTextView != mode) continue;
+                try
+                {
+                    await RequireRepository().SaveTextViewAsync(guide, mode);
+                }
+                catch (Exception)
+                {
+                    ShowErrorStatus(TextViewSaveFailed);
+                    return;
+                }
+                if (!ReferenceEquals(session, readerSession)) return;
+                if (chosenTextView != mode) continue;
+                AnnounceStatus(TextViewMessages.For(mode));
                 return;
             }
-            try
-            {
-                await RequireRepository().SaveTextViewAsync(guide, mode);
-            }
-            catch (Exception)
-            {
-                ShowErrorStatus(TextViewSaveFailed);
-                return;
-            }
-            AnnounceStatus(TextViewMessages.For(mode));
         }
         finally
         {
-            switchingTextView = false;
+            if (ReferenceEquals(switchingTextView, session)) switchingTextView = null;
+            if (ReferenceEquals(session, readerSession)) ShowTextViewChoice(session.Mode);
         }
     }
 
