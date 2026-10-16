@@ -4496,33 +4496,32 @@ try {
                 if (-not $item) { throw 'The Reflow view shows no block to focus.' }
                 $item.SetFocus()
             }
-            # A text inside the visible part of the Reflow list, found through the blocks' text.
-            $textBlock = New-Object System.Windows.Automation.PropertyCondition(
+            # A row of the seeded table is inside the visible part of the Reflow list.
+            # The table's rows are monospace and never wrap, so row N sits N/120 down its item.
+            $listItem = New-Object System.Windows.Automation.PropertyCondition(
                 [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
-                [System.Windows.Automation.ControlType]::Text)
-            function Test-ReflowTextVisible([string] $text) {
+                [System.Windows.Automation.ControlType]::ListItem)
+            function Test-ReflowRowVisible([int] $row) {
                 $list = Find-ById 'ReaderReflowBlocks'
                 if (-not $list) { return $false }
                 $bounds = $list.Current.BoundingRectangle
-                foreach ($block in @($list.FindAll([System.Windows.Automation.TreeScope]::Descendants, $textBlock))) {
-                    $pattern = $null
-                    if (-not $block.TryGetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern, [ref] $pattern)) { continue }
-                    $range = $pattern.DocumentRange.FindText($text, $false, $false)
-                    if (-not $range) { continue }
-                    foreach ($rect in $range.GetBoundingRectangles()) {
-                        if ($rect.Height -gt 0 -and $rect.Top -ge $bounds.Top -and $rect.Bottom -le $bounds.Bottom) { return $true }
-                    }
+                foreach ($item in @($list.FindAll([System.Windows.Automation.TreeScope]::Descendants, $listItem))) {
+                    if (-not $item.Current.Name.StartsWith('Row 001')) { continue }
+                    $rect = $item.Current.BoundingRectangle
+                    if ($rect.Height -le 0) { return $false }
+                    $y = $rect.Top + $rect.Height * ($row - 0.5) / 120
+                    return ($y -ge $bounds.Top -and $y -le $bounds.Bottom)
                 }
                 return $false
             }
-            function Wait-ReflowTextVisible([string] $text, [string] $step) {
+            function Wait-ReflowRowVisible([int] $row, [string] $step) {
                 $deadline = (Get-Date).AddSeconds(8)
                 do {
-                    if (Test-ReflowTextVisible $text) { return }
+                    if (Test-ReflowRowVisible $row) { return }
                     Start-Sleep -Milliseconds 250
                 } while ((Get-Date) -lt $deadline)
-                [void](Save-WindowScreenshot 'reflow-text-hidden')
-                throw "After $step '$text' isn't on screen in the Reflow view."
+                [void](Save-WindowScreenshot 'reflow-row-hidden')
+                throw "After $step row $row isn't on screen in the Reflow view."
             }
             function Find-Next([string] $query, [string] $count) {
                 [System.Windows.Forms.SendKeys]::SendWait('^f')
@@ -5265,11 +5264,11 @@ try {
                 # Final review: a match deep in a tall block shows on screen, and stays
                 # there when the find bar closes and the reading area grows.
                 Find-Next 'Row 100' '1 of 1'
-                Wait-ReflowTextVisible 'Row 100' 'finding a row deep in the table'
+                Wait-ReflowRowVisible 100 'finding a row deep in the table'
                 [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
                 Wait-HiddenById 'ReaderFindBar'
                 Start-Sleep -Seconds 1
-                Wait-ReflowTextVisible 'Row 100' 'closing the find bar'
+                Wait-ReflowRowVisible 100 'closing the find bar'
                 $report.phases += 'reflow-find'
             }
             elseif ($Mode -eq 'reflow-bookmark') {
