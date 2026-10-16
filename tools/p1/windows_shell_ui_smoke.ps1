@@ -5022,6 +5022,8 @@ try {
                 Invoke-OverflowCommand 'Add bookmark'
                 [void](Wait-Status 'Bookmark added.')
                 [void](Wait-BookmarkNames @('The castle*') 'adding from the toolbar')
+                Wait-FocusOnBookmark 'adding from the toolbar'
+
                 # Away to the first section through Contents, then back through Bookmarks.
                 Invoke-OverflowCommand 'Contents'
                 [void](Wait-VisibleById 'ReaderContentsTree')
@@ -5030,6 +5032,8 @@ try {
                 [void](Wait-HtmlPosition { param($p) $p.quote -and $p.quote -notlike 'Castle*' } 'leaving the Castle heading')
                 Invoke-OverflowCommand 'Bookmarks'
                 [void](Wait-BookmarkNames @('The castle*') 'opening the Bookmarks tab')
+                Wait-FocusOnBookmark 'choosing Bookmarks on the toolbar'
+
                 [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
                 [void](Wait-HtmlPosition { param($p) $p.quote -like 'Castle*' } 'following the bookmark')
                 $report.bookmarkHtmlScreenshot = Save-WindowScreenshot 'bookmark-html'

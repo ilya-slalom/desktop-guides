@@ -502,15 +502,33 @@ public sealed partial class ReaderToolbar : UserControl
     public event EventHandler? ContentsRequested;
 
     private void ShowContentsClicked(object sender, RoutedEventArgs args) =>
-        ContentsRequested?.Invoke(this, EventArgs.Empty);
+        RaiseAfterOverflow(() => ContentsRequested?.Invoke(this, EventArgs.Empty));
 
     // T19.1: the shell opens the Bookmarks tab, or adds a bookmark here.
     public event EventHandler? BookmarksRequested;
     public event EventHandler? AddBookmarkRequested;
 
     private void ShowBookmarksClicked(object sender, RoutedEventArgs args) =>
-        BookmarksRequested?.Invoke(this, EventArgs.Empty);
+        RaiseAfterOverflow(() => BookmarksRequested?.Invoke(this, EventArgs.Empty));
 
     private void AddBookmarkClicked(object sender, RoutedEventArgs args) =>
-        AddBookmarkRequested?.Invoke(this, EventArgs.Empty);
+        RaiseAfterOverflow(() => AddBookmarkRequested?.Invoke(this, EventArgs.Empty));
+
+    // T19.1: a closing overflow menu hands focus back to "More". A command
+    // that moves focus into the pane runs once the menu has closed, so the
+    // menu doesn't take focus back from it.
+    private void RaiseAfterOverflow(Action raise)
+    {
+        if (!Commands.IsOpen)
+        {
+            raise();
+            return;
+        }
+        void Closed(object? sender, object args)
+        {
+            Commands.Closed -= Closed;
+            raise();
+        }
+        Commands.Closed += Closed;
+    }
 }
