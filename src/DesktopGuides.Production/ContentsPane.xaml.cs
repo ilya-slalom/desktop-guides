@@ -7,6 +7,8 @@ using VirtualKey = Windows.System.VirtualKey;
 
 namespace DesktopGuides.Production;
 
+public enum ReaderPaneTab { Contents, Bookmarks }
+
 // T18.2: the reader's Contents pane. It shows an outline and reports what
 // the user picked; the shell does the moving.
 public sealed partial class ContentsPane : UserControl
@@ -16,12 +18,56 @@ public sealed partial class ContentsPane : UserControl
     public ContentsPane()
     {
         InitializeComponent();
+        Tabs.SetOptions(
+        [
+            new BoundedChoiceOption("Contents", "ReaderPaneContentsTab"),
+            new BoundedChoiceOption("Bookmarks", "ReaderPaneBookmarksTab")
+        ]);
+        Tabs.SelectedIndex = 0;
+        Tabs.ChoiceChanged += (_, _) =>
+        {
+            ApplyTab();
+            // Only the user's choice: the shell sets the tab while it loads.
+            if (!settingTab) TabChanged?.Invoke(this, EventArgs.Empty);
+        };
         KeyDown += PaneKeyDown;
     }
 
     public event EventHandler<OutlineEntry>? EntryInvoked;
     public event EventHandler? SearchRequested;
     public event EventHandler? CloseRequested;
+
+    private bool settingTab;
+
+    public event EventHandler? TabChanged;
+    public event EventHandler? BookmarksRequested;
+
+    public BookmarksPane BookmarksTab => BookmarksView;
+
+    public ReaderPaneTab Tab => Tabs.SelectedIndex == 1 ? ReaderPaneTab.Bookmarks : ReaderPaneTab.Contents;
+
+    public void ShowTab(ReaderPaneTab tab)
+    {
+        settingTab = true;
+        try
+        {
+            Tabs.SelectedIndex = tab == ReaderPaneTab.Bookmarks ? 1 : 0;
+        }
+        finally
+        {
+            settingTab = false;
+        }
+        ApplyTab();
+    }
+
+    private void ApplyTab()
+    {
+        ContentsView.Visibility = Tab == ReaderPaneTab.Contents ? Visibility.Visible : Visibility.Collapsed;
+        BookmarksView.Visibility = Tab == ReaderPaneTab.Bookmarks ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void BookmarksClicked(object sender, RoutedEventArgs args) =>
+        BookmarksRequested?.Invoke(this, EventArgs.Empty);
 
     public void ShowBuilding()
     {
@@ -37,6 +83,7 @@ public sealed partial class ContentsPane : UserControl
         {
             Empty.Visibility = Visibility.Visible;
             SearchLink.Visibility = canSearch ? Visibility.Visible : Visibility.Collapsed;
+            BookmarksLink.Visibility = Visibility.Visible;
             return;
         }
         foreach (OutlineEntry entry in outline.Entries) Tree.RootNodes.Add(NodeFor(entry));
@@ -57,6 +104,11 @@ public sealed partial class ContentsPane : UserControl
     public void FocusContent() =>
         DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
         {
+            if (Tab == ReaderPaneTab.Bookmarks)
+            {
+                BookmarksView.FocusContent();
+                return;
+            }
             if (Tree.Visibility == Visibility.Visible &&
                 Tree.SelectedNode is TreeViewNode node && Tree.ContainerFromNode(node) is Control item &&
                 item.Focus(FocusState.Programmatic))
@@ -75,6 +127,7 @@ public sealed partial class ContentsPane : UserControl
         Building.Visibility = Visibility.Collapsed;
         Empty.Visibility = Visibility.Collapsed;
         SearchLink.Visibility = Visibility.Collapsed;
+        BookmarksLink.Visibility = Visibility.Collapsed;
     }
 
     private TreeViewNode NodeFor(OutlineEntry entry)

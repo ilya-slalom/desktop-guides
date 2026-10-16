@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -274,7 +274,10 @@ try {
         '^Window background set to (Mica|Acrylic|Solid)\.$',
         '^Colorful icons turned (on|off)\.$',
         '^(No games match\.|\d+ of \d+ games match\.)$',
-        '^Opened near your last place\. The guide changed since you were here\.$')
+        '^Opened near your last place\. The guide changed since you were here\.$',
+        '^Bookmark added\.$',
+        '^This place is already bookmarked\.$',
+        "^This bookmark's place may have shifted\.$")
 
     function Test-QuietStatus([string] $message) {
         foreach ($pattern in $quietStatusPatterns) {
@@ -1577,13 +1580,13 @@ try {
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed',
         'workflow-pdf-exit')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
             elseif ($Mode -like 'html-theme-*') { 'Web Theme Game' }
             elseif ($Mode -like 'pdf-*') { 'PDF Reader Game' }
-            elseif ($Mode -like 'progress-*' -or $Mode -like 'completion-*' -or $Mode -like 'find-*' -or $Mode -like 'contents-*') { 'Progress Game' }
+            elseif ($Mode -like 'progress-*' -or $Mode -like 'completion-*' -or $Mode -like 'find-*' -or $Mode -like 'contents-*' -or $Mode -like 'bookmark-*') { 'Progress Game' }
             elseif ($Mode -like 'text-size-*') { 'Text Size Game' }
             elseif ($Mode -like 'workflow-*') { 'Workflow Game' }
             else { 'Text Reader Game' }
@@ -4319,7 +4322,7 @@ try {
                 $report.phases += 'workflow-restored-places'
             }
         }
-        elseif ($Mode -like 'find-*' -or $Mode -like 'contents-*') {
+        elseif ($Mode -like 'find-*' -or $Mode -like 'contents-*' -or $Mode -like 'bookmark-*') {
             # T18.1: in-guide search. Searching must never save the reading place.
             function Read-Saves { return [int] (Read-ProgressCounts).saves }
             # The MARK number of the page's top line, within a range.
@@ -4397,6 +4400,63 @@ try {
                     Start-Sleep -Milliseconds 200
                 } while ((Get-Date) -lt $deadline)
                 throw "After $step the top line was '$name'; expected '$pattern'."
+            }
+            $bookmarkItem = New-Object System.Windows.Automation.PropertyCondition(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::ListItem)
+            function Get-BookmarkItems {
+                $list = Find-ById 'ReaderBookmarksList'
+                if (-not $list -or $list.Current.IsOffscreen) { return @() }
+                return @($list.FindAll([System.Windows.Automation.TreeScope]::Descendants, $bookmarkItem))
+            }
+            # The list's names, in order, each matching its -like pattern.
+            function Wait-BookmarkNames([string[]] $patterns, [string] $step) {
+                $deadline = (Get-Date).AddSeconds(10)
+                $names = @()
+                do {
+                    $names = @(Get-BookmarkItems | ForEach-Object { $_.Current.Name })
+                    if ($names.Count -eq $patterns.Count) {
+                        $matched = $true
+                        for ($i = 0; $i -lt $names.Count; $i++) {
+                            if ($names[$i] -notlike $patterns[$i]) { $matched = $false }
+                        }
+                        if ($matched) { return $names }
+                    }
+                    Start-Sleep -Milliseconds 250
+                } while ((Get-Date) -lt $deadline)
+                [void](Save-WindowScreenshot 'bookmark-names')
+                throw "After $step the bookmarks read '$($names -join ' | ')'; expected '$($patterns -join ' | ')'."
+            }
+            function Select-Bookmark([string] $pattern) {
+                $item = @(Get-BookmarkItems | Where-Object { $_.Current.Name -like $pattern })[0]
+                if (-not $item) { throw "No bookmark is named like '$pattern'." }
+                $item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+                $item.SetFocus()
+            }
+            # After an add, the keyboard is on a bookmark in the list.
+            function Wait-FocusOnBookmark([string] $step) { Wait-FocusIn 'ReaderBookmarksList' $step }
+            function Wait-FocusIn([string] $id, [string] $step) {
+                $deadline = (Get-Date).AddSeconds(5)
+                do {
+                    $node = [System.Windows.Automation.AutomationElement]::FocusedElement
+                    for ($depth = 0; $node -and $depth -lt 8; $depth++) {
+                        if ($node.Current.AutomationId -eq $id) { return }
+                        $node = [System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($node)
+                    }
+                    Start-Sleep -Milliseconds 200
+                } while ((Get-Date) -lt $deadline)
+                $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+                $where = if ($focused) { "$($focused.Current.ControlType.ProgrammaticName) '$($focused.Current.AutomationId)' '$($focused.Current.Name)'" } else { 'nothing' }
+                [void](Save-WindowScreenshot 'bookmark-focus')
+                throw "After $step the keyboard isn't in '$id'; focus is on $where."
+            }
+            function Wait-SavedAfter([int] $baseline, [string] $step) {
+                $deadline = (Get-Date).AddSeconds(8)
+                do {
+                    Start-Sleep -Milliseconds 250
+                    $saves = Read-Saves
+                } while ($saves -le $baseline -and (Get-Date) -lt $deadline)
+                if ($saves -le $baseline) { throw "$step saved nothing." }
             }
 
             [void](Wait-Name 'LibraryHeading' 'Library')
@@ -4879,6 +4939,168 @@ try {
                 [System.Windows.Forms.SendKeys]::SendWait('^+c')
                 [void](Wait-Name 'ReaderContentsEmpty' 'No sections found in this guide.')
                 $report.phases += 'contents-pdf'
+            }
+            elseif ($Mode -eq 'bookmark-txt') {
+                Open-TextGuide 'Sections Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Wait-FirstTextRow
+                # Contents first, so the outline is built and the bookmark takes its entry's name.
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                Wait-ContentsSelected 'Introduction'
+                [System.Windows.Forms.SendKeys]::SendWait('{DOWN}{DOWN}{ENTER}')
+                [void](Wait-TopRowLike '*Walkthrough: Castle*' 'following Walkthrough: Castle')
+                Assert-FocusInGuide 'following an entry'
+                [System.Windows.Forms.SendKeys]::SendWait('^d')
+                [void](Wait-Status 'Bookmark added.')
+                [void](Wait-BookmarkNames @('Walkthrough: Castle, *% through') 'adding a bookmark')
+                Wait-FocusOnBookmark 'adding a bookmark'
+                # One place, one bookmark.
+                [System.Windows.Forms.SendKeys]::SendWait('^d')
+                [void](Wait-Status 'This place is already bookmarked.')
+                [void](Wait-BookmarkNames @('Walkthrough: Castle, *% through') 'adding at the same place')
+                Wait-FocusOnBookmark 'adding at the same place'
+                # F2 edits in place; Escape cancels without closing the pane.
+                [System.Windows.Forms.SendKeys]::SendWait('{F2}')
+                [void](Wait-VisibleById 'ReaderBookmarkEditor')
+                [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                Wait-HiddenById 'ReaderBookmarkEditor'
+                [void](Wait-VisibleById 'ReaderBookmarksList')
+                [System.Windows.Forms.SendKeys]::SendWait('{F2}')
+                [void](Wait-VisibleById 'ReaderBookmarkEditor')
+                [System.Windows.Forms.SendKeys]::SendWait('Castle gate{ENTER}')
+                [void](Wait-BookmarkNames @('Castle gate, *% through') 'renaming')
+                # Leave the place, then follow the bookmark back: a deliberate move saves.
+                [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                Wait-HiddenById 'ReaderBookmarksList'
+                Assert-FocusInGuide 'closing the pane'
+                [System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
+                $deadline = (Get-Date).AddSeconds(10)
+                while ((Get-TopRowName) -like '*Walkthrough: Castle*' -and (Get-Date) -lt $deadline) {
+                    Start-Sleep -Milliseconds 200
+                }
+                Start-Sleep -Seconds 2
+                $baseline = Read-Saves
+                [System.Windows.Forms.SendKeys]::SendWait('^+b')
+                [void](Wait-BookmarkNames @('Castle gate, *% through') 'opening the Bookmarks tab')
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                $report.bookmarkTop = Wait-TopRowLike '*Walkthrough: Castle*' 'following a bookmark'
+                Assert-FocusInGuide 'following a bookmark'
+                Wait-SavedAfter $baseline 'Following a bookmark'
+                # Delete, then Undo within 10 s. Wide: the pane stays open.
+                Select-Bookmark 'Castle gate*'
+                [System.Windows.Forms.SendKeys]::SendWait('{DELETE}')
+                [void](Wait-Status 'Bookmark deleted.')
+                [void](Wait-VisibleById 'ReaderBookmarksEmpty')
+                # Undo with the pane closed: the keyboard goes back to the guide.
+                [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                Wait-HiddenById 'ReaderBookmarksEmpty'
+                (Wait-VisibleById 'ShellStatusAction').SetFocus()
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                Assert-FocusInGuide 'undoing with the pane closed'
+                [System.Windows.Forms.SendKeys]::SendWait('^+b')
+                [void](Wait-BookmarkNames @('Castle gate, *% through') 'undoing the delete')
+                $report.bookmarkTxtScreenshot = Save-WindowScreenshot 'bookmark-txt'
+                $report.phases += 'bookmark-txt'
+            }
+            elseif ($Mode -eq 'bookmark-restart') {
+                # A new launch on the same data: bookmark-txt's bookmark is still there.
+                Open-TextGuide 'Sections Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Wait-FirstTextRow
+                [System.Windows.Forms.SendKeys]::SendWait('^+b')
+                [void](Wait-BookmarkNames @('Castle gate, *% through') 'reopening after a restart')
+                $report.phases += 'bookmark-restart'
+            }
+            elseif ($Mode -eq 'bookmark-html') {
+                # The keyboard is in the page (#115): the toolbar's commands drive the pane.
+                Open-TextGuide 'Contents Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-PageName 'Contents Web Guide')
+                [void](Wait-HtmlPosition { param($p) $p.locator } 'a first capture')
+                Invoke-OverflowCommand 'Contents'
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                Wait-ContentsSelected 'Getting started'
+                Wait-FocusIn 'ReaderContentsTree' 'choosing Contents on the toolbar'
+                [System.Windows.Forms.SendKeys]::SendWait('{DOWN}{DOWN}{DOWN}{ENTER}')
+                [void](Wait-HtmlPosition { param($p) $p.quote -like 'Castle*' } 'the Castle heading on top')
+                Invoke-OverflowCommand 'Add bookmark'
+                [void](Wait-Status 'Bookmark added.')
+                [void](Wait-BookmarkNames @('The castle*') 'adding from the toolbar')
+                Wait-FocusOnBookmark 'adding from the toolbar'
+
+                # Away to the first section through Contents, then back through Bookmarks.
+                Invoke-OverflowCommand 'Contents'
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                Wait-ContentsSelected 'The castle'
+                Wait-FocusIn 'ReaderContentsTree' 'choosing Contents again'
+                [System.Windows.Forms.SendKeys]::SendWait('{UP}{UP}{UP}{ENTER}')
+                [void](Wait-HtmlPosition { param($p) $p.quote -and $p.quote -notlike 'Castle*' } 'leaving the Castle heading')
+                Invoke-OverflowCommand 'Bookmarks'
+                [void](Wait-BookmarkNames @('The castle*') 'opening the Bookmarks tab')
+                Wait-FocusOnBookmark 'choosing Bookmarks on the toolbar'
+
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                [void](Wait-HtmlPosition { param($p) $p.quote -like 'Castle*' } 'following the bookmark')
+                $report.bookmarkHtmlScreenshot = Save-WindowScreenshot 'bookmark-html'
+                $report.phases += 'bookmark-html'
+            }
+            elseif ($Mode -eq 'bookmark-pdf') {
+                Open-TextGuide 'Long PDF Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-PdfPage 1 200 'page 1 of 200')
+                [System.Windows.Forms.SendKeys]::SendWait('{PGDN}{PGDN}')
+                [void](Wait-PdfPage 3 200 'page 3 of 200')
+                # No outline in this guide: the page names the bookmark.
+                [System.Windows.Forms.SendKeys]::SendWait('^d')
+                [void](Wait-Status 'Bookmark added.')
+                [void](Wait-BookmarkNames @('Page 3, page 3') 'adding in a PDF')
+                # The pane opened on Bookmarks; the Contents tab still shows this guide's contents.
+                (Find-ById 'ReaderPaneContentsTab').GetCurrentPattern(
+                    [System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+                [void](Wait-Name 'ReaderContentsEmpty' 'No sections found in this guide.')
+                # A double click on Add makes one bookmark.
+                [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                Wait-HiddenById 'ReaderContentsEmpty'
+                [System.Windows.Forms.SendKeys]::SendWait('{PGDN}')
+                [void](Wait-PdfPage 4 200 'page 4 of 200')
+                [System.Windows.Forms.SendKeys]::SendWait('^+b')
+                $add = (Wait-VisibleById 'ReaderBookmarksAdd').GetCurrentPattern(
+                    [System.Windows.Automation.InvokePattern]::Pattern)
+                $add.Invoke()
+                $add.Invoke()
+                [void](Wait-Status 'Bookmark added.')
+                Start-Sleep -Seconds 2
+                [void](Wait-BookmarkNames @('Page 3, page 3', 'Page 4, page 4') 'a double click on Add')
+                $report.phases += 'bookmark-pdf'
+            }
+            elseif ($Mode -eq 'bookmark-changed') {
+                # Seeded: one bookmark saved against older content, and one damaged.
+                Open-TextGuide 'Sections Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Wait-FirstTextRow
+                [System.Windows.Forms.SendKeys]::SendWait('^+b')
+                [void](Wait-BookmarkNames @('Old place', 'Damaged bookmark') 'opening seeded bookmarks')
+                Select-Bookmark 'Old place'
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                [void](Wait-Status "This bookmark's place couldn't be found.")
+                [void](Wait-BookmarkNames @('Old place', 'Damaged bookmark') 'a place that can''t be found')
+                # A damaged bookmark offers only Delete: no rename.
+                Select-Bookmark 'Damaged bookmark'
+                [System.Windows.Forms.SendKeys]::SendWait('{F2}')
+                Start-Sleep -Milliseconds 500
+                $editor = Find-ById 'ReaderBookmarkEditor'
+                if ($editor -and -not $editor.Current.IsOffscreen) { throw 'A damaged bookmark offered a rename.' }
+                $report.bookmarkChangedScreenshot = Save-WindowScreenshot 'bookmark-changed'
+                [System.Windows.Forms.SendKeys]::SendWait('{DELETE}')
+                [void](Wait-Status 'Bookmark deleted.')
+                [void](Wait-BookmarkNames @('Old place') 'deleting the damaged bookmark')
+                $report.phases += 'bookmark-changed'
             }
             elseif ($Mode -eq 'find-pdf-scan') {
                 Open-TextGuide 'Scanned PDF Guide'
@@ -6007,6 +6229,8 @@ try {
             ShortcutZoomOut = 'Zoom out (PDF) or smaller text, Ctrl+Minus'
             ShortcutZoomReset = 'Fit to width (PDF) or reset text size, Ctrl+0'
             ShortcutCloseDialog = 'Close the dialog, Esc'
+            ShortcutAddBookmark = 'Add bookmark, Ctrl+D'
+            ShortcutShowBookmarks = 'Show bookmarks, Ctrl+Shift+B'
         }
         foreach ($id in $expected.Keys) {
             [void](Show-SettingsCard $id)
@@ -7900,6 +8124,13 @@ try {
 }
 catch {
     $report.error = $_ | Out-String
+    # T19.1: what a failed bookmark operation threw, when the gate recorded one.
+    if ($Mode -like 'bookmark-*' -and $AppCacheRoot) {
+        $failure = Join-Path $AppCacheRoot "diagnostics\bookmarks-$ProcessId.json"
+        if (Test-Path -LiteralPath $failure) {
+            try { $report.bookmarkFailure = Get-Content -LiteralPath $failure -Raw -Encoding UTF8 | ConvertFrom-Json } catch { }
+        }
+    }
     if (($Mode -eq 'game-editor' -or $Mode -eq 'catalog' -or $Mode -like 'import-*' -or $Mode -like 'remove-*' -or
         $Mode -like 'provider-*' -or $Mode -like 'game-actions*' -or $Mode -like 'export-*' -or
         $Mode -like 'restore-*') -and $root) {

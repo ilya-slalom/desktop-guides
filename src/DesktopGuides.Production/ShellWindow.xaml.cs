@@ -162,6 +162,7 @@ public sealed partial class ShellWindow : Window
         InitializeKeyboard();
         InitializeFind();
         InitializeContents();
+        InitializeBookmarks();
         InitializeShortcutList();
     }
 

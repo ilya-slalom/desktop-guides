@@ -1,8 +1,8 @@
 # T19.1 bookmarks: design
 
 Status: approved in conversation, 16 October 2026. PR a (storage and
-backup) is implemented on `feat/p2-t19-1-bookmarks`; PR b (the Bookmarks
-tab) follows.
+backup) merged as #126. PR b (the Bookmarks tab) is implemented on
+`feat/p2-t19-1-bookmarks-tab`.
 
 ## Intent
 
@@ -173,6 +173,10 @@ design.
 3. **One place, one bookmark:** adding at an already bookmarked place
    selects the existing bookmark (the user's choice).
 4. **"Add bookmark" is also a toolbar command**, because of #115.
+5. **The Bookmarks tab has its own "Add bookmark" button,** beside the
+   toolbar's, as the design's mock-up showed.
+6. **Opening the tab selects the first bookmark** when no add or follow
+   chose one; the design doesn't say which.
 
 ## PR a verification record
 
@@ -206,4 +210,56 @@ See the [PR a plan](t19-1-bookmarks-plan.md).
   - **The minors are deferred:** a hand-edited non-hex id, a hand-edited
     label of astral characters, and a test that could delete the real
     guide first.
+
+## PR b verification record
+
+See the [PR b plan](t19-1-bookmarks-tab-plan.md).
+
+- **Core,** each test failing first and then passing on the host:
+  - `BookmarkListTests` (14): reading order, the duplicate check (a stale
+    bookmark isn't "here"), default labels, screen-reader names and the
+    messages;
+  - the two keyboard rows;
+  - `NoTwoShortcutsShareKeysWhereBothCanRun`, the first key-conflict
+    test. A temporary clash made it fail with "ShowContents and
+    ShowBookmarks on Ctrl+Shift+C".
+  - the bookmark keys' routing, the commands' Outline capability, and the
+    two toolbar tooltips.
+
+  The full suite passes, 1295/1295. Infrastructure passes 829/829.
+- **Production:** it builds with 0 warnings, with warnings as errors. The
+  reader-toolbar smoke project, which compiles the toolbar directly, still
+  builds.
+- **Installed:** the `navigation` shard passes on both lanes, with
+  `bookmark-txt`, `bookmark-restart`, `bookmark-html`, `bookmark-pdf` and
+  `bookmark-changed` beside the contents and find modes. Screenshots:
+  [bookmark-txt](evidence/ci/t19-1/bookmark-txt.png),
+  [bookmark-html](evidence/ci/t19-1/bookmark-html.png) and
+  [bookmark-changed](evidence/ci/t19-1/bookmark-changed.png).
+- **Found on the way:** the installed runs found three focus bugs, each
+  fixed in the app:
+  1. "This place is already bookmarked." was announced before the list
+     had focus, so a key pressed then was lost. The status now waits for
+     the focus.
+  2. A list just shown had no rows to focus yet, so focus fell to the Add
+     button. The list lays out first, as the guide list does.
+  3. The toolbar's overflow menu, closing, took focus back from the pane.
+     Contents, Bookmarks and Add bookmark now run after it closes.
+
+  They also found a race that predates this work: a database check failed
+  while SQLite deleted its `-wal` file. It showed as "Couldn't load this
+  guide's bookmarks." and was fixed separately in #128.
+- **Final review:** 0 Critical. One Important finding, and two Minor ones
+  raised to Important by their effect, are fixed, each with an installed
+  step:
+  1. **The Contents tab was blank** after the pane opened on Bookmarks.
+     The step failed first, then passed.
+  2. **Undo with the pane closed left focus nowhere.** The step failed
+     first, then passed.
+  3. **A double click on Add made two bookmarks at one place.** The step
+     passes; as a race, it wasn't seen failing first.
+
+  The minors are deferred and listed in the PR. Also fixed after the
+  screenshots: the Bookmarks tab's label was clipped, so the tabs now share
+  the pane's width.
 

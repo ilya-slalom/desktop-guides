@@ -132,6 +132,28 @@
                     <FontIcon Glyph="&#xE8FD;" />
                 </AppBarButton.Icon>
             </AppBarButton>
+            <AppBarButton x:Name="ShowBookmarks"
+                          Label="Bookmarks"
+                          ToolTipService.ToolTip="Bookmarks (Ctrl+Shift+B)"
+                          AutomationProperties.AcceleratorKey="Ctrl+Shift+B"
+                          Visibility="Collapsed"
+                          Click="ShowBookmarksClicked">
+                <AppBarButton.Icon>
+                    <!-- Bookmarks. -->
+                    <FontIcon Glyph="&#xE8A4;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton x:Name="AddBookmark"
+                          Label="Add bookmark"
+                          ToolTipService.ToolTip="Add bookmark (Ctrl+D)"
+                          AutomationProperties.AcceleratorKey="Ctrl+D"
+                          Visibility="Collapsed"
+                          Click="AddBookmarkClicked">
+                <AppBarButton.Icon>
+                    <!-- Add. -->
+                    <FontIcon Glyph="&#xE710;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
             <AppBarButton x:Name="FindInGuide"
                           Icon="Find"
                           Label="Find in guide"

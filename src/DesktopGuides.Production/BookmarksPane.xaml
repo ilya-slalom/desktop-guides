@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl x:Class="DesktopGuides.Production.BookmarksPane"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:DesktopGuides.Production"
+             AutomationProperties.AutomationId="ReaderBookmarksPane"
+             AutomationProperties.Name="Bookmarks">
+    <Grid RowSpacing="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Button x:Name="AddButton" Content="Add bookmark" Click="AddClicked"
+                ToolTipService.ToolTip="Add bookmark (Ctrl+D)"
+                AutomationProperties.AutomationId="ReaderBookmarksAdd" />
+        <TextBlock x:Name="Empty" Grid.Row="1" Visibility="Collapsed" TextWrapping="Wrap"
+                   Text="No bookmarks in this guide yet."
+                   AutomationProperties.AutomationId="ReaderBookmarksEmpty"
+                   Style="{StaticResource DesktopGuidesBodyStyle}" />
+        <ListView x:Name="List" Grid.Row="2" Visibility="Collapsed"
+                  SelectionMode="Single" IsItemClickEnabled="True"
+                  ItemClick="ItemClicked" KeyDown="ListKeyDown"
+                  ContainerContentChanging="ListContainerChanging"
+                  AutomationProperties.AutomationId="ReaderBookmarksList"
+                  AutomationProperties.Name="Bookmarks">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="local:BookmarkRow">
+                    <Grid>
+                        <TextBlock Text="{x:Bind Label}" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   Visibility="{x:Bind LabelVisibility, Mode=OneWay}" />
+                        <TextBox MaxLength="80"
+                                 Visibility="{x:Bind EditorVisibility, Mode=OneWay}"
+                                 KeyDown="EditorKeyDown" LostFocus="EditorLostFocus"
+                                 AutomationProperties.AutomationId="ReaderBookmarkEditor"
+                                 AutomationProperties.Name="Bookmark name" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </Grid>
+</UserControl>

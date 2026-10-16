@@ -19,6 +19,8 @@ public sealed class ReaderToolbarTooltipTests
     [InlineData("GoToPage", ShortcutCommand.GoToPage)]
     [InlineData("FitToWidth", ShortcutCommand.ZoomReset)]
     [InlineData("ResetTextSize", ShortcutCommand.ZoomReset)]
+    [InlineData("ShowBookmarks", ShortcutCommand.ShowBookmarks)]
+    [InlineData("AddBookmark", ShortcutCommand.AddBookmark)]
     public void EachToolbarTooltipNamesItsKeys(string name, ShortcutCommand command)
     {
         string xaml = File.ReadAllText(Path.Combine(
