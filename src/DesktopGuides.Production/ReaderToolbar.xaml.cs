@@ -135,6 +135,8 @@ public sealed partial class ReaderToolbar : UserControl
         bool fitWidth = supported.Contains(ReaderCommand.FitWidth);
         bool find = supported.Contains(ReaderCommand.Find);
         bool contents = supported.Contains(ReaderCommand.Contents);
+        bool bookmarks = supported.Contains(ReaderCommand.Bookmarks);
+        bool addBookmark = supported.Contains(ReaderCommand.AddBookmark);
         PageStart.Visibility = Show(edges);
         PreviousPage.Visibility = Show(pages);
         NextPage.Visibility = Show(pages);
@@ -149,9 +151,12 @@ public sealed partial class ReaderToolbar : UserControl
         FitToWidth.Visibility = Show(fitWidth);
         FindInGuide.Visibility = Show(find);
         ShowContents.Visibility = Show(contents);
+        ShowBookmarks.Visibility = Show(bookmarks);
+        AddBookmark.Visibility = Show(addBookmark);
         GroupSeparator.Visibility = Show(ReaderCommandPolicy.ShowsGroupSeparator(supported));
         Commands.Visibility = Show(
-            pages || edges || textSize || zoom || pageJump || fitWidth || find || contents);
+            pages || edges || textSize || zoom || pageJump || fitWidth || find || contents ||
+            bookmarks || addBookmark);
     }
 
     private static Visibility Show(bool visible) =>
@@ -412,7 +417,8 @@ public sealed partial class ReaderToolbar : UserControl
             foreach (Control command in new Control[]
             {
                 PageStart, PreviousPage, NextPage, PageEnd, SmallerText, LargerText,
-                ZoomOut, ZoomIn, GoToPage, FitToWidth, ResetTextSize, ShowContents, FindInGuide
+                ZoomOut, ZoomIn, GoToPage, FitToWidth, ResetTextSize, ShowContents, ShowBookmarks, AddBookmark,
+                FindInGuide
             })
             {
                 if (command.Visibility == Visibility.Visible &&
@@ -497,4 +503,14 @@ public sealed partial class ReaderToolbar : UserControl
 
     private void ShowContentsClicked(object sender, RoutedEventArgs args) =>
         ContentsRequested?.Invoke(this, EventArgs.Empty);
+
+    // T19.1: the shell opens the Bookmarks tab, or adds a bookmark here.
+    public event EventHandler? BookmarksRequested;
+    public event EventHandler? AddBookmarkRequested;
+
+    private void ShowBookmarksClicked(object sender, RoutedEventArgs args) =>
+        BookmarksRequested?.Invoke(this, EventArgs.Empty);
+
+    private void AddBookmarkClicked(object sender, RoutedEventArgs args) =>
+        AddBookmarkRequested?.Invoke(this, EventArgs.Empty);
 }

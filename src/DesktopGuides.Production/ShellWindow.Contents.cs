@@ -1,3 +1,4 @@
+using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Reading;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -25,21 +26,24 @@ public sealed partial class ShellWindow
             if (ContentsNarrow) CloseContents(focusGuide: false);
             _ = OpenFindAsync();
         };
-        ReaderActions.ContentsRequested += (_, _) => ToggleContents();
+        ReaderActions.ContentsRequested += (_, _) => TogglePane(ReaderPaneTab.Contents);
         ReaderBody.SizeChanged += (_, _) => UpdateContentsLayout();
     }
 
     // Called once a session's tracking starts, so a restore has run.
-    private void StartContents(IReaderSession session)
+    private void StartContents(IReaderSession session, Guide guide, string contentSha256, string? htmlEntry)
     {
         StopContents();
         if (session is not IOutlineReader reader) return;
+        StartBookmarks(guide, contentSha256, htmlEntry);
         CancellationTokenSource cancel = new();
         outlineCancel = cancel;
         if (contentsOpen)
         {
             ShowContentsHost();
+            ReaderContents.ShowTab(paneTab);
             ReaderContents.ShowBuilding();
+            if (paneTab == ReaderPaneTab.Bookmarks) _ = RefreshBookmarksAsync(select: null, focus: false);
         }
         _ = BuildOutlineAsync(session, reader, cancel.Token);
     }
@@ -66,17 +70,27 @@ public sealed partial class ShellWindow
         if (ReaderContentsHost.Visibility == Visibility.Visible) await ShowOutlineAsync(focus: false);
     }
 
-    private void ToggleContents()
+    // The command for the tab already showing closes the pane.
+    private void TogglePane(ReaderPaneTab tab)
     {
-        if (ReaderContentsHost.Visibility == Visibility.Visible) CloseContents(focusGuide: true);
-        else _ = OpenContentsAsync();
+        if (ReaderContentsHost.Visibility == Visibility.Visible && ReaderContents.Tab == tab)
+        {
+            CloseContents(focusGuide: true);
+        }
+        else
+        {
+            _ = OpenPaneAsync(tab);
+        }
     }
+
+    private Task OpenPaneAsync(ReaderPaneTab tab) =>
+        tab == ReaderPaneTab.Bookmarks ? OpenBookmarksAsync(select: null) : OpenContentsAsync();
 
     private bool ToggleContentsFromKeyboard()
     {
         // Before tracking starts there's no outline to show yet.
         if (readerSession is not IOutlineReader || outlineCancel is null) return false;
-        ToggleContents();
+        TogglePane(ReaderPaneTab.Contents);
         return true;
     }
 
@@ -84,6 +98,8 @@ public sealed partial class ShellWindow
     {
         if (readerSession is not IOutlineReader || outlineCancel is null) return;
         contentsOpen = true;
+        paneTab = ReaderPaneTab.Contents;
+        ReaderContents.ShowTab(ReaderPaneTab.Contents);
         ShowContentsHost();
         if (outline is null)
         {
@@ -152,6 +168,7 @@ public sealed partial class ShellWindow
         outlineCancel = null;
         outline = null;
         ReaderContents.Clear();
+        StopBookmarks();
         HideContentsHost();
     }
 
