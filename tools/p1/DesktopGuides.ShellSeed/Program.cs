@@ -8,6 +8,7 @@ using System.Text.Json.Nodes;
 using DesktopGuides.Core.Backup;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Import;
+using DesktopGuides.Core.Reading;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Providers;
 using DesktopGuides.Infrastructure.Artwork;
@@ -848,6 +849,33 @@ if (args.Length >= 3 && args[0] == "describe-text-scales")
         scales[id] = preferences?.TextScale;
     }
     Console.WriteLine(JsonSerializer.Serialize(scales));
+    return 0;
+}
+
+if (args.Length == 2 && args[0] == "clear-bookmarks")
+{
+    // T19.1: each bookmark pass that adds its own starts from none.
+    ExecuteSql(new ManagedPathResolver(args[1]), "DELETE FROM Bookmarks");
+    return 0;
+}
+
+if (args.Length == 2 && args[0] == "seed-bookmarks")
+{
+    // T19.1: Sections Guide gets a bookmark saved against older content,
+    // whose words aren't in the guide and which has no estimate (so it can't
+    // be found), and one whose locator doesn't parse.
+    string stale = ReaderLocationCodec.Serialize(new ReaderLocation(
+        GuideFormat.Txt, ReaderLocationCodec.CurrentVersion, new string('0', 64),
+        new TextPosition(0, "These words were never in the sections guide."), null));
+    ExecuteSql(new ManagedPathResolver(args[1]), $$"""
+        DELETE FROM Bookmarks;
+        INSERT INTO Bookmarks (Id, GuideId, LocatorJson, Label, CreatedUtcMs, UpdatedUtcMs)
+        SELECT '{{Guid.NewGuid():N}}', Id, '{{stale}}', 'Old place', 1000, 1000
+        FROM Guides WHERE Title = 'Sections Guide';
+        INSERT INTO Bookmarks (Id, GuideId, LocatorJson, Label, CreatedUtcMs, UpdatedUtcMs)
+        SELECT '{{Guid.NewGuid():N}}', Id, '{not json', 'Broken', 2000, 2000
+        FROM Guides WHERE Title = 'Sections Guide';
+        """);
     return 0;
 }
 

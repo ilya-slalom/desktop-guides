@@ -1840,6 +1840,22 @@ function Run-NavigationScenarios {
     if ($null -eq (& $estimateOf 'Outline PDF Guide')) {
         throw 'Following a PDF outline entry stored no place.'
     }
+
+    # T19.1: bookmarks.
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    Invoke-ShellSeed @('clear-bookmarks', $dataRoot) | Out-Null
+    $report.bookmarkTxt = Invoke-ProgressPass 'bookmark-txt' 0
+    if ($null -eq (& $estimateOf 'Sections Guide')) {
+        throw 'Following a bookmark stored no place.'
+    }
+    $report.bookmarkRestart = Invoke-ProgressPass 'bookmark-restart' 0
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.bookmarkHtml = Invoke-ProgressPass 'bookmark-html' 0 -HtmlPosition
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.bookmarkPdf = Invoke-ProgressPass 'bookmark-pdf' 0
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    Invoke-ShellSeed @('seed-bookmarks', $dataRoot) | Out-Null
+    $report.bookmarkChanged = Invoke-ProgressPass 'bookmark-changed' 0
 }
 
 function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $Kill, [string] $resultName = $mode,
