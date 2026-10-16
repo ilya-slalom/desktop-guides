@@ -871,7 +871,9 @@ if (args.Length == 3 && args[0] == "seed-reflow")
         string chapter = File.ReadAllText(Path.Combine(Path.GetFullPath(args[2]), "p2", "txt-reflow.txt"));
         string folder = Directory.CreateTempSubdirectory("desktop-guides-reflow-").FullName;
         string file = Path.Combine(folder, "reflow-guide.txt");
-        File.WriteAllText(file, string.Concat(Enumerable.Range(1, 12).Select(n => $"Chapter {n:00}\n\n{chapter}\n")));
+        // Then one tall preserved block: a 120-row table with no blank lines.
+        string table = string.Concat(Enumerable.Range(1, 120).Select(n => $"Row {n:000}    Item {n:000}    Price {n * 10}\n"));
+        File.WriteAllText(file, string.Concat(Enumerable.Range(1, 12).Select(n => $"Chapter {n:00}\n\n{chapter}\n")) + "Item table\n\n" + table);
         if (await new GuideImportValidator().InspectAsync(file, CancellationToken.None) is not ImportReady ready)
         {
             throw new InvalidOperationException("The reflow guide failed the import preview.");

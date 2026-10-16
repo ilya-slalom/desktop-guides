@@ -4496,6 +4496,34 @@ try {
                 if (-not $item) { throw 'The Reflow view shows no block to focus.' }
                 $item.SetFocus()
             }
+            # A text inside the visible part of the Reflow list, found through the blocks' text.
+            $textBlock = New-Object System.Windows.Automation.PropertyCondition(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::Text)
+            function Test-ReflowTextVisible([string] $text) {
+                $list = Find-ById 'ReaderReflowBlocks'
+                if (-not $list) { return $false }
+                $bounds = $list.Current.BoundingRectangle
+                foreach ($block in @($list.FindAll([System.Windows.Automation.TreeScope]::Descendants, $textBlock))) {
+                    $pattern = $null
+                    if (-not $block.TryGetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern, [ref] $pattern)) { continue }
+                    $range = $pattern.DocumentRange.FindText($text, $false, $false)
+                    if (-not $range) { continue }
+                    foreach ($rect in $range.GetBoundingRectangles()) {
+                        if ($rect.Height -gt 0 -and $rect.Top -ge $bounds.Top -and $rect.Bottom -le $bounds.Bottom) { return $true }
+                    }
+                }
+                return $false
+            }
+            function Wait-ReflowTextVisible([string] $text, [string] $step) {
+                $deadline = (Get-Date).AddSeconds(8)
+                do {
+                    if (Test-ReflowTextVisible $text) { return }
+                    Start-Sleep -Milliseconds 250
+                } while ((Get-Date) -lt $deadline)
+                [void](Save-WindowScreenshot 'reflow-text-hidden')
+                throw "After $step '$text' isn't on screen in the Reflow view."
+            }
             function Find-Next([string] $query, [string] $count) {
                 [System.Windows.Forms.SendKeys]::SendWait('^f')
                 [void](Wait-VisibleById 'ReaderFindBar')
@@ -5154,6 +5182,13 @@ try {
                 Wait-StatusClosed
                 Wait-FirstTextRow
                 Wait-TextViewChosen 'Original'
+                # Final review: a quick second choice wins; the view follows the choice.
+                Select-TextView 'Reflow'
+                Select-TextView 'Original'
+                Start-Sleep -Seconds 3
+                Wait-TextViewChosen 'Original'
+                $settled = Read-TextPlace
+                if ($settled -and $settled.view -ne 'Original') { throw "The choice reads Original, but the view is $($settled.view)." }
                 # Down to chapter 7 in Original, by search.
                 Find-Next 'Chapter 07' '1 of 1'
                 [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
@@ -5227,6 +5262,14 @@ try {
                 [void](Wait-TextPlace { param($p) $p.view -eq 'Original' -and $p.offset -gt $second.offset } 'the third match in Original')
                 Select-TextView 'Reflow'
                 [void](Wait-Status 'Reflow view.')
+                # Final review: a match deep in a tall block shows on screen, and stays
+                # there when the find bar closes and the reading area grows.
+                Find-Next 'Row 100' '1 of 1'
+                Wait-ReflowTextVisible 'Row 100' 'finding a row deep in the table'
+                [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                Wait-HiddenById 'ReaderFindBar'
+                Start-Sleep -Seconds 1
+                Wait-ReflowTextVisible 'Row 100' 'closing the find bar'
                 $report.phases += 'reflow-find'
             }
             elseif ($Mode -eq 'reflow-bookmark') {
