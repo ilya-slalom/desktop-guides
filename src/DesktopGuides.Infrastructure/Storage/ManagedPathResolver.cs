@@ -50,13 +50,47 @@ public sealed class ManagedPathResolver : ILibraryPaths
 
     public void ValidateDatabasePath()
     {
-        foreach (string suffix in new[] { "", "-wal", "-shm", "-journal" })
+        RejectDatabaseFileLinks(DatabasePath);
+        foreach (string suffix in new[] { "-wal", "-shm", "-journal" })
         {
-            string path = DatabasePath + suffix;
-            RejectFilesystemLinks(path);
-            if (OperatingSystem.IsWindows() && File.Exists(path))
+            ValidateSidecar(DatabasePath + suffix);
+        }
+    }
+
+    private static void RejectDatabaseFileLinks(string path)
+    {
+        RejectFilesystemLinks(path);
+        if (OperatingSystem.IsWindows() && File.Exists(path))
+        {
+            WindowsFileLinks.RejectMultipleHardLinks(path);
+        }
+    }
+
+    // SQLite deletes -wal and -journal as a connection closes, and while
+    // that delete is pending Windows denies access to the file. A sidecar
+    // this process can't read is one SQLite here can't open either, so it
+    // can't be followed: it passes. A sharing violation is tried again
+    // briefly, and a sidecar that vanished meanwhile passes too.
+    private static void ValidateSidecar(string path)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            try
             {
-                WindowsFileLinks.RejectMultipleHardLinks(path);
+                RejectDatabaseFileLinks(path);
+                return;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return;
+            }
+            catch (IOException) when (!File.Exists(path))
+            {
+                return;
+            }
+            catch (IOException) when (attempt < 5)
+            {
+                Thread.Sleep(50);
             }
         }
     }

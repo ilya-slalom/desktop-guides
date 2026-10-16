@@ -1,5 +1,8 @@
-using DesktopGuides.Infrastructure.Storage;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using DesktopGuides.Infrastructure.Storage;
+using Microsoft.Win32.SafeHandles;
 using Xunit;
 
 namespace DesktopGuides.Infrastructure.Tests;
@@ -45,6 +48,27 @@ public sealed class ManagedPathResolverTests
         Directory.CreateSymbolicLink(directoryLink, outsideDirectory);
         Assert.Throws<InvalidDataException>(() =>
             paths.ResolveExistingGuideFile(guideId, "linked/secret.txt"));
+    }
+
+    // SQLite deletes -wal as a connection closes. While that delete is pending,
+    // Windows denies access to the file; the check must not fail the open.
+    [Fact]
+    public void ASidecarBeingDeletedPassesTheCheck()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using TestLibrary directory = new();
+        ManagedPathResolver paths = directory.Paths;
+        paths.EnsureCreated();
+        File.WriteAllText(paths.DatabasePath, "");
+        string wal = paths.DatabasePath + "-wal";
+        File.WriteAllText(wal, "wal");
+        using SafeFileHandle pending = DeletePending.Open(wal);
+
+        paths.ValidateDatabasePath();
     }
 
     [Fact]
@@ -153,5 +177,39 @@ public sealed class ManagedPathResolverTests
                 Directory.Delete(Root, true);
             }
         }
+    }
+
+    // A handle with DELETE access marked for the classic (non-POSIX) delete:
+    // the name stays, and other opens are denied, until the handle closes.
+    private static class DeletePending
+    {
+        private const uint Delete = 0x00010000;
+        private const uint GenericRead = 0x80000000;
+        private const uint ShareAll = 7;
+        private const uint OpenExisting = 3;
+        private const int FileDispositionInfo = 4;
+
+        public static SafeFileHandle Open(string path)
+        {
+            SafeFileHandle handle = CreateFileW(
+                path, Delete | GenericRead, ShareAll, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+            if (handle.IsInvalid) throw new Win32Exception();
+            byte deleteFile = 1;
+            if (!SetFileInformationByHandle(handle, FileDispositionInfo, ref deleteFile, 1))
+            {
+                handle.Dispose();
+                throw new Win32Exception();
+            }
+            return handle;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern SafeFileHandle CreateFileW(
+            string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetFileInformationByHandle(
+            SafeFileHandle handle, int infoClass, ref byte info, uint size);
     }
 }
