@@ -1267,12 +1267,95 @@ public sealed class SqliteLibraryRepositoryTests
         await using SqliteLibraryRepository repository = new(directory.Paths);
         await repository.InitializeAsync();
 
-        Assert.Equal(5L, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.Equal((long)LibrarySchema.CurrentVersion, ReadUserVersion(directory.Paths.DatabasePath));
         Assert.NotNull(await repository.GetGuideAsync(guideId));
         using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
         using SqliteCommand count = connection.CreateCommand();
         count.CommandText = "SELECT count(*) FROM Bookmarks";
         Assert.Equal(0L, (long)count.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public async Task UpgradesPopulatedVersionFiveWithOriginalViews()
+    {
+        using TestLibrary directory = new();
+        Guid gameId = Guid.NewGuid();
+        Guid guideId = Guid.NewGuid();
+        CreatePopulatedVersionFive(directory, gameId, guideId);
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+
+        Assert.Equal(6L, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.Equal(TextViewMode.Original, (await repository.GetReaderPreferencesAsync(guideId))?.TextView);
+    }
+
+    [Fact]
+    public async Task FailedVersionSixMigrationStaysAtVersionFive()
+    {
+        using TestLibrary directory = new();
+        CreatePopulatedVersionFive(directory, Guid.NewGuid(), Guid.NewGuid());
+
+        await using (SqliteLibraryRepository failing = new(directory.Paths, null, version =>
+        {
+            if (version == 6) throw new IOException("Injected after the v6 column was added.");
+        }))
+        {
+            LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(() => failing.InitializeAsync());
+            Assert.Equal(LibraryOpenIssue.MigrationFailed, error.Issue);
+        }
+
+        Assert.Equal(5L, ReadUserVersion(directory.Paths.DatabasePath));
+    }
+
+    // Review Focus 5: each save changes only its own column.
+    [Fact]
+    public async Task TheViewAndTheTextSizeSaveApart()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Reflow", null, null);
+        Guid guide = Guid.NewGuid();
+        InsertGuide(directory.Paths.DatabasePath, guide, game.Id);
+
+        await repository.SaveReaderPreferencesAsync(guide, 1.25);
+        await repository.SaveTextViewAsync(guide, TextViewMode.Reflow);
+        Assert.Equal(new ReaderPreferences(guide, 1.25, TextViewMode.Reflow), await repository.GetReaderPreferencesAsync(guide));
+
+        await repository.SaveReaderPreferencesAsync(guide, 1.5);
+        Assert.Equal(TextViewMode.Reflow, (await repository.GetReaderPreferencesAsync(guide))?.TextView);
+        await repository.SaveTextViewAsync(guide, TextViewMode.Original);
+        Assert.Equal(new ReaderPreferences(guide, 1.5, TextViewMode.Original), await repository.GetReaderPreferencesAsync(guide));
+    }
+
+    [Fact]
+    public async Task SavingTheViewOfAMissingGuideFails()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => repository.SaveTextViewAsync(Guid.NewGuid(), TextViewMode.Reflow));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => repository.SaveTextViewAsync(Guid.NewGuid(), (TextViewMode)7));
+    }
+
+    [Fact]
+    public async Task TheColumnRefusesAnUnknownView()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Reflow", null, null);
+        Guid guide = Guid.NewGuid();
+        InsertGuide(directory.Paths.DatabasePath, guide, game.Id);
+
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand update = connection.CreateCommand();
+        update.CommandText = $"UPDATE ReaderPreferences SET TextView = 'Wide' WHERE GuideId = '{guide:N}'";
+        Assert.Throws<SqliteException>(() => update.ExecuteNonQuery());
     }
 
     [Fact]
@@ -1587,6 +1670,15 @@ public sealed class SqliteLibraryRepositoryTests
                 () => repository.RenameBookmarkAsync(Guid.NewGuid(), "   "));
             Assert.Empty(await repository.ListBookmarksAsync(guide));
         }
+    }
+
+    private static void CreatePopulatedVersionFive(TestLibrary directory, Guid gameId, Guid guideId)
+    {
+        CreatePopulatedVersionFour(directory, gameId, guideId);
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = LibrarySchema.Version5;
+        command.ExecuteNonQuery();
     }
 
     private static void CreatePopulatedVersionFour(TestLibrary directory, Guid gameId, Guid guideId)

@@ -2,7 +2,7 @@ namespace DesktopGuides.Infrastructure.Storage;
 
 internal static class LibrarySchema
 {
-    public const int CurrentVersion = 5;
+    public const int CurrentVersion = 6;
 
     public const string Version1 = """
         CREATE TABLE Games (
@@ -118,12 +118,20 @@ internal static class LibrarySchema
         PRAGMA user_version = 5;
         """;
 
+    // T19.2: a TXT guide's Original or Reflow view. Null reads as Original.
+    public const string Version6 = """
+        ALTER TABLE ReaderPreferences ADD COLUMN TextView TEXT
+            CHECK (TextView IS NULL OR TextView IN ('Original', 'Reflow'));
+        PRAGMA user_version = 6;
+        """;
+
     public static readonly (int Version, string Sql)[] Migrations =
     [
         (1, Version1),
         (2, Version2),
         (3, Version3),
         (4, Version4),
-        (5, Version5)
+        (5, Version5),
+        (6, Version6)
     ];
 }

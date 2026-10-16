@@ -68,6 +68,7 @@ internal sealed class FakeRepository : ILibraryRepository
     public Task RestoreBookmarkAsync(Bookmark bookmark, CancellationToken token = default) => throw new NotSupportedException();
     public Task<ReaderPreferences?> GetReaderPreferencesAsync(Guid guideId, CancellationToken token = default) => throw new NotSupportedException();
     public Task SaveReaderPreferencesAsync(Guid guideId, double? textScale, CancellationToken token = default) => throw new NotSupportedException();
+    public Task SaveTextViewAsync(Guid guideId, TextViewMode view, CancellationToken token = default) => throw new NotSupportedException();
     public Task<AppSettings> GetSettingsAsync(CancellationToken token = default) => throw new NotSupportedException();
     public Task SaveSettingsAsync(AppSettings settings, CancellationToken token = default) => throw new NotSupportedException();
     public Task<AppSettings> UpdateSettingsAsync(Func<AppSettings, AppSettings> update, CancellationToken token = default) => throw new NotSupportedException();

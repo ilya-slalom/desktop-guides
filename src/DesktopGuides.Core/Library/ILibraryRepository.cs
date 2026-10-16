@@ -28,6 +28,8 @@ public interface ILibraryRepository : IReadingLocationStore, IGuideCompletionSto
         Guid guideId, CancellationToken token = default);
     Task SaveReaderPreferencesAsync(
         Guid guideId, double? textScale, CancellationToken token = default);
+    // T19.2: changes only the view, so it never races a text-size save.
+    Task SaveTextViewAsync(Guid guideId, TextViewMode view, CancellationToken token = default);
     Task<AppSettings> GetSettingsAsync(CancellationToken token = default);
     Task SaveSettingsAsync(AppSettings settings, CancellationToken token = default);
     Task<AppSettings> UpdateSettingsAsync(
