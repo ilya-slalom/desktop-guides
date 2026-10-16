@@ -4489,6 +4489,13 @@ try {
                 } while ((Get-Date) -lt $deadline)
                 throw "Expected the $view view chosen."
             }
+            # The list itself takes no focus; its blocks do, as the line view's rows.
+            function Focus-ReflowBlock {
+                $list = Wait-VisibleById 'ReaderReflowBlocks'
+                $item = $list.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $bookmarkItem)
+                if (-not $item) { throw 'The Reflow view shows no block to focus.' }
+                $item.SetFocus()
+            }
             function Find-Next([string] $query, [string] $count) {
                 [System.Windows.Forms.SendKeys]::SendWait('^f')
                 [void](Wait-VisibleById 'ReaderFindBar')
@@ -5161,7 +5168,7 @@ try {
                     throw "Reflow opened at offset $($reflow.offset); Original was at $($original.offset)."
                 }
                 # Text size applies to both views.
-                (Wait-VisibleById 'ReaderReflowBlocks').SetFocus()
+                Focus-ReflowBlock
                 [System.Windows.Forms.SendKeys]::SendWait('^{ADD}')
                 [void](Wait-TextPlace { param($p) [double] $p.scale -gt 1 } 'a larger text size')
                 $report.reflowSwitchScreenshot = Save-WindowScreenshot 'reflow-switch'
@@ -5232,7 +5239,7 @@ try {
                 [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
                 Wait-HiddenById 'ReaderFindBar'
                 $marked = Wait-TextPlace { param($p) $p.view -eq 'Reflow' -and $p.offset -gt 0 } 'the place to bookmark'
-                (Wait-VisibleById 'ReaderReflowBlocks').SetFocus()
+                Focus-ReflowBlock
                 [System.Windows.Forms.SendKeys]::SendWait('^d')
                 [void](Wait-Status 'Bookmark added.')
                 [void](Wait-BookmarkNames @('*') 'adding in Reflow')
