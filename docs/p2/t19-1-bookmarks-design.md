@@ -1,6 +1,8 @@
 # T19.1 bookmarks: design
 
-Status: approved in conversation, 16 October 2026. Not yet implemented.
+Status: approved in conversation, 16 October 2026. PR a (storage and
+backup) is implemented on `feat/p2-t19-1-bookmarks`; PR b (the Bookmarks
+tab) follows.
 
 ## Intent
 
@@ -171,3 +173,37 @@ design.
 3. **One place, one bookmark:** adding at an already bookmarked place
    selects the existing bookmark (the user's choice).
 4. **"Add bookmark" is also a toolbar command**, because of #115.
+
+## PR a verification record
+
+See the [PR a plan](t19-1-bookmarks-plan.md).
+
+- **Core,** failing first and then passing on the host:
+  `BookmarkRulesTests` (10). The full suite passes, 1275/1275.
+- **Infrastructure,** on the host:
+  - **the migration:** an upgrade from a populated version 4, and a
+    failed version 5 migration that stays at 4 (2);
+  - **the store** (10, including the review's double undo): list order
+    and fields, rename, delete and undo, the limit at 500, an undo at the
+    limit, a missing guide on add and on undo, the cascade with the
+    reading state left alone, and limits refused before the write;
+  - **backup** (4): the snapshot holds bookmarks; restore refuses a
+    dangling and an oversized row; a version 4 backup restores, then
+    migrates with no bookmarks. The two refusal tests passed when
+    written, because they pin existing validation. A temporary change to
+    valid rows made both fail.
+
+  The full suite passes, 828/828.
+- **Production:** it builds with 0 warnings, with warnings as errors.
+- **Rulings:** the plan missed three bare `BackupTo(..., 4)` arguments in
+  test fixtures. Each means the live database's version and now uses
+  `LibrarySchema.CurrentVersion`.
+- **Final review:** 0 Critical, 1 Important and 3 Minor.
+  - **The Important finding is fixed,** with a failing test first: an
+    undo run twice gave a raw primary-key error, or "This guide has 500
+    bookmarks." at the limit. A restore now leaves a bookmark that is
+    already stored as it is.
+  - **The minors are deferred:** a hand-edited non-hex id, a hand-edited
+    label of astral characters, and a test that could delete the real
+    guide first.
+
