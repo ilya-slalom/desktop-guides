@@ -19,6 +19,7 @@ public sealed partial class ShellWindow
     private string bookmarkSha = string.Empty;
     private string? bookmarkEntry;
     private IReadOnlyList<BookmarkItem> bookmarks = [];
+    private bool addingBookmark;
     private Func<Task>? undoAction;
     private DispatcherQueueTimer? undoTimer;
 
@@ -34,6 +35,7 @@ public sealed partial class ShellWindow
         {
             paneTab = ReaderContents.Tab;
             if (paneTab == ReaderPaneTab.Bookmarks) _ = RefreshBookmarksAsync(select: null, focus: false);
+            else _ = ShowContentsTabAsync();
         };
         ReaderActions.BookmarksRequested += (_, _) => TogglePane(ReaderPaneTab.Bookmarks);
         ReaderActions.AddBookmarkRequested += (_, _) => _ = AddBookmarkAsync();
@@ -124,7 +126,22 @@ public sealed partial class ShellWindow
         if (focus) await ReaderContents.BookmarksTab.FocusContentAsync();
     }
 
+    // One add at a time: a double click must not make two bookmarks at one place.
     private async Task AddBookmarkAsync()
+    {
+        if (addingBookmark) return;
+        addingBookmark = true;
+        try
+        {
+            await AddBookmarkOnceAsync();
+        }
+        finally
+        {
+            addingBookmark = false;
+        }
+    }
+
+    private async Task AddBookmarkOnceAsync()
     {
         if (bookmarkGuide is not Guid guide || readerSession is not IReaderSession session ||
             session is not IOutlineReader reader || repository is not SqliteLibraryRepository store)
@@ -249,7 +266,11 @@ public sealed partial class ShellWindow
                 ShowErrorStatus(BookmarkList.SaveFailed);
                 return;
             }
-            if (bookmarkGuide == deleted.GuideId) await RefreshBookmarksAsync(deleted.Id, focus: true);
+            // The Undo button just hid: focus goes to the list if it shows, else the guide.
+            bool showing = ReaderContentsHost.Visibility == Visibility.Visible &&
+                ReaderContents.Tab == ReaderPaneTab.Bookmarks;
+            if (bookmarkGuide == deleted.GuideId) await RefreshBookmarksAsync(deleted.Id, focus: showing);
+            if (!showing) FocusReaderContent();
         };
         ShowStatus(BookmarkList.Deleted, InfoBarSeverity.Informational, isClosable: true, autoDismiss: false);
         ShowStatusAction(BookmarkList.UndoLabel, undo);

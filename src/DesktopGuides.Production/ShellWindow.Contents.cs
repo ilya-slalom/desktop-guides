@@ -83,6 +83,15 @@ public sealed partial class ShellWindow
         }
     }
 
+    // The pane may have opened on Bookmarks: the Contents tab gets its
+    // outline, or "Finding sections…" while it builds.
+    private async Task ShowContentsTabAsync()
+    {
+        if (readerSession is not IOutlineReader || outlineCancel is null) return;
+        if (outline is null) ReaderContents.ShowBuilding();
+        else await ShowOutlineAsync(focus: false);
+    }
+
     private Task OpenPaneAsync(ReaderPaneTab tab) =>
         tab == ReaderPaneTab.Bookmarks ? OpenBookmarksAsync(select: null) : OpenContentsAsync();
 
