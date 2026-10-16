@@ -81,15 +81,22 @@ public sealed partial class BookmarksPane : UserControl
         TaskCompletionSource done = new();
         bool queued = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
         {
-            if (!(List.SelectedItem is BookmarkRow row && List.ContainerFromItem(row) is ListViewItem item &&
-                item.Focus(FocusState.Programmatic)))
-            {
-                AddButton.Focus(FocusState.Programmatic);
-            }
+            if (!FocusSelected()) AddButton.Focus(FocusState.Programmatic);
             done.TrySetResult();
         });
         if (!queued) done.TrySetResult();
         return done.Task;
+    }
+
+    // A list just shown has no item containers until layout runs, as with
+    // the guide list: lay out, bring the row into view, lay out again.
+    private bool FocusSelected()
+    {
+        if (List.SelectedItem is not BookmarkRow row) return false;
+        List.UpdateLayout();
+        List.ScrollIntoView(row);
+        List.UpdateLayout();
+        return List.ContainerFromItem(row) is ListViewItem item && item.Focus(FocusState.Programmatic);
     }
 
     private void AddClicked(object sender, RoutedEventArgs args) => AddRequested?.Invoke(this, EventArgs.Empty);

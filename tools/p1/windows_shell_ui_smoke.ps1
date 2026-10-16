@@ -4444,7 +4444,10 @@ try {
                     }
                     Start-Sleep -Milliseconds 200
                 } while ((Get-Date) -lt $deadline)
-                throw "After $step the keyboard isn't in the bookmarks list."
+                $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+                $where = if ($focused) { "$($focused.Current.ControlType.ProgrammaticName) '$($focused.Current.AutomationId)' '$($focused.Current.Name)'" } else { 'nothing' }
+                [void](Save-WindowScreenshot 'bookmark-focus')
+                throw "After $step the keyboard isn't in the bookmarks list; focus is on $where."
             }
             function Wait-SavedAfter([int] $baseline, [string] $step) {
                 $deadline = (Get-Date).AddSeconds(8)
