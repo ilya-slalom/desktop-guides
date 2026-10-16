@@ -168,7 +168,7 @@ internal sealed class TextReaderSession : IReaderSession, IFindableReader, IOutl
         reflowView?.ShowMatch(ReflowHighlights.For(plan!, match.Start, match.Length));
         if (Mode == TextViewMode.Reflow && reflowView is not null)
         {
-            reflowView.ScrollToOffset(match.Start);
+            reflowView.ScrollToMatch(match.Start);
         }
         else
         {

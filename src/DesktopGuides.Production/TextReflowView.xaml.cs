@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
+using Windows.Foundation;
 
 namespace DesktopGuides.Production;
 
@@ -18,6 +19,9 @@ public sealed partial class TextReflowView : UserControl
     private double textScale;
     private double baseFontSize = 14;
     private int anchorBlock;
+    // How far into the anchor block the view's top is, as a share of its
+    // height, so a resize or a closed find bar keeps a place inside a tall block.
+    private double anchorFraction;
     private int reportedTop = -1;
     private bool restoring;
     private ScrollViewer? viewer;
@@ -48,15 +52,36 @@ public sealed partial class TextReflowView : UserControl
         {
             textScale = value;
             RefreshRealized();
-            ScrollToBlock(anchorBlock);
+            ScrollToBlock(anchorBlock, anchorFraction);
         }
     }
 
     // The block holding the offset goes to the top; before the first layout
     // it is kept and applied once items exist.
-    public void ScrollToOffset(int offset) => ScrollToBlock(plan.BlockAt(offset));
+    public void ScrollToOffset(int offset) => ScrollToBlock(plan.BlockAt(offset), 0);
 
-    public void ScrollToEdge(ReaderEdge edge) => ScrollToBlock(edge == ReaderEdge.Start ? 0 : plan.Blocks.Count - 1);
+    // A match shows its own line, with a little context above it, even deep
+    // inside a block taller than the window.
+    public void ScrollToMatch(int offset)
+    {
+        int index = plan.BlockAt(offset);
+        ScrollToBlock(index, 0);
+        if (viewer is null || Blocks.ContainerFromIndex(index) is not ListViewItem item || item.ActualHeight <= 0 ||
+            item.ContentTemplateRoot is not Grid { Children: [TextBlock prose, ScrollViewer { Content: TextBlock preserved }] })
+        {
+            return;
+        }
+        ReflowBlock block = plan.Blocks[index];
+        TextBlock text = block.Kind == ReflowKind.Prose ? prose : preserved;
+        TextPointer? position = text.ContentStart.GetPositionAtOffset(block.DisplayIndexOf(offset), LogicalDirection.Forward);
+        if (position is null) return;
+        double line = position.GetCharacterRect(LogicalDirection.Forward).Top;
+        double inItem = text.TransformToVisual(item).TransformPoint(new Point(0, line)).Y - 3 * text.FontSize * 1.4;
+        ScrollToBlock(index, Math.Clamp(inItem / item.ActualHeight, 0, 1));
+    }
+
+    public void ScrollToEdge(ReaderEdge edge) =>
+        ScrollToBlock(edge == ReaderEdge.Start ? 0 : plan.Blocks.Count - 1, 0);
 
     // A page is a viewport: blocks have no common height.
     public void PageBy(int delta) => ScrollByViewport(delta);
@@ -93,12 +118,22 @@ public sealed partial class TextReflowView : UserControl
         Blocks.ItemsSource = null;
     }
 
-    private void ScrollToBlock(int index)
+    private void ScrollToBlock(int index, double fraction)
     {
         anchorBlock = Math.Clamp(index, 0, plan.Blocks.Count - 1);
+        anchorFraction = fraction;
         if (Blocks.ItemsSource is null) return;
         restoring = true;
         Blocks.ScrollIntoView(plan.Blocks[anchorBlock], ScrollIntoViewAlignment.Leading);
+        if (fraction > 0 && viewer is not null)
+        {
+            Blocks.UpdateLayout();
+            if (Blocks.ContainerFromIndex(anchorBlock) is ListViewItem item)
+            {
+                double top = item.TransformToVisual(viewer).TransformPoint(default).Y;
+                viewer.ChangeView(null, viewer.VerticalOffset + top + fraction * item.ActualHeight, null, true);
+            }
+        }
         dispatcher?.TryEnqueue(DispatcherQueuePriority.Low, () => restoring = false);
     }
 
@@ -113,17 +148,26 @@ public sealed partial class TextReflowView : UserControl
         Blocks.ItemsSource = plan.Blocks;
         viewer = Blocks.FindDescendant<ScrollViewer>();
         if (viewer is not null) viewer.ViewChanged += OnViewChanged;
-        ScrollToBlock(anchorBlock);
+        ScrollToBlock(anchorBlock, anchorFraction);
     }
 
-    // A wider or narrower window re-wraps prose; the top block stays.
-    private void OnSizeChanged(object sender, SizeChangedEventArgs args) => ScrollToBlock(anchorBlock);
+    // A wider or narrower window re-wraps prose; the place in the top block stays.
+    private void OnSizeChanged(object sender, SizeChangedEventArgs args) => ScrollToBlock(anchorBlock, anchorFraction);
 
     private void OnViewChanged(object? sender, ScrollViewerViewChangedEventArgs args)
     {
         if (args.IsIntermediate) return;
         int top = FirstVisibleIndex;
-        if (!restoring) anchorBlock = top;
+        if (!restoring)
+        {
+            anchorBlock = top;
+            anchorFraction = 0;
+            if (viewer is not null && Blocks.ContainerFromIndex(top) is ListViewItem item && item.ActualHeight > 0)
+            {
+                double above = -item.TransformToVisual(viewer).TransformPoint(default).Y;
+                anchorFraction = Math.Clamp(above / item.ActualHeight, 0, 1);
+            }
+        }
         if (top != reportedTop)
         {
             reportedTop = top;
