@@ -8,21 +8,21 @@ public sealed class DiagnosticFileTests : IDisposable
     private readonly string folder = Directory.CreateTempSubdirectory("dg-diagnostic-").FullName;
 
     // A directory in the file's place makes the replace fail on every OS,
-    // as a test's open handle does on Windows.
+    // as a test's open handle does on Windows. It goes before the first
+    // retry, so no timing decides whether the reader let go in time.
     [Fact]
-    public async Task AReplaceBlockedForAMomentStillLands()
+    public void AReplaceBlockedForAMomentStillLands()
     {
         string path = Path.Combine(folder, "position.json");
         Directory.CreateDirectory(path);
-        Task release = Task.Run(async () =>
+        int retries = 0;
+
+        DiagnosticFile.Write(path, "{\"a\":2}", beforeRetry: () =>
         {
-            await Task.Delay(100);
-            Directory.Delete(path);
+            if (retries++ == 0) Directory.Delete(path);
         });
 
-        DiagnosticFile.Write(path, "{\"a\":2}");
-
-        await release;
+        Assert.Equal(1, retries);
         Assert.Equal("{\"a\":2}", File.ReadAllText(path));
         Assert.False(File.Exists(path + ".tmp"));
     }

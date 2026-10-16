@@ -12,7 +12,10 @@ public static class DiagnosticFile
     private const int Attempts = 20;
     private static readonly TimeSpan Wait = TimeSpan.FromMilliseconds(25);
 
-    public static void Write(string path, string contents)
+    public static void Write(string path, string contents) => Write(path, contents, beforeRetry: null);
+
+    // Tests release the block here instead of racing the retries.
+    internal static void Write(string path, string contents, Action? beforeRetry)
     {
         string temporary = path + ".tmp";
         File.WriteAllText(temporary, contents);
@@ -26,6 +29,7 @@ public static class DiagnosticFile
             catch (Exception error) when (attempt < Attempts && error is IOException or UnauthorizedAccessException)
             {
                 Thread.Sleep(Wait);
+                beforeRetry?.Invoke();
             }
         }
     }
