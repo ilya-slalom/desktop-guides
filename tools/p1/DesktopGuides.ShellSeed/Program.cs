@@ -859,6 +859,32 @@ if (args.Length == 2 && args[0] == "clear-bookmarks")
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "seed-reflow")
+{
+    // T19.2: a long TXT guide, twelve chapters of the reflow fixture, and
+    // Numbered Lines Guide saved as Reflow. It has no prose, so it opens in Original.
+    ManagedPathResolver reflowPaths = new(args[1]);
+    await using (SqliteLibraryRepository reflowRepository = new(reflowPaths))
+    {
+        await reflowRepository.InitializeAsync();
+        Game reflowGame = (await reflowRepository.ListGamesAsync()).Single(game => game.Title == "Progress Game");
+        string chapter = File.ReadAllText(Path.Combine(Path.GetFullPath(args[2]), "p2", "txt-reflow.txt"));
+        string folder = Directory.CreateTempSubdirectory("desktop-guides-reflow-").FullName;
+        string file = Path.Combine(folder, "reflow-guide.txt");
+        File.WriteAllText(file, string.Concat(Enumerable.Range(1, 12).Select(n => $"Chapter {n:00}\n\n{chapter}\n")));
+        if (await new GuideImportValidator().InspectAsync(file, CancellationToken.None) is not ImportReady ready)
+        {
+            throw new InvalidOperationException("The reflow guide failed the import preview.");
+        }
+        await new GuideImportPublisher(reflowRepository, reflowPaths).PublishAsync(
+            ready.Manifest, reflowGame.Id, "Reflow Guide", false, null, CancellationToken.None);
+        Directory.Delete(folder, recursive: true);
+    }
+    ExecuteSql(reflowPaths,
+        "UPDATE ReaderPreferences SET TextView = 'Reflow' WHERE GuideId = (SELECT Id FROM Guides WHERE Title = 'Numbered Lines Guide')");
+    return 0;
+}
+
 if (args.Length == 2 && args[0] == "seed-bookmarks")
 {
     // T19.1: Sections Guide gets a bookmark saved against older content,

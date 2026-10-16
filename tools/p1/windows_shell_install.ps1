@@ -1856,6 +1856,18 @@ function Run-NavigationScenarios {
     Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
     Invoke-ShellSeed @('seed-bookmarks', $dataRoot) | Out-Null
     $report.bookmarkChanged = Invoke-ProgressPass 'bookmark-changed' 0
+
+    # T19.2: the reflow view.
+    Invoke-ShellSeed @('seed-reflow', $dataRoot, $fixtureRoot) | Out-Null
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.reflowSwitch = Invoke-ProgressPass 'reflow-switch' 0
+    $report.reflowRestart = Invoke-ProgressPass 'reflow-restart' 0
+    $report.reflowNone = Invoke-ProgressPass 'reflow-none' 0
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.reflowFind = Invoke-ProgressPass 'reflow-find' 0
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    Invoke-ShellSeed @('clear-bookmarks', $dataRoot) | Out-Null
+    $report.reflowBookmark = Invoke-ProgressPass 'reflow-bookmark' 0
 }
 
 function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $Kill, [string] $resultName = $mode,

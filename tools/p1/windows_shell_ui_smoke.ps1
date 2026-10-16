@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -277,7 +277,8 @@ try {
         '^Opened near your last place\. The guide changed since you were here\.$',
         '^Bookmark added\.$',
         '^This place is already bookmarked\.$',
-        "^This bookmark's place may have shifted\.$")
+        "^This bookmark's place may have shifted\.$",
+        '^(Reflow|Original) view\.$')
 
     function Test-QuietStatus([string] $message) {
         foreach ($pattern in $quietStatusPatterns) {
@@ -1580,13 +1581,13 @@ try {
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark',
         'workflow-pdf-exit')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
             elseif ($Mode -like 'html-theme-*') { 'Web Theme Game' }
             elseif ($Mode -like 'pdf-*') { 'PDF Reader Game' }
-            elseif ($Mode -like 'progress-*' -or $Mode -like 'completion-*' -or $Mode -like 'find-*' -or $Mode -like 'contents-*' -or $Mode -like 'bookmark-*') { 'Progress Game' }
+            elseif ($Mode -like 'progress-*' -or $Mode -like 'completion-*' -or $Mode -like 'find-*' -or $Mode -like 'contents-*' -or $Mode -like 'bookmark-*' -or $Mode -like 'reflow-*') { 'Progress Game' }
             elseif ($Mode -like 'text-size-*') { 'Text Size Game' }
             elseif ($Mode -like 'workflow-*') { 'Workflow Game' }
             else { 'Text Reader Game' }
@@ -4322,7 +4323,7 @@ try {
                 $report.phases += 'workflow-restored-places'
             }
         }
-        elseif ($Mode -like 'find-*' -or $Mode -like 'contents-*' -or $Mode -like 'bookmark-*') {
+        elseif ($Mode -like 'find-*' -or $Mode -like 'contents-*' -or $Mode -like 'bookmark-*' -or $Mode -like 'reflow-*') {
             # T18.1: in-guide search. Searching must never save the reading place.
             function Read-Saves { return [int] (Read-ProgressCounts).saves }
             # The MARK number of the page's top line, within a range.
@@ -4457,6 +4458,44 @@ try {
                     $saves = Read-Saves
                 } while ($saves -le $baseline -and (Get-Date) -lt $deadline)
                 if ($saves -le $baseline) { throw "$step saved nothing." }
+            }
+            # T19.2: the TXT session's view and first visible offset (test gate).
+            function Read-TextPlace {
+                $path = Join-Path $AppCacheRoot "diagnostics\txt-place-$ProcessId.json"
+                if (-not (Test-Path -LiteralPath $path)) { return $null }
+                try { return Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return $null }
+            }
+            function Wait-TextPlace([scriptblock] $until, [string] $what) {
+                $deadline = (Get-Date).AddSeconds(10)
+                $place = $null
+                do {
+                    $place = Read-TextPlace
+                    if ($place -and (& $until $place)) { return $place }
+                    Start-Sleep -Milliseconds 250
+                } while ((Get-Date) -lt $deadline)
+                [void](Save-WindowScreenshot 'text-place-timeout')
+                throw "The TXT place never showed $what. Last: view=$($place.view) offset=$($place.offset)."
+            }
+            function Select-TextView([string] $view) {
+                (Wait-VisibleById "ReaderTextView$view").GetCurrentPattern(
+                    [System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+            }
+            function Wait-TextViewChosen([string] $view) {
+                $deadline = (Get-Date).AddSeconds(10)
+                do {
+                    $item = Find-ById "ReaderTextView$view"
+                    if ($item -and $item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Current.IsSelected) { return }
+                    Start-Sleep -Milliseconds 200
+                } while ((Get-Date) -lt $deadline)
+                throw "Expected the $view view chosen."
+            }
+            function Find-Next([string] $query, [string] $count) {
+                [System.Windows.Forms.SendKeys]::SendWait('^f')
+                [void](Wait-VisibleById 'ReaderFindBar')
+                (Get-SearchPattern 'FindQueryInput').SetValue($query)
+                (Wait-VisibleById 'FindQueryInput').SetFocus()
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                [void](Wait-Name 'FindCount' $count)
             }
 
             [void](Wait-Name 'LibraryHeading' 'Library')
@@ -5101,6 +5140,112 @@ try {
                 [void](Wait-Status 'Bookmark deleted.')
                 [void](Wait-BookmarkNames @('Old place') 'deleting the damaged bookmark')
                 $report.phases += 'bookmark-changed'
+            }
+            elseif ($Mode -eq 'reflow-switch') {
+                Open-TextGuide 'Reflow Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Wait-FirstTextRow
+                Wait-TextViewChosen 'Original'
+                # Down to chapter 7 in Original, by search.
+                Find-Next 'Chapter 07' '1 of 1'
+                [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                Wait-HiddenById 'ReaderFindBar'
+                $original = Wait-TextPlace { param($p) $p.view -eq 'Original' -and $p.offset -gt 0 } 'an Original place'
+                # Reflow keeps the block that held the top line.
+                Select-TextView 'Reflow'
+                [void](Wait-Status 'Reflow view.')
+                [void](Wait-VisibleById 'ReaderReflowBlocks')
+                $reflow = Wait-TextPlace { param($p) $p.view -eq 'Reflow' } 'the Reflow view'
+                if ($reflow.offset -gt $original.offset -or ($original.offset - $reflow.offset) -gt 2000) {
+                    throw "Reflow opened at offset $($reflow.offset); Original was at $($original.offset)."
+                }
+                # Text size applies to both views.
+                (Wait-VisibleById 'ReaderReflowBlocks').SetFocus()
+                [System.Windows.Forms.SendKeys]::SendWait('^{ADD}')
+                [void](Wait-TextPlace { param($p) [double] $p.scale -gt 1 } 'a larger text size')
+                $report.reflowSwitchScreenshot = Save-WindowScreenshot 'reflow-switch'
+                # Back to Original: that block's first line, at the same size.
+                Select-TextView 'Original'
+                [void](Wait-Status 'Original view.')
+                $back = Wait-TextPlace { param($p) $p.view -eq 'Original' } 'Original again'
+                if ($back.offset -ne $reflow.offset) { throw "Original came back at $($back.offset); the block started at $($reflow.offset)." }
+                if ([double] $back.lineScale -ne [double] $back.scale) { throw "The line view kept size $($back.lineScale), not $($back.scale)." }
+                # Leave it saved as Reflow, for reflow-restart.
+                Select-TextView 'Reflow'
+                [void](Wait-Status 'Reflow view.')
+                $report.reflowSwitch = [ordered]@{ original = $original.offset; reflow = $reflow.offset; back = $back.offset }
+                $report.phases += 'reflow-switch'
+            }
+            elseif ($Mode -eq 'reflow-restart') {
+                # A new launch opens the guide in its saved view.
+                Open-TextGuide 'Reflow Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-VisibleById 'ReaderReflowBlocks')
+                Wait-TextViewChosen 'Reflow'
+                [void](Wait-TextPlace { param($p) $p.view -eq 'Reflow' } 'Reflow after a restart')
+                $report.phases += 'reflow-restart'
+            }
+            elseif ($Mode -eq 'reflow-none') {
+                # Seeded as Reflow, but with no prose: it opens in Original, quietly.
+                Open-TextGuide 'Numbered Lines Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Wait-FirstTextRow
+                Wait-TextViewChosen 'Original'
+                Select-TextView 'Reflow'
+                [void](Wait-Status 'This guide has no prose to reflow.')
+                Wait-TextViewChosen 'Original'
+                if (Find-ById 'ReaderReflowBlocks') { throw 'A guide with no prose showed the Reflow view.' }
+                $report.phases += 'reflow-none'
+            }
+            elseif ($Mode -eq 'reflow-find') {
+                Open-TextGuide 'Reflow Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-VisibleById 'ReaderReflowBlocks')
+                Find-Next 'eastern marsh' '1 of 12'
+                $first = Wait-TextPlace { param($p) $p.view -eq 'Reflow' -and $p.offset -gt 0 } 'the first match'
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                [void](Wait-Name 'FindCount' '2 of 12')
+                $second = Wait-TextPlace { param($p) $p.offset -gt $first.offset } 'the second match'
+                $report.reflowFindScreenshot = Save-WindowScreenshot 'reflow-find'
+                # Switching keeps the search: the next step goes on from the second match.
+                Select-TextView 'Original'
+                [void](Wait-Status 'Original view.')
+                (Wait-VisibleById 'FindQueryInput').SetFocus()
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                [void](Wait-Name 'FindCount' '3 of 12')
+                [void](Wait-TextPlace { param($p) $p.view -eq 'Original' -and $p.offset -gt $second.offset } 'the third match in Original')
+                Select-TextView 'Reflow'
+                [void](Wait-Status 'Reflow view.')
+                $report.phases += 'reflow-find'
+            }
+            elseif ($Mode -eq 'reflow-bookmark') {
+                # A bookmark added in Reflow is followed exactly in Original.
+                Open-TextGuide 'Reflow Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-VisibleById 'ReaderReflowBlocks')
+                Find-Next 'Chapter 05' '1 of 1'
+                [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                Wait-HiddenById 'ReaderFindBar'
+                $marked = Wait-TextPlace { param($p) $p.view -eq 'Reflow' -and $p.offset -gt 0 } 'the place to bookmark'
+                (Wait-VisibleById 'ReaderReflowBlocks').SetFocus()
+                [System.Windows.Forms.SendKeys]::SendWait('^d')
+                [void](Wait-Status 'Bookmark added.')
+                [void](Wait-BookmarkNames @('*') 'adding in Reflow')
+                [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                Select-TextView 'Original'
+                [void](Wait-Status 'Original view.')
+                [System.Windows.Forms.SendKeys]::SendWait('^{HOME}')
+                [void](Wait-TextPlace { param($p) $p.view -eq 'Original' -and $p.offset -eq 0 } 'the start')
+                [System.Windows.Forms.SendKeys]::SendWait('^+b')
+                [void](Wait-BookmarkNames @('*') 'opening the bookmarks')
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                [void](Wait-TextPlace { param($p) $p.view -eq 'Original' -and $p.offset -eq $marked.offset } 'the bookmark in Original')
+                $report.phases += 'reflow-bookmark'
             }
             elseif ($Mode -eq 'find-pdf-scan') {
                 Open-TextGuide 'Scanned PDF Guide'
