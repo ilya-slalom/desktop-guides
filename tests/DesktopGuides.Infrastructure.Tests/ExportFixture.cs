@@ -62,6 +62,7 @@ internal sealed class ExportFixture : IAsyncDisposable
             UPDATE ReadingStates SET LocatorJson = '{"format":"Txt"}', EstimatedFraction = 0.5,
                 LastOpenedUtcMs = 1000 WHERE GuideId = '{{TxtGuide:N}}';
             UPDATE ReaderPreferences SET TextScale = 1.25 WHERE GuideId = '{{HtmlGuide:N}}';
+            UPDATE ReaderPreferences SET TextView = 'Reflow' WHERE GuideId = '{{TxtGuide:N}}';
             INSERT OR REPLACE INTO Settings (Key, Value) VALUES ('Theme', 'Dark');
             """);
         await Library.Repository.AddBookmarkAsync(TxtGuide, "{\"format\":\"Txt\"}", "Boss fight");

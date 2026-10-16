@@ -63,6 +63,13 @@ public sealed class LibraryRestorerValidationTests : IAsyncLifetime
                 "PRAGMA ignore_check_constraints = ON; UPDATE Bookmarks SET Label = printf('%.90c', 'x');"),
             LibraryRestoreIssue.DatabaseInvalid);
 
+    // A hand-edited backup can bypass the CHECK; integrity_check reports it.
+    [Fact]
+    public async Task AnUnknownTextViewIsInvalid() =>
+        await Refused(fixture.RewriteDatabase(
+                "PRAGMA ignore_check_constraints = ON; UPDATE ReaderPreferences SET TextView = 'Wide';"),
+            LibraryRestoreIssue.DatabaseInvalid);
+
     [Fact]
     public async Task AnAlteredSchemaIsInvalid() =>
         await Refused(fixture.RewriteDatabase("CREATE TABLE Extra (Id INTEGER);"), LibraryRestoreIssue.DatabaseInvalid);

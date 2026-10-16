@@ -124,6 +124,14 @@ public sealed class LibraryExporterTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task TheSnapshotHoldsTheTextView()
+    {
+        string zip = (await Export()).Path;
+
+        Assert.Equal("Reflow", Scalar(zip, $"SELECT TextView FROM ReaderPreferences WHERE GuideId = '{fixture.TxtGuide:N}'"));
+    }
+
+    [Fact]
     public async Task NothingOutsideTheReferencedLibraryIsArchived()
     {
         ManagedPathResolver paths = fixture.Library.Paths;
