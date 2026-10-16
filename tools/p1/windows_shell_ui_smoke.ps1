@@ -4434,12 +4434,13 @@ try {
                 $item.SetFocus()
             }
             # After an add, the keyboard is on a bookmark in the list.
-            function Wait-FocusOnBookmark([string] $step) {
+            function Wait-FocusOnBookmark([string] $step) { Wait-FocusIn 'ReaderBookmarksList' $step }
+            function Wait-FocusIn([string] $id, [string] $step) {
                 $deadline = (Get-Date).AddSeconds(5)
                 do {
                     $node = [System.Windows.Automation.AutomationElement]::FocusedElement
-                    for ($depth = 0; $node -and $depth -lt 6; $depth++) {
-                        if ($node.Current.AutomationId -eq 'ReaderBookmarksList') { return }
+                    for ($depth = 0; $node -and $depth -lt 8; $depth++) {
+                        if ($node.Current.AutomationId -eq $id) { return }
                         $node = [System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($node)
                     }
                     Start-Sleep -Milliseconds 200
@@ -4447,7 +4448,7 @@ try {
                 $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
                 $where = if ($focused) { "$($focused.Current.ControlType.ProgrammaticName) '$($focused.Current.AutomationId)' '$($focused.Current.Name)'" } else { 'nothing' }
                 [void](Save-WindowScreenshot 'bookmark-focus')
-                throw "After $step the keyboard isn't in the bookmarks list; focus is on $where."
+                throw "After $step the keyboard isn't in '$id'; focus is on $where."
             }
             function Wait-SavedAfter([int] $baseline, [string] $step) {
                 $deadline = (Get-Date).AddSeconds(8)
@@ -5017,6 +5018,7 @@ try {
                 Invoke-OverflowCommand 'Contents'
                 [void](Wait-VisibleById 'ReaderContentsTree')
                 Wait-ContentsSelected 'Getting started'
+                Wait-FocusIn 'ReaderContentsTree' 'choosing Contents on the toolbar'
                 [System.Windows.Forms.SendKeys]::SendWait('{DOWN}{DOWN}{DOWN}{ENTER}')
                 [void](Wait-HtmlPosition { param($p) $p.quote -like 'Castle*' } 'the Castle heading on top')
                 Invoke-OverflowCommand 'Add bookmark'
@@ -5028,6 +5030,7 @@ try {
                 Invoke-OverflowCommand 'Contents'
                 [void](Wait-VisibleById 'ReaderContentsTree')
                 Wait-ContentsSelected 'The castle'
+                Wait-FocusIn 'ReaderContentsTree' 'choosing Contents again'
                 [System.Windows.Forms.SendKeys]::SendWait('{UP}{UP}{UP}{ENTER}')
                 [void](Wait-HtmlPosition { param($p) $p.quote -and $p.quote -notlike 'Castle*' } 'leaving the Castle heading')
                 Invoke-OverflowCommand 'Bookmarks'
@@ -8098,6 +8101,13 @@ try {
 }
 catch {
     $report.error = $_ | Out-String
+    # T19.1: what a failed bookmark operation threw, when the gate recorded one.
+    if ($Mode -like 'bookmark-*' -and $AppCacheRoot) {
+        $failure = Join-Path $AppCacheRoot "diagnostics\bookmarks-$ProcessId.json"
+        if (Test-Path -LiteralPath $failure) {
+            try { $report.bookmarkFailure = Get-Content -LiteralPath $failure -Raw -Encoding UTF8 | ConvertFrom-Json } catch { }
+        }
+    }
     if (($Mode -eq 'game-editor' -or $Mode -eq 'catalog' -or $Mode -like 'import-*' -or $Mode -like 'remove-*' -or
         $Mode -like 'provider-*' -or $Mode -like 'game-actions*' -or $Mode -like 'export-*' -or
         $Mode -like 'restore-*') -and $root) {

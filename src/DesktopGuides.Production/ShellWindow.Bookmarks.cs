@@ -1,6 +1,7 @@
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Reading;
 using DesktopGuides.Infrastructure.Storage;
+using System.Text.Json;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -102,8 +103,9 @@ public sealed partial class ShellWindow
         {
             stored = await store.ListBookmarksAsync(guide);
         }
-        catch (Exception)
+        catch (Exception error)
         {
+            RecordBookmarkFailureForTest("list", error);
             ShowErrorStatus(BookmarksLoadFailed);
             return null;
         }
@@ -134,8 +136,9 @@ public sealed partial class ShellWindow
         {
             place = await session.GetLocationAsync(CancellationToken.None);
         }
-        catch (Exception)
+        catch (Exception error)
         {
+            RecordBookmarkFailureForTest("location", error);
             ShowErrorStatus(BookmarkList.SaveFailed);
             return;
         }
@@ -159,8 +162,9 @@ public sealed partial class ShellWindow
             ShowWarningStatus(BookmarkList.Full);
             return;
         }
-        catch (Exception)
+        catch (Exception error)
         {
+            RecordBookmarkFailureForTest("add", error);
             ShowErrorStatus(BookmarkList.SaveFailed);
             return;
         }
@@ -195,8 +199,9 @@ public sealed partial class ShellWindow
         {
             await store.RenameBookmarkAsync(item.Bookmark.Id, label);
         }
-        catch (Exception)
+        catch (Exception error)
         {
+            RecordBookmarkFailureForTest("rename", error);
             ShowErrorStatus(BookmarkList.SaveFailed);
             return;
         }
@@ -213,8 +218,9 @@ public sealed partial class ShellWindow
         {
             await store.DeleteBookmarkAsync(id);
         }
-        catch (Exception)
+        catch (Exception error)
         {
+            RecordBookmarkFailureForTest("delete", error);
             ShowErrorStatus(BookmarkList.SaveFailed);
             return;
         }
@@ -237,8 +243,9 @@ public sealed partial class ShellWindow
                 ShowWarningStatus(BookmarkList.Full);
                 return;
             }
-            catch (Exception)
+            catch (Exception error)
             {
+                RecordBookmarkFailureForTest("restore", error);
                 ShowErrorStatus(BookmarkList.SaveFailed);
                 return;
             }
@@ -249,5 +256,38 @@ public sealed partial class ShellWindow
         undoAction = undo;
         undoTimer?.Stop();
         undoTimer?.Start();
+    }
+
+    // Test gate only: what a failed bookmark operation threw, so a test that
+    // sees "Couldn't load…" or "Couldn't save…" can say why.
+    private void RecordBookmarkFailureForTest(string stage, Exception error)
+    {
+        if (cacheRoot is null ||
+            !TestGate.IsOpen(AppLane.Current.LocalEvent("ProgressDiagnostics", Environment.ProcessId)))
+        {
+            return;
+        }
+        try
+        {
+            using MemoryStream buffer = new();
+            using (Utf8JsonWriter json = new(buffer))
+            {
+                json.WriteStartObject();
+                json.WriteString("stage", stage);
+                json.WriteString("type", error.GetType().FullName);
+                json.WriteString("hresult", $"0x{error.HResult:X8}");
+                json.WriteString("message", error.Message);
+                json.WriteEndObject();
+            }
+            string folder = Path.Combine(cacheRoot, "diagnostics");
+            Directory.CreateDirectory(folder);
+            DiagnosticFile.Write(
+                Path.Combine(folder, $"bookmarks-{Environment.ProcessId}.json"),
+                System.Text.Encoding.UTF8.GetString(buffer.ToArray()));
+        }
+        catch (Exception failure) when (failure is IOException or UnauthorizedAccessException)
+        {
+            // Test diagnostics must never affect reading.
+        }
     }
 }
