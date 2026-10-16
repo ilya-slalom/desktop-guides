@@ -19,6 +19,7 @@ public interface IBookmarkStore
     Task<bool> DeleteBookmarkAsync(Guid bookmarkId, CancellationToken token = default);
 
     // Undo: puts a deleted bookmark back with its id and times, under the
-    // same limit and guide checks as an add.
+    // same limit and guide checks as an add. One already stored is left as
+    // it is, so an undo run twice does nothing more.
     Task RestoreBookmarkAsync(Bookmark bookmark, CancellationToken token = default);
 }

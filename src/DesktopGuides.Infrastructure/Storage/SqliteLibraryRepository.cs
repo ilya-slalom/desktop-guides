@@ -619,7 +619,8 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         return WriteAsync(() => InsertBookmark(restored), token);
     }
 
-    // Counts and inserts in one transaction, under the write gate.
+    // Counts and inserts in one transaction, under the write gate. A
+    // bookmark already stored, such as an undo run twice, is left as it is.
     private void InsertBookmark(Bookmark bookmark)
     {
         using SqliteConnection connection = OpenConnection();
@@ -629,11 +630,14 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             count.Transaction = transaction;
             count.CommandText = """
                 SELECT (SELECT COUNT(*) FROM Guides WHERE Id = $guide),
-                       (SELECT COUNT(*) FROM Bookmarks WHERE GuideId = $guide)
+                       (SELECT COUNT(*) FROM Bookmarks WHERE GuideId = $guide),
+                       (SELECT COUNT(*) FROM Bookmarks WHERE Id = $id)
                 """;
             count.Parameters.AddWithValue("$guide", bookmark.GuideId.ToString("N"));
+            count.Parameters.AddWithValue("$id", bookmark.Id.ToString("N"));
             using SqliteDataReader reader = count.ExecuteReader();
             reader.Read();
+            if (reader.GetInt64(2) != 0) return;
             if (reader.GetInt64(0) == 0)
             {
                 throw new InvalidOperationException("This guide is no longer in the library.");

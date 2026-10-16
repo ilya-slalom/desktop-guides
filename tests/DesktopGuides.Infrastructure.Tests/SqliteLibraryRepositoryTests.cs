@@ -1500,6 +1500,27 @@ public sealed class SqliteLibraryRepositoryTests
         }
     }
 
+    // An undo run twice (a double click) leaves the one bookmark, even at the limit.
+    [Fact]
+    public async Task RestoringTwiceKeepsOneBookmark()
+    {
+        using TestLibrary directory = new();
+        (SqliteLibraryRepository repository, Guid guide) = await BookmarkLibraryAsync(directory, new FixedTimeProvider(Now));
+        await using (repository)
+        {
+            Bookmark bookmark = await repository.AddBookmarkAsync(guide, "{}", "Undo me");
+            Assert.True(await repository.DeleteBookmarkAsync(bookmark.Id));
+            InsertBookmarks(directory.Paths.DatabasePath, guide, BookmarkRules.MaxPerGuide - 1);
+
+            await repository.RestoreBookmarkAsync(bookmark);
+            await repository.RestoreBookmarkAsync(bookmark);
+
+            IReadOnlyList<Bookmark> listed = await repository.ListBookmarksAsync(guide);
+            Assert.Equal(BookmarkRules.MaxPerGuide, listed.Count);
+            Assert.Equal(bookmark, Assert.Single(listed, b => b.Id == bookmark.Id));
+        }
+    }
+
     [Fact]
     public async Task AddingToAMissingGuideSaysSo()
     {
