@@ -66,16 +66,21 @@ public sealed partial class TextReflowView : UserControl
     {
         int index = plan.BlockAt(offset);
         ScrollToBlock(index, 0);
-        if (viewer is null || Blocks.ContainerFromIndex(index) is not ListViewItem item || item.ActualHeight <= 0 ||
+        if (viewer is null) return;
+        // The block's container exists only after a layout.
+        Blocks.UpdateLayout();
+        if (Blocks.ContainerFromIndex(index) is not ListViewItem item || item.ActualHeight <= 0 ||
             item.ContentTemplateRoot is not Grid { Children: [TextBlock prose, ScrollViewer { Content: TextBlock preserved }] })
         {
             return;
         }
         ReflowBlock block = plan.Blocks[index];
         TextBlock text = block.Kind == ReflowKind.Prose ? prose : preserved;
-        TextPointer? position = text.ContentStart.GetPositionAtOffset(block.DisplayIndexOf(offset), LogicalDirection.Forward);
-        if (position is null) return;
-        double line = position.GetCharacterRect(LogicalDirection.Forward).Top;
+        int display = block.DisplayIndexOf(offset);
+        TextPointer? position = text.ContentStart.GetPositionAtOffset(display, LogicalDirection.Forward);
+        // Without a text position, the match's share of the block's text places it.
+        double line = position?.GetCharacterRect(LogicalDirection.Forward).Top ??
+            text.ActualHeight * display / Math.Max(1, block.Text.Length);
         double inItem = text.TransformToVisual(item).TransformPoint(new Point(0, line)).Y - 3 * text.FontSize * 1.4;
         ScrollToBlock(index, Math.Clamp(inItem / item.ActualHeight, 0, 1));
     }
