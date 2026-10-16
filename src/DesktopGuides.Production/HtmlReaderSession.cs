@@ -164,6 +164,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         {
             await OpenEntryAsync(source, token);
             await WriteAppearanceAsync();
+            HtmlOpenTimelineForTest.Mark("appearance-written");
             entryLoaded = true;
         }
         finally
@@ -196,15 +197,19 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         try
         {
             Directory.CreateDirectory(profile);
+            HtmlOpenTimelineForTest.Mark("environment", Path.GetFileName(profile));
             environment = await CoreWebView2Environment.CreateWithOptionsAsync(
                 browserFolder, profile, new CoreWebView2EnvironmentOptions
                 {
                     AdditionalBrowserArguments = HtmlBrowserEnvironment.Arguments,
                 });
+            HtmlOpenTimelineForTest.Mark("environment-created");
             await View.EnsureCoreWebView2Async(environment);
+            HtmlOpenTimelineForTest.Mark("ensured", $"browser {View.CoreWebView2.BrowserProcessId}");
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
+            HtmlOpenTimelineForTest.Mark("runtime-failed", $"{error.GetType().Name} 0x{error.HResult:X8}");
             // The runtime is installed but didn't start.
             throw new HtmlGuideLoadException(HtmlGuideLoadError.RuntimeFailed);
         }
@@ -241,7 +246,9 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
             core.NavigationCompleted += Completed;
             pendingNavigation = completion;
             core.Navigate(policy.EntryUri.AbsoluteUri);
+            HtmlOpenTimelineForTest.Mark("navigate");
             success = await completion.Task.WaitAsync(TimeSpan.FromSeconds(15), token);
+            HtmlOpenTimelineForTest.Mark("navigated", $"{success} {entry}");
         }
         catch (Exception error) when (error is not OperationCanceledException and not HtmlGuideLoadException)
         {

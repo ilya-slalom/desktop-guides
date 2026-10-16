@@ -2018,8 +2018,10 @@ public sealed partial class ShellWindow : Window
                 case ReaderRoute readerRoute:
                     ReaderPanel.Visibility = Visibility.Visible;
                     ShowRouteProgress("Loading guide…");
+                    HtmlOpenTimelineForTest.Begin(cacheRoot);
                     await PauseReaderMetadataReadForTestAsync();
                     Guide? guide = await library.GetGuideAsync(readerRoute.GuideId);
+                    HtmlOpenTimelineForTest.Mark("guide-read");
                     if (generation != renderGeneration)
                     {
                         return false;
@@ -2048,6 +2050,7 @@ public sealed partial class ShellWindow : Window
                     ReaderFormat.Text = guide.Format.ToString().ToUpperInvariant();
                     // Shown before the content opens, so it stays usable when a load fails.
                     ReadingState? readingState = await library.GetReadingStateAsync(guide.Id);
+                    HtmlOpenTimelineForTest.Mark("state-read");
                     if (generation != renderGeneration)
                     {
                         return false;

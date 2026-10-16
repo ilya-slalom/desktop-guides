@@ -341,6 +341,10 @@ try {
             }
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
+        # #102: what the window showed when the status never came.
+        if (Get-Command Save-WindowScreenshot -ErrorAction SilentlyContinue) {
+            try { [void](Save-WindowScreenshot 'status-timeout') } catch { }
+        }
         throw "Expected shell status '$($expected -join "' or '")'; $lastObserved. Last consumed sequence: $script:lastStatusSequence."
     }
 

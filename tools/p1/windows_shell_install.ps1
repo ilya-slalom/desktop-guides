@@ -884,10 +884,47 @@ function Run-ShellSmoke(
         $result = Read-ShellSmokeResult $resultPath $invocationId $mode `
             $report.launchedProcessId $targetSessionId
         if (-not $result.success) {
+            if ("$($result.error)" -match "Loading guide|Web page guides couldn't start") {
+                Save-OpenStallEvidence $ResultName
+            }
             throw "Installed $mode shell smoke failed: $($result.error)"
         }
         return $result
     }
+}
+
+# #102: what the app and WebView2 were doing when a guide open never
+# finished. The app is still running here; the shard stops after this.
+function Save-OpenStallEvidence([string] $resultName) {
+    $evidence = [ordered]@{ processId = $report.launchedProcessId }
+    try {
+        $timeline = Join-Path (Get-HtmlCacheRoot) "diagnostics\html-open-$($report.launchedProcessId).json"
+        $evidence.timeline = if (Test-Path -LiteralPath $timeline) {
+            Get-Content -LiteralPath $timeline -Raw -Encoding UTF8 | ConvertFrom-Json
+        } else { $null }
+        $app = Get-Process -Id $report.launchedProcessId -ErrorAction SilentlyContinue
+        $evidence.appResponding = if ($app) { $app.Responding } else { $null }
+        $evidence.webView2 = @(
+            Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'" |
+                ForEach-Object {
+                    $type = if ($_.CommandLine -match '--type=(\S+)') { $Matches[1] } else { 'browser' }
+                    $userData = if ($_.CommandLine -match '--user-data-dir="?([^"]+?)"?(\s|$)') {
+                        Split-Path -Leaf $Matches[1]
+                    } else { $null }
+                    [ordered]@{
+                        processId = $_.ProcessId
+                        parentProcessId = $_.ParentProcessId
+                        created = $_.CreationDate.ToString('o')
+                        type = $type
+                        profile = $userData
+                    }
+                })
+    }
+    catch {
+        $evidence.error = $_ | Out-String
+    }
+    $evidence | ConvertTo-Json -Depth 6 |
+        Set-Content -LiteralPath (Join-Path $ResultDirectory "$resultName.open-stall.json") -Encoding UTF8
 }
 
 function Run-DesignLanguageScenarios {
@@ -2960,6 +2997,10 @@ function Run-ProviderScenarios {
     Assert-NoCredentialLeak $secrets 'AfterRemove'
 }
 
+# #102: one gate for the whole run, so every launch records its guide opens,
+# including a guide reopened at startup.
+$openTimelineGate = [System.Threading.EventWaitHandle]::new(
+    $false, [System.Threading.EventResetMode]::ManualReset, "Local\$eventPrefix.HtmlOpenTimeline")
 try {
     $report.windowsAppRuntime = @(
         Get-AppxPackage -Name 'Microsoft.WindowsAppRuntime.2*' |
@@ -3212,6 +3253,7 @@ catch {
     }
 }
 finally {
+    $openTimelineGate.Dispose()
     if ($dataRoot) {
         $blob = Join-Path $dataRoot 'providers.bin'
         if (Test-Path -LiteralPath $blob) {

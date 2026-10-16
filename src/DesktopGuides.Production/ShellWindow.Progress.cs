@@ -177,7 +177,9 @@ public sealed partial class ShellWindow
             {
                 try
                 {
+                    HtmlOpenTimelineForTest.Mark("restore");
                     kind = (await session.RestoreLocationAsync(location, token)).Kind;
+                    HtmlOpenTimelineForTest.Mark("restored", kind.ToString());
                 }
                 catch (OperationCanceledException) when (token.IsCancellationRequested)
                 {
@@ -206,6 +208,7 @@ public sealed partial class ShellWindow
         }
         progressTracking = progress!.Track(guide.Id, session, baseline);
         StartContents(session);
+        HtmlOpenTimelineForTest.Mark("ready");
         return true;
     }
 
