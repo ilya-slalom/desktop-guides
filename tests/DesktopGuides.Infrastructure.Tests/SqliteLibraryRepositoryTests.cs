@@ -1373,6 +1373,201 @@ public sealed class SqliteLibraryRepositoryTests
         Assert.Throws<SqliteException>(() => command.ExecuteNonQuery());
     }
 
+    // T19.1 bookmarks
+
+    private static async Task<(SqliteLibraryRepository Repository, Guid Guide)> BookmarkLibraryAsync(
+        TestLibrary directory, TimeProvider clock)
+    {
+        SqliteLibraryRepository repository = new(directory.Paths, clock);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Bookmarks", null, null);
+        Guid guide = Guid.NewGuid();
+        InsertGuide(directory.Paths.DatabasePath, guide, game.Id);
+        return (repository, guide);
+    }
+
+    private static void InsertBookmarks(string databasePath, Guid guideId, int count)
+    {
+        using SqliteConnection connection = OpenWithForeignKeys(databasePath);
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        for (int i = 0; i < count; i++)
+        {
+            using SqliteCommand command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                INSERT INTO Bookmarks (Id, GuideId, LocatorJson, Label, CreatedUtcMs, UpdatedUtcMs)
+                VALUES ($id, $guide, '{}', 'Seeded', 0, 0)
+                """;
+            command.Parameters.AddWithValue("$id", Guid.NewGuid().ToString("N"));
+            command.Parameters.AddWithValue("$guide", guideId.ToString("N"));
+            command.ExecuteNonQuery();
+        }
+        transaction.Commit();
+    }
+
+    [Fact]
+    public async Task BookmarksListOldestFirstAsAdded()
+    {
+        using TestLibrary directory = new();
+        AdjustableTimeProvider clock = new(Now);
+        (SqliteLibraryRepository repository, Guid guide) = await BookmarkLibraryAsync(directory, clock);
+        await using (repository)
+        {
+            Bookmark first = await repository.AddBookmarkAsync(guide, "{\"page\":4}", "  Boss: Dragon ");
+            clock.Now = Now.AddMinutes(1);
+            Bookmark second = await repository.AddBookmarkAsync(guide, "{\"page\":2}", "Page 2");
+
+            Assert.Equal("Boss: Dragon", first.Label);
+            Assert.Equal((guide, Now, Now), (first.GuideId, first.CreatedUtc, first.UpdatedUtc));
+            Assert.Equal([first, second], await repository.ListBookmarksAsync(guide));
+            Assert.Empty(await repository.ListBookmarksAsync(Guid.NewGuid()));
+        }
+    }
+
+    [Fact]
+    public async Task ARenameKeepsTheCreationTime()
+    {
+        using TestLibrary directory = new();
+        AdjustableTimeProvider clock = new(Now);
+        (SqliteLibraryRepository repository, Guid guide) = await BookmarkLibraryAsync(directory, clock);
+        await using (repository)
+        {
+            Bookmark added = await repository.AddBookmarkAsync(guide, "{}", "Old");
+            clock.Now = Now.AddHours(1);
+
+            Bookmark? renamed = await repository.RenameBookmarkAsync(added.Id, " New ");
+
+            Assert.Equal(added with { Label = "New", UpdatedUtc = Now.AddHours(1) }, renamed);
+            Assert.Equal([renamed!], await repository.ListBookmarksAsync(guide));
+            Assert.Null(await repository.RenameBookmarkAsync(Guid.NewGuid(), "Gone"));
+        }
+    }
+
+    [Fact]
+    public async Task DeleteRemovesOnlyThatBookmarkAndRestorePutsItBack()
+    {
+        using TestLibrary directory = new();
+        (SqliteLibraryRepository repository, Guid guide) = await BookmarkLibraryAsync(directory, new FixedTimeProvider(Now));
+        await using (repository)
+        {
+            Bookmark kept = await repository.AddBookmarkAsync(guide, "{}", "Kept");
+            Bookmark deleted = await repository.AddBookmarkAsync(guide, "{\"page\":9}", "Deleted");
+
+            Assert.True(await repository.DeleteBookmarkAsync(deleted.Id));
+            Assert.False(await repository.DeleteBookmarkAsync(deleted.Id));
+            Assert.Equal([kept], await repository.ListBookmarksAsync(guide));
+
+            await repository.RestoreBookmarkAsync(deleted);
+
+            // Both share the fixed time, so the list order between them is by id.
+            Assert.Equal(new[] { kept, deleted }.OrderBy(b => b.Id), (await repository.ListBookmarksAsync(guide)).OrderBy(b => b.Id));
+        }
+    }
+
+    [Fact]
+    public async Task TheFiveHundredAndFirstBookmarkIsRefused()
+    {
+        using TestLibrary directory = new();
+        (SqliteLibraryRepository repository, Guid guide) = await BookmarkLibraryAsync(directory, new FixedTimeProvider(Now));
+        await using (repository)
+        {
+            Game other = await repository.AddGameAsync("Other", null, null);
+            Guid otherGuide = Guid.NewGuid();
+            InsertGuide(directory.Paths.DatabasePath, otherGuide, other.Id);
+            InsertBookmarks(directory.Paths.DatabasePath, guide, BookmarkRules.MaxPerGuide);
+
+            BookmarkLimitException error = await Assert.ThrowsAsync<BookmarkLimitException>(
+                () => repository.AddBookmarkAsync(guide, "{}", "One more"));
+
+            Assert.Equal(guide, error.GuideId);
+            Assert.Equal(BookmarkRules.MaxPerGuide, (await repository.ListBookmarksAsync(guide)).Count);
+            Assert.NotNull(await repository.AddBookmarkAsync(otherGuide, "{}", "Another guide's"));
+        }
+    }
+
+    [Fact]
+    public async Task RestoreObeysTheLimit()
+    {
+        using TestLibrary directory = new();
+        (SqliteLibraryRepository repository, Guid guide) = await BookmarkLibraryAsync(directory, new FixedTimeProvider(Now));
+        await using (repository)
+        {
+            Bookmark deleted = await repository.AddBookmarkAsync(guide, "{}", "Deleted");
+            Assert.True(await repository.DeleteBookmarkAsync(deleted.Id));
+            InsertBookmarks(directory.Paths.DatabasePath, guide, BookmarkRules.MaxPerGuide);
+
+            await Assert.ThrowsAsync<BookmarkLimitException>(() => repository.RestoreBookmarkAsync(deleted));
+        }
+    }
+
+    [Fact]
+    public async Task AddingToAMissingGuideSaysSo()
+    {
+        using TestLibrary directory = new();
+        (SqliteLibraryRepository repository, _) = await BookmarkLibraryAsync(directory, new FixedTimeProvider(Now));
+        await using (repository)
+        {
+            InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => repository.AddBookmarkAsync(Guid.NewGuid(), "{}", "Lost"));
+            Assert.Equal("This guide is no longer in the library.", error.Message);
+        }
+    }
+
+    [Fact]
+    public async Task RestoringToAMissingGuideSaysSo()
+    {
+        using TestLibrary directory = new();
+        (SqliteLibraryRepository repository, Guid guide) = await BookmarkLibraryAsync(directory, new FixedTimeProvider(Now));
+        await using (repository)
+        {
+            Bookmark bookmark = await repository.AddBookmarkAsync(guide, "{}", "Undo me");
+            Assert.True(await repository.DeleteBookmarkAsync(bookmark.Id));
+
+            InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => repository.RestoreBookmarkAsync(bookmark with { GuideId = Guid.NewGuid() }));
+            Assert.Equal("This guide is no longer in the library.", error.Message);
+        }
+    }
+
+    [Fact]
+    public async Task BookmarksGoWithTheirGuideAndLeaveItsStateAlone()
+    {
+        using TestLibrary directory = new();
+        (SqliteLibraryRepository repository, Guid guide) = await BookmarkLibraryAsync(directory, new FixedTimeProvider(Now));
+        await using (repository)
+        {
+            await repository.SaveReadingLocationAsync(guide, "{\"at\":1}", 0.5);
+            await repository.AddBookmarkAsync(guide, "{\"at\":2}", "Elsewhere");
+
+            ReadingState? state = await repository.GetReadingStateAsync(guide);
+            Assert.Equal(("{\"at\":1}", 0.5), (state?.LocatorJson, state?.EstimatedFraction));
+
+            using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+            using SqliteCommand delete = connection.CreateCommand();
+            delete.CommandText = $"DELETE FROM Guides WHERE Id = '{guide:N}'";
+            delete.ExecuteNonQuery();
+
+            Assert.Empty(await repository.ListBookmarksAsync(guide));
+        }
+    }
+
+    [Fact]
+    public async Task OutOfBoundsInputIsRefusedBeforeTheWrite()
+    {
+        using TestLibrary directory = new();
+        (SqliteLibraryRepository repository, Guid guide) = await BookmarkLibraryAsync(directory, new FixedTimeProvider(Now));
+        await using (repository)
+        {
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => repository.AddBookmarkAsync(guide, new string('é', 2049), "Too long a locator"));
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => repository.AddBookmarkAsync(guide, "{}", new string('a', 81)));
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => repository.RenameBookmarkAsync(Guid.NewGuid(), "   "));
+            Assert.Empty(await repository.ListBookmarksAsync(guide));
+        }
+    }
+
     private static void CreatePopulatedVersionFour(TestLibrary directory, Guid gameId, Guid guideId)
     {
         CreatePopulatedVersionThree(directory, gameId, guideId);
