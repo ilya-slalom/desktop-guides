@@ -195,7 +195,11 @@ $runs = Items $report 'smokeRuns'
 $lines.Add(''); $lines.Add('### Scenarios')
 if ($runs.Count -eq 0) { $lines.Add((Line $false 'No scenario timings recorded')) }
 foreach ($run in $runs) {
-    $text = "$($run.name) ($([Math]::Round([double] $run.seconds, 1)) s)"
+    $timing = "$([Math]::Round([double] $run.seconds, 1)) s"
+    # #102: slow guide opens stay visible even when they pass.
+    $slowest = Field $run 'slowestOpenSeconds'
+    if ($null -ne $slowest) { $timing += "; slowest guide open $([Math]::Round([double] $slowest, 1)) s" }
+    $text = "$($run.name) ($timing)"
     if (-not $run.passed -and $run.error) { $text += ': ' + (Hide-Paths ("$($run.error)" -split "`n")[0]) }
     $lines.Add((Line ([bool] $run.passed) $text))
 }

@@ -300,6 +300,9 @@ try {
         [switch] $AllowHidden,
         [switch] $Prefix,
         [int] $Seconds = 15) {
+        # #102: opening a guide waits on WebView2 or PDF start-up, which a
+        # loaded runner slowed to 17 s while the app worked as it should.
+        if (-not $PSBoundParameters.ContainsKey('Seconds') -and $expected -contains 'Guide ready.') { $Seconds = 60 }
         $lastObserved = 'status probe was not found'
         $deadline = (Get-Date).AddSeconds($Seconds)
         do {

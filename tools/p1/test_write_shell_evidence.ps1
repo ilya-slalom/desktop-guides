@@ -39,7 +39,10 @@ try {
         smokeRuns = @(
             [ordered]@{ name = 'design-system'; mode = 'design-language'; startedAt = '2026-10-12T00:00:01Z'; seconds = 12.5; passed = $true; error = $null },
             [ordered]@{ name = 'keyboard'; mode = 'keyboard'; startedAt = '2026-10-12T00:00:20Z'; seconds = 30.0; passed = $false
-                error = "Expected focus. At C:\Users\someone\AppData\Local\Temp\x.ps1 and $($env:LOCALAPPDATA)\Packages\y" })
+                error = "Expected focus. At C:\Users\someone\AppData\Local\Temp\x.ps1 and $($env:LOCALAPPDATA)\Packages\y" },
+            # #102: the slowest guide open in the scenario, when one finished.
+            [ordered]@{ name = 'html-reader-online'; mode = 'html-reader'; startedAt = '2026-10-12T00:01:00Z'; seconds = 31.3; passed = $true; error = $null
+                slowestOpenSeconds = 17.1 })
         packageStillInstalled = $false; certificateStillTrusted = $false
         # No processCleanupErrors: the installer sets it only after a cleanup error.
         finishedAt = '2026-10-12T00:05:00.2500000Z'
@@ -62,6 +65,7 @@ try {
     Assert-True ($text.Contains("- $pass Signed MSIX SHA-256 ``BBB``")) 'The signed hash line is missing.'
     Assert-True ($text.Contains("- $pass design-system (12.5 s)")) 'The passing scenario line is missing.'
     Assert-True ($text.Contains("- $fail keyboard (30 s)")) 'The failing scenario line is missing.'
+    Assert-True ($text.Contains("- $pass html-reader-online (31.3 s; slowest guide open 17.1 s)")) 'The slowest guide open is missing.'
     Assert-True ($text.Contains("- $pass Package removed")) 'The cleanup line is missing.'
     Assert-True ($text.Contains("- $pass Providers: fixtures")) 'The providers line is missing.'
     Assert-True ($text.Contains("- $pass No test-owned scheduled task or process left")) 'A report without cleanup errors showed one.'

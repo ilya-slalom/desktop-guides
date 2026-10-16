@@ -51,6 +51,28 @@ public sealed class HtmlOpenTimelineTests
         Assert.Equal(100, stage.GetProperty("ms").GetInt64());
     }
 
+    // Tests time each scenario's opens from the ones that finished during it.
+    [Fact]
+    public void EachFinishedOpenKeepsItsTimeAcrossLaterOpens()
+    {
+        HtmlOpenTimeline timeline = new(() => now);
+        timeline.Begin();
+        now = 1_800;
+        timeline.Mark("ready");
+        now = 5_000;
+        timeline.Begin();
+        now = 22_100;
+        timeline.Mark("ready");
+        now = 30_000;
+        timeline.Begin();
+        timeline.Mark("navigate");
+
+        using JsonDocument json = JsonDocument.Parse(timeline.ToJson());
+
+        Assert.Equal([1_800L, 17_100L],
+            json.RootElement.GetProperty("ready").EnumerateArray().Select(r => r.GetInt64()));
+    }
+
     [Fact]
     public void ADetailWithQuotesStaysValidJson()
     {

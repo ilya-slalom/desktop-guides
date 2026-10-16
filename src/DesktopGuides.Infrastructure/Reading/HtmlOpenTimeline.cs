@@ -11,6 +11,9 @@ namespace DesktopGuides.Infrastructure.Reading;
 public sealed class HtmlOpenTimeline(Func<long> clockMs)
 {
     private readonly List<(string Stage, long Ms, string? Detail)> stages = [];
+    // Every finished open in the process, so a test can time the opens that
+    // finished during one scenario.
+    private readonly List<long> ready = [];
     private long began;
     private int opens;
 
@@ -21,7 +24,12 @@ public sealed class HtmlOpenTimeline(Func<long> clockMs)
         stages.Clear();
     }
 
-    public void Mark(string stage, string? detail = null) => stages.Add((stage, clockMs() - began, detail));
+    public void Mark(string stage, string? detail = null)
+    {
+        long ms = clockMs() - began;
+        stages.Add((stage, ms, detail));
+        if (stage == "ready") ready.Add(ms);
+    }
 
     public string ToJson()
     {
@@ -39,6 +47,9 @@ public sealed class HtmlOpenTimeline(Func<long> clockMs)
                 if (detail is not null) json.WriteString("detail", detail);
                 json.WriteEndObject();
             }
+            json.WriteEndArray();
+            json.WriteStartArray("ready");
+            foreach (long ms in ready) json.WriteNumberValue(ms);
             json.WriteEndArray();
             json.WriteEndObject();
         }
