@@ -4510,6 +4510,7 @@ try {
                     $rect = $item.Current.BoundingRectangle
                     if ($rect.Height -le 0) { return $false }
                     $y = $rect.Top + $rect.Height * ($row - 0.5) / 120
+                    $script:reflowRowProbe = "item $($rect.Top),$($rect.Height) list $($bounds.Top),$($bounds.Height) row $y"
                     return ($y -ge $bounds.Top -and $y -le $bounds.Bottom)
                 }
                 return $false
@@ -5265,6 +5266,8 @@ try {
                 # there when the find bar closes and the reading area grows.
                 Find-Next 'Row 100' '1 of 1'
                 Wait-ReflowRowVisible 100 'finding a row deep in the table'
+                $report.reflowRowProbe = $script:reflowRowProbe
+                $report.reflowRowScreenshot = Save-WindowScreenshot 'reflow-row'
                 [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
                 Wait-HiddenById 'ReaderFindBar'
                 Start-Sleep -Seconds 1
