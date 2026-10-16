@@ -1,6 +1,8 @@
 # T19.2 TXT reflow: design
 
-Status: approved in conversation, 16 October 2026. Not yet implemented.
+Status: approved in conversation, 16 October 2026. PR a (the planner and
+the view preference) is implemented on `feat/p2-t19-2-reflow`; PR b (the
+reflow view) follows.
 
 ## Intent
 
@@ -189,3 +191,48 @@ design.
      punctuation.
    - **A paragraph with list markers after its first line** stays
      preserved.
+
+## PR a verification record
+
+See the [PR a plan](t19-2-reflow-plan.md).
+
+- **Core,** each test failing first and then passing on the host:
+  - `TextLocatorTests` gains 4 tests, for `CaptureAt`;
+  - `TextReflowPlannerTests` (18, including the review's three) runs over
+    the authored `p2/txt-reflow.txt`. It covers block kinds, joining, the
+    offset round trip for every display index, blocks that cover the text,
+    no prose, an empty guide, cancellation, and TR19.1 (text, hash and
+    locators unchanged).
+
+  The full suite passes, 1317/1317.
+- **Infrastructure:** the full suite passes, 837/837. New tests:
+  - the schema 5 to 6 migration, and a failed one;
+  - the view and the text size saving apart;
+  - a missing guide or an unknown view refused, and the column's `CHECK`;
+  - backups: the snapshot holds the view, restore refuses an unknown one,
+    and a schema 5 backup restores, keeps its text sizes and opens as
+    Original.
+
+  The refusal test passed when written. A temporary valid value made it
+  fail.
+- **Production:** it builds with 0 warnings, with warnings as errors.
+- **Rulings:**
+  1. **T19.1 version 4 backup test:** it now rebuilds `ReaderPreferences`
+     with version 1's exact statement, so its schema stays version 4.
+  2. **T19.1 upgrade check:** a literal `5L` in T19.1's upgrade test is
+     now `LibrarySchema.CurrentVersion`.
+  3. **The two-space rule changed:** see deviation 4.
+- **Final review:** 0 Critical, 3 Important and 4 Minor. All three
+  Important findings were about prose rules that real guides would break,
+  and each is fixed with a failing test first:
+  1. one symbol (HP/MP, 50%, [WLK3]) or a typographic quote made a
+     paragraph preserved;
+  2. two spaces after a sentence did;
+  3. a list of long items was joined into prose.
+
+  **The minors are deferred:**
+  - the heading check's cost and cancellation;
+  - `Budget` having no caller until PR b;
+  - `CaptureAt` at a low surrogate;
+  - a form feed in prose text.
+

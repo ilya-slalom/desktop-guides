@@ -1,6 +1,6 @@
 # P2 implementation plan and exit gates
 
-Status: M7 complete, 15 October 2026 (T18.1: #113, #116 and #117). M8 complete, 16 October 2026 (T18.2: #118 and #119). M9 in progress: T19.1 PR a merged (#126); PR b (the Bookmarks tab) in review. P1 is complete (54 of 54 tasks; v1.0.1
+Status: M7 complete, 15 October 2026 (T18.1: #113, #116 and #117). M8 complete, 16 October 2026 (T18.2: #118 and #119). M9 complete, 16 October 2026 (T19.1: #126 and #129). M10 in progress: T19.2 PR a (the reflow planner and the view preference) in review. P1 is complete (54 of 54 tasks; v1.0.1
 published). This plan orders the **3 P2 stories and 6 tasks** in the
 [work breakdown](../work-breakdown.md#p2--reader-depth-and-local-ownership).
 
