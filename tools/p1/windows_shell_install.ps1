@@ -804,90 +804,155 @@ function Run-ShellSmoke(
     [string] $BackupPath = '',
     [string] $WorkflowRoot = '',
     [string] $WorkflowStatePath = '') {
-    return Measure-SmokeRun $report.smokeRuns $ResultName $mode {
-        $resultPath = Join-Path $ResultDirectory "$ResultName.json"
-        Clear-ShellSmokeResult $resultPath
-        $invocationId = [Guid]::NewGuid().ToString('N')
-        $script = Join-Path $PSScriptRoot 'windows_shell_ui_smoke.ps1'
-        $arguments = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass ' +
-            '-File "' + $script + '" -Mode ' + $mode +
-            ' -ResultPath "' + $resultPath + '"' +
-            ' -InvocationId ' + $invocationId +
-            ' -ProcessId ' + $report.launchedProcessId +
-            ' -SessionId ' + $targetSessionId +
-            ' -ExecutablePath "' + $expectedExecutablePath + '"' +
-            ' -ExpectedResumeGuide "' + $expectedResumeGuide + '"' +
-            ' -ExitDelayMilliseconds ' + $ExitDelayMilliseconds +
-            ' -ExpectedScalePercent ' + $ExpectedScalePercent +
-            ' -ExpectedTopLine ' + $ExpectedTopLine
-        $arguments += ' -EventPrefix ' + $eventPrefix
-        if ($ExpectedMaterial) {
-            $arguments += ' -ExpectedMaterial ' + $ExpectedMaterial
+    $opensBefore = @(Read-GuideOpenTimes).Count
+    try {
+        return Measure-SmokeRun $report.smokeRuns $ResultName $mode {
+            $resultPath = Join-Path $ResultDirectory "$ResultName.json"
+            Clear-ShellSmokeResult $resultPath
+            $invocationId = [Guid]::NewGuid().ToString('N')
+            $script = Join-Path $PSScriptRoot 'windows_shell_ui_smoke.ps1'
+            $arguments = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass ' +
+                '-File "' + $script + '" -Mode ' + $mode +
+                ' -ResultPath "' + $resultPath + '"' +
+                ' -InvocationId ' + $invocationId +
+                ' -ProcessId ' + $report.launchedProcessId +
+                ' -SessionId ' + $targetSessionId +
+                ' -ExecutablePath "' + $expectedExecutablePath + '"' +
+                ' -ExpectedResumeGuide "' + $expectedResumeGuide + '"' +
+                ' -ExitDelayMilliseconds ' + $ExitDelayMilliseconds +
+                ' -ExpectedScalePercent ' + $ExpectedScalePercent +
+                ' -ExpectedTopLine ' + $ExpectedTopLine
+            $arguments += ' -EventPrefix ' + $eventPrefix
+            if ($ExpectedMaterial) {
+                $arguments += ' -ExpectedMaterial ' + $ExpectedMaterial
+            }
+            if ($SwitchToMaterial) {
+                $arguments += ' -SwitchToMaterial ' + $SwitchToMaterial
+            }
+            if ($ExpectedIcons) { $arguments += ' -ExpectedIcons ' + $ExpectedIcons }
+            if ($SwitchIcons) { $arguments += ' -SwitchIcons ' + $SwitchIcons }
+            if ($EmptyLibrary) { $arguments += ' -EmptyLibrary' }
+            if ($ExpectedTheme) {
+                $arguments += ' -ExpectedTheme ' + $ExpectedTheme
+            }
+            if ($ExpectedThemeStatus) {
+                $arguments += ' -ExpectedThemeStatus "' + $ExpectedThemeStatus + '"'
+            }
+            if ($SwitchToTheme) {
+                $arguments += ' -SwitchToTheme ' + $SwitchToTheme
+            }
+            if ($WindowsTheme) {
+                $arguments += ' -WindowsTheme ' + $WindowsTheme
+            }
+            if ($IgdbCredentialFile) {
+                $arguments += ' -IgdbCredentialFile "' + $IgdbCredentialFile + '"'
+            }
+            if ($SteamGridDbCredentialFile) {
+                $arguments += ' -SteamGridDbCredentialFile "' + $SteamGridDbCredentialFile + '"'
+            }
+            if ($ExpectedProviderFailure) {
+                $arguments += ' -ExpectedProviderFailure ' + $ExpectedProviderFailure
+            }
+            if ($ExpectedGuideTitle) {
+                $arguments += ' -ExpectedGuideTitle "' + $ExpectedGuideTitle + '"'
+            }
+            if ($AppDataRoot) {
+                $arguments += ' -AppDataRoot "' + $AppDataRoot + '"'
+            }
+            if ($AppCacheRoot) {
+                $arguments += ' -AppCacheRoot "' + $AppCacheRoot + '"'
+            }
+            if ($BackupPath) { $arguments += ' -BackupPath "' + $BackupPath + '"' }
+            if ($WorkflowRoot) { $arguments += ' -WorkflowRoot "' + $WorkflowRoot + '"' }
+            if ($WorkflowStatePath) { $arguments += ' -WorkflowStatePath "' + $WorkflowStatePath + '"' }
+            $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
+                -Argument $arguments -WorkingDirectory $PSScriptRoot
+            Register-ScheduledTask -TaskName $smokeTask -Action $action `
+                -Principal $principal -Force | Out-Null
+            Start-ScheduledTask -TaskName $smokeTask
+            $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*' -or $mode -like 'completion-*' -or $mode -like 'export-*' -or $mode -like 'restore-*' -or $mode -like 'workflow-*' -or $mode -eq 'html-position') { 240 }
+                elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*' -or $mode -like 'theme-*' -or $mode -like 'text-size-*') { 120 }
+                # #102: room for one guide open at the smoke's 60 s budget.
+                else { 120 }
+            $deadline = (Get-Date).AddSeconds($timeoutSeconds)
+            do {
+                Start-Sleep -Milliseconds 500
+            } while (-not (Test-Path $resultPath) -and (Get-Date) -lt $deadline)
+            if (-not (Test-Path $resultPath)) {
+                throw "Installed $mode shell smoke timed out."
+            }
+            if (-not (Wait-ScheduledTaskIdle $smokeTask 10 -RequireRegistered)) {
+                throw "Installed $mode shell smoke task did not finish after writing its result."
+            }
+            $result = Read-ShellSmokeResult $resultPath $invocationId $mode `
+                $report.launchedProcessId $targetSessionId
+            if (-not $result.success) {
+                if ("$($result.error)" -match "Loading guide|Web page guides couldn't start") {
+                    Save-OpenStallEvidence $ResultName
+                }
+                throw "Installed $mode shell smoke failed: $($result.error)"
+            }
+            return $result
         }
-        if ($SwitchToMaterial) {
-            $arguments += ' -SwitchToMaterial ' + $SwitchToMaterial
-        }
-        if ($ExpectedIcons) { $arguments += ' -ExpectedIcons ' + $ExpectedIcons }
-        if ($SwitchIcons) { $arguments += ' -SwitchIcons ' + $SwitchIcons }
-        if ($EmptyLibrary) { $arguments += ' -EmptyLibrary' }
-        if ($ExpectedTheme) {
-            $arguments += ' -ExpectedTheme ' + $ExpectedTheme
-        }
-        if ($ExpectedThemeStatus) {
-            $arguments += ' -ExpectedThemeStatus "' + $ExpectedThemeStatus + '"'
-        }
-        if ($SwitchToTheme) {
-            $arguments += ' -SwitchToTheme ' + $SwitchToTheme
-        }
-        if ($WindowsTheme) {
-            $arguments += ' -WindowsTheme ' + $WindowsTheme
-        }
-        if ($IgdbCredentialFile) {
-            $arguments += ' -IgdbCredentialFile "' + $IgdbCredentialFile + '"'
-        }
-        if ($SteamGridDbCredentialFile) {
-            $arguments += ' -SteamGridDbCredentialFile "' + $SteamGridDbCredentialFile + '"'
-        }
-        if ($ExpectedProviderFailure) {
-            $arguments += ' -ExpectedProviderFailure ' + $ExpectedProviderFailure
-        }
-        if ($ExpectedGuideTitle) {
-            $arguments += ' -ExpectedGuideTitle "' + $ExpectedGuideTitle + '"'
-        }
-        if ($AppDataRoot) {
-            $arguments += ' -AppDataRoot "' + $AppDataRoot + '"'
-        }
-        if ($AppCacheRoot) {
-            $arguments += ' -AppCacheRoot "' + $AppCacheRoot + '"'
-        }
-        if ($BackupPath) { $arguments += ' -BackupPath "' + $BackupPath + '"' }
-        if ($WorkflowRoot) { $arguments += ' -WorkflowRoot "' + $WorkflowRoot + '"' }
-        if ($WorkflowStatePath) { $arguments += ' -WorkflowStatePath "' + $WorkflowStatePath + '"' }
-        $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
-            -Argument $arguments -WorkingDirectory $PSScriptRoot
-        Register-ScheduledTask -TaskName $smokeTask -Action $action `
-            -Principal $principal -Force | Out-Null
-        Start-ScheduledTask -TaskName $smokeTask
-        $timeoutSeconds = if ($mode -like 'provider-*' -or $mode -like 'pdf-*' -or $mode -like 'progress-*' -or $mode -like 'completion-*' -or $mode -like 'export-*' -or $mode -like 'restore-*' -or $mode -like 'workflow-*' -or $mode -eq 'html-position') { 240 }
-            elseif ($mode -like 'catalog*' -or $mode -like 'import-*' -or $mode -like 'game-actions*' -or $mode -like 'html-*' -or $mode -like 'theme-*' -or $mode -like 'text-size-*') { 120 }
-            else { 60 }
-        $deadline = (Get-Date).AddSeconds($timeoutSeconds)
-        do {
-            Start-Sleep -Milliseconds 500
-        } while (-not (Test-Path $resultPath) -and (Get-Date) -lt $deadline)
-        if (-not (Test-Path $resultPath)) {
-            throw "Installed $mode shell smoke timed out."
-        }
-        if (-not (Wait-ScheduledTaskIdle $smokeTask 10 -RequireRegistered)) {
-            throw "Installed $mode shell smoke task did not finish after writing its result."
-        }
-        $result = Read-ShellSmokeResult $resultPath $invocationId $mode `
-            $report.launchedProcessId $targetSessionId
-        if (-not $result.success) {
-            throw "Installed $mode shell smoke failed: $($result.error)"
-        }
-        return $result
     }
+    finally {
+        # #102: slow guide opens stay visible in the evidence when they pass.
+        $times = @(Read-GuideOpenTimes)
+        if ($times.Count -gt $opensBefore -and $report.smokeRuns.Count -gt 0) {
+            $slowest = ($times[$opensBefore..($times.Count - 1)] | Measure-Object -Maximum).Maximum
+            $report.smokeRuns[$report.smokeRuns.Count - 1]['slowestOpenSeconds'] = [Math]::Round($slowest / 1000, 1)
+        }
+    }
+}
+
+# #102: each finished guide open in the launched app, in milliseconds. A read
+# can meet the app's replace of the file, so it tries again for a moment.
+function Read-GuideOpenTimes {
+    $path = Join-Path (Get-HtmlCacheRoot) "diagnostics\html-open-$($report.launchedProcessId).json"
+    for ($attempt = 0; $attempt -lt 5; $attempt++) {
+        if (-not (Test-Path -LiteralPath $path)) { return @() }
+        try {
+            return @((Get-Content -LiteralPath $path -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json).ready)
+        }
+        catch {
+            Start-Sleep -Milliseconds 50
+        }
+    }
+    return @()
+}
+
+# #102: what the app and WebView2 were doing when a guide open never
+# finished. The app is still running here; the shard stops after this.
+function Save-OpenStallEvidence([string] $resultName) {
+    $evidence = [ordered]@{ processId = $report.launchedProcessId }
+    try {
+        $timeline = Join-Path (Get-HtmlCacheRoot) "diagnostics\html-open-$($report.launchedProcessId).json"
+        $evidence.timeline = if (Test-Path -LiteralPath $timeline) {
+            Get-Content -LiteralPath $timeline -Raw -Encoding UTF8 | ConvertFrom-Json
+        } else { $null }
+        $app = Get-Process -Id $report.launchedProcessId -ErrorAction SilentlyContinue
+        $evidence.appResponding = if ($app) { $app.Responding } else { $null }
+        $evidence.webView2 = @(
+            Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'" |
+                ForEach-Object {
+                    $type = if ($_.CommandLine -match '--type=(\S+)') { $Matches[1] } else { 'browser' }
+                    $userData = if ($_.CommandLine -match '--user-data-dir="?([^"]+?)"?(\s|$)') {
+                        Split-Path -Leaf $Matches[1]
+                    } else { $null }
+                    [ordered]@{
+                        processId = $_.ProcessId
+                        parentProcessId = $_.ParentProcessId
+                        created = $_.CreationDate.ToString('o')
+                        type = $type
+                        profile = $userData
+                    }
+                })
+    }
+    catch {
+        $evidence.error = $_ | Out-String
+    }
+    $evidence | ConvertTo-Json -Depth 6 |
+        Set-Content -LiteralPath (Join-Path $ResultDirectory "$resultName.open-stall.json") -Encoding UTF8
 }
 
 function Run-DesignLanguageScenarios {
@@ -2960,6 +3025,10 @@ function Run-ProviderScenarios {
     Assert-NoCredentialLeak $secrets 'AfterRemove'
 }
 
+# #102: one gate for the whole run, so every launch records its guide opens,
+# including a guide reopened at startup.
+$openTimelineGate = [System.Threading.EventWaitHandle]::new(
+    $false, [System.Threading.EventResetMode]::ManualReset, "Local\$eventPrefix.HtmlOpenTimeline")
 try {
     $report.windowsAppRuntime = @(
         Get-AppxPackage -Name 'Microsoft.WindowsAppRuntime.2*' |
@@ -3212,6 +3281,7 @@ catch {
     }
 }
 finally {
+    $openTimelineGate.Dispose()
     if ($dataRoot) {
         $blob = Join-Path $dataRoot 'providers.bin'
         if (Test-Path -LiteralPath $blob) {

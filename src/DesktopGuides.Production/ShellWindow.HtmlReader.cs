@@ -22,6 +22,7 @@ public sealed partial class ShellWindow
         try
         {
             load = await htmlLoader!.LoadAsync(guide, token);
+            HtmlOpenTimelineForTest.Mark("files-loaded", load.GetType().Name);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -38,6 +39,7 @@ public sealed partial class ShellWindow
         }
         HtmlGuideLoaded loaded = (HtmlGuideLoaded)load;
         double textScale = await ReadTextScaleAsync(guide.Id);
+        HtmlOpenTimelineForTest.Mark("scale-read");
         if (generation != renderGeneration)
         {
             return false;
@@ -64,6 +66,7 @@ public sealed partial class ShellWindow
         }
         catch (HtmlGuideLoadException error)
         {
+            HtmlOpenTimelineForTest.Mark("open-failed", error.Error.ToString());
             if (generation != renderGeneration)
             {
                 return false;
@@ -78,6 +81,7 @@ public sealed partial class ShellWindow
         {
             return false;
         }
+        HtmlOpenTimelineForTest.Mark("opened");
         ReaderActions.SetSession(session);
         // T16.1: HTML gets the reader keys; only text size applies there.
         ReaderActions.KeysEnabled = true;
