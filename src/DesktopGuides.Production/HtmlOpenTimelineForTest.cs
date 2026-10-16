@@ -21,6 +21,8 @@ internal static class HtmlOpenTimelineForTest
         Mark("route");
     }
 
+    public static bool IsRecording => path is not null;
+
     public static void Mark(string stage, string? detail = null)
     {
         if (path is null) return;

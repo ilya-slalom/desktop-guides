@@ -46,6 +46,9 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     private HtmlScroll? lastScroll;
     private bool ticking;
     private static readonly TimeSpan ResizeSettle = TimeSpan.FromMilliseconds(300);
+    // #102: a loaded runner took 8.7 s to load a local entry once WebView2
+    // was up, so 15 s left a slow PC an error instead of its guide.
+    private static readonly TimeSpan EntryNavigationTimeout = TimeSpan.FromSeconds(45);
     private CancellationTokenSource? resizeDelay;
     private bool opened;
     private bool resizing;
@@ -219,6 +222,8 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         TaskCompletionSource<bool> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         void Completed(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args) =>
             completion.TrySetResult(args.IsSuccess);
+        void ContentLoading(CoreWebView2 sender, CoreWebView2ContentLoadingEventArgs args) =>
+            HtmlOpenTimelineForTest.Mark("content-loading");
         core = View.CoreWebView2;
         bool success;
         try
@@ -244,14 +249,19 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
             core.LaunchingExternalUriScheme += OnLaunchingExternalUriScheme;
             core.ProcessFailed += OnProcessFailed;
             core.NavigationCompleted += Completed;
+            core.ContentLoading += ContentLoading;
             pendingNavigation = completion;
             core.Navigate(policy.EntryUri.AbsoluteUri);
             HtmlOpenTimelineForTest.Mark("navigate");
-            success = await completion.Task.WaitAsync(TimeSpan.FromSeconds(15), token);
+            success = await completion.Task.WaitAsync(EntryNavigationTimeout, token);
             HtmlOpenTimelineForTest.Mark("navigated", $"{success} {entry}");
         }
         catch (Exception error) when (error is not OperationCanceledException and not HtmlGuideLoadException)
         {
+            if (error is TimeoutException && HtmlOpenTimelineForTest.IsRecording)
+            {
+                HtmlOpenTimelineForTest.Mark("navigation-timeout", ProcessKindsForTest());
+            }
             // A timeout or a COM failure leaves the guide unreadable, not the app.
             // A stall before the entry request says nothing about the guide's files.
             throw new HtmlGuideLoadException(HtmlGuideLoadMessages.ForFailedOpen(entry, failed));
@@ -260,7 +270,11 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         {
             pendingNavigation = null;
             // A closed or crashed view raises nothing more, and touching it could throw.
-            if (!disposed && !failed) core.NavigationCompleted -= Completed;
+            if (!disposed && !failed)
+            {
+                core.NavigationCompleted -= Completed;
+                core.ContentLoading -= ContentLoading;
+            }
         }
         if (!success || entry != HtmlEntryState.Served)
         {
@@ -818,12 +832,14 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
                 bool isEntry = serve.Asset.Kind == GuideAssetKind.EntryHtml;
                 // An entry read that throws is treated as changed.
                 if (isEntry) entry = HtmlEntryState.Changed;
+                if (isEntry) HtmlOpenTimelineForTest.Mark("entry-requested");
                 HtmlAssetRead read = await Task.Run(() => reader.Read(serve.Asset));
                 if (isEntry && read.Status == HtmlAssetReadStatus.Missing) entry = HtmlEntryState.Missing;
                 if (read.Status == HtmlAssetReadStatus.Served && !disposed && environment is not null)
                 {
                     diagnostics?.RecordServed(serve.Asset.RequestPath);
                     if (isEntry) entry = HtmlEntryState.Served;
+                    if (isEntry) HtmlOpenTimelineForTest.Mark("entry-served");
                     args.Response = environment.CreateWebResourceResponse(
                         new MemoryStream(read.Bytes!).AsRandomAccessStream(), 200, "OK",
                         HtmlRequestPolicy.ServedHeaders(serve.ContentType));
@@ -871,6 +887,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         {
             case HtmlNavigationKind.Entry:
                 diagnostics?.RecordEntryNavigation();
+                if (!entryNavigated) HtmlOpenTimelineForTest.Mark("navigation-starting");
                 entryNavigated = true;
                 break;
             case HtmlNavigationKind.SameDocument:
@@ -1017,6 +1034,21 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         {
             // Test diagnostics must never affect closing a guide.
+        }
+    }
+
+    // Test gate only (#102): which WebView2 processes were up when the entry
+    // navigation timed out, such as "Browser,GpuProcess,Utility".
+    private string ProcessKindsForTest()
+    {
+        try
+        {
+            return environment is null ? "no environment" : string.Join(",",
+                environment.GetProcessInfos().Select(info => info.Kind.ToString()).Order());
+        }
+        catch (Exception error)
+        {
+            return error.GetType().Name;
         }
     }
 

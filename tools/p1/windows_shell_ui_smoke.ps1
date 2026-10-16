@@ -302,7 +302,12 @@ try {
         [int] $Seconds = 15) {
         # #102: opening a guide waits on WebView2 or PDF start-up, which a
         # loaded runner slowed to 17 s while the app worked as it should.
-        if (-not $PSBoundParameters.ContainsKey('Seconds') -and $expected -contains 'Guide ready.') { $Seconds = 60 }
+        # An open ends in one of three statuses.
+        $openEnds = @('Guide ready.',
+            'Opened near your last place. The guide changed since you were here.',
+            "Couldn't return to your last place, so the guide opened at the start.")
+        if (-not $PSBoundParameters.ContainsKey('Seconds') -and
+            @($expected | Where-Object { $openEnds -contains $_ }).Count -gt 0) { $Seconds = 60 }
         $lastObserved = 'status probe was not found'
         $deadline = (Get-Date).AddSeconds($Seconds)
         do {
