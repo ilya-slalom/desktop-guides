@@ -306,4 +306,36 @@ public sealed class PdfPageTextSourceTests
             open.Wait();
         }
     }
+
+    [Fact]
+    public async Task TheOutlineKeepsThisDocumentsPagesAndLeavesOutLinks()
+    {
+        using PdfPageTextSource source = Open("generated/pdf-outline.pdf");
+
+        IReadOnlyList<PdfOutlineNode> outline = await source.GetOutlineAsync(CancellationToken.None);
+
+        Assert.Equal(["Part One", "Part Two", "Appendix"], outline.Select(n => n.Title));
+        Assert.Equal([0, 3, 5], outline.Select(n => n.PageIndex));
+        Assert.Equal(["Maps"], outline[2].Children.Select(n => n.Title));
+        Assert.Equal(["Chapter 1", "Chapter 2"], outline[0].Children.Select(n => n.Title));
+        Assert.Equal([1, 2], outline[0].Children.Select(n => n.PageIndex));
+        Assert.Equal(4, Assert.Single(outline[1].Children).PageIndex);
+    }
+
+    [Fact]
+    public async Task ADocumentWithoutAnOutlineHasNone()
+    {
+        using PdfPageTextSource source = Open(Long);
+
+        Assert.Empty(await source.GetOutlineAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ACancelledOutlineReadStops()
+    {
+        using PdfPageTextSource source = Open("generated/pdf-outline.pdf");
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            source.GetOutlineAsync(new CancellationToken(canceled: true)));
+    }
 }

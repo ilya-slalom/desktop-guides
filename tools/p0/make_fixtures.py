@@ -135,6 +135,39 @@ def lines_pdf() -> bytes:
     return write_pdf(objects)
 
 
+def outline_pdf() -> bytes:
+    """T18.2: six text pages and a nested outline, with a website link and
+    a link to another file that the contents must leave out, and a grouping
+    entry with no page of its own."""
+    page_count = 6
+    first_page = 14  # object number of page 1; each page is followed by its content
+    page_ref = lambda n: first_page + 2 * (n - 1)
+    def dest(n: int) -> str:
+        return f"/Dest [{page_ref(n)} 0 R /XYZ 0 792 0]"
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R /Outlines 3 0 R /PageMode /UseOutlines >>",
+        ("<< /Type /Pages /Count 6 /Kids [" + " ".join(f"{page_ref(n)} 0 R" for n in range(1, 7)) + "] >>").encode(),
+        b"<< /Type /Outlines /First 4 0 R /Last 11 0 R /Count 9 >>",
+        f"<< /Title (Part One) /Parent 3 0 R /First 5 0 R /Last 6 0 R /Count 2 /Next 7 0 R {dest(1)} >>".encode(),
+        f"<< /Title (Chapter 1) /Parent 4 0 R /Next 6 0 R {dest(2)} >>".encode(),
+        f"<< /Title (Chapter 2) /Parent 4 0 R /Prev 5 0 R {dest(3)} >>".encode(),
+        f"<< /Title (Part Two) /Parent 3 0 R /Prev 4 0 R /Next 8 0 R /First 10 0 R /Last 10 0 R /Count 1 {dest(4)} >>".encode(),
+        b"<< /Title (Website) /Parent 3 0 R /Prev 7 0 R /Next 9 0 R /A << /S /URI /URI (https://example.com/guide) >> >>",
+        b"<< /Title (Other guide) /Parent 3 0 R /Prev 8 0 R /Next 11 0 R /A << /S /GoToR /F (other.pdf) /D [0 /Fit] >> >>",
+        f"<< /Title (Chapter 3) /Parent 7 0 R {dest(5)} >>".encode(),
+        # A grouping entry with no page of its own takes its first child's.
+        b"<< /Title (Appendix) /Parent 3 0 R /Prev 9 0 R /First 12 0 R /Last 12 0 R /Count 1 >>",
+        f"<< /Title (Maps) /Parent 11 0 R {dest(6)} >>".encode(),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    for n in range(1, page_count + 1):
+        objects.append(
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 13 0 R >> >> /Contents {page_ref(n) + 1} 0 R >>".encode())
+        commands = f"BT /F1 20 Tf 72 720 Td (Outline guide - page {n} of {page_count}) Tj ET".encode()
+        objects.append(f"<< /Length {len(commands)} >>\nstream\n".encode() + commands + b"\nendstream")
+    return write_pdf(objects)
+
+
 def tagged_pdf() -> bytes:
     """One text page with a paragraph structure element and parent tree."""
     commands = (
@@ -396,6 +429,12 @@ def main() -> None:
         lines_pdf(),
         "pdf",
         "In-guide search: a match far below the page-text fold, after many line breaks",
+    )
+    add(
+        "generated/pdf-outline.pdf",
+        outline_pdf(),
+        "pdf",
+        "Contents: a nested outline, with website and other-file links left out",
     )
     add(
         "pdf-access.pdf",

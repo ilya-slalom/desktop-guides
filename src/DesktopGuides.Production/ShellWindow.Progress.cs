@@ -60,8 +60,7 @@ public sealed partial class ShellWindow
             try
             {
                 Directory.CreateDirectory(folder);
-                string temp = path + ".tmp";
-                File.WriteAllText(temp, JsonSerializer.Serialize(
+                DiagnosticFile.Write(path, JsonSerializer.Serialize(
                     new ProgressCountsForTest(
                         counts.Saves,
                         counts.SkippedUnchanged,
@@ -77,7 +76,6 @@ public sealed partial class ShellWindow
                             lastFailure.WriteMs),
                         failureContext),
                     ProductionJsonContext.Default.ProgressCountsForTest));
-                File.Move(temp, path, true);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {

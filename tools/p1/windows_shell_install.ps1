@@ -1763,6 +1763,18 @@ function Run-NavigationScenarios {
     # contents-txt left the place at Walkthrough: Castle.
     Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
     $report.contentsNarrow = Invoke-ProgressPass 'contents-narrow' 0
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.contentsHtml = Invoke-ProgressPass 'contents-html' 0 -HtmlPosition
+    if ($null -eq (& $estimateOf 'Contents Web Guide')) {
+        throw 'Following an HTML contents entry stored no place.'
+    }
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.contentsHtmlHeadings = Invoke-ProgressPass 'contents-html-headings' 0 -HtmlPosition
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.contentsPdf = Invoke-ProgressPass 'contents-pdf' 0
+    if ($null -eq (& $estimateOf 'Outline PDF Guide')) {
+        throw 'Following a PDF outline entry stored no place.'
+    }
 }
 
 function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $Kill, [string] $resultName = $mode,

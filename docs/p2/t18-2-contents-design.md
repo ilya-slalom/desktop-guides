@@ -1,8 +1,8 @@
 # T18.2 table of contents: design
 
 Status: approved in conversation, 15 October 2026. PR a (the contract, the
-TXT detector, the pane and its keys) is implemented on
-`feat/p2-t18-2-contents`. PR b (HTML and PDF sources) follows.
+TXT detector, the pane and its keys) merged as #118. PR b (HTML and PDF
+sources) is implemented on `feat/p2-t18-2-contents-html-pdf`.
 
 ## Intent
 
@@ -78,9 +78,11 @@ P2 design.
   - **The script:** a fixed script, like T18.1's find scripts, returns
     each `h1` to `h6` and each same-page `#id` link. For each it gives the
     walk offset and the text, and for a link, its target's offset.
-  - **Core decides.** A run of three or more same-page links whose
-    targets exist is the page's own contents list, and is used instead
-    of the headings.
+  - **Core decides.** A container holding three or more same-page links,
+    each to a different place further down the page, is the page's own
+    contents list, and is used instead of the headings. A references or
+    "Back to top" list points back up, or to one place, so it never
+    counts.
   - **Locations:** each entry's location is the HTML position the reader
     already uses (the offset, the quote and the id), so a restore is
     exact.
@@ -88,7 +90,9 @@ P2 design.
   - **The outline:** the file's own outline, read with PdfPig's
     bookmarks from the search document.
   - **Locations:** entries that point into the document become page
-    locations. Links to websites or other files are left out.
+    locations. Links to websites or other files are left out, and their
+    children move up. A grouping entry with no page of its own takes its
+    first child's page.
   - **Without an outline:** the result is `None`, with no detection.
 - **Building:** the outline builds in the background once the guide is
   open. A failure or a timeout gives `None`, and never delays opening or
@@ -197,5 +201,42 @@ See the [PR a plan](t18-2-contents-plan.md).
   1. bracketed button names became search codes;
   2. cross-references took entries;
   3. table rows and a paragraph's last line over a rule became headings.
+
+  The minors are deferred and listed in the PR.
+
+## PR b verification record
+
+See the [PR b plan](t18-2-contents-html-pdf-plan.md).
+
+- **Core,** each test failing first and then passing on the host:
+  `HtmlOutlineRulesTests` (15, including the review's three). The full
+  Core suite passes, 1265/1265.
+- **Infrastructure:** the PDF outline tests (3), over a generated
+  `pdf-outline.pdf`. That fixture has a nested outline, a website link
+  and an other-file link, and a grouping entry with no page. The full
+  suite passes, 806/806.
+- **Production:** it builds with 0 warnings, with warnings as errors.
+- **Installed:** the `navigation` shard passes on both lanes, with
+  `contents-html`, `contents-html-headings` and `contents-pdf` beside PR
+  a's modes. Dispatches:
+  [38749883671](https://github.com/ilya-slalom/desktop-guides/actions/runs/38749883671)
+  and, after the review,
+  [38755884810](https://github.com/ilya-slalom/desktop-guides/actions/runs/38755884810).
+  Screenshots: [contents-html](evidence/ci/t18-2/contents-html.png) and
+  [contents-pdf](evidence/ci/t18-2/contents-pdf.png).
+- **Found on the way:** PdfPig's `TryGetBookmarks` takes
+  `allowContainerNode`, which defaults to `false` and then drops grouping
+  entries with their children. A fixture grouping entry failed the test
+  with the default and passes with `true`.
+- **Final review:** 0 Critical, 3 Important and 6 Minor. All three
+  Important findings are fixed:
+  1. **A references, footnote or back-to-top list beat the real
+     contents.** Only forward links count now, each target once.
+  2. **A quote cut through a surrogate pair discarded the whole
+     outline.** The entry is now kept.
+  3. **The empty-anchor lookup was quadratic.** It was measured in
+     headless Chrome with scripts disabled. On a 30,000-paragraph page
+     with 1,000 empty anchors, the old script was cut off after 120 s;
+     the new one finishes in 1.6 s.
 
   The minors are deferred and listed in the PR.

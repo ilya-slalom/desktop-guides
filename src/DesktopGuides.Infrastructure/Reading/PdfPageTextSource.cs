@@ -1,10 +1,14 @@
 using DesktopGuides.Infrastructure.Import;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
+using UglyToad.PdfPig.Outline;
 
 namespace DesktopGuides.Infrastructure.Reading;
 
 public sealed record PdfPageText(string Text, bool HasLetters, bool Truncated);
+
+// T18.2: an outline entry that opens a page of this document (0-based).
+public sealed record PdfOutlineNode(string Title, int PageIndex, IReadOnlyList<PdfOutlineNode> Children);
 
 public sealed class PdfPageTextException(int pageIndex, Exception inner)
     : Exception($"Page {pageIndex + 1}'s text couldn't be read.", inner)
@@ -87,6 +91,75 @@ public sealed class PdfPageTextSource : IPdfPageTextReader, IDisposable
         {
             gate.Release();
         }
+    }
+
+    // T18.2: the document's own outline, read under the gate like a page.
+    // No outline, or one PdfPig can't read, is an empty list.
+    public async Task<IReadOnlyList<PdfOutlineNode>> GetOutlineAsync(CancellationToken token)
+    {
+        ObjectDisposedException.ThrowIf(disposed || closing, this);
+        await gate.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            ObjectDisposedException.ThrowIf(disposed || closing, this);
+            return await Task.Run(() => ReadOutline(token), token).ConfigureAwait(false);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private IReadOnlyList<PdfOutlineNode> ReadOutline(CancellationToken token)
+    {
+        reader.Token = token;
+        try
+        {
+            // Grouping entries (no page of their own) are kept; Map gives them their first child's page.
+            return document.TryGetBookmarks(out Bookmarks? bookmarks, allowContainerNode: true) && bookmarks is not null
+                ? Map(bookmarks.Roots)
+                : [];
+        }
+        catch (Exception) when (token.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(token);
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            return [];
+        }
+        finally
+        {
+            reader.Token = CancellationToken.None;
+        }
+    }
+
+    // Entries that open a page here. A link to a website or another file is
+    // left out, and its children move up; a grouping entry takes its first
+    // child's page.
+    private List<PdfOutlineNode> Map(IEnumerable<BookmarkNode> nodes)
+    {
+        List<PdfOutlineNode> mapped = [];
+        foreach (BookmarkNode node in nodes)
+        {
+            List<PdfOutlineNode> children = Map(node.Children);
+            int? page = node switch
+            {
+                ExternalBookmarkNode or EmbeddedBookmarkNode => null,
+                DocumentBookmarkNode inDocument => inDocument.PageNumber - 1,
+                ContainerBookmarkNode when children.Count > 0 => children[0].PageIndex,
+                _ => null,
+            };
+            if (page is int index && index >= 0 && index < PageCount && !string.IsNullOrWhiteSpace(node.Title))
+            {
+                mapped.Add(new PdfOutlineNode(node.Title.Trim(), index, children));
+            }
+            else
+            {
+                mapped.AddRange(children);
+            }
+        }
+        return mapped;
     }
 
     // Waits at most `wait` for a running extraction. If it is still running,

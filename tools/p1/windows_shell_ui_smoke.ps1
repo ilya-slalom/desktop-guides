@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -1565,7 +1565,7 @@ try {
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf',
         'workflow-pdf-exit')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
@@ -4772,6 +4772,101 @@ try {
                 [void](Wait-TopRowLike '*Walkthrough: Castle*' 'following an entry in the overlay')
                 Assert-FocusInGuide 'the overlay closing'
                 $report.phases += 'contents-narrow'
+            }
+            elseif ($Mode -eq 'contents-html') {
+                Open-TextGuide 'Contents Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-PageName 'Contents Web Guide')
+                [void](Wait-HtmlPosition { param($p) $p.locator } 'a first capture')
+                Start-Sleep -Seconds 2
+                $baseline = Read-Saves
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                $names = @(Get-ContentsItems | ForEach-Object { $_.Current.Name })
+                $report.contentsHtmlNames = $names
+                # The page's own list, not its headings; the link with no target is left out.
+                if (($names -join '|') -ne 'Getting started|The forest|North path|The castle') {
+                    throw "The contents read '$($names -join ', ')'."
+                }
+                Wait-ContentsSelected 'Getting started'
+                [System.Windows.Forms.SendKeys]::SendWait('{DOWN}{DOWN}{DOWN}{ENTER}')
+                [void](Wait-HtmlPosition { param($p) $p.quote -like 'Castle*' } 'the Castle heading on top')
+                $deadline = (Get-Date).AddSeconds(8)
+                do {
+                    Start-Sleep -Milliseconds 250
+                    $afterFollow = Read-Saves
+                } while ($afterFollow -le $baseline -and (Get-Date) -lt $deadline)
+                if ($afterFollow -le $baseline) { throw 'Following an HTML contents entry saved nothing.' }
+                # The keyboard is in the page now (#115): the toolbar's command toggles the pane.
+                Invoke-OverflowCommand 'Contents'
+                Wait-HiddenById 'ReaderContentsTree'
+                Invoke-OverflowCommand 'Contents'
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                Wait-ContentsSelected 'The castle'
+                $report.contentsHtmlScreenshot = Save-WindowScreenshot 'contents-html'
+                Invoke-Element (Wait-VisibleById 'ReaderContentsClose')
+                Wait-HiddenById 'ReaderContentsTree'
+                $report.phases += 'contents-html'
+            }
+            elseif ($Mode -eq 'contents-html-headings') {
+                # Long Web Guide has no contents list, and names that shadow DOM members.
+                Open-TextGuide 'Long Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-PageName 'Long Web Guide')
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                $names = @(Get-ContentsItems | ForEach-Object { $_.Current.Name })
+                $report.contentsHeadingNames = $names
+                $walkthrough = [array]::IndexOf($names, 'Walkthrough')
+                if ($names[0] -ne 'Long Web Guide' -or $walkthrough -lt 1) {
+                    throw "The headings read '$($names -join ', ')'."
+                }
+                [System.Windows.Forms.SendKeys]::SendWait(('{DOWN}' * $walkthrough) + '{ENTER}')
+                [void](Wait-HtmlPosition { param($p) $p.quote -like 'Walkthrough*' } 'the Walkthrough heading on top')
+                $report.phases += 'contents-html-headings'
+            }
+            elseif ($Mode -eq 'contents-pdf') {
+                Open-TextGuide 'Outline PDF Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-PdfPage 1 6 'page 1 of 6')
+                Start-Sleep -Seconds 2
+                $baseline = Read-Saves
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                $names = @(Get-ContentsItems | ForEach-Object { $_.Current.Name })
+                $report.contentsPdfNames = $names
+                # The website and other-file links are left out.
+                if (($names -join '|') -ne 'Part One|Chapter 1|Chapter 2|Part Two|Chapter 3|Appendix|Maps') {
+                    throw "The outline read '$($names -join ', ')'."
+                }
+                Wait-ContentsSelected 'Part One'
+                [System.Windows.Forms.SendKeys]::SendWait('{DOWN}{DOWN}{DOWN}{DOWN}{ENTER}')
+                [void](Wait-PdfPage 5 6 'page 5 of 6')
+                $deadline = (Get-Date).AddSeconds(8)
+                do {
+                    Start-Sleep -Milliseconds 250
+                    $afterFollow = Read-Saves
+                } while ($afterFollow -le $baseline -and (Get-Date) -lt $deadline)
+                if ($afterFollow -le $baseline) { throw 'Following a PDF outline entry saved nothing.' }
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                Wait-HiddenById 'ReaderContentsTree'
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                Wait-ContentsSelected 'Chapter 3'
+                $report.contentsPdfScreenshot = Save-WindowScreenshot 'contents-pdf'
+                [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                Wait-HiddenById 'ReaderContentsTree'
+                # A PDF with no outline of its own: the fallback, never detection.
+                [System.Windows.Forms.SendKeys]::SendWait('%{LEFT}')
+                [void](Wait-Name 'GameHeading' $textGame)
+                Open-TextGuide 'Long PDF Guide'
+                [void](Wait-Status 'Guide ready.')
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                [void](Wait-Name 'ReaderContentsEmpty' 'No sections found in this guide.')
+                $report.phases += 'contents-pdf'
             }
             elseif ($Mode -eq 'find-pdf-scan') {
                 Open-TextGuide 'Scanned PDF Guide'
