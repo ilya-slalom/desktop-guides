@@ -84,7 +84,7 @@ public sealed class LibraryExportRepositoryTests : IAsyncLifetime
 
         using (SqliteConnection live = Live())
         {
-            SqliteLibraryRepository.BackupTo(live, copy, 4);
+            SqliteLibraryRepository.BackupTo(live, copy, LibrarySchema.CurrentVersion);
         }
 
         // A WAL copy can't be opened read-only once its -shm is gone; this only reads.
@@ -118,7 +118,7 @@ public sealed class LibraryExportRepositoryTests : IAsyncLifetime
 
         using (SqliteConnection live = Live())
         {
-            Assert.Throws<IOException>(() => SqliteLibraryRepository.BackupTo(live, copy, 4));
+            Assert.Throws<IOException>(() => SqliteLibraryRepository.BackupTo(live, copy, LibrarySchema.CurrentVersion));
         }
 
         Assert.Equal("keep me", File.ReadAllText(copy));

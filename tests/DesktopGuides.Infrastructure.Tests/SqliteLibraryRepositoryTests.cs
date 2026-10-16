@@ -109,7 +109,7 @@ public sealed class SqliteLibraryRepositoryTests
         using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
         using SqliteCommand version = connection.CreateCommand();
         version.CommandText = "PRAGMA user_version";
-        Assert.Equal(4L, (long)version.ExecuteScalar()!);
+        Assert.Equal((long)LibrarySchema.CurrentVersion, (long)version.ExecuteScalar()!);
         using SqliteCommand index = connection.CreateCommand();
         index.CommandText = """
             SELECT name FROM sqlite_schema
@@ -593,7 +593,7 @@ public sealed class SqliteLibraryRepositoryTests
 
         using SqliteCommand version = active.CreateCommand();
         version.CommandText = "PRAGMA user_version";
-        Assert.Equal(4L, (long)version.ExecuteScalar()!);
+        Assert.Equal((long)LibrarySchema.CurrentVersion, (long)version.ExecuteScalar()!);
         using SqliteCommand index = active.CreateCommand();
         index.CommandText = """
             SELECT name FROM sqlite_schema
@@ -1045,7 +1045,7 @@ public sealed class SqliteLibraryRepositoryTests
         Game game = Assert.Single(await repository.ListGamesAsync());
         Assert.Equal(gameId, game.Id);
         Assert.Null(game.Link);
-        Assert.Equal(4L, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.Equal((long)LibrarySchema.CurrentVersion, ReadUserVersion(directory.Paths.DatabasePath));
         Assert.Single(Directory.GetFiles(directory.Paths.RecoveryRoot, "*.sqlite"));
     }
 
@@ -1251,9 +1251,50 @@ public sealed class SqliteLibraryRepositoryTests
         await using SqliteLibraryRepository repository = new(directory.Paths);
         await repository.InitializeAsync();
 
-        Assert.Equal(4L, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.Equal((long)LibrarySchema.CurrentVersion, ReadUserVersion(directory.Paths.DatabasePath));
         Assert.NotNull(await repository.GetGuideAsync(guideId));
         Assert.Empty(await repository.GetGuideAssetsAsync(guideId));
+    }
+
+    [Fact]
+    public async Task UpgradesPopulatedVersionFourWithAnEmptyBookmarkTable()
+    {
+        using TestLibrary directory = new();
+        Guid gameId = Guid.NewGuid();
+        Guid guideId = Guid.NewGuid();
+        CreatePopulatedVersionFour(directory, gameId, guideId);
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+
+        Assert.Equal(5L, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.NotNull(await repository.GetGuideAsync(guideId));
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand count = connection.CreateCommand();
+        count.CommandText = "SELECT count(*) FROM Bookmarks";
+        Assert.Equal(0L, (long)count.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public async Task FailedVersionFiveMigrationStaysAtVersionFour()
+    {
+        using TestLibrary directory = new();
+        CreatePopulatedVersionFour(directory, Guid.NewGuid(), Guid.NewGuid());
+
+        await using (SqliteLibraryRepository failing = new(directory.Paths, null, version =>
+        {
+            if (version == 5) throw new IOException("Injected after the v5 table was created.");
+        }))
+        {
+            LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(() => failing.InitializeAsync());
+            Assert.Equal(LibraryOpenIssue.MigrationFailed, error.Issue);
+        }
+
+        Assert.Equal(4L, ReadUserVersion(directory.Paths.DatabasePath));
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand table = connection.CreateCommand();
+        table.CommandText = "SELECT count(*) FROM sqlite_master WHERE name = 'Bookmarks'";
+        Assert.Equal(0L, (long)table.ExecuteScalar()!);
     }
 
     [Fact]
@@ -1330,6 +1371,15 @@ public sealed class SqliteLibraryRepositoryTests
         command.Parameters.AddWithValue("$kind", kind);
         command.Parameters.AddWithValue("$hash", hash);
         Assert.Throws<SqliteException>(() => command.ExecuteNonQuery());
+    }
+
+    private static void CreatePopulatedVersionFour(TestLibrary directory, Guid gameId, Guid guideId)
+    {
+        CreatePopulatedVersionThree(directory, gameId, guideId);
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = LibrarySchema.Version4;
+        command.ExecuteNonQuery();
     }
 
     private static void CreatePopulatedVersionThree(TestLibrary directory, Guid gameId, Guid guideId)

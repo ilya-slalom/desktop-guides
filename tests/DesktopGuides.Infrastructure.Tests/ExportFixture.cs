@@ -76,7 +76,7 @@ internal sealed class ExportFixture : IAsyncDisposable
         string path = Path.Combine(Library.Root, $"snapshot-{Guid.NewGuid():N}.sqlite");
         using SqliteConnection live = new($"Data Source={Library.Paths.DatabasePath};Pooling=False");
         live.Open();
-        SqliteLibraryRepository.BackupTo(live, path, 4);
+        SqliteLibraryRepository.BackupTo(live, path, LibrarySchema.CurrentVersion);
         return path;
     }
 
