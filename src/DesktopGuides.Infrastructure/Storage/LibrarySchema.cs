@@ -2,7 +2,7 @@ namespace DesktopGuides.Infrastructure.Storage;
 
 internal static class LibrarySchema
 {
-    public const int CurrentVersion = 4;
+    public const int CurrentVersion = 5;
 
     public const string Version1 = """
         CREATE TABLE Games (
@@ -104,11 +104,26 @@ internal static class LibrarySchema
         PRAGMA user_version = 4;
         """;
 
+    // T19.1: a guide's named places. Removing the guide removes them.
+    public const string Version5 = """
+        CREATE TABLE Bookmarks (
+            Id TEXT PRIMARY KEY CHECK (length(Id) = 32),
+            GuideId TEXT NOT NULL REFERENCES Guides(Id) ON DELETE CASCADE,
+            LocatorJson TEXT NOT NULL CHECK (length(LocatorJson) BETWEEN 1 AND 4096),
+            Label TEXT NOT NULL CHECK (length(Label) BETWEEN 1 AND 80),
+            CreatedUtcMs INTEGER NOT NULL CHECK (CreatedUtcMs >= 0),
+            UpdatedUtcMs INTEGER NOT NULL CHECK (UpdatedUtcMs >= 0)
+        );
+        CREATE INDEX IX_Bookmarks_GuideId ON Bookmarks(GuideId);
+        PRAGMA user_version = 5;
+        """;
+
     public static readonly (int Version, string Sql)[] Migrations =
     [
         (1, Version1),
         (2, Version2),
         (3, Version3),
-        (4, Version4)
+        (4, Version4),
+        (5, Version5)
     ];
 }

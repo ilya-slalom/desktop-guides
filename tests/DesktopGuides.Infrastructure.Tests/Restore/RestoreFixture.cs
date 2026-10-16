@@ -114,7 +114,8 @@ internal sealed class RestoreFixture : IAsyncDisposable
     }
 
     /// <summary>A self-consistent backup whose database was changed by <paramref name="sql"/>.</summary>
-    public string RewriteDatabase(string sql) => Rewrite(files =>
+    public string RewriteDatabase(
+        string sql, Func<LibraryArchiveManifest, LibraryArchiveManifest>? editManifest = null) => Rewrite(files =>
     {
         int index = files.FindIndex(file => file.Name == LibraryArchiveManifest.DatabasePath);
         string copy = Path.Combine(Target.Root, $"db-{Guid.NewGuid():N}.sqlite");
@@ -127,7 +128,7 @@ internal sealed class RestoreFixture : IAsyncDisposable
             command.ExecuteNonQuery();
         }
         files[index] = files[index] with { Bytes = File.ReadAllBytes(copy) };
-    });
+    }, editManifest: editManifest);
 
     public string WriteBytes(byte[] bytes)
     {

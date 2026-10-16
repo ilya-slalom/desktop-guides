@@ -27,6 +27,23 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
             RestoreMarker.Read(fixture.Target.Paths));
     }
 
+    // A backup from before P2 restores as it is, and the next open migrates it.
+    [Fact]
+    public async Task AVersionFourBackupRestoresAndMigrates()
+    {
+        string backup = fixture.RewriteDatabase(
+            "DROP TABLE Bookmarks; PRAGMA user_version = 4;",
+            manifest => manifest with { SchemaVersion = 4 });
+        LibraryRestoreStage stage = await fixture.StageAsync(backup);
+
+        await fixture.Restorer().ReplaceAsync(stage, CancellationToken.None);
+        await fixture.Target.RestartAsync();
+
+        Assert.Equal(LibrarySchema.CurrentVersion.ToString(), fixture.Target.Scalar("PRAGMA user_version"));
+        Assert.Equal("0", fixture.Target.Scalar("SELECT COUNT(*) FROM Bookmarks"));
+        Assert.Equal("3", fixture.Target.Scalar("SELECT COUNT(*) FROM Guides"));
+    }
+
     [Fact]
     public async Task ReplacingNoLibraryRecordsThatThereWasNone()
     {

@@ -32,7 +32,7 @@ public sealed class LibraryRestorerStageTests : IAsyncLifetime
 
         LibraryRestoreStage stage = await fixture.StageAsync();
 
-        Assert.Equal((2, 3, "1.0.0.0", 4), (stage.Games, stage.Guides, stage.AppVersion, stage.SchemaVersion));
+        Assert.Equal((2, 3, "1.0.0.0", LibrarySchema.CurrentVersion), (stage.Games, stage.Guides, stage.AppVersion, stage.SchemaVersion));
         string library = Path.Combine(LibraryRestorer.StageRoot(fixture.Target.Paths, stage.StageId), "library");
         Assert.True(File.Exists(Path.Combine(library, "library.sqlite")));
         Assert.True(File.Exists(Path.Combine(library, "content", fixture.Source.TxtGuide.ToString("N"), "guide.txt")));

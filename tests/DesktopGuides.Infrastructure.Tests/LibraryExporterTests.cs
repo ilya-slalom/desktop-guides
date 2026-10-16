@@ -115,6 +115,15 @@ public sealed class LibraryExporterTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task TheSnapshotHoldsTheBookmarks()
+    {
+        string zip = (await Export()).Path;
+
+        Assert.Equal("Boss fight|{\"format\":\"Txt\"}", Scalar(zip,
+            $"SELECT Label || '|' || LocatorJson FROM Bookmarks WHERE GuideId = '{fixture.TxtGuide:N}'"));
+    }
+
+    [Fact]
     public async Task NothingOutsideTheReferencedLibraryIsArchived()
     {
         ManagedPathResolver paths = fixture.Library.Paths;

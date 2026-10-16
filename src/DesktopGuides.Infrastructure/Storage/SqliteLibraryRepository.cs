@@ -524,6 +524,153 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         }, token);
     }
 
+    // T19.1 bookmarks
+
+    private const string BookmarkColumns =
+        "Id, GuideId, LocatorJson, Label, CreatedUtcMs, UpdatedUtcMs";
+
+    public Task<IReadOnlyList<Bookmark>> ListBookmarksAsync(
+        Guid guideId, CancellationToken token = default) =>
+        ReadAsync<IReadOnlyList<Bookmark>>(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = $"""
+                SELECT {BookmarkColumns} FROM Bookmarks
+                WHERE GuideId = $guide ORDER BY CreatedUtcMs, Id
+                """;
+            command.Parameters.AddWithValue("$guide", guideId.ToString("N"));
+            using SqliteDataReader reader = command.ExecuteReader();
+            List<Bookmark> bookmarks = [];
+            while (reader.Read()) bookmarks.Add(ReadBookmark(reader));
+            return bookmarks;
+        }, token);
+
+    public Task<Bookmark> AddBookmarkAsync(
+        Guid guideId, string locatorJson, string label, CancellationToken token = default)
+    {
+        string locator = BookmarkRules.Locator(locatorJson);
+        string name = BookmarkRules.Label(label);
+        return WriteAsync(() =>
+        {
+            // Whole milliseconds, so the returned record equals the stored one.
+            DateTimeOffset now = FromUnixMilliseconds(clock.GetUtcNow().ToUnixTimeMilliseconds());
+            Bookmark bookmark = new(Guid.NewGuid(), guideId, locator, name, now, now);
+            InsertBookmark(bookmark);
+            return bookmark;
+        }, token);
+    }
+
+    public Task<Bookmark?> RenameBookmarkAsync(
+        Guid bookmarkId, string label, CancellationToken token = default)
+    {
+        string name = BookmarkRules.Label(label);
+        return WriteAsync<Bookmark?>(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            using SqliteCommand update = connection.CreateCommand();
+            update.Transaction = transaction;
+            update.CommandText = """
+                UPDATE Bookmarks SET Label = $label, UpdatedUtcMs = $now WHERE Id = $id
+                """;
+            update.Parameters.AddWithValue("$id", bookmarkId.ToString("N"));
+            update.Parameters.AddWithValue("$label", name);
+            update.Parameters.AddWithValue("$now", clock.GetUtcNow().ToUnixTimeMilliseconds());
+            if (update.ExecuteNonQuery() != 1) return null;
+            using SqliteCommand read = connection.CreateCommand();
+            read.Transaction = transaction;
+            read.CommandText = $"SELECT {BookmarkColumns} FROM Bookmarks WHERE Id = $id";
+            read.Parameters.AddWithValue("$id", bookmarkId.ToString("N"));
+            Bookmark renamed;
+            using (SqliteDataReader reader = read.ExecuteReader())
+            {
+                reader.Read();
+                renamed = ReadBookmark(reader);
+            }
+            transaction.Commit();
+            return renamed;
+        }, token);
+    }
+
+    public Task<bool> DeleteBookmarkAsync(Guid bookmarkId, CancellationToken token = default) =>
+        WriteAsync(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM Bookmarks WHERE Id = $id";
+            command.Parameters.AddWithValue("$id", bookmarkId.ToString("N"));
+            return command.ExecuteNonQuery() == 1;
+        }, token);
+
+    public Task RestoreBookmarkAsync(Bookmark bookmark, CancellationToken token = default)
+    {
+        ArgumentNullException.ThrowIfNull(bookmark);
+        if (bookmark.Id == Guid.Empty || bookmark.CreatedUtc.ToUnixTimeMilliseconds() < 0 ||
+            bookmark.UpdatedUtc.ToUnixTimeMilliseconds() < 0)
+        {
+            throw new ArgumentException("A stored bookmark is required.", nameof(bookmark));
+        }
+        Bookmark restored = bookmark with
+        {
+            LocatorJson = BookmarkRules.Locator(bookmark.LocatorJson),
+            Label = BookmarkRules.Label(bookmark.Label)
+        };
+        return WriteAsync(() => InsertBookmark(restored), token);
+    }
+
+    // Counts and inserts in one transaction, under the write gate. A
+    // bookmark already stored, such as an undo run twice, is left as it is.
+    private void InsertBookmark(Bookmark bookmark)
+    {
+        using SqliteConnection connection = OpenConnection();
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        using (SqliteCommand count = connection.CreateCommand())
+        {
+            count.Transaction = transaction;
+            count.CommandText = """
+                SELECT (SELECT COUNT(*) FROM Guides WHERE Id = $guide),
+                       (SELECT COUNT(*) FROM Bookmarks WHERE GuideId = $guide),
+                       (SELECT COUNT(*) FROM Bookmarks WHERE Id = $id)
+                """;
+            count.Parameters.AddWithValue("$guide", bookmark.GuideId.ToString("N"));
+            count.Parameters.AddWithValue("$id", bookmark.Id.ToString("N"));
+            using SqliteDataReader reader = count.ExecuteReader();
+            reader.Read();
+            if (reader.GetInt64(2) != 0) return;
+            if (reader.GetInt64(0) == 0)
+            {
+                throw new InvalidOperationException("This guide is no longer in the library.");
+            }
+            if (reader.GetInt64(1) >= BookmarkRules.MaxPerGuide)
+            {
+                throw new BookmarkLimitException(bookmark.GuideId);
+            }
+        }
+        using SqliteCommand insert = connection.CreateCommand();
+        insert.Transaction = transaction;
+        insert.CommandText = $"""
+            INSERT INTO Bookmarks ({BookmarkColumns})
+            VALUES ($id, $guide, $locator, $label, $created, $updated)
+            """;
+        insert.Parameters.AddWithValue("$id", bookmark.Id.ToString("N"));
+        insert.Parameters.AddWithValue("$guide", bookmark.GuideId.ToString("N"));
+        insert.Parameters.AddWithValue("$locator", bookmark.LocatorJson);
+        insert.Parameters.AddWithValue("$label", bookmark.Label);
+        insert.Parameters.AddWithValue("$created", bookmark.CreatedUtc.ToUnixTimeMilliseconds());
+        insert.Parameters.AddWithValue("$updated", bookmark.UpdatedUtc.ToUnixTimeMilliseconds());
+        insert.ExecuteNonQuery();
+        transaction.Commit();
+    }
+
+    private static Bookmark ReadBookmark(SqliteDataReader reader) => new(
+        Guid.ParseExact(reader.GetString(0), "N"),
+        Guid.ParseExact(reader.GetString(1), "N"),
+        reader.GetString(2),
+        reader.GetString(3),
+        FromUnixMilliseconds(reader.GetInt64(4)),
+        FromUnixMilliseconds(reader.GetInt64(5)));
+
     public Task<ReaderPreferences?> GetReaderPreferencesAsync(
         Guid guideId, CancellationToken token = default) =>
         ReadAsync<ReaderPreferences?>(() =>

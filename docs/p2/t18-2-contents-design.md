@@ -1,8 +1,8 @@
 # T18.2 table of contents: design
 
 Status: approved in conversation, 15 October 2026. PR a (the contract, the
-TXT detector, the pane and its keys) merged as #118. PR b (HTML and PDF
-sources) is implemented on `feat/p2-t18-2-contents-html-pdf`.
+TXT detector, the pane and its keys) merged as #118, and PR b (HTML and PDF
+sources) as #119. T18.2 and M8 are complete.
 
 ## Intent
 
