@@ -27,12 +27,30 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
             RestoreMarker.Read(fixture.Target.Paths));
     }
 
+    // Review Focus 4: a backup from before schema 6 keeps its text sizes and opens as Original.
+    [Fact]
+    public async Task AVersionFiveBackupRestoresAndMigrates()
+    {
+        string backup = fixture.RewriteDatabase(
+            RestoreFixture.ReaderPreferencesBeforeVersionSix() + " PRAGMA user_version = 5;",
+            manifest => manifest with { SchemaVersion = 5 });
+        LibraryRestoreStage stage = await fixture.StageAsync(backup);
+
+        await fixture.Restorer().ReplaceAsync(stage, CancellationToken.None);
+        await fixture.Target.RestartAsync();
+
+        Assert.Equal(LibrarySchema.CurrentVersion.ToString(), fixture.Target.Scalar("PRAGMA user_version"));
+        Assert.Equal("0", fixture.Target.Scalar("SELECT COUNT(*) FROM ReaderPreferences WHERE TextView IS NOT NULL"));
+        Assert.Equal("1.25", fixture.Target.Scalar(
+            $"SELECT TextScale FROM ReaderPreferences WHERE GuideId = '{fixture.Source.HtmlGuide:N}'"));
+    }
+
     // A backup from before P2 restores as it is, and the next open migrates it.
     [Fact]
     public async Task AVersionFourBackupRestoresAndMigrates()
     {
         string backup = fixture.RewriteDatabase(
-            "DROP TABLE Bookmarks; PRAGMA user_version = 4;",
+            RestoreFixture.ReaderPreferencesBeforeVersionSix() + " DROP TABLE Bookmarks; PRAGMA user_version = 4;",
             manifest => manifest with { SchemaVersion = 4 });
         LibraryRestoreStage stage = await fixture.StageAsync(backup);
 

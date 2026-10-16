@@ -17,8 +17,15 @@ public static class TextLocator
     {
         ArgumentNullException.ThrowIfNull(document);
         IReadOnlyList<int> starts = document.LineStarts;
+        return CaptureAt(document, starts[Math.Clamp(line, 0, starts.Count - 1)]);
+    }
+
+    // T19.2: any offset, not only a line's start, for the reflow view's blocks.
+    public static ReaderLocation CaptureAt(TextGuideDocument document, int offset)
+    {
+        ArgumentNullException.ThrowIfNull(document);
         string text = document.Text;
-        int offset = starts[Math.Clamp(line, 0, starts.Count - 1)];
+        offset = Math.Clamp(offset, 0, text.Length);
         int length = Math.Min(ContextLength, text.Length - offset);
         // The codec rejects NUL, and the JSON writer rejects a lone high surrogate.
         int nul = text.IndexOf('\0', offset, length);

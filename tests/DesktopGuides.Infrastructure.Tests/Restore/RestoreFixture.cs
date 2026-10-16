@@ -113,6 +113,23 @@ internal sealed class RestoreFixture : IAsyncDisposable
         return path;
     }
 
+    // T19.2: ReaderPreferences as versions 1 to 5 created it, before schema
+    // 6's TextView column, for backups from before schema 6.
+    public static string ReaderPreferencesBeforeVersionSix()
+    {
+        string first = LibrarySchema.Version1;
+        int start = first.IndexOf("CREATE TABLE ReaderPreferences", StringComparison.Ordinal);
+        int end = first.IndexOf(");", start, StringComparison.Ordinal) + 2;
+        return $"""
+            PRAGMA foreign_keys = OFF;
+            CREATE TABLE ReaderPreferencesBefore AS SELECT GuideId, TextScale FROM ReaderPreferences;
+            DROP TABLE ReaderPreferences;
+            {first[start..end]}
+            INSERT INTO ReaderPreferences (GuideId, TextScale) SELECT GuideId, TextScale FROM ReaderPreferencesBefore;
+            DROP TABLE ReaderPreferencesBefore;
+            """;
+    }
+
     /// <summary>A self-consistent backup whose database was changed by <paramref name="sql"/>.</summary>
     public string RewriteDatabase(
         string sql, Func<LibraryArchiveManifest, LibraryArchiveManifest>? editManifest = null) => Rewrite(files =>

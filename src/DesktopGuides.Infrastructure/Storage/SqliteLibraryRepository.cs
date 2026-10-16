@@ -677,13 +677,14 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         {
             using SqliteConnection connection = OpenConnection();
             using SqliteCommand command = connection.CreateCommand();
-            command.CommandText = "SELECT GuideId, TextScale FROM ReaderPreferences WHERE GuideId = $id";
+            command.CommandText = "SELECT GuideId, TextScale, TextView FROM ReaderPreferences WHERE GuideId = $id";
             command.Parameters.AddWithValue("$id", guideId.ToString("N"));
             using SqliteDataReader reader = command.ExecuteReader();
             return reader.Read()
                 ? new ReaderPreferences(
                     Guid.ParseExact(reader.GetString(0), "N"),
-                    reader.IsDBNull(1) ? null : reader.GetDouble(1))
+                    reader.IsDBNull(1) ? null : reader.GetDouble(1),
+                    !reader.IsDBNull(2) && reader.GetString(2) == "Reflow" ? TextViewMode.Reflow : TextViewMode.Original)
                 : null;
         }, token);
 
@@ -703,6 +704,22 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                 """;
             command.Parameters.AddWithValue("$id", guideId.ToString("N"));
             command.Parameters.AddWithValue("$scale", (object?)textScale ?? DBNull.Value);
+            RequireUpdated(command.ExecuteNonQuery(), "reader preferences");
+        }, token);
+    }
+
+    public Task SaveTextViewAsync(Guid guideId, TextViewMode view, CancellationToken token = default)
+    {
+        if (!Enum.IsDefined(view)) throw new ArgumentOutOfRangeException(nameof(view));
+        return WriteAsync(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                UPDATE ReaderPreferences SET TextView = $view WHERE GuideId = $id
+                """;
+            command.Parameters.AddWithValue("$id", guideId.ToString("N"));
+            command.Parameters.AddWithValue("$view", view.ToString());
             RequireUpdated(command.ExecuteNonQuery(), "reader preferences");
         }, token);
     }

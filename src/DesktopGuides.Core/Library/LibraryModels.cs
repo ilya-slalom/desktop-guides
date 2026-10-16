@@ -48,7 +48,11 @@ public sealed record ReadingState(
     DateTimeOffset? LastOpenedUtc,
     DateTimeOffset? CompletedUtc);
 
-public sealed record ReaderPreferences(Guid GuideId, double? TextScale);
+// T19.2: how a TXT guide is shown. Null in the library reads as Original.
+public enum TextViewMode { Original, Reflow }
+
+public sealed record ReaderPreferences(
+    Guid GuideId, double? TextScale, TextViewMode TextView = TextViewMode.Original);
 
 public enum WindowMaterial
 {

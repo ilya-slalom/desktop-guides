@@ -1,0 +1,36 @@
+=======================================================
+ REFLOW GUIDE
+=======================================================
+
+This guide is an authored fixture for the reflow view. Its paragraphs
+are hard-wrapped near seventy columns, the way many plain text guides
+were written, so the reflow view can join them into running prose.
+
+The forest path starts east of the village. Follow the stream until the
+old bridge, then take the left fork past the ruined watchtower. Wolves
+roam here at night, so travel by day and keep a torch in your pack.
+
+MAP OF THE FOREST
+
+      N
+      |
+  W --+-- E          [Village]----[Bridge]
+      |                  |           |
+      S              [Tower]     [Cave]
+
+Item            Location        Price
+Torch           Village shop    10
+Rope            Bridge camp     25
+
+- Torch
+- Rope
+- Map
+
+    code: ABCD-1234
+    code: EFGH-5678
+
+The castle gate opens only at dawn. Wait by the moat until the bell
+rings twice, then cross quickly before the drawbridge rises again. A
+well-timed dash saves the long detour through the eastern marsh, where
+Level 12 bandits wait. They say it's "hard", and they're right-
+handed archers who rarely miss.
