@@ -65,7 +65,11 @@ public sealed record ReflowPlan(IReadOnlyList<ReflowBlock> Blocks)
 public static class TextReflowPlanner
 {
     public static readonly TimeSpan Budget = TimeSpan.FromSeconds(2);
-    private const string ProsePunctuation = ".,;:'\"!?()-";
+    // Plain punctuation, including the typographic quotes, dashes and ellipsis
+    // that guides copied from word processors carry.
+    private const string ProsePunctuation = ".,;:'\"!?()-\u2018\u2019\u201C\u201D\u2013\u2014\u2026";
+    // Characters that draw a layout; never prose.
+    private const string LayoutCharacters = "|\\_";
     private const int MinimumWidthSample = 30;
 
     // Null when the guide has no prose, is empty, or the token ends first.
@@ -168,7 +172,9 @@ public static class TextReflowPlanner
         for (int k = 0; k < paragraph.Count; k++)
         {
             ReadOnlySpan<char> line = Line(text, lines[paragraph[k]]);
-            if (IsIndented(line) || !IsTexty(line) || line.Trim().Contains("  ", StringComparison.Ordinal)) return false;
+            if (IsIndented(line) || !IsTexty(line) || HasAlignmentGap(line.Trim())) return false;
+            // A list keeps its items apart.
+            if (k > 0 && IsListItem(line)) return false;
             bool last = k == paragraph.Count - 1;
             if ((!last || paragraph.Count == 1) && line.TrimEnd().Length < minimum) return false;
         }
@@ -210,17 +216,54 @@ public static class TextReflowPlanner
 
     private static bool IsIndented(ReadOnlySpan<char> line) => line.Length > 0 && (line[0] == ' ' || line[0] == '\t');
 
-    // Letters, digits, spaces and plain punctuation only, mostly letters and digits.
+    // Mostly letters and digits. Layout characters, control characters, box
+    // drawing and rules (three or more of one symbol) are never prose; other
+    // symbols, such as HP/MP or 50%, are allowed up to a tenth of the line.
     private static bool IsTexty(ReadOnlySpan<char> line)
     {
         ReadOnlySpan<char> trimmed = line.Trim();
         if (trimmed.IsEmpty) return false;
         int words = 0;
+        int other = 0;
+        int run = 0;
+        char previous = '\0';
         foreach (char c in trimmed)
         {
-            if (char.IsLetterOrDigit(c)) words++;
-            else if (c != ' ' && !ProsePunctuation.Contains(c)) return false;
+            run = c == previous ? run + 1 : 1;
+            previous = c;
+            if (char.IsLetterOrDigit(c))
+            {
+                words++;
+                continue;
+            }
+            if (char.IsControl(c) || LayoutCharacters.Contains(c) || c is >= '\u2500' and <= '\u259F') return false;
+            if (run >= 3 && c is not ('.' or '!' or '?' or ' ')) return false;
+            if (c != ' ' && !ProsePunctuation.Contains(c)) other++;
         }
-        return words >= 0.6 * trimmed.Length;
+        return words >= 0.6 * trimmed.Length && other <= 0.1 * trimmed.Length;
+    }
+
+    // Column alignment: three or more spaces, or two that don't follow the end
+    // of a sentence (older guides put two spaces after one).
+    private static bool HasAlignmentGap(ReadOnlySpan<char> line)
+    {
+        for (int i = 1; i + 1 < line.Length; i++)
+        {
+            if (line[i] != ' ' || line[i + 1] != ' ') continue;
+            bool third = i + 2 < line.Length && line[i + 2] == ' ';
+            if (third || ".!?:".IndexOf(line[i - 1]) < 0) return true;
+            i++;
+        }
+        return false;
+    }
+
+    // "- item", "* item", "+ item", "• item", "1. item" or "1) item".
+    private static bool IsListItem(ReadOnlySpan<char> line)
+    {
+        if (line.Length >= 2 && line[0] is '-' or '*' or '+' or '\u2022' && line[1] == ' ') return true;
+        int digits = 0;
+        while (digits < line.Length && digits < 4 && char.IsAsciiDigit(line[digits])) digits++;
+        return digits is > 0 and < 4 && digits + 1 < line.Length &&
+            line[digits] is '.' or ')' && line[digits + 1] == ' ';
     }
 }

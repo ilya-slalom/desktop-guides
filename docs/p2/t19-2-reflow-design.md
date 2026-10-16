@@ -178,3 +178,14 @@ design.
    format with it.
 3. **The view is saved in a `TextView` column**, through its own save
    method, so it never races the text-size save.
+4. **Prose tolerates the way real guides are written** (final review, 16
+   October 2026):
+   - **Two spaces after a sentence** don't count as a column gap. Three or
+     more spaces, or two anywhere else, still do.
+   - **Symbols such as HP/MP, 50%, +10 or [WLK3]** may make up a tenth of
+     a line. Layout characters (`|`, `\`, `_`, box drawing, and runs of
+     three or more of one symbol) are never prose.
+   - **Typographic quotes, dashes and the ellipsis** count as plain
+     punctuation.
+   - **A paragraph with list markers after its first line** stays
+     preserved.

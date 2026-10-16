@@ -112,6 +112,39 @@ public sealed class TextReflowPlannerTests
         Assert.All(Plan(Doc(text))!.Blocks, block => Assert.Equal(ReflowKind.Prose, block.Kind));
     }
 
+    // Final review: guides write HP/MP, 50%, +10 Attack, [WLK3], curly
+    // quotes and dashes in ordinary prose.
+    [Fact]
+    public void ProseMayHoldGameSymbols()
+    {
+        string text = Prose(Wrapped,
+            "Equip the Iron Sword for +10 Attack and keep HP/MP above 50% before the\n" +
+            "boss in [WLK3]. It\u2019s \u201ceasy\u201d \u2014 if you heal at $500 & save first.");
+
+        Assert.All(Plan(Doc(text))!.Blocks, block => Assert.Equal(ReflowKind.Prose, block.Kind));
+    }
+
+    // Final review: older ASCII guides put two spaces after a sentence.
+    [Fact]
+    public void TwoSpacesAfterASentenceStayProse()
+    {
+        string text = Prose(Wrapped.Replace("village. Follow", "village.  Follow"),
+            Wrapped.Replace("watchtower. Wolves", "watchtower.  Wolves"));
+
+        Assert.All(Plan(Doc(text))!.Blocks, block => Assert.Equal(ReflowKind.Prose, block.Kind));
+    }
+
+    // Final review: a list of long items must not run together.
+    [Fact]
+    public void AListOfLongItemsIsPreserved()
+    {
+        string list =
+            "1. Talk to the elder in the village and take the Sword from the chest.\n" +
+            "2. Go to the cave north of the village and fight the boss at the end.";
+
+        Assert.Equal([ReflowKind.Prose, ReflowKind.Preserved], Plan(Doc(Prose(Wrapped, list)))!.Blocks.Select(b => b.Kind));
+    }
+
     [Fact]
     public void AnInteriorDoubleSpaceIsPreserved()
     {
