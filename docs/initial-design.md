@@ -58,9 +58,11 @@ matching every feature.
 1. **Navigation:** in-guide search for TXT/HTML, HTML heading navigation, TXT
    table-of-contents detection, bookmarks, and optional smart TXT reflow. Keep
    a preformatted mode so diagrams remain legible.
-2. **More material:** multi-page offline HTML imports, images/maps, CBZ, and
-   selected manual formats. Add PDF text search only with a PDF engine that
-   exposes text; the proposed MVP renderer exposes page images.
+2. **More material:** multi-page offline HTML imports and image maps in P2;
+   CBZ and other manual formats after the final milestone (the
+   [format survey](p2/format-survey.md), 17 October 2026). Add PDF text
+   search only with a PDF engine that exposes text; the proposed MVP
+   renderer exposes page images.
 3. **Collection and platform features:** supported online guide sources,
    lawful offline capture, controller shortcuts, multi-window reading,
    annotations, and optional device sync. Each online source
