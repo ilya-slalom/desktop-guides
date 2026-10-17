@@ -4476,6 +4476,33 @@ try {
                 [void](Save-WindowScreenshot 'text-place-timeout')
                 throw "The TXT place never showed $what. Last: view=$($place.view) offset=$($place.offset)."
             }
+            # The choice is beside the toolbar, or on its own row under it, left-aligned;
+            # either way the four movement commands stay on the toolbar.
+            function Wait-TextViewPlacement([string] $place) {
+                $deadline = (Get-Date).AddSeconds(8)
+                $seen = ''
+                do {
+                    $commands = Find-ById 'ReaderCommands'
+                    $choice = Find-ById 'ReaderTextView'
+                    $hidden = @('Go to start', 'Previous page', 'Next page', 'Go to end' | Where-Object {
+                        $button = Find-ByName $_
+                        -not $button -or $button.Current.IsOffscreen
+                    })
+                    if ($commands -and $choice -and $hidden.Count -eq 0) {
+                        $c = $commands.Current.BoundingRectangle
+                        $v = $choice.Current.BoundingRectangle
+                        $seen = "toolbar $($c.Left),$($c.Top),$($c.Bottom) choice $($v.Left),$($v.Top)"
+                        $below = $v.Top -ge $c.Bottom - 2 -and [Math]::Abs($v.Left - $c.Left) -le 8
+                        $beside = $v.Top -lt $c.Bottom -and $v.Left -gt $c.Left + 100
+                        if (($place -eq 'below' -and $below) -or ($place -eq 'beside' -and $beside)) { return }
+                    } else {
+                        $seen = "hidden commands: $($hidden -join ', ')"
+                    }
+                    Start-Sleep -Milliseconds 250
+                } while ((Get-Date) -lt $deadline)
+                [void](Save-WindowScreenshot "text-view-$place")
+                throw "The text view choice isn't $place the toolbar ($seen)."
+            }
             function Select-TextView([string] $view) {
                 (Wait-VisibleById "ReaderTextView$view").GetCurrentPattern(
                     [System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
@@ -5205,6 +5232,11 @@ try {
                 Wait-StatusClosed
                 Wait-FirstTextRow
                 Wait-TextViewChosen 'Original'
+                # A narrow window keeps every command on the toolbar; the choice moves under it.
+                Resize-ShellWindow 768 720
+                Wait-TextViewPlacement 'below'
+                Resize-ShellWindow 1024 720
+                Wait-TextViewPlacement 'beside'
                 # Final review: a quick second choice wins; the view follows the choice.
                 Select-TextView 'Reflow'
                 Select-TextView 'Original'

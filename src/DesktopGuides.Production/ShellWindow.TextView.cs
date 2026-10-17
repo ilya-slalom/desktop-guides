@@ -2,6 +2,7 @@ using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Reading;
 using DesktopGuides.Core.Text;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 
 namespace DesktopGuides.Production;
 
@@ -15,6 +16,8 @@ public sealed partial class ShellWindow
     private TextReaderSession? switchingTextView;
     private TextViewMode chosenTextView;
     private Guid? textViewGuide;
+    // The narrowest toolbar row known to hold the choice beside the toolbar.
+    private double textViewBesideWidth;
 
     private void InitializeTextView()
     {
@@ -24,6 +27,8 @@ public sealed partial class ShellWindow
             new BoundedChoiceOption("Reflow", "ReaderTextViewReflow")
         ]);
         ShowTextViewChoice(TextViewMode.Original);
+        ReaderActions.OverflowChanged += (_, _) => PlaceTextViewChoice();
+        ReaderToolbarRow.SizeChanged += (_, _) => PlaceTextViewChoice();
         ReaderTextView.ChoiceChanged += (_, _) =>
         {
             if (settingTextView) return;
@@ -43,6 +48,33 @@ public sealed partial class ShellWindow
         {
             settingTextView = false;
         }
+    }
+
+    // The choice sits beside the toolbar while every command still fits. If
+    // a command overflows, the choice takes its own row, left-aligned, until
+    // the row is wider than where that happened.
+    private void PlaceTextViewChoice()
+    {
+        bool beside = Grid.GetRow(ReaderTextView) == 0;
+        double width = ReaderToolbarRow.ActualWidth;
+        if (beside && ReaderTextView.Visibility == Visibility.Visible && ReaderActions.HasOverflow)
+        {
+            textViewBesideWidth = Math.Max(textViewBesideWidth, width + 1);
+            MoveTextViewChoice(below: true);
+        }
+        else if (!beside && width >= textViewBesideWidth)
+        {
+            MoveTextViewChoice(below: false);
+        }
+    }
+
+    private void MoveTextViewChoice(bool below)
+    {
+        Grid.SetColumnSpan(ReaderActions, below ? 2 : 1);
+        Grid.SetRow(ReaderTextView, below ? 1 : 0);
+        Grid.SetColumn(ReaderTextView, below ? 0 : 1);
+        Grid.SetColumnSpan(ReaderTextView, below ? 2 : 1);
+        ReaderTextView.HorizontalAlignment = below ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
     }
 
     private void HideTextViewChoice()
@@ -78,6 +110,7 @@ public sealed partial class ShellWindow
         ReaderTextView.Visibility = (session.Capabilities & ReaderCapabilities.Reflow) != 0
             ? Visibility.Visible
             : Visibility.Collapsed;
+        PlaceTextViewChoice();
     }
 
     private async Task ChooseTextViewAsync(TextViewMode mode)

@@ -508,13 +508,18 @@
                 </Grid>
 
                 <StackPanel Grid.Row="1">
-                    <Grid ColumnSpacing="12">
+                    <Grid x:Name="ReaderToolbarRow" ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <local:ReaderToolbar x:Name="ReaderActions" />
-                        <!-- T19.2: TXT only; beside the toolbar, which compiles without the Toolkit. -->
+                        <!-- T19.2: TXT only; beside the toolbar, which compiles without the Toolkit,
+                             or on its own row under it when the toolbar would lose commands. -->
                         <local:BoundedChoice x:Name="ReaderTextView" Grid.Column="1"
                                              VerticalAlignment="Center" Visibility="Collapsed"
                                              AutomationProperties.AutomationId="ReaderTextView"
