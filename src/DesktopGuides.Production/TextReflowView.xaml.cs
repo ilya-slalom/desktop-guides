@@ -131,12 +131,14 @@ public sealed partial class TextReflowView : UserControl
         restoring = true;
         // A place inside a realized block is scrolled to directly: a
         // ScrollIntoView applied after a layout would undo it.
-        bool inside = fraction > 0 && viewer is not null;
+        // A place under a thousandth of the way in is the block's start. A
+        // new text size or width must be laid out before the block is measured.
+        bool inside = fraction > 0.001 && viewer is not null;
         if (!inside || Blocks.ContainerFromIndex(anchorBlock) is not ListViewItem)
         {
             Blocks.ScrollIntoView(plan.Blocks[anchorBlock], ScrollIntoViewAlignment.Leading);
-            if (inside) Blocks.UpdateLayout();
         }
+        if (inside) Blocks.UpdateLayout();
         if (inside && Blocks.ContainerFromIndex(anchorBlock) is ListViewItem item)
         {
             double top = item.TransformToVisual(viewer).TransformPoint(default).Y;
