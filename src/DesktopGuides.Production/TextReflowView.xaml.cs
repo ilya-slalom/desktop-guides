@@ -129,17 +129,18 @@ public sealed partial class TextReflowView : UserControl
         anchorFraction = fraction;
         if (Blocks.ItemsSource is null) return;
         restoring = true;
-        // A realized block is scrolled to directly: a ScrollIntoView applied
-        // after a layout would undo a place inside the block.
-        if (viewer is null || Blocks.ContainerFromIndex(anchorBlock) is not ListViewItem)
+        // A place inside a realized block is scrolled to directly: a
+        // ScrollIntoView applied after a layout would undo it.
+        bool inside = fraction > 0 && viewer is not null;
+        if (!inside || Blocks.ContainerFromIndex(anchorBlock) is not ListViewItem)
         {
             Blocks.ScrollIntoView(plan.Blocks[anchorBlock], ScrollIntoViewAlignment.Leading);
-            if (fraction > 0 && viewer is not null) Blocks.UpdateLayout();
+            if (inside) Blocks.UpdateLayout();
         }
-        if (viewer is not null && Blocks.ContainerFromIndex(anchorBlock) is ListViewItem item)
+        if (inside && Blocks.ContainerFromIndex(anchorBlock) is ListViewItem item)
         {
             double top = item.TransformToVisual(viewer).TransformPoint(default).Y;
-            viewer.ChangeView(null, viewer.VerticalOffset + top + fraction * item.ActualHeight, null, true);
+            viewer!.ChangeView(null, viewer.VerticalOffset + top + fraction * item.ActualHeight, null, true);
         }
         dispatcher?.TryEnqueue(DispatcherQueuePriority.Low, () => restoring = false);
     }
