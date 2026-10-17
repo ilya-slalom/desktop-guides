@@ -14,7 +14,9 @@ public enum ReaderCapabilities
     TextSize = 32,
     Find = 64,
     SelectableText = 128,
-    Outline = 256
+    Outline = 256,
+    // T19.2: TXT's Original or Reflow view.
+    Reflow = 512
 }
 
 public enum ReaderCommand

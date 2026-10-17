@@ -1,8 +1,7 @@
 # T19.2 TXT reflow: design
 
-Status: approved in conversation, 16 October 2026. PR a (the planner and
-the view preference) is implemented on `feat/p2-t19-2-reflow`; PR b (the
-reflow view) follows.
+Status: approved in conversation, 16 October 2026. PR a merged as #130.
+PR b (the reflow view) implemented on `feat/p2-t19-2-reflow-view`.
 
 ## Intent
 
@@ -191,6 +190,13 @@ design.
      punctuation.
    - **A paragraph with list markers after its first line** stays
      preserved.
+5. **The choice sits beside the reader toolbar,** not inside its command
+   bar: the toolbar's smoke project compiles the toolbar without the
+   Toolkit that `BoundedChoice` needs.
+6. **In a narrow window the choice takes its own row,** left-aligned under
+   the toolbar, so the toolbar keeps every command (the user's choice, 17
+   October 2026). It returns beside the toolbar once the row is wide
+   enough.
 
 ## PR a verification record
 
@@ -236,3 +242,55 @@ See the [PR a plan](t19-2-reflow-plan.md).
   - `CaptureAt` at a low surrogate;
   - a form feed in prose text.
 
+## PR b verification record
+
+See the [PR b plan](t19-2-reflow-view-plan.md).
+
+- **Core,** each test failing first and then passing on the host:
+  `ReflowHighlightsTests` (7) covers a match's ranges across blocks and
+  segments, and the view messages. The full suite passes, 1324/1324.
+  Infrastructure passes 837/837.
+- **Production:** it builds with 0 warnings, with warnings as errors.
+- **Installed:** the `navigation` shard passes on both lanes, with
+  `reflow-switch`, `reflow-restart`, `reflow-none`, `reflow-find` and
+  `reflow-bookmark` beside the contents, find and bookmark modes, and the
+  PR's run passes every shard. `reflow-switch` also checks the choice
+  under the toolbar at 768 px and beside it at 1024 px. The seed adds "Reflow
+  Guide": twelve chapters of the authored fixture, then a 120-row table.
+  Screenshots: [reflow-switch](evidence/ci/t19-2/reflow-switch.png),
+  [reflow-find](evidence/ci/t19-2/reflow-find.png) and
+  [a match deep in the table](evidence/ci/t19-2/reflow-find-row.png).
+- **Rulings:**
+  1. **The choice sits beside the toolbar:** see deviation 5.
+  2. **The list takes no keyboard focus;** its block items do, as the line
+     view's rows. The modes focus the first block.
+  3. **The table row check reads the row's own text range.** UI
+     Automation clips item bounds to the list, and WinUI text blocks don't
+     support `FindText`.
+- **Final review:** 0 Critical and 3 Important. One Minor, a planner
+  exception stopping the guide opening, was raised to Important by its
+  effect. All four are fixed:
+  1. **A choice made during a switch was dropped,** so the choice read
+     Original while the view stayed Reflow. The last choice now wins. The
+     step failed first, then passed.
+  2. **A match deep in a block taller than the window stayed off-screen.**
+     The view now shows the match's line with a little context. The step
+     failed first, then passed.
+  3. **A taller reading area,** such as after the find bar closed,
+     **snapped to the block's start.** A height change alone now keeps the
+     scroll offset; a width or text size change still returns to the
+     block's start, as places are kept to the block. The step failed
+     first, then passed.
+  4. **A planner exception** now reads as no plan. No input makes the
+     planner throw, so this fix has no failing test.
+
+  A first version of fix 3 kept a place inside the block on every
+  resize. The installed runs caught two regressions from it: the first
+  match of a find stayed off-screen, and a larger text size overshot into
+  the next block. It was replaced by the simpler rule above.
+- **Found by the PR's run:** at the core shard's 768 px window, the choice
+  beside the toolbar pushed Go to start and Go to end into the overflow
+  menu. See deviation 6. A hidden choice also took 12 px from the PDF
+  and HTML toolbars; it now uses a margin, not column spacing.
+
+  The minors are deferred and listed in the PR.

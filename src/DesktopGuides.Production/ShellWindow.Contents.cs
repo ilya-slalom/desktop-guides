@@ -202,7 +202,7 @@ public sealed partial class ShellWindow
     {
         bool focused = readerSession switch
         {
-            TextReaderSession text => text.View.FocusLines(),
+            TextReaderSession text => text.FocusSurface(),
             PdfReaderSession pdf => pdf.View.FocusPreview(),
             HtmlReaderSession html => html.View.Focus(FocusState.Programmatic),
             _ => false

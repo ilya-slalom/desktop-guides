@@ -53,7 +53,16 @@ public sealed partial class ReaderToolbar : UserControl
                 args.Handled = TryRunKey(sender.Key, sender.Modifiers);
             KeyboardAccelerators.Add(accelerator);
         }
+        // The event comes before the move; the shell reads HasOverflow after it.
+        Commands.DynamicOverflowItemsChanging += (_, _) =>
+            DispatcherQueue.TryEnqueue(() => OverflowChanged?.Invoke(this, EventArgs.Empty));
     }
+
+    // T19.2: whether a shown command has moved into the overflow menu.
+    public bool HasOverflow => Commands.PrimaryCommands.Any(command =>
+        command is ICommandBarElement { IsInOverflow: true } and UIElement { Visibility: Visibility.Visible });
+
+    public event EventHandler? OverflowChanged;
 
     // The open document's page count; 0 means the dialog has no range.
     public int PageCount { get; set; }

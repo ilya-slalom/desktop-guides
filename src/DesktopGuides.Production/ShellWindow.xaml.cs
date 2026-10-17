@@ -163,6 +163,7 @@ public sealed partial class ShellWindow : Window
         InitializeFind();
         InitializeContents();
         InitializeBookmarks();
+        InitializeTextView();
         InitializeShortcutList();
     }
 
@@ -2018,6 +2019,7 @@ public sealed partial class ShellWindow : Window
 
                 case ReaderRoute readerRoute:
                     ReaderPanel.Visibility = Visibility.Visible;
+                    HideTextViewChoice();
                     ShowRouteProgress("Loading guide…");
                     HtmlOpenTimelineForTest.Begin(cacheRoot);
                     await PauseReaderMetadataReadForTestAsync();
@@ -2124,10 +2126,16 @@ public sealed partial class ShellWindow : Window
                     }
                     TextReaderSession session = new(
                         document, maxColumns, textScale,
-                        TextReaderSession.DiagnosticsFolderForTest(cacheRoot!));
+                        TextReaderSession.DiagnosticsFolderForTest(cacheRoot!),
+                        TextReaderSession.PlaceFileForTest(cacheRoot!));
                     readerSession = session;
+                    await StartTextViewAsync(guide.Id, session, readerToken);
+                    if (generation != renderGeneration)
+                    {
+                        return false;
+                    }
                     MarkReaderGuide(GuideFileStatus.Ok);
-                    ShowReaderSurface(loading: false, view: session.View);
+                    ShowReaderSurface(loading: false, view: session.Surface);
                     ReaderActions.SetSession(session);
                     // T16.1: TXT gets the reader keys PDF already had.
                     ReaderActions.KeysEnabled = true;

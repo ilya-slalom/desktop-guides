@@ -1,6 +1,8 @@
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Reading;
 using DesktopGuides.Core.Text;
+using DesktopGuides.Infrastructure.Storage;
+using Microsoft.UI.Xaml;
 
 namespace DesktopGuides.Production;
 
@@ -10,14 +12,104 @@ internal sealed class TextReaderSession : IReaderSession, IFindableReader, IOutl
 {
     private readonly TextGuideDocument document;
     private bool disposed;
+    private readonly string? placeFile;
+    private double textScale;
+    private bool planned;
+    private ReflowPlan? plan;
+    private TextReflowView? reflowView;
+    private TextMatch? shownMatch;
+
+    // T19.2: the place file for installed tests, behind the progress gate.
+    public static string? PlaceFileForTest(string cacheRoot) =>
+        TestGate.IsOpen(AppLane.Current.LocalEvent("ProgressDiagnostics", Environment.ProcessId))
+            ? Path.Combine(cacheRoot, "diagnostics", $"txt-place-{Environment.ProcessId}.json")
+            : null;
+
+    public TextViewMode Mode { get; private set; } = TextViewMode.Original;
+    public UIElement Surface => Mode == TextViewMode.Reflow && reflowView is not null ? reflowView : View;
+    public event EventHandler? ViewChanged;
+
+    private int FirstVisibleOffset => Mode == TextViewMode.Reflow && reflowView is not null
+        ? reflowView.FirstVisibleOffset
+        : document.LineStarts[Math.Clamp(View.FirstVisibleIndex, 0, document.LineStarts.Count - 1)];
+
+    // T19.2: shows the guide in the other view at the same block. Reflow is
+    // planned once, off the UI thread, within the planner's budget. False
+    // when Reflow has no plan: no prose, a failure, or out of time.
+    public async Task<bool> SetViewAsync(TextViewMode mode, CancellationToken token)
+    {
+        if (disposed) return false;
+        if (mode == Mode) return true;
+        int offset = FirstVisibleOffset;
+        if (mode == TextViewMode.Reflow)
+        {
+            if (!planned)
+            {
+                planned = true;
+                TextGuideDocument source = document;
+                using CancellationTokenSource budget = CancellationTokenSource.CreateLinkedTokenSource(token);
+                budget.CancelAfter(TextReflowPlanner.Budget);
+                try
+                {
+                    plan = await Task.Run(
+                        () => TextReflowPlanner.Plan(source, TextSectionDetector.Detect(source.Text, budget.Token), budget.Token),
+                        CancellationToken.None);
+                }
+                catch (Exception)
+                {
+                    // A planning failure is no plan; the guide stays readable in Original.
+                    plan = null;
+                }
+                token.ThrowIfCancellationRequested();
+            }
+            if (disposed || plan is null) return false;
+            if (reflowView is null)
+            {
+                reflowView = new TextReflowView(plan, textScale);
+                reflowView.TopBlockChanged += OnTopLineChanged;
+                if (shownMatch is TextMatch match) reflowView.ShowMatch(ReflowHighlights.For(plan, match.Start, match.Length));
+            }
+            reflowView.ScrollToOffset(offset);
+        }
+        else
+        {
+            View.ScrollToLine(document.LineAtOffset(offset));
+        }
+        Mode = mode;
+        ViewChanged?.Invoke(this, EventArgs.Empty);
+        WritePlaceForTest();
+        return true;
+    }
+
+    public bool FocusSurface() =>
+        Mode == TextViewMode.Reflow && reflowView is not null ? reflowView.FocusBlocks() : View.FocusLines();
+
+    // Test gate only: the view and its first visible offset.
+    private void WritePlaceForTest()
+    {
+        if (placeFile is null || disposed) return;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(placeFile)!);
+            DiagnosticFile.Write(placeFile, string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"{{\"view\":\"{Mode}\",\"offset\":{FirstVisibleOffset},\"scale\":{textScale:R},\"lineScale\":{View.TextScale:R}}}"));
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // Test diagnostics must never affect reading.
+        }
+    }
 
     // The initial text scale applies before the first measure (Ruling 5);
     // with a diagnostics folder the view reports each measure there.
     public TextReaderSession(
-        TextGuideDocument document, int maxColumns, double textScale, string? diagnosticsFolder)
+        TextGuideDocument document, int maxColumns, double textScale, string? diagnosticsFolder,
+        string? placeFile = null)
     {
         ArgumentNullException.ThrowIfNull(document);
         this.document = document;
+        this.textScale = textScale;
+        this.placeFile = placeFile;
         string? diagnosticsPath = diagnosticsFolder is null
             ? null
             : Path.Combine(diagnosticsFolder, $"txt-text-size-{Environment.ProcessId}.json");
@@ -35,7 +127,7 @@ internal sealed class TextReaderSession : IReaderSession, IFindableReader, IOutl
     public GuideFormat Format => GuideFormat.Txt;
     public ReaderCapabilities Capabilities =>
         ReaderCapabilities.Scroll | ReaderCapabilities.PageNavigation | ReaderCapabilities.TextSize |
-        ReaderCapabilities.Find | ReaderCapabilities.Outline;
+        ReaderCapabilities.Find | ReaderCapabilities.Outline | ReaderCapabilities.Reflow;
 
     // Capabilities don't change during a TXT session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
@@ -61,17 +153,28 @@ internal sealed class TextReaderSession : IReaderSession, IFindableReader, IOutl
             current = null;
         }
         token.ThrowIfCancellationRequested();
-        int top = document.LineStarts[Math.Clamp(View.FirstVisibleIndex, 0, document.LineStarts.Count - 1)];
+        int top = FirstVisibleOffset;
         current = TextMatcher.Step(matches, current, top, direction);
         if (current is not int index)
         {
+            shownMatch = null;
             View.ClearMatch();
+            reflowView?.ClearMatch();
             return FindResult.None;
         }
         TextMatch match = matches[index];
+        shownMatch = match;
         View.ShowMatch(Segments(match));
-        // A little context above the match, as a reader expects.
-        View.ScrollToLine(Math.Max(0, document.LineAtOffset(match.Start) - 3));
+        reflowView?.ShowMatch(ReflowHighlights.For(plan!, match.Start, match.Length));
+        if (Mode == TextViewMode.Reflow && reflowView is not null)
+        {
+            reflowView.ScrollToMatch(match.Start);
+        }
+        else
+        {
+            // A little context above the match, as a reader expects.
+            View.ScrollToLine(Math.Max(0, document.LineAtOffset(match.Start) - 3));
+        }
         return new FindResult(FindOutcome.Found, index + 1, matches.Count, false, 0);
     }
 
@@ -80,7 +183,9 @@ internal sealed class TextReaderSession : IReaderSession, IFindableReader, IOutl
         findText = null;
         matches = [];
         current = null;
+        shownMatch = null;
         View.ClearMatch();
+        reflowView?.ClearMatch();
     }
 
     // T18.2: sections from the guide's own markup, found off the UI thread
@@ -126,7 +231,7 @@ internal sealed class TextReaderSession : IReaderSession, IFindableReader, IOutl
     public Task<ReaderLocation> GetLocationAsync(CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        return Task.FromResult(TextLocator.Capture(document, View.FirstVisibleIndex));
+        return Task.FromResult(TextLocator.CaptureAt(document, FirstVisibleOffset));
     }
 
     public Task<RestoreOutcome> RestoreLocationAsync(ReaderLocation location, CancellationToken token)
@@ -136,7 +241,14 @@ internal sealed class TextReaderSession : IReaderSession, IFindableReader, IOutl
         token.ThrowIfCancellationRequested();
         if (!disposed && restore.Outcome.Kind != RestoreKind.Unavailable)
         {
-            View.ScrollToLine(restore.Line);
+            if (Mode == TextViewMode.Reflow && reflowView is not null)
+            {
+                reflowView.ScrollToOffset(document.LineStarts[Math.Clamp(restore.Line, 0, document.LineStarts.Count - 1)]);
+            }
+            else
+            {
+                View.ScrollToLine(restore.Line);
+            }
         }
         return Task.FromResult(restore.Outcome);
     }
@@ -150,16 +262,22 @@ internal sealed class TextReaderSession : IReaderSession, IFindableReader, IOutl
         switch (action)
         {
             case ScrollAction scroll:
-                View.ScrollByViewport(scroll.VerticalViewportFraction);
+                if (Mode == TextViewMode.Reflow && reflowView is not null) reflowView.ScrollByViewport(scroll.VerticalViewportFraction);
+                else View.ScrollByViewport(scroll.VerticalViewportFraction);
                 break;
             case PageTurnAction page:
-                View.PageBy(page.Delta);
+                if (Mode == TextViewMode.Reflow && reflowView is not null) reflowView.PageBy(page.Delta);
+                else View.PageBy(page.Delta);
                 break;
             case PageEdgeAction edge:
-                View.ScrollToEdge(edge.Edge);
+                if (Mode == TextViewMode.Reflow && reflowView is not null) reflowView.ScrollToEdge(edge.Edge);
+                else View.ScrollToEdge(edge.Edge);
                 break;
             case TextSizeAction size:
+                textScale = size.Scale;
                 View.TextScale = size.Scale;
+                if (reflowView is not null) reflowView.TextScale = size.Scale;
+                WritePlaceForTest();
                 break;
             default:
                 throw new NotSupportedException($"TXT guides don't support {action.Command}.");
@@ -174,10 +292,18 @@ internal sealed class TextReaderSession : IReaderSession, IFindableReader, IOutl
             disposed = true;
             View.TopLineChanged -= OnTopLineChanged;
             View.Clear();
+            if (reflowView is not null)
+            {
+                reflowView.TopBlockChanged -= OnTopLineChanged;
+                reflowView.Clear();
+            }
         }
         return ValueTask.CompletedTask;
     }
 
-    private void OnTopLineChanged(object? sender, EventArgs args) =>
+    private void OnTopLineChanged(object? sender, EventArgs args)
+    {
+        WritePlaceForTest();
         LocationChanged?.Invoke(this, new LocationChangedEventArgs());
+    }
 }

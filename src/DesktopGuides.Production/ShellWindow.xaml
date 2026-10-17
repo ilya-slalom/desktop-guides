@@ -508,7 +508,24 @@
                 </Grid>
 
                 <StackPanel Grid.Row="1">
-                    <local:ReaderToolbar x:Name="ReaderActions" />
+                    <Grid x:Name="ReaderToolbarRow">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <local:ReaderToolbar x:Name="ReaderActions" />
+                        <!-- T19.2: TXT only; beside the toolbar, which compiles without the Toolkit,
+                             or on its own row under it when the toolbar would lose commands. -->
+                        <!-- A margin, not column spacing, so a hidden choice leaves the toolbar its width. -->
+                        <local:BoundedChoice x:Name="ReaderTextView" Grid.Column="1" Margin="12,0,0,0"
+                                             VerticalAlignment="Center" Visibility="Collapsed"
+                                             AutomationProperties.AutomationId="ReaderTextView"
+                                             AutomationProperties.Name="Text view" />
+                    </Grid>
                     <local:FindBar x:Name="ReaderFind" Visibility="Collapsed" />
                     <!-- Collapsed while closed, so the Reader's layout is unchanged without a link. -->
                     <InfoBar x:Name="ReaderExternalLinkBar"
