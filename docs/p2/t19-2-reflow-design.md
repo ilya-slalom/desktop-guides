@@ -193,6 +193,10 @@ design.
 5. **The choice sits beside the reader toolbar,** not inside its command
    bar: the toolbar's smoke project compiles the toolbar without the
    Toolkit that `BoundedChoice` needs.
+6. **In a narrow window the choice takes its own row,** left-aligned under
+   the toolbar, so the toolbar keeps every command (the user's choice, 17
+   October 2026). It returns beside the toolbar once the row is wide
+   enough.
 
 ## PR a verification record
 
@@ -249,8 +253,9 @@ See the [PR b plan](t19-2-reflow-view-plan.md).
 - **Production:** it builds with 0 warnings, with warnings as errors.
 - **Installed:** the `navigation` shard passes on both lanes, with
   `reflow-switch`, `reflow-restart`, `reflow-none`, `reflow-find` and
-  `reflow-bookmark` beside the contents, find and bookmark modes (runs
-  38994824789, MSIX, and 38994830640, portable). The seed adds "Reflow
+  `reflow-bookmark` beside the contents, find and bookmark modes, and the
+  PR's run passes every shard. `reflow-switch` also checks the choice
+  under the toolbar at 768 px and beside it at 1024 px. The seed adds "Reflow
   Guide": twelve chapters of the authored fixture, then a 120-row table.
   Screenshots: [reflow-switch](evidence/ci/t19-2/reflow-switch.png),
   [reflow-find](evidence/ci/t19-2/reflow-find.png) and
@@ -272,12 +277,20 @@ See the [PR b plan](t19-2-reflow-view-plan.md).
      The view now shows the match's line with a little context. The step
      failed first, then passed.
   3. **A taller reading area,** such as after the find bar closed,
-     **snapped to the block's start.** The place is now the block plus how
-     far into it the top is. The step failed first, then passed.
+     **snapped to the block's start.** A height change alone now keeps the
+     scroll offset; a width or text size change still returns to the
+     block's start, as places are kept to the block. The step failed
+     first, then passed.
   4. **A planner exception** now reads as no plan. No input makes the
      planner throw, so this fix has no failing test.
 
-  The installed runs also caught two regressions from fix 3, both fixed
-  in the same pass: the first match of a find stayed off-screen, and a
-  larger text size overshot into the next block. The minors are deferred
-  and listed in the PR.
+  A first version of fix 3 kept a place inside the block on every
+  resize. The installed runs caught two regressions from it: the first
+  match of a find stayed off-screen, and a larger text size overshot into
+  the next block. It was replaced by the simpler rule above.
+- **Found by the PR's run:** at the core shard's 768 px window, the choice
+  beside the toolbar pushed Go to start and Go to end into the overflow
+  menu. See deviation 6. A hidden choice also took 12 px from the PDF
+  and HTML toolbars; it now uses a margin, not column spacing.
+
+  The minors are deferred and listed in the PR.
