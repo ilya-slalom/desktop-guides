@@ -129,15 +129,17 @@ public sealed partial class TextReflowView : UserControl
         anchorFraction = fraction;
         if (Blocks.ItemsSource is null) return;
         restoring = true;
-        Blocks.ScrollIntoView(plan.Blocks[anchorBlock], ScrollIntoViewAlignment.Leading);
-        if (fraction > 0 && viewer is not null)
+        // A realized block is scrolled to directly: a ScrollIntoView applied
+        // after a layout would undo a place inside the block.
+        if (viewer is null || Blocks.ContainerFromIndex(anchorBlock) is not ListViewItem)
         {
-            Blocks.UpdateLayout();
-            if (Blocks.ContainerFromIndex(anchorBlock) is ListViewItem item)
-            {
-                double top = item.TransformToVisual(viewer).TransformPoint(default).Y;
-                viewer.ChangeView(null, viewer.VerticalOffset + top + fraction * item.ActualHeight, null, true);
-            }
+            Blocks.ScrollIntoView(plan.Blocks[anchorBlock], ScrollIntoViewAlignment.Leading);
+            if (fraction > 0 && viewer is not null) Blocks.UpdateLayout();
+        }
+        if (viewer is not null && Blocks.ContainerFromIndex(anchorBlock) is ListViewItem item)
+        {
+            double top = item.TransformToVisual(viewer).TransformPoint(default).Y;
+            viewer.ChangeView(null, viewer.VerticalOffset + top + fraction * item.ActualHeight, null, true);
         }
         dispatcher?.TryEnqueue(DispatcherQueuePriority.Low, () => restoring = false);
     }
@@ -156,8 +158,12 @@ public sealed partial class TextReflowView : UserControl
         ScrollToBlock(anchorBlock, anchorFraction);
     }
 
-    // A wider or narrower window re-wraps prose; the place in the top block stays.
-    private void OnSizeChanged(object sender, SizeChangedEventArgs args) => ScrollToBlock(anchorBlock, anchorFraction);
+    // A wider or narrower window re-wraps prose; the place in the top block
+    // stays. A height change alone keeps the scroll offset, and so the place.
+    private void OnSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        if (args.NewSize.Width != args.PreviousSize.Width) ScrollToBlock(anchorBlock, anchorFraction);
+    }
 
     private void OnViewChanged(object? sender, ScrollViewerViewChangedEventArgs args)
     {
