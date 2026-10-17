@@ -75,6 +75,7 @@ public sealed partial class ShellWindow
         Grid.SetColumn(ReaderTextView, below ? 0 : 1);
         Grid.SetColumnSpan(ReaderTextView, below ? 2 : 1);
         ReaderTextView.HorizontalAlignment = below ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+        ReaderTextView.Margin = below ? default : new Thickness(12, 0, 0, 0);
     }
 
     private void HideTextViewChoice()
