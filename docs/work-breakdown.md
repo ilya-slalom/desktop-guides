@@ -609,7 +609,8 @@ library and points to Export in Settings.
 
 Designed in the [P2 technical design](p2-technical-design.md), 15 October
 2026. S18 and S19 are designed in full; S21 starts with T21.1's survey, and
-each format then gets its own design.
+each format then gets its own design. The survey was approved on 17 October
+2026, and T21.2 was limited to multi-page HTML and image maps.
 
 ### S18 — Search and navigate within guides
 
@@ -658,9 +659,14 @@ locator, offline check, and failure behavior before it is marked supported.
 
 - **T21.1** Prioritize image maps, multi-page HTML, CBZ, and other manual
   formats using real guide samples.
-- **T21.2** Add one importer/reader adapter at a time and extend backup tests.
+- **T21.2** Add one importer/reader adapter at a time and extend backup
+  tests: multi-page HTML, then image maps (the
+  [format survey](p2/format-survey.md)'s ranks 1 and 2, 17 October 2026).
+  TXT is already supported and is unchanged. The other formats wait until
+  [after the final milestone](#after-the-final-milestone).
 - **TR21.1** Multi-page HTML locators include document path and cross-page
   progress rules; archives cannot extract outside their staging root.
+- **TR21.2** A multi-page HTML guide's links between its imported pages open those pages, and every page reads styled, even when the site's stylesheets weren't saved with it.
 
 ## P3 — connected and optional features
 
@@ -777,6 +783,15 @@ on the Windows host, which is unavailable until then.
 
 TR16.1, TR16.2 and TR10.3 get their full evidence here; P1 records what
 T16.1 and T10.1–T10.3 verified.
+
+## After the final milestone
+
+Candidates with no phase, added when needed:
+
+- **More guide formats,** from the [format survey](p2/format-survey.md):
+  MHTML (a page saved as one file), CBZ, EPUB and Markdown, in the
+  survey's order. Each would need its own design and meet S21's
+  acceptance and TR21.1.
 
 ## Release gates and ordering
 

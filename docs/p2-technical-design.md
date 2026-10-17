@@ -240,6 +240,10 @@ record OutlineEntry(string Title, int Level, ReaderLocation Location,
   uncertainty stated. No sample is committed.
 - **What follows:** T21.2 then designs and adds one format at a time,
   each extending the backup tests and meeting TR21.1.
+- **The outcome** (approved 17 October 2026): T21.2 adds multi-page HTML,
+  then image maps. Multi-page HTML must also keep links between its pages
+  working and every page styled (TR21.2). MHTML, CBZ, EPUB and Markdown
+  wait until after the final milestone.
 
 ## 8. Shared UI, accessibility and testing
 
@@ -280,7 +284,7 @@ record OutlineEntry(string Title, int Level, ReaderLocation Location,
 | M9 | T19.1 bookmarks | |
 | M10 | T19.2 reflow | |
 | any time | T21.1 survey | Research; can run alongside. |
-| after the survey | T21.2 formats | One design and PR per format. |
+| after the survey | T21.2 formats | One design and PR per format: multi-page HTML, then image maps. |
 
 - **Per task:** each task gets a design note and its own PR, as in P1. The
   [implementation plan](p2/implementation-plan.md) holds the dependency
@@ -302,4 +306,4 @@ accurately) and R9 (Windows usability) apply to them as constraints.
 | TR18.1 | 2, 4 | Controls present only with capability flags; detection failure doesn't block scrolling |
 | S19 bookmarks | 5 | Repository, migration and backup tests; `bookmark-*` modes |
 | S19 reflow and TR19.1 | 6 | Planner offset round-trip tests; `reflow-*` modes; source bytes unchanged |
-| S21 and TR21.1 | 7 | The survey document, then per-format designs |
+| S21, TR21.1 and TR21.2 | 7 | The survey document, then per-format designs |

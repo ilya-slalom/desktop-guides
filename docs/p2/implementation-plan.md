@@ -1,6 +1,6 @@
 # P2 implementation plan and exit gates
 
-Status: M7 complete, 15 October 2026 (T18.1: #113, #116 and #117). M8 complete, 16 October 2026 (T18.2: #118 and #119). M9 complete, 16 October 2026 (T19.1: #126 and #129). M10 in progress: T19.2 PR a merged (#130); PR b (the reflow view) in review. P1 is complete (54 of 54 tasks; v1.0.1
+Status: M7 complete, 15 October 2026 (T18.1: #113, #116 and #117). M8 complete, 16 October 2026 (T18.2: #118 and #119). M9 complete, 16 October 2026 (T19.1: #126 and #129). M10 complete, 17 October 2026 (T19.2: #130 and #131). T21.1 (the format survey) in review; T21.2 is limited to multi-page HTML and image maps. P1 is complete (54 of 54 tasks; v1.0.1
 published). This plan orders the **3 P2 stories and 6 tasks** in the
 [work breakdown](../work-breakdown.md#p2--reader-depth-and-local-ownership).
 
@@ -96,14 +96,15 @@ against the AGENTS.md prevalence rule.
 
 ## S21: selected local material formats
 
-**Exit for S21:** each added format meets TR21.1 and the S21 acceptance.
+**Exit for S21:** each added format meets TR21.1, TR21.2 where it applies,
+and the S21 acceptance.
 That means a documented importer, reader controls, a locator, an offline
 check and failure behaviour, all in place before it is marked supported.
 
 | Task | Prerequisites | Output and verifiable exit | TR |
 | --- | --- | --- | --- |
 | T21.1 | None (research; can run alongside M7–M10) | `docs/p2/format-survey.md`. It samples representative guides from major public game-guide sites across genres and eras. For each candidate format (image maps, multi-page HTML, CBZ, EPUB, Markdown, and others found), it records frequency, whether the format can be read offline, import-security risk, locator needs, and the likely reader. The output is a ranked list with its uncertainty stated. No sample is committed. **Exit:** the survey is reviewed and its ranking approved by the user. | — |
-| T21.2 | T21.1; for each format, its own design; T19.1 for backup coverage | One importer and reader adapter per format, in the survey's order. Each extends the backup tests and states its locator and offline behaviour. **Exit,** for each format: the importer refuses unsafe archives (no extraction outside the staging folder) and untrusted content; the format's reader modes pass; the offline check passes; and the format is listed as supported only after that. | TR21.1 |
+| T21.2 | T21.1; for each format, its own design; T19.1 for backup coverage | Two formats, in this order: multi-page HTML, then image maps (the [survey](format-survey.md)'s ranks 1 and 2, approved 17 October 2026). The other formats wait until after the final milestone. Each format extends the backup tests and states its locator and offline behaviour. Multi-page HTML must fix what saved pages lose: links between its pages open the imported pages, and every page reads styled (TR21.2). **Exit,** for each format: the importer refuses unsafe archives (no extraction outside the staging folder) and untrusted content; the format's reader modes pass; the offline check passes; and the format is listed as supported only after that. | TR21.1, TR21.2 |
 
 ## Verification
 
@@ -124,4 +125,4 @@ check and failure behaviour, all in place before it is marked supported.
 | --- | --- | --- | --- |
 | S18 search and contents | T18.1, T18.2 | TR18.1 | [Sections 3 and 4](../p2-technical-design.md#3-s18-search-t181) |
 | S19 bookmarks and reflow | T19.1, T19.2 | TR19.1 | [Sections 5 and 6](../p2-technical-design.md#5-s19-bookmarks-t191) |
-| S21 local formats | T21.1, T21.2 | TR21.1 | [Section 7](../p2-technical-design.md#7-s21-the-format-survey-t211) |
+| S21 local formats | T21.1, T21.2 | TR21.1, TR21.2 | [Section 7](../p2-technical-design.md#7-s21-the-format-survey-t211) |
