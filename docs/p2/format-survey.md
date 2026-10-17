@@ -37,8 +37,11 @@ Made by the user, 17 October 2026:
 - **Plain text** is already supported and stays as it is.
 - **Multi-page HTML must fix what saved pages lose** (TR21.2):
   - links between its pages open the imported pages, not the site;
-  - every page reads styled, even when the site's stylesheets weren't
-    saved with it.
+  - its pages keep the guide's own stylesheets: the ones they link import
+    with them. The app doesn't substitute styles of its own. In the
+    samples, a browser's "Webpage, Complete" save appeared to keep only
+    inline styles, so the design starts by finding why the linked
+    stylesheets are lost.
 - **MHTML, CBZ, EPUB and Markdown** wait until after the final milestone.
   They're listed in the work breakdown's
   [After the final milestone](../work-breakdown.md#after-the-final-milestone).
@@ -156,7 +159,11 @@ items. The search also matches books that aren't game guides.
 - **How often:** all three wiki walkthroughs were 28–40 pages, and
   GameFAQs' HTML guides are split across pages as well.
 - **Offline:** saved pages keep text and images on all four sites.
-  Styling broke on two, which the reader's own styles can absorb.
+  Styling broke on two. The saves appeared to keep only inline styles,
+  not the stylesheets the pages link. Today's importer takes linked
+  `.css` files and their `@import`s, but only files named `.css`. Wiki
+  stylesheets are often served from URLs such as `load.php?…`, which the
+  design should check.
 - **Risks:**
   - every page is untrusted HTML under today's policy;
   - links between pages must point at the imported copies, not the site;

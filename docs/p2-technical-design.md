@@ -242,7 +242,8 @@ record OutlineEntry(string Title, int Level, ReaderLocation Location,
   each extending the backup tests and meeting TR21.1.
 - **The outcome** (approved 17 October 2026): T21.2 adds multi-page HTML,
   then image maps. Multi-page HTML must also keep links between its pages
-  working and every page styled (TR21.2). MHTML, CBZ, EPUB and Markdown
+  working and its own linked stylesheets imported, not replaced by the
+  app's (TR21.2). MHTML, CBZ, EPUB and Markdown
   wait until after the final milestone.
 
 ## 8. Shared UI, accessibility and testing

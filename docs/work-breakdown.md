@@ -666,7 +666,10 @@ locator, offline check, and failure behavior before it is marked supported.
   [after the final milestone](#after-the-final-milestone).
 - **TR21.1** Multi-page HTML locators include document path and cross-page
   progress rules; archives cannot extract outside their staging root.
-- **TR21.2** A multi-page HTML guide's links between its imported pages open those pages, and every page reads styled, even when the site's stylesheets weren't saved with it.
+- **TR21.2** A multi-page HTML guide's links between its imported pages
+  open those pages, and its pages keep the guide's own stylesheets: the
+  ones it links import with it. The app doesn't substitute styles of its
+  own for missing ones.
 
 ## P3 — connected and optional features
 
