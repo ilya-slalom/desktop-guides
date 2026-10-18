@@ -913,7 +913,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     {
         args.Handled = true;
         HtmlNavigation navigation = HtmlNavigationPolicy.Classify(
-            args.Uri, policy.EntryUri, entryNavigated: true, args.IsUserInitiated);
+            args.Uri, policy.EntryUri, documentNavigated: true, args.IsUserInitiated);
         if (navigation.Kind == HtmlNavigationKind.External)
         {
             ExternalLinkRequested?.Invoke(this, navigation.ExternalUri!);
