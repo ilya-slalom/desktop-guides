@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Diagnostics;
 using System.IO.Compression;
 using DesktopGuides.Core.Backup;
@@ -496,5 +497,27 @@ public sealed class LibraryExporterTests : IAsyncLifetime
         LibraryExportResult result = await Export(Exporter(protectedRoots: PackagedRoots()));
 
         Assert.True(File.Exists(result.Path));
+    }
+
+    [Fact]
+    public async Task TheSnapshotHoldsThePages()
+    {
+        string zip = (await Export()).Path;
+
+        Assert.Equal("1", Scalar(zip, $"SELECT COUNT(*) FROM GuidePages WHERE GuideId = '{fixture.HtmlGuide:N}' AND PageOrder = 0"));
+    }
+
+    [Theory]
+    [InlineData("DELETE FROM GuidePages WHERE GuideId = '{0}'")]
+    [InlineData("UPDATE GuidePages SET PageOrder = 1 WHERE GuideId = '{0}'")]
+    [InlineData("UPDATE GuideAssets SET Kind = 'Page' WHERE GuideId = '{0}' AND Kind = 'EntryHtml'")]
+    public async Task BrokenPageRowsDamageTheGuide(string sql)
+    {
+        fixture.Library.Execute(string.Format(CultureInfo.InvariantCulture, sql, fixture.HtmlGuide.ToString("N")));
+
+        LibraryExportException error = await Fails(LibraryExportIssue.ManagedFilesDamaged);
+
+        Assert.Equal(new[] { fixture.HtmlGuide }, error.GuideIds);
+        AssertNothingLeft();
     }
 }
