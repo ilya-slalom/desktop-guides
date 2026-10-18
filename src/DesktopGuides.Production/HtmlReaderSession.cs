@@ -655,14 +655,18 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         {
             if (query.Text != findText)
             {
+                // A step cancelled before the query's state is whole leaves
+                // none of it: the next step reads and counts again.
+                findText = null;
                 if (!await ReadMatchesAsync(query, token))
                 {
                     ResetFind();
                     return FindResult.Failure;
                 }
-                findText = query.Text;
-                matchIndex = null;
-                pageCounts = guide ? await CountPagesAsync(query, token) : null;
+                int[]? counts = guide ? await CountPagesAsync(query, token) : null;
+                // The open page's live count wins over its saved text.
+                if (counts is not null) counts[pageIndex] = matches.Count;
+                (findText, matchIndex, pageCounts) = (query.Text, null, counts);
             }
             token.ThrowIfCancellationRequested();
             bool across = guide && pageCounts is not null;
@@ -671,20 +675,21 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
                 : TextMatcher.Step(matches, matchIndex, current?.Offset ?? 0, direction);
             if (index is null && across)
             {
-                if (GuideFind.NextPage(pageCounts!, pageIndex, direction) is int page)
+                // A page whose saved matches are all hidden (a site menu its
+                // stylesheet hides) counts 0 once opened, and the step goes on.
+                while (index is null && GuideFind.NextPage(pageCounts!, pageIndex, direction) is int page)
                 {
+                    findText = null;
                     if (!await MoveToPageAsync(page, null, forFind: true) || !await ReadMatchesAsync(query, token))
                     {
                         return FindResult.Failure;
                     }
-                    matchIndex = null;
+                    (findText, matchIndex) = (query.Text, null);
+                    pageCounts![pageIndex] = matches.Count;
                     index = matches.Count == 0 ? null : direction == FindDirection.Next ? 0 : matches.Count - 1;
                 }
-                else
-                {
-                    // No other page matches: wrap within the open page, as one page does.
-                    index = TextMatcher.Step(matches, matchIndex, current?.Offset ?? 0, direction);
-                }
+                // No other page matches: wrap within the open page, as one page does.
+                index ??= TextMatcher.Step(matches, matchIndex, current?.Offset ?? 0, direction);
             }
             matchIndex = index;
             if (matchIndex is not int at)
