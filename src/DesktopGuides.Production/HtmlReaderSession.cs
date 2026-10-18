@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
@@ -33,7 +34,13 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     private CoreWebView2Environment? environment;
     private CoreWebView2? core;
     private string? contentSha256;
-    private bool entryNavigated;
+    private bool documentNavigated;
+    // T21.2: the guide's pages and the one the view shows. document is
+    // that page's guide address; documentNavigated is documentNavigated's
+    // meaning for whichever page is open.
+    private readonly HtmlGuidePages pages;
+    private int pageIndex;
+    private Uri document;
     private HtmlEntryState entry;
     private bool disposed;
     private TaskCompletionSource<bool>? pendingNavigation;
@@ -83,6 +90,8 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         ArgumentNullException.ThrowIfNull(loaded);
         ArgumentException.ThrowIfNullOrEmpty(cacheRoot);
         policy = loaded.Policy;
+        pages = loaded.Pages;
+        document = pages.AddressOf(0);
         reader = loaded.Reader;
         this.cacheRoot = cacheRoot;
         this.diagnostics = diagnostics;
@@ -103,7 +112,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     public GuideFormat Format => GuideFormat.Html;
     public ReaderCapabilities Capabilities =>
         ReaderCapabilities.Scroll | ReaderCapabilities.TextSize | ReaderCapabilities.Find |
-        ReaderCapabilities.Outline;
+        ReaderCapabilities.Outline | (pages.Count > 1 ? ReaderCapabilities.GuidePages : ReaderCapabilities.None);
 
     // Capabilities don't change during an HTML session.
     public event EventHandler? CapabilitiesChanged { add { } remove { } }
@@ -251,7 +260,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
             core.NavigationCompleted += Completed;
             core.ContentLoading += ContentLoading;
             pendingNavigation = completion;
-            core.Navigate(policy.EntryUri.AbsoluteUri);
+            core.Navigate(document.AbsoluteUri);
             HtmlOpenTimelineForTest.Mark("navigate");
             success = await completion.Task.WaitAsync(EntryNavigationTimeout, token);
             HtmlOpenTimelineForTest.Mark("navigated", $"{success} {entry}");
@@ -284,6 +293,76 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         }
     }
 
+    // T21.2: opens another of the guide's pages with a new top-level
+    // navigation, writes the appearance, and shows the fragment or the top.
+    // It takes the restore turn, so the tracker and restores wait for it.
+    // A move to the open page with a fragment only scrolls.
+    private async Task<bool> GoToPageAsync(int index, string? fragment)
+    {
+        if (disposed || failed || core is null || index < 0 || index >= pages.Count) return false;
+        if (index == pageIndex)
+        {
+            if (fragment is not null) core.Navigate(document.AbsoluteUri + fragment);
+            return true;
+        }
+        await restoreTurn.WaitAsync();
+        restoring = true;
+        try
+        {
+            pageIndex = index;
+            document = pages.AddressOf(index);
+            documentNavigated = false;
+            applied = null;
+            current = Start;
+            lastScroll = null;
+            ResetFind();
+            if (!await NavigateDocumentAsync())
+            {
+                if (!disposed)
+                {
+                    Failed?.Invoke(this, HtmlGuideLoadMessages.ForFailedOpen(entry, failed));
+                }
+                return false;
+            }
+            await WriteAppearanceAsync();
+            if (fragment is not null) core.Navigate(document.AbsoluteUri + fragment);
+            current = await CaptureAsync() ?? Start;
+            WritePositionForTest();
+            RaiseLocationChanged();
+            return true;
+        }
+        finally
+        {
+            restoring = false;
+            restoreTurn.Release();
+        }
+    }
+
+    // The open's wait, for a later page: the view must load and serve the
+    // page within the open's budget.
+    private async Task<bool> NavigateDocumentAsync()
+    {
+        TaskCompletionSource<bool> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        void Completed(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args) =>
+            completion.TrySetResult(args.IsSuccess);
+        core!.NavigationCompleted += Completed;
+        try
+        {
+            pendingNavigation = completion;
+            core.Navigate(document.AbsoluteUri);
+            return await completion.Task.WaitAsync(EntryNavigationTimeout) && entry == HtmlEntryState.Served;
+        }
+        catch (Exception error) when (error is TimeoutException or COMException)
+        {
+            return false;
+        }
+        finally
+        {
+            pendingNavigation = null;
+            if (!disposed && !failed) core.NavigationCompleted -= Completed;
+        }
+    }
+
     // A capture that fails or is rejected keeps the last good point.
     public async Task<ReaderLocation> GetLocationAsync(CancellationToken token)
     {
@@ -296,7 +375,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
             WritePositionForTest();
         }
         token.ThrowIfCancellationRequested();
-        return HtmlLocationRules.Capture(contentSha256 ?? string.Empty, policy.Entry.RequestPath, current ?? Start);
+        return HtmlLocationRules.Capture(contentSha256 ?? string.Empty, pages[pageIndex].RequestPath, current ?? Start, pageIndex, pages.Count);
     }
 
     public async Task<RestoreOutcome> RestoreLocationAsync(ReaderLocation location, CancellationToken token)
@@ -307,7 +386,14 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         {
             return new RestoreOutcome(RestoreKind.Unavailable, HtmlLocationRules.UnavailableReason);
         }
-        return await RestoreAsync(HtmlLocationRules.Decode(location, contentSha256, policy.Entry.RequestPath));
+        LocationDecodeResult decoded = HtmlLocationRules.Decode(location, contentSha256, pages.DocumentPaths);
+        if (decoded.Location?.Payload is HtmlPosition position &&
+            pages.IndexOfDocument(position.DocumentPath) is int page && page != pageIndex &&
+            !await GoToPageAsync(page, null))
+        {
+            return new RestoreOutcome(RestoreKind.Unavailable, HtmlLocationRules.UnavailableReason);
+        }
+        return await RestoreAsync(decoded);
     }
 
     // Before the open's write, the open picks the appearance up; during a
@@ -448,12 +534,24 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     }
 
     // A text size keeps the current theme; the style's zoom applies it.
-    public Task ExecuteAsync(ReaderAction action, CancellationToken token)
+    public async Task ExecuteAsync(ReaderAction action, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(action);
-        return action is TextSizeAction size
-            ? ApplyAppearanceAsync(appearance with { TextScale = size.Scale }, token)
-            : throw new NotSupportedException($"HTML guides don't support {action.Command}.");
+        switch (action)
+        {
+            case TextSizeAction size:
+                await ApplyAppearanceAsync(appearance with { TextScale = size.Scale }, token);
+                break;
+            // T21.2: in a guide of several pages, the page commands move between its pages.
+            case PageTurnAction turn when pages.Count > 1:
+                await GoToPageAsync(pages.Step(pageIndex, turn.Delta), null);
+                break;
+            case PageEdgeAction edge when pages.Count > 1:
+                await GoToPageAsync(edge.Edge == ReaderEdge.Start ? 0 : pages.Count - 1, null);
+                break;
+            default:
+                throw new NotSupportedException($"HTML guides don't support {action.Command}.");
+        }
     }
 
     // T18.1: the last query's matches over the walk's text. A find step is
@@ -561,7 +659,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         if (!await entryLoad.Task.WaitAsync(token) || disposed || contentSha256 is null) return Outline.Empty;
         string? reply = await RunScriptAsync(HtmlOutlineScripts.Collect);
         token.ThrowIfCancellationRequested();
-        return HtmlOutlineRules.Build(reply, contentSha256, policy.Entry.RequestPath);
+        return HtmlOutlineRules.Build(reply, contentSha256, pages[pageIndex].RequestPath);
     }
 
     public long OrderOf(ReaderLocation location) =>
@@ -582,7 +680,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         try
         {
             if (!Uri.TryCreate(core.Source, UriKind.Absolute, out Uri? source) ||
-                !HtmlNavigationPolicy.IsEntryDocument(source, policy.EntryUri))
+                !HtmlNavigationPolicy.IsEntryDocument(source, document))
             {
                 return null;
             }
@@ -619,7 +717,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     {
         string? reply = await RunScriptAsync(HtmlPositionScripts.Capture);
         if (disposed) return null;
-        HtmlCapture? capture = HtmlLocationRules.ParseCapture(reply, policy.EntryUri);
+        HtmlCapture? capture = HtmlLocationRules.ParseCapture(reply, document);
         if (capture is null) diagnostics?.RecordRejectedCapture();
         return capture;
     }
@@ -829,7 +927,9 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
                 {
                     await Task.Delay(TimeSpan.FromSeconds(1));
                 }
-                bool isEntry = serve.Asset.Kind == GuideAssetKind.EntryHtml;
+                // The open page's own document decides the open's outcome.
+                bool isEntry = serve.Asset.Kind is GuideAssetKind.EntryHtml or GuideAssetKind.Page &&
+                    string.Equals(serve.Asset.RequestPath, pages[pageIndex].RequestPath, StringComparison.Ordinal);
                 // An entry read that throws is treated as changed.
                 if (isEntry) entry = HtmlEntryState.Changed;
                 if (isEntry) HtmlOpenTimelineForTest.Mark("entry-requested");
@@ -882,13 +982,13 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     private void OnNavigationStarting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args)
     {
         HtmlNavigation navigation = HtmlNavigationPolicy.Classify(
-            args.Uri, policy.EntryUri, entryNavigated, args.IsUserInitiated);
+            args.Uri, document, documentNavigated, args.IsUserInitiated, pages);
         switch (navigation.Kind)
         {
             case HtmlNavigationKind.Entry:
                 diagnostics?.RecordEntryNavigation();
-                if (!entryNavigated) HtmlOpenTimelineForTest.Mark("navigation-starting");
-                entryNavigated = true;
+                if (!documentNavigated) HtmlOpenTimelineForTest.Mark("navigation-starting");
+                documentNavigated = true;
                 break;
             case HtmlNavigationKind.SameDocument:
                 break;
@@ -899,6 +999,10 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
             case HtmlNavigationKind.Unavailable:
                 args.Cancel = true;
                 RaiseUnavailableLink();
+                break;
+            case HtmlNavigationKind.Page:
+                args.Cancel = true;
+                _ = GoToPageAsync(navigation.PageIndex!.Value, navigation.Fragment);
                 break;
             default:
                 args.Cancel = true;
@@ -913,7 +1017,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     {
         args.Handled = true;
         HtmlNavigation navigation = HtmlNavigationPolicy.Classify(
-            args.Uri, policy.EntryUri, documentNavigated: true, args.IsUserInitiated);
+            args.Uri, document, documentNavigated: true, args.IsUserInitiated, pages);
         if (navigation.Kind == HtmlNavigationKind.External)
         {
             ExternalLinkRequested?.Invoke(this, navigation.ExternalUri!);
@@ -921,6 +1025,10 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         else if (navigation.Kind == HtmlNavigationKind.Unavailable)
         {
             RaiseUnavailableLink();
+        }
+        else if (navigation.Kind == HtmlNavigationKind.Page)
+        {
+            _ = GoToPageAsync(navigation.PageIndex!.Value, navigation.Fragment);
         }
     }
 
@@ -1060,7 +1168,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         try
         {
             string? locator = current is null ? null : ReaderLocationCodec.Serialize(
-                HtmlLocationRules.Capture(contentSha256 ?? string.Empty, policy.Entry.RequestPath, current));
+                HtmlLocationRules.Capture(contentSha256 ?? string.Empty, pages[pageIndex].RequestPath, current, pageIndex, pages.Count));
             string json = JsonSerializer.Serialize(
                 new HtmlPositionForTest(
                     locator,

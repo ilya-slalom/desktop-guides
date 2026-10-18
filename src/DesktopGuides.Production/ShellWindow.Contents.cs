@@ -31,11 +31,11 @@ public sealed partial class ShellWindow
     }
 
     // Called once a session's tracking starts, so a restore has run.
-    private void StartContents(IReaderSession session, Guide guide, string contentSha256, string? htmlEntry)
+    private void StartContents(IReaderSession session, Guide guide, string contentSha256, IReadOnlyCollection<string>? htmlDocuments)
     {
         StopContents();
         if (session is not IOutlineReader reader) return;
-        StartBookmarks(guide, contentSha256, htmlEntry);
+        StartBookmarks(guide, contentSha256, htmlDocuments);
         CancellationTokenSource cancel = new();
         outlineCancel = cancel;
         if (contentsOpen)

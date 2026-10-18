@@ -25,6 +25,8 @@ public sealed partial class ReaderToolbar : UserControl
     [
         (VirtualKey.PageUp, VirtualKeyModifiers.None),
         (VirtualKey.PageDown, VirtualKeyModifiers.None),
+        (VirtualKey.PageUp, Ctrl),
+        (VirtualKey.PageDown, Ctrl),
         (VirtualKey.Home, Ctrl),
         (VirtualKey.End, Ctrl),
         (VirtualKey.G, Ctrl),
@@ -38,12 +40,15 @@ public sealed partial class ReaderToolbar : UserControl
     ];
 
     private bool promptOpen;
+    // T21.2: the page buttons' own tooltips, for sessions that page as TXT and PDF do.
+    private readonly object?[] pageTips;
     // The open guide's text size; the shell sets it at open (Ruling 3).
     private double textScale = TextSizeSteps.Default;
 
     public ReaderToolbar()
     {
         InitializeComponent();
+        pageTips = [.. new[] { PageStart, PreviousPage, NextPage, PageEnd }.Select(ToolTipService.GetToolTip)];
         // The tooltips name the keys, so WinUI's own key tips stay hidden.
         KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
         foreach ((VirtualKey key, VirtualKeyModifiers modifiers) in KeyTable)
@@ -150,6 +155,14 @@ public sealed partial class ReaderToolbar : UserControl
         PreviousPage.Visibility = Show(pages);
         NextPage.Visibility = Show(pages);
         PageEnd.Visibility = Show(edges);
+        // T21.2: a web guide of several pages names its own keys.
+        bool guidePages = session is not null && (session.Capabilities & ReaderCapabilities.GuidePages) != 0;
+        string?[] guideTips = ["Go to the first page", "Previous page (Ctrl+Page Up)", "Next page (Ctrl+Page Down)", "Go to the last page"];
+        AppBarButton[] pageButtons = [PageStart, PreviousPage, NextPage, PageEnd];
+        for (int index = 0; index < pageButtons.Length; index++)
+        {
+            ToolTipService.SetToolTip(pageButtons[index], guidePages ? guideTips[index] : pageTips[index]);
+        }
         SmallerText.Visibility = Show(textSize);
         LargerText.Visibility = Show(textSize);
         TextSizeContainer.Visibility = Show(textSize);
@@ -203,13 +216,31 @@ public sealed partial class ReaderToolbar : UserControl
         VisualTreeHelper.GetOpenPopupsForXamlRoot(XamlRoot)
             .Any(popup => popup.Child is ContentDialog);
 
-    private AppBarButton? CommandFor(VirtualKey key, VirtualKeyModifiers modifiers) =>
-        (key, modifiers) switch
+    private AppBarButton? CommandFor(VirtualKey key, VirtualKeyModifiers modifiers)
+    {
+        // T21.2: which page keys page depends on the session.
+        PageKey? page = key switch
         {
-            (VirtualKey.PageUp, VirtualKeyModifiers.None) => PreviousPage,
-            (VirtualKey.PageDown, VirtualKeyModifiers.None) => NextPage,
-            (VirtualKey.Home, Ctrl) => PageStart,
-            (VirtualKey.End, Ctrl) => PageEnd,
+            VirtualKey.PageUp => PageKey.PageUp,
+            VirtualKey.PageDown => PageKey.PageDown,
+            VirtualKey.Home => PageKey.Home,
+            VirtualKey.End => PageKey.End,
+            _ => null
+        };
+        if (page is PageKey pageKey)
+        {
+            if (modifiers is not (VirtualKeyModifiers.None or Ctrl)) return null;
+            return PageKeyRouting.For(session?.Capabilities ?? ReaderCapabilities.None, pageKey, modifiers == Ctrl) switch
+            {
+                PageKeyCommand.PreviousPage => PreviousPage,
+                PageKeyCommand.NextPage => NextPage,
+                PageKeyCommand.PageStart => PageStart,
+                PageKeyCommand.PageEnd => PageEnd,
+                _ => null
+            };
+        }
+        return (key, modifiers) switch
+        {
             (VirtualKey.G, Ctrl) => GoToPage,
             (VirtualKey.Add or EqualsKey, Ctrl) => ZoomOr(ZoomIn, LargerText),
             (EqualsKey, Ctrl | VirtualKeyModifiers.Shift) => ZoomOr(ZoomIn, LargerText),
@@ -217,6 +248,7 @@ public sealed partial class ReaderToolbar : UserControl
             (VirtualKey.Number0 or VirtualKey.NumberPad0, Ctrl) => ZoomOr(FitToWidth, ResetTextSize),
             _ => null
         };
+    }
 
     // Ruling 2: a session shows zoom or text size, not both. The zoom
     // commands win while visible, even disabled.

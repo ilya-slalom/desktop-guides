@@ -142,7 +142,7 @@ public sealed partial class ShellWindow
     // newer render took over.
     private async Task<bool> OpenAtSavedPlaceAsync(
         Guide guide, IReaderSession session, int generation, string contentSha256,
-        string? htmlEntry, CancellationToken token)
+        IReadOnlyCollection<string>? htmlDocuments, CancellationToken token)
     {
         string? stored;
         RestoreKind? kind = null;
@@ -170,7 +170,7 @@ public sealed partial class ShellWindow
             // Stored and override locators are untrusted; only the codec's
             // result reaches the session.
             LocationDecodeResult decoded = ReaderLocationCodec.Deserialize(
-                stored, guide.Format, contentSha256, htmlEntry);
+                stored, guide.Format, contentSha256, htmlDocuments);
             kind = RestoreKind.Unavailable;
             if ((decoded.Status is LocationDecodeStatus.Valid or LocationDecodeStatus.ContentChanged) &&
                 decoded.Location is ReaderLocation location)
@@ -207,7 +207,7 @@ public sealed partial class ShellWindow
             return false;
         }
         progressTracking = progress!.Track(guide.Id, session, baseline);
-        StartContents(session, guide, contentSha256, htmlEntry);
+        StartContents(session, guide, contentSha256, htmlDocuments);
         HtmlOpenTimelineForTest.Mark("ready");
         return true;
     }

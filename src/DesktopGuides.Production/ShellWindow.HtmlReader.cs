@@ -88,7 +88,7 @@ public sealed partial class ShellWindow
         BeginTextSize(guide.Id, textScale);
         return await OpenAtSavedPlaceAsync(
             guide, session, generation, guide.ContentSha256.ToLowerInvariant(),
-            loaded.Policy.Entry.RequestPath, token);
+            loaded.Pages.DocumentPaths, token);
     }
 
     private void ShowHtmlLoadError(HtmlGuideLoadError error)
