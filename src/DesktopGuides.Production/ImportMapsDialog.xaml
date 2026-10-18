@@ -1,0 +1,29 @@
+<ContentDialog
+    x:Class="DesktopGuides.Production.ImportMapsDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    PrimaryButtonText="Import maps"
+    IsPrimaryButtonEnabled="False"
+    CloseButtonText="Close"
+    DefaultButton="Primary"
+    AutomationProperties.AutomationId="ImportMapsDialog">
+    <ScrollViewer MaxHeight="520"
+                  VerticalScrollBarVisibility="Auto">
+        <StackPanel Width="520"
+                    Spacing="{StaticResource DesktopGuidesSpacing12}">
+            <StackPanel x:Name="ImportMapsBusy"
+                        Style="{StaticResource DesktopGuidesBusyRowStyle}"
+                        AutomationProperties.AutomationId="ImportMapsBusy">
+                <ProgressRing Width="20" Height="20" IsActive="True" />
+                <TextBlock x:Name="ImportMapsStatus"
+                           Text="Checking the maps…"
+                           Style="{StaticResource DesktopGuidesBodyStyle}"
+                           AutomationProperties.AutomationId="ImportMapsStatus"
+                           AutomationProperties.LiveSetting="Polite" />
+            </StackPanel>
+            <StackPanel x:Name="ImportMapsList"
+                        Spacing="{StaticResource DesktopGuidesSpacing12}"
+                        AutomationProperties.AutomationId="ImportMapsList" />
+        </StackPanel>
+    </ScrollViewer>
+</ContentDialog>

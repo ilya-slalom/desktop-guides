@@ -490,6 +490,7 @@
                                 Content="Import maps"
                                 IsEnabled="False"
                                 Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                                Click="ImportMapsClicked"
                                 AutomationProperties.AutomationId="ImportMapsButton" />
                     </Grid>
                     <Grid Grid.Row="2">

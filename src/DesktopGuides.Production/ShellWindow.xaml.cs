@@ -76,6 +76,7 @@ public sealed partial class ShellWindow : Window
     private GuideImportPublisher? guidePublisher;
     private bool importRequested;
     private ImportGuideDialog? activeImportDialog;
+    private ImportMapsDialog? activeMapsDialog;
     private GuideRemover? guideRemover;
     private bool removeRequested;
     private ContentDialog? activeRemoveDialog;
@@ -521,6 +522,7 @@ public sealed partial class ShellWindow : Window
         activeGameEditor?.Hide();
         activeAddGameDialog?.Hide();
         activeImportDialog?.Hide();
+        activeMapsDialog?.Hide();
         activeRemoveDialog?.Hide();
         refreshCancel?.Cancel();
         backupCancel?.Cancel();
