@@ -10,6 +10,23 @@ public static class ImportPresentation
     public const string PdfPasswordIncorrect = "That password didn't open this PDF. Try again.";
     public const string PasswordProtectedFact = "Password protected";
 
+    // T21.2: a multi-page guide's pages, counted and listed in reading order.
+    public const int ShownPages = 20;
+
+    public static string PageCount(int count) =>
+        count == 1 ? "1 page" : string.Create(CultureInfo.CurrentCulture, $"{count:N0} pages");
+
+    public static string PageList(IReadOnlyList<string> titles)
+    {
+        ArgumentNullException.ThrowIfNull(titles);
+        List<string> lines = titles.Take(ShownPages).Select((title, index) => $"{index + 1}. {title}").ToList();
+        if (titles.Count > ShownPages)
+        {
+            lines.Add(string.Create(CultureInfo.CurrentCulture, $"and {titles.Count - ShownPages:N0} more"));
+        }
+        return string.Join('\n', lines);
+    }
+
     public static string FormatLabel(GuideFormat format) => format switch
     {
         GuideFormat.Txt => "Text (TXT)",
