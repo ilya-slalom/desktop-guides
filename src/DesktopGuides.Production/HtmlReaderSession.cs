@@ -299,6 +299,9 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     // A move to the open page with a fragment only scrolls.
     private async Task<bool> GoToPageAsync(int index, string? fragment)
     {
+        // A click's own NavigationStarting calls here: the new navigation
+        // starts once that handler has returned and cancelled the click.
+        await Task.Yield();
         if (disposed || failed || core is null || index < 0 || index >= pages.Count) return false;
         if (index == pageIndex)
         {
