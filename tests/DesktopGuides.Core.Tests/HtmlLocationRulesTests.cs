@@ -367,6 +367,18 @@ public sealed class HtmlLocationRulesTests
             HtmlLocationRules.Outcome(same, null));
     }
 
+    // T21.2 PR c: another page's contents entry is its top, which no layout moves.
+    [Fact]
+    public void ThePageTopOfUnchangedBytesIsExact()
+    {
+        ReaderLocation top = HtmlLocationRules.Capture(Sha, Path, new HtmlCapture(0, null, null, 0), 1, 3);
+        HtmlRestoreTarget fraction = new(HtmlRestoreStep.Fraction, 0, 0);
+
+        Assert.Equal(new RestoreOutcome(RestoreKind.Exact), HtmlLocationRules.Outcome(Plan(top, Sha), fraction));
+        Assert.Equal(new RestoreOutcome(RestoreKind.Approximate, HtmlLocationRules.ChangedReason),
+            HtmlLocationRules.Outcome(Plan(top, OtherSha), fraction));
+    }
+
     [Fact]
     public void AStepThePlanDidNotAllowIsUnavailable() =>
         Assert.Equal(RestoreKind.Unavailable,

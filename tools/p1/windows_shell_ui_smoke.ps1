@@ -5149,6 +5149,15 @@ try {
                 [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 2 - Guides Example.html' } 'chapter 2 from its entry')
                 # The pane is rebuilt for the new page, and its entry is the current one.
                 Wait-ContentsSelected 'Chapter 2'
+                # A page's top is an exact place: no "near your last place" notice.
+                $deadline = (Get-Date).AddSeconds(1)
+                do {
+                    $notice = Find-ById 'ReaderNotice'
+                    if ($notice -and -not $notice.Current.IsOffscreen) {
+                        throw "Chapter 2's entry showed the notice '$($notice.Current.Name)'."
+                    }
+                    Start-Sleep -Milliseconds 100
+                } while ((Get-Date) -lt $deadline)
                 $report.htmlPagesContentsScreenshot = Save-WindowScreenshot 'html-pages-contents'
                 Invoke-Element (Wait-VisibleById 'ReaderContentsClose')
                 Wait-HiddenById 'ReaderContentsTree'

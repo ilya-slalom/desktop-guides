@@ -210,6 +210,9 @@ public static class HtmlLocationRules
         {
             HtmlRestoreStep.Exact => new RestoreOutcome(RestoreKind.Exact),
             HtmlRestoreStep.Context when !plan.ContentChanged => new RestoreOutcome(RestoreKind.Context),
+            // T21.2: a page's top is the same place at any layout.
+            HtmlRestoreStep.Fraction when !plan.ContentChanged && target.Fraction == 0 =>
+                new RestoreOutcome(RestoreKind.Exact),
             // A fraction of unchanged bytes is approximate, but "the guide
             // changed" would be false.
             _ => plan.ContentChanged
