@@ -419,4 +419,38 @@ public sealed class HtmlLocationRulesTests
     public void NoTargetIsAnUnavailableAppearanceRestore() =>
         Assert.Equal(new RestoreOutcome(RestoreKind.Unavailable, HtmlLocationRules.UnavailableReason),
             HtmlLocationRules.AppearanceOutcome(null));
+
+    // T21.2: progress counts the pages before the open one.
+    [Fact]
+    public void ProgressCountsAcrossPages()
+    {
+        ReaderLocation location = HtmlLocationRules.Capture(
+            new string('a', 64), "Chapter 2.html", new HtmlCapture(40, "The tower key", null, 0.5), 2, 4);
+
+        Assert.Equal(0.625, location.EstimatedFraction);
+        HtmlPosition position = Assert.IsType<HtmlPosition>(location.Payload);
+        Assert.Equal(("Chapter 2.html", 0.5), (position.DocumentPath, position.ScrollFraction));
+    }
+
+    [Fact]
+    public void APlaceOnAnyPageOfTheGuideDecodes()
+    {
+        string sha = new('a', 64);
+        ReaderLocation location = HtmlLocationRules.Capture(sha, "Chapter 2.html", new HtmlCapture(40, "q", null, 0.5), 2, 4);
+
+        LocationDecodeResult decoded = HtmlLocationRules.Decode(location, sha, ["Start.html", "Chapter 1.html", "Chapter 2.html"]);
+
+        Assert.Equal(LocationDecodeStatus.Valid, decoded.Status);
+    }
+
+    // Review Focus 5.
+    [Fact]
+    public void APlaceOnAnotherPageSetIsInvalid()
+    {
+        string sha = new('a', 64);
+        ReaderLocation location = HtmlLocationRules.Capture(sha, "Elsewhere.html", new HtmlCapture(0, null, null, 0));
+
+        Assert.Equal(LocationDecodeStatus.Invalid,
+            HtmlLocationRules.Decode(location, sha, ["Start.html", "Chapter 1.html"]).Status);
+    }
 }

@@ -106,19 +106,31 @@ public static class HtmlLocationRules
         Math.Abs(last.Height - now.Height) > 1 ||
         Math.Abs(last.ViewportHeight - now.ViewportHeight) > 1;
 
-    public static ReaderLocation Capture(string contentSha256, string documentPath, HtmlCapture capture)
+    // T21.2: progress counts the pages before the open one; the scroll
+    // fraction stays within the page.
+    public static ReaderLocation Capture(
+        string contentSha256, string documentPath, HtmlCapture capture, int pageIndex = 0, int pageCount = 1)
     {
         ArgumentNullException.ThrowIfNull(capture);
+        if (pageCount < 1 || pageIndex < 0 || pageIndex >= pageCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pageIndex), pageIndex, "The page must be one of the guide's pages.");
+        }
         return new ReaderLocation(
             GuideFormat.Html,
             ReaderLocationCodec.CurrentVersion,
             contentSha256.ToLowerInvariant(),
             new HtmlPosition(documentPath, capture.ElementId, capture.Quote, capture.Offset, capture.Fraction),
-            capture.Fraction);
+            pageCount > 1 ? (pageIndex + capture.Fraction) / pageCount : capture.Fraction);
     }
 
     // A typed location gets the same checks as stored JSON.
-    public static LocationDecodeResult Decode(ReaderLocation location, string contentSha256, string documentPath)
+    public static LocationDecodeResult Decode(ReaderLocation location, string contentSha256, string documentPath) =>
+        Decode(location, contentSha256, (IReadOnlyCollection<string>)[documentPath]);
+
+    // T21.2: a place on any of the guide's documents.
+    public static LocationDecodeResult Decode(
+        ReaderLocation location, string contentSha256, IReadOnlyCollection<string> documents)
     {
         ArgumentNullException.ThrowIfNull(location);
         string json;
@@ -131,7 +143,7 @@ public static class HtmlLocationRules
             return new LocationDecodeResult(LocationDecodeStatus.Invalid, null);
         }
         return ReaderLocationCodec.Deserialize(
-            json, GuideFormat.Html, contentSha256.ToLowerInvariant(), documentPath);
+            json, GuideFormat.Html, contentSha256.ToLowerInvariant(), documents);
     }
 
     public static HtmlRestorePlan PlanRestore(LocationDecodeResult result)

@@ -65,7 +65,16 @@ public static class ReaderLocationCodec
         string? json,
         GuideFormat expectedFormat,
         string expectedContentSha256,
-        string? expectedHtmlDocument = null)
+        string? expectedHtmlDocument = null) =>
+        Deserialize(json, expectedFormat, expectedContentSha256,
+            expectedHtmlDocument is null ? null : (IReadOnlyCollection<string>)[expectedHtmlDocument]);
+
+    // T21.2: an HTML place is valid on any of the guide's documents.
+    public static LocationDecodeResult Deserialize(
+        string? json,
+        GuideFormat expectedFormat,
+        string expectedContentSha256,
+        IReadOnlyCollection<string>? htmlDocuments)
     {
         if (string.IsNullOrWhiteSpace(json) ||
             Encoding.UTF8.GetByteCount(json) > MaxBytes ||
@@ -119,9 +128,9 @@ public static class ReaderLocationCodec
                 format, version, hash, position, OptionalFraction(root, "estimatedFraction"));
             Validate(location);
             if (format == GuideFormat.Html &&
-                (expectedHtmlDocument is null ||
-                 ManagedRelativePath.Parse(expectedHtmlDocument) !=
-                 ((HtmlPosition)position).DocumentPath))
+                (htmlDocuments is null ||
+                 !htmlDocuments.Any(document =>
+                     ManagedRelativePath.Parse(document) == ((HtmlPosition)position).DocumentPath)))
             {
                 return new(LocationDecodeStatus.Invalid, null);
             }
