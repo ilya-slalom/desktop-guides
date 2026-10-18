@@ -5051,8 +5051,22 @@ try {
                 Wait-StatusClosed
                 [void](Wait-HtmlPosition { param($p) $p.document -eq 'Sample Quest - Guides Example.html' } 'the first page')
                 # A link by the page's website address opens the imported copy.
-                Click-Element (Wait-PageLink 'Chapter 1')
+                # Final review: a quick second click lands mid-move; it must not break the move.
+                $chapter1 = Wait-PageLink 'Chapter 1'
+                Click-Element $chapter1
+                Click-Element $chapter1
                 [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 1 - Guides Example.html' } 'chapter 1 by its link')
+                # Review Focus 1: the open page's own website address with a fragment scrolls; no reload.
+                Click-Element (Wait-PageLink 'To the end of this chapter')
+                Start-Sleep -Milliseconds 1500
+                $after = Read-HtmlPosition
+                # The trace keeps its last entries; after the same-page move, a reload would log a new entry navigation.
+                $at = $after.trace.LastIndexOf('move 1 from 1')
+                if ($at -lt 0) { throw "The link to the open page wasn't handled as that page: $($after.trace)" }
+                $tail = $after.trace.Substring($at)
+                if ($after.document -ne 'Chapter 1 - Guides Example.html' -or $tail -like '*nav Entry*') {
+                    throw "A link to the open page reloaded it: $tail"
+                }
                 Click-Element (Wait-PageLink 'On to chapter 3')
                 [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 3 - Guides Example.html' } 'chapter 3 by its link')
                 # The toolbar follows the reading order, not the links.
