@@ -205,6 +205,18 @@
                                        Style="{StaticResource DesktopGuidesBodyStyle}"
                                        AutomationProperties.AutomationId="ImportAssets" />
                         </Grid>
+                        <Grid x:Name="ImportPixelsRow"
+                              Visibility="Collapsed"
+                              ColumnSpacing="{StaticResource DesktopGuidesSpacing12}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Size" Style="{StaticResource DesktopGuidesMetadataStyle}" />
+                            <TextBlock x:Name="ImportPixels" Grid.Column="1"
+                                       Style="{StaticResource DesktopGuidesBodyStyle}"
+                                       AutomationProperties.AutomationId="ImportPixels" />
+                        </Grid>
                         <Grid x:Name="ImportPagesRow"
                               Visibility="Collapsed"
                               ColumnSpacing="{StaticResource DesktopGuidesSpacing12}">

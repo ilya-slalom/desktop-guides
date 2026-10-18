@@ -431,7 +431,14 @@
                                                  HorizontalAlignment="Left" />
                 </StackPanel>
 
-                <Grid Grid.Row="3">
+                <!-- T21.2: the guides and the game's maps share the list area. -->
+                <Grid Grid.Row="3" RowSpacing="{StaticResource DesktopGuidesSpacing12}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="2*" MinHeight="112" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" MinHeight="112" />
+                    </Grid.RowDefinitions>
+                <Grid>
                     <Border x:Name="GameEmptyState"
                             Style="{StaticResource DesktopGuidesEmptyStateStyle}"
                             AutomationProperties.AutomationId="GameGuideEmptyState">
@@ -451,6 +458,59 @@
                               SelectionChanged="GuideSelected"
                               AutomationProperties.AutomationId="GuideList"
                               AutomationProperties.Name="Guides" />
+                </Grid>
+                    <Grid x:Name="GameMapsHeader"
+                          Grid.Row="1"
+                          ColumnSpacing="{StaticResource DesktopGuidesSpacing16}"
+                          AutomationProperties.AutomationId="GameMapsHeader">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Maps"
+                                   Style="{StaticResource DesktopGuidesSectionTitleStyle}" />
+                        <Button x:Name="OpenSelectedMapButton"
+                                Grid.Column="1"
+                                Content="Open selected map"
+                                Visibility="Collapsed"
+                                Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                                Click="OpenSelectedGuideClicked"
+                                AutomationProperties.AutomationId="OpenSelectedMap" />
+                        <Button x:Name="RemoveSelectedMapButton"
+                                Grid.Column="2"
+                                Content="Remove map"
+                                Visibility="Collapsed"
+                                Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                                Click="RemoveSelectedGuideClicked"
+                                AutomationProperties.AutomationId="RemoveSelectedMap" />
+                        <Button x:Name="ImportMapsButton"
+                                Grid.Column="3"
+                                Content="Import maps"
+                                IsEnabled="False"
+                                Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                                AutomationProperties.AutomationId="ImportMapsButton" />
+                    </Grid>
+                    <Grid Grid.Row="2">
+                        <Border x:Name="MapsEmptyState"
+                                Visibility="Collapsed"
+                                Style="{StaticResource DesktopGuidesEmptyStateStyle}"
+                                AutomationProperties.AutomationId="MapsEmptyState">
+                            <TextBlock x:Name="MapsEmpty"
+                                       Text="No maps yet."
+                                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                                       AutomationProperties.AutomationId="MapsEmpty" />
+                        </Border>
+                        <ListView x:Name="MapList"
+                                  Visibility="Collapsed"
+                                  SelectionMode="Single"
+                                  Style="{StaticResource DesktopGuidesListStyle}"
+                                  ItemTemplate="{StaticResource DesktopGuidesCatalogRowTemplate}"
+                                  SelectionChanged="GuideSelected"
+                                  AutomationProperties.AutomationId="MapList"
+                                  AutomationProperties.Name="Maps" />
+                    </Grid>
                 </Grid>
             </Grid>
 

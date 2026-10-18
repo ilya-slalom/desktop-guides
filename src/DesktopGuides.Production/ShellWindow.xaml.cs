@@ -2,6 +2,7 @@ using DesktopGuides.Core.Backup;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Maps;
 using DesktopGuides.Core.Navigation;
 using DesktopGuides.Core.Providers;
 using DesktopGuides.Core.Reading;
@@ -71,7 +72,7 @@ public sealed partial class ShellWindow : Window
     private bool applyingMaterialSelection;
     private GameEditorDialog? activeGameEditor;
     private AddGameDialog? activeAddGameDialog;
-    private readonly GuideImportValidator importValidator = new();
+    private readonly GuideImportValidator importValidator = new(maps: new WicMapImageDecoder());
     private GuideImportPublisher? guidePublisher;
     private bool importRequested;
     private ImportGuideDialog? activeImportDialog;
@@ -138,6 +139,12 @@ public sealed partial class ShellWindow : Window
             UIElement.KeyDownEvent, new KeyEventHandler(GuideKeyDown), true);
         ArtworkListLoader.NameRows(GuideList);
         GuideList.LayoutUpdated += GuideListLayoutUpdated;
+        MapList.AddHandler(
+            UIElement.TappedEvent, new TappedEventHandler(GuideTapped), true);
+        MapList.AddHandler(
+            UIElement.KeyDownEvent, new KeyEventHandler(GuideKeyDown), true);
+        ArtworkListLoader.NameRows(MapList);
+        MapList.LayoutUpdated += GuideListLayoutUpdated;
         Navigation.RegisterPropertyChangedCallback(
             NavigationView.IsPaneOpenProperty, (_, _) => UpdatePaneStatus());
         UpdatePaneStatus();
@@ -690,6 +697,7 @@ public sealed partial class ShellWindow : Window
         {
             return;
         }
+        ClearOtherListSelection(ReferenceEquals(sender, MapList) ? GuideList : MapList);
         if (navigator.Current is GameRoute)
         {
             navigator.SetAnchor(SelectedGuide?.Id);
@@ -709,13 +717,15 @@ public sealed partial class ShellWindow : Window
         }
     }
 
-    private Guide? SelectedGuide => GuideAt(GuideList.SelectedItem);
+    // T21.2: a selection in the Maps list is the selected guide too; one
+    // list's selection clears the other's.
+    private Guide? SelectedGuide => GuideAt(GuideList.SelectedItem) ?? GuideAt(MapList.SelectedItem);
 
     private static Guide? GuideAt(object? item) => (item as GuideRowItem)?.Guide;
 
     private Guide? GuideFromRow(DependencyObject? source)
     {
-        while (source is not null && !ReferenceEquals(source, GuideList))
+        while (source is not null && !ReferenceEquals(source, GuideList) && !ReferenceEquals(source, MapList))
         {
             if (source is Button)
             {
@@ -766,8 +776,44 @@ public sealed partial class ShellWindow : Window
             !gameRemoveRequested && refreshCancel is null;
     }
 
+    private ListView SelectedGuideList => MapList.SelectedItem is not null ? MapList : GuideList;
+
+    private void ClearOtherListSelection(ListView other)
+    {
+        if (other.SelectedItem is null)
+        {
+            return;
+        }
+        settingGuideSelection = true;
+        try
+        {
+            other.SelectedItem = null;
+        }
+        finally
+        {
+            settingGuideSelection = false;
+        }
+    }
+
     private void UpdateOpenSelectedGuideAction()
     {
+        bool map = SelectedGuide?.Format == GuideFormat.Image;
+        if (map && GuideList.IsEnabled &&
+            navigator.Current is GameRoute mapGame &&
+            SelectedGuide is Guide selectedMap &&
+            selectedMap.GameId == mapGame.GameId)
+        {
+            AutomationProperties.SetName(OpenSelectedMapButton, $"Open {selectedMap.Title}");
+            AutomationProperties.SetName(RemoveSelectedMapButton, $"Remove {selectedMap.Title}");
+            OpenSelectedMapButton.Visibility = Visibility.Visible;
+            RemoveSelectedMapButton.Visibility = Visibility.Visible;
+            OpenSelectedGuideButton.Visibility = Visibility.Collapsed;
+            RemoveSelectedGuideButton.Visibility = Visibility.Collapsed;
+            GameCompletionChoice.Hide();
+            return;
+        }
+        OpenSelectedMapButton.Visibility = Visibility.Collapsed;
+        RemoveSelectedMapButton.Visibility = Visibility.Collapsed;
         if (GuideList.IsEnabled &&
             navigator.Current is GameRoute game &&
             SelectedGuide is Guide guide &&
@@ -804,7 +850,7 @@ public sealed partial class ShellWindow : Window
             SelectedGuide is not Guide selected ||
             selected.Id != guideId ||
             selected.GameId != game.GameId ||
-            GuideList.ContainerFromItem(GuideList.SelectedItem) is not Control container)
+            SelectedGuideList.ContainerFromItem(SelectedGuideList.SelectedItem) is not Control container)
         {
             return;
         }
@@ -1198,8 +1244,11 @@ public sealed partial class ShellWindow : Window
         }
         removeRequested = true;
         GuideList.IsEnabled = false;
+        MapList.IsEnabled = false;
         OpenSelectedGuideButton.IsEnabled = false;
         RemoveSelectedGuideButton.IsEnabled = false;
+        OpenSelectedMapButton.IsEnabled = false;
+        RemoveSelectedMapButton.IsEnabled = false;
         ImportGuideButton.IsEnabled = false;
         bool rendered = false;
         try
@@ -1282,11 +1331,14 @@ public sealed partial class ShellWindow : Window
             removeRequested = false;
             OpenSelectedGuideButton.IsEnabled = true;
             RemoveSelectedGuideButton.IsEnabled = true;
+            OpenSelectedMapButton.IsEnabled = true;
+            RemoveSelectedMapButton.IsEnabled = true;
             if (!closeRequested && navigator.Current is GameRoute shown && shown.GameId == route.GameId)
             {
                 if (!rendered)
                 {
                     GuideList.IsEnabled = true;
+                    MapList.IsEnabled = true;
                     ImportGuideButton.IsEnabled = !importRequested;
                     UpdateOpenSelectedGuideAction();
                     RemoveSelectedGuideButton.Focus(FocusState.Programmatic);
@@ -1544,7 +1596,7 @@ public sealed partial class ShellWindow : Window
     private async Task<string?> PickGuideFileAsync()
     {
         FileOpenPicker picker = new(AppWindow.Id);
-        foreach (string type in (string[])[".txt", ".html", ".htm", ".pdf"])
+        foreach (string type in (string[])[".txt", ".html", ".htm", ".pdf", ".png", ".jpg", ".jpeg"])
         {
             picker.FileTypeFilter.Add(type);
         }
@@ -1788,8 +1840,12 @@ public sealed partial class ShellWindow : Window
             {
                 try
                 {
-                    await library.UpdateSettingsAsync(
-                        s => s with { LastActiveGuideId = guide.Id });
+                    // T21.2: a glance at a map isn't reading, so Resume keeps the guide.
+                    if (guide.Format != GuideFormat.Image)
+                    {
+                        await library.UpdateSettingsAsync(
+                            s => s with { LastActiveGuideId = guide.Id });
+                    }
                 }
                 catch (Exception error)
                 {
@@ -1893,7 +1949,7 @@ public sealed partial class ShellWindow : Window
                     // ListAnchor.Resolve uses them to find a removed guide's survivor.
                     bool sameGameList = detailsGameId == gameRoute.GameId;
                     List<Guid> shownGuideIds = sameGameList
-                        ? [.. GuideList.Items.OfType<GuideRowItem>().Select(item => item.Guide.Id)]
+                        ? [.. GuideList.Items.Concat(MapList.Items).OfType<GuideRowItem>().Select(item => item.Guide.Id)]
                         : [];
                     Guid? wantedGuideId = pendingGuideFocus ?? navigator.CurrentAnchor ??
                         (sameGameList ? SelectedGuide?.Id : null);
@@ -1907,11 +1963,17 @@ public sealed partial class ShellWindow : Window
                     GameEmptyState.Visibility = Visibility.Collapsed;
                     GuideList.Visibility = Visibility.Collapsed;
                     GuideList.IsEnabled = false;
+                    MapsEmptyState.Visibility = Visibility.Collapsed;
+                    MapList.Visibility = Visibility.Collapsed;
+                    MapList.IsEnabled = false;
+                    ImportMapsButton.IsEnabled = false;
                     settingGuideSelection = true;
                     try
                     {
                         GuideList.ItemsSource = null;
                         GuideList.SelectedItem = null;
+                        MapList.ItemsSource = null;
+                        MapList.SelectedItem = null;
                     }
                     finally
                     {
@@ -1929,12 +1991,15 @@ public sealed partial class ShellWindow : Window
                         ShowWarningStatus("This game is no longer in your library.");
                         return false;
                     }
-                    IReadOnlyList<GuideRowItem> guides =
-                        (await library.ListGuideSummariesAsync(gameRoute.GameId))
-                        .Select(summary => new GuideRowItem(
-                            summary, TimeProvider.System, CultureInfo.CurrentCulture,
-                            guideHealth[summary.Guide.Id], colorfulIcons, themeSettings?.HighContrast == true))
-                        .ToList();
+                    IReadOnlyList<GuideSummary> summaries = await library.ListGuideSummariesAsync(gameRoute.GameId);
+                    GuideRowItem Row(GuideSummary summary) => new(
+                        summary, TimeProvider.System, CultureInfo.CurrentCulture,
+                        guideHealth[summary.Guide.Id], colorfulIcons, themeSettings?.HighContrast == true);
+                    // T21.2: maps have their own section, by title.
+                    IReadOnlyList<GuideRowItem> guides = summaries
+                        .Where(summary => summary.Guide.Format != GuideFormat.Image).Select(Row).ToList();
+                    IReadOnlyList<GuideRowItem> maps = MapPresentation.Sort(
+                        summaries.Where(summary => summary.Guide.Format == GuideFormat.Image)).Select(Row).ToList();
                     if (generation != renderGeneration)
                     {
                         return false;
@@ -1962,13 +2027,16 @@ public sealed partial class ShellWindow : Window
                     }
                     EditGameButton.IsEnabled = true;
                     ImportGuideButton.IsEnabled = !importRequested;
+                    ImportMapsButton.IsEnabled = !importRequested;
                     loadedGameGuideCount = guides.Count;
                     UpdateRemoveGameAction();
+                    IReadOnlyList<GuideRowItem> rows = [.. guides, .. maps];
                     Guid? selectedGuideId = ListAnchor.Resolve(
-                        shownGuideIds, [.. guides.Select(item => item.Guide.Id)], wantedGuideId);
+                        shownGuideIds, [.. rows.Select(item => item.Guide.Id)], wantedGuideId);
                     GuideRowItem? selectedGuide = selectedGuideId is Guid id
-                        ? guides.First(item => item.Guide.Id == id)
+                        ? rows.First(item => item.Guide.Id == id)
                         : null;
+                    bool mapSelected = selectedGuide?.Guide.Format == GuideFormat.Image;
                     if (pendingGuideFocus is not null)
                     {
                         // Focus follows the survivor when the wanted guide is gone.
@@ -1982,30 +2050,38 @@ public sealed partial class ShellWindow : Window
                     try
                     {
                         GuideList.ItemsSource = guides;
-                        GuideList.SelectedItem = selectedGuide;
+                        GuideList.SelectedItem = mapSelected ? null : selectedGuide;
+                        MapList.ItemsSource = maps;
+                        MapList.SelectedItem = mapSelected ? selectedGuide : null;
                     }
                     finally
                     {
                         settingGuideSelection = false;
                     }
                     GuideList.IsEnabled = true;
+                    MapList.IsEnabled = true;
                     GameEmptyState.Visibility =
                         guides.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
                     GuideList.Visibility =
                         guides.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+                    MapsEmptyState.Visibility =
+                        maps.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+                    MapList.Visibility =
+                        maps.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
                     UpdateOpenSelectedGuideAction();
                     if (pendingGuideFocus is not null && selectedGuide is not null)
                     {
                         guideFocusRenderGeneration = generation;
-                        GuideList.UpdateLayout();
-                        GuideList.ScrollIntoView(selectedGuide);
-                        GuideList.UpdateLayout();
+                        ListView shownList = mapSelected ? MapList : GuideList;
+                        shownList.UpdateLayout();
+                        shownList.ScrollIntoView(selectedGuide);
+                        shownList.UpdateLayout();
                         TryRestoreGuideFocus();
                         DispatcherQueue.TryEnqueue(() =>
                         {
                             if (guideFocusRenderGeneration == generation)
                             {
-                                GuideList.UpdateLayout();
+                                SelectedGuideList.UpdateLayout();
                                 TryRestoreGuideFocus();
                             }
                         });
@@ -2050,13 +2126,25 @@ public sealed partial class ShellWindow : Window
                     }
                     ReaderHeading.Text = guide.Title;
                     ReaderGameName.Text = readerGame.Title;
-                    ReaderFormat.Text = guide.Format.ToString().ToUpperInvariant();
+                    ReaderFormat.Text = guide.Format == GuideFormat.Image
+                        ? MapPresentation.KindOf(guide).Label()
+                        : guide.Format.ToString().ToUpperInvariant();
                     // Shown before the content opens, so it stays usable when a load fails.
                     ReadingState? readingState = await library.GetReadingStateAsync(guide.Id);
                     HtmlOpenTimelineForTest.Mark("state-read");
                     if (generation != renderGeneration)
                     {
                         return false;
+                    }
+                    // T21.2: a map has no completion, place or progress.
+                    if (guide.Format == GuideFormat.Image)
+                    {
+                        ReaderCompletionChoice.Hide();
+                        if (!await OpenMapAsync(guide, generation))
+                        {
+                            return false;
+                        }
+                        break;
                     }
                     ReaderCompletionChoice.Show(guide.Id, guide.Title,
                         GuideCompletionPresentation.IsComplete(readingState?.CompletedUtc));
@@ -2075,6 +2163,10 @@ public sealed partial class ShellWindow : Window
                             return false;
                         }
                         break;
+                    }
+                    if (guide.Format != GuideFormat.Txt)
+                    {
+                        throw new NotSupportedException($"No reader opens {guide.Format} guides.");
                     }
                     ShowReaderSurface(loading: true);
                     readerLoad = new CancellationTokenSource();

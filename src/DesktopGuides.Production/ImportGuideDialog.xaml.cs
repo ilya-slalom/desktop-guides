@@ -1,3 +1,4 @@
+using System.Globalization;
 using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
 using Microsoft.UI.Xaml;
@@ -440,6 +441,7 @@ public sealed partial class ImportGuideDialog : ContentDialog
         ImportEncodingRow.Visibility = Visibility.Collapsed;
         ImportAssetsRow.Visibility = Visibility.Collapsed;
         ImportPagesRow.Visibility = Visibility.Collapsed;
+        ImportPixelsRow.Visibility = Visibility.Collapsed;
         ImportPageListRow.Visibility = Visibility.Collapsed;
         ImportProtectedRow.Visibility = Visibility.Collapsed;
         ImportPdfPasswordStep.Visibility = Visibility.Collapsed;
@@ -569,6 +571,10 @@ public sealed partial class ImportGuideDialog : ContentDialog
                     ImportPageListRow.Visibility = Visibility.Visible;
                 }
                 ShowWarnings(html.Warnings);
+                break;
+            case MapImportManifest map:
+                ImportPixels.Text = string.Create(CultureInfo.InvariantCulture, $"{map.PixelWidth} × {map.PixelHeight} pixels");
+                ImportPixelsRow.Visibility = Visibility.Visible;
                 break;
             case PdfImportManifest pdf:
                 ImportPages.Text = pdf.PageCount == 1 ? "1 page" : $"{pdf.PageCount} pages";
