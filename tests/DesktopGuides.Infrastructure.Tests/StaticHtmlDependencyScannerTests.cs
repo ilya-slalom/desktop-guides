@@ -511,6 +511,217 @@ public sealed class StaticHtmlDependencyScannerTests
             manifest.Assets.Select(asset => asset.RelativePath));
     }
 
+    [Fact]
+    public async Task AStyleSheetLinkedByRoleIsIncludedWhateverItsName()
+    {
+        MemorySource source = new(
+            ("guide.html", """<link rel="stylesheet" href="Guide_files/load.php?lang=en">"""),
+            ("Guide_files/load.php", """@import "load(2).php"; .title { background: url(icon.png) }"""),
+            ("Guide_files/load(2).php", ".body { color: #333 }"),
+            ("Guide_files/icon.png", "icon"));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner().ScanAsync("guide.html", source);
+
+        Assert.Equal(
+            [("Guide_files/icon.png", StaticAssetKind.Image), ("Guide_files/load(2).php", StaticAssetKind.StyleSheet),
+                ("Guide_files/load.php", StaticAssetKind.StyleSheet), ("guide.html", StaticAssetKind.EntryHtml)],
+            manifest.Assets.Select(asset => (asset.RelativePath, asset.Kind)));
+        Assert.All(manifest.References, reference => Assert.Equal(StaticReferenceStatus.Included, reference.Status));
+    }
+
+    [Theory]
+    [InlineData("<!DOCTYPE html><html><body>Not found</body></html>")]
+    [InlineData("  \n<html>")]
+    [InlineData("body { color: red }\0\0")]
+    public async Task AStyleSheetThatIsntCssIsSkipped(string content)
+    {
+        MemorySource source = new(
+            ("guide.html", """<link rel="stylesheet" href="load.php">"""),
+            ("load.php", content));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner().ScanAsync("guide.html", source);
+
+        Assert.Equal(["guide.html"], manifest.Assets.Select(asset => asset.RelativePath));
+        StaticAssetReference reference = Assert.Single(manifest.References);
+        Assert.Equal((StaticReferenceStatus.Invalid, StaticAssetKind.StyleSheet), (reference.Status, reference.ExpectedKind));
+        Assert.Equal(manifest.Assets.Sum(asset => asset.ByteCount), manifest.TotalBytes);
+    }
+
+    [Fact]
+    public async Task SavedPagesJoinInBreadthFirstLinkOrder()
+    {
+        MemoryFolder folder = new(
+            ("Start.html", SavedPage("https://guides.example/wiki/Quest", "Quest — Guides", """
+                <a href="https://guides.example/wiki/Quest/One">One</a>
+                <a href="https://Guides.Example/wiki/Quest%3ATwo#top">Two</a>
+                <a href="https://guides.example/wiki/Quest/Unsaved">Unsaved</a>
+                <a href="https://other.example/wiki/Elsewhere">Elsewhere</a>
+                """)),
+            ("One.html", SavedPage("https://guides.example/wiki/Quest/One", "One — Guides", """
+                <a href="https://guides.example/wiki/Quest/Three">Three</a>
+                <a href="https://guides.example/wiki/Quest">Back</a>
+                <link rel="stylesheet" href="One_files/load.php">
+                """)),
+            ("One_files/load.php", ".one { color: blue }"),
+            ("Two.html", """
+                <html><head><title>Two — Guides</title>
+                <link rel="canonical" href="https://guides.example/wiki/Quest:Two"></head>
+                <body><a href="https://guides.example/wiki/Quest">Back</a></body></html>
+                """),
+            ("Three.html", SavedPage("https://guides.example/wiki/Quest/Three", "Three — Guides",
+                """<a href="One.html">Relative</a>""")),
+            ("Elsewhere.html", SavedPage("https://other.example/wiki/Elsewhere", "Elsewhere", "")),
+            ("Loose.html", SavedPage("https://guides.example/wiki/Loose", "Loose", "")));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner().ScanAsync("Start.html", folder);
+
+        Assert.Equal(
+            [("Start.html", "https://guides.example/wiki/Quest", "Quest — Guides"),
+                ("One.html", "https://guides.example/wiki/Quest/One", "One — Guides"),
+                ("Two.html", "https://guides.example/wiki/Quest:Two", "Two — Guides"),
+                ("Three.html", "https://guides.example/wiki/Quest/Three", "Three — Guides")],
+            manifest.Pages.Select(page => (page.RelativePath, page.OriginalUrl, page.Title)));
+        Assert.Equal(
+            [StaticAssetKind.Page, StaticAssetKind.StyleSheet, StaticAssetKind.EntryHtml, StaticAssetKind.Page, StaticAssetKind.Page],
+            manifest.Assets.Select(asset => asset.Kind));
+        Assert.DoesNotContain(manifest.Assets, asset => asset.RelativePath is "Elsewhere.html" or "Loose.html");
+    }
+
+    [Fact]
+    public async Task WithoutARecordedAddressThePageStandsAlone()
+    {
+        MemoryFolder folder = new(
+            ("Start.html", """<a href="https://guides.example/wiki/Quest/One">One</a>"""),
+            ("One.html", SavedPage("https://guides.example/wiki/Quest/One", "One", "")));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner().ScanAsync("Start.html", folder);
+
+        Assert.Equal(["Start.html"], manifest.Pages.Select(page => page.RelativePath));
+        Assert.DoesNotContain("One.html", folder.Reads);
+    }
+
+    // Review Focus 5: a plain source stays one page, with its title.
+    [Fact]
+    public async Task ASinglePageHasOnePage()
+    {
+        MemorySource source = new(("guide.html", "<title>Lone Guide</title><p>Text</p>"));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner().ScanAsync("guide.html", source);
+
+        StaticPage page = Assert.Single(manifest.Pages);
+        Assert.Equal(("guide.html", "guide.html", null, "Lone Guide"),
+            (page.RelativePath, page.RequestRelativePath, page.OriginalUrl, page.Title));
+    }
+
+    // Review Focus 2.
+    [Fact]
+    public async Task TwoSavesOfOnePageJoinOnce()
+    {
+        MemoryFolder folder = new(
+            ("Start.html", SavedPage("https://guides.example/q", "Start", """<a href="https://guides.example/q/1">1</a>""")),
+            ("One (1).html", SavedPage("https://guides.example/q/1", "One again", "")),
+            ("One.html", SavedPage("https://guides.example/q/1", "One", "")));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner().ScanAsync("Start.html", folder);
+
+        Assert.Equal(["Start.html", "One (1).html"], manifest.Pages.Select(page => page.RelativePath));
+    }
+
+    // Review Focus 4: '%' isn't a safe managed name, so the page is never opened.
+    [Fact]
+    public async Task AnUnsafePageNameIsNotACandidate()
+    {
+        MemoryFolder folder = new(
+            ("Start.html", SavedPage("https://guides.example/q", "Start", """<a href="https://guides.example/q/half">Half</a>""")),
+            ("50% Done.html", SavedPage("https://guides.example/q/half", "Half", "")));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner().ScanAsync("Start.html", folder);
+
+        Assert.Equal(["Start.html"], manifest.Pages.Select(page => page.RelativePath));
+        Assert.DoesNotContain("50% Done.html", folder.Reads);
+    }
+
+    // Review Focus 1.
+    [Fact]
+    public async Task ManyLinksDontUseTheReferenceBudget()
+    {
+        string links = string.Concat(Enumerable.Range(0, 50).Select(n => $"<a href=\"https://guides.example/q/{n}\">{n}</a>"));
+        MemoryFolder folder = new(("Start.html", SavedPage("https://guides.example/q", "Start", links)));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner(new StaticHtmlScanLimits(MaxReferences: 5))
+            .ScanAsync("Start.html", folder);
+
+        Assert.Single(manifest.Pages);
+    }
+
+    // Review Focus 3: each page's stylesheet fits the rule budget on its own.
+    [Fact]
+    public async Task BudgetsApplyPerPage()
+    {
+        string rules = string.Concat(Enumerable.Range(0, 8).Select(n => $".r{n} {{ color: red }}"));
+        MemoryFolder folder = new(
+            ("Start.html", SavedPage("https://guides.example/q", "Start",
+                """<link rel="stylesheet" href="a.css"><a href="https://guides.example/q/1">1</a><a href="https://guides.example/q/2">2</a>""")),
+            ("a.css", rules),
+            ("One.html", SavedPage("https://guides.example/q/1", "One", """<link rel="stylesheet" href="b.css">""")),
+            ("b.css", rules),
+            ("Two.html", SavedPage("https://guides.example/q/2", "Two", """<link rel="stylesheet" href="c.css">""")),
+            ("c.css", rules));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner(new StaticHtmlScanLimits(MaxCssRules: 10))
+            .ScanAsync("Start.html", folder);
+
+        Assert.Equal(3, manifest.Pages.Count);
+    }
+
+    [Theory]
+    [InlineData(StaticScanLimit.PageCount)]
+    [InlineData(StaticScanLimit.GuideBytes)]
+    [InlineData(StaticScanLimit.GuideAssetCount)]
+    public async Task GuideLimitsStopTheScan(StaticScanLimit limit)
+    {
+        MemoryFolder folder = new(
+            ("Start.html", SavedPage("https://guides.example/q", "Start",
+                """<a href="https://guides.example/q/1">1</a><a href="https://guides.example/q/2">2</a>""")),
+            ("One.html", SavedPage("https://guides.example/q/1", "One", "")),
+            ("Two.html", SavedPage("https://guides.example/q/2", "Two", "")));
+        StaticHtmlScanLimits limits = limit switch
+        {
+            StaticScanLimit.PageCount => new(MaxPages: 2),
+            StaticScanLimit.GuideBytes => new(MaxGuideBytes: 250),
+            _ => new(MaxGuideAssets: 2),
+        };
+
+        StaticHtmlScanException error = await Assert.ThrowsAsync<StaticHtmlScanException>(
+            () => new StaticHtmlDependencyScanner(limits).ScanAsync("Start.html", folder));
+
+        Assert.Equal(limit, error.Limit);
+    }
+
+    // A source that also lists its top-level pages, as a saved folder does.
+    private sealed class MemoryFolder(params (string Path, string Text)[] files)
+        : IStaticHtmlAssetSource, IStaticHtmlPageDirectory
+    {
+        private readonly MemorySource source = new(files);
+        private readonly string[] pages = files
+            .Select(file => file.Path)
+            .Where(path => !path.Contains('/') &&
+                (path.EndsWith(".html", StringComparison.OrdinalIgnoreCase) ||
+                 path.EndsWith(".htm", StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+
+        public List<string> Reads => source.Reads;
+
+        public IReadOnlyList<string> ListPages() => pages;
+
+        public ValueTask<Stream?> OpenReadAsync(string safeRelativePath, CancellationToken cancellationToken = default) =>
+            source.OpenReadAsync(safeRelativePath, cancellationToken);
+    }
+
+    private static string SavedPage(string url, string title, string body) =>
+        $"<!DOCTYPE html>\n<!-- saved from url=({url.Length:0000}){url} -->\n" +
+        $"<html><head><title>{title}</title></head><body>{body}</body></html>";
+
     private sealed class MemorySource(params (string Path, string Text)[] files)
         : IStaticHtmlAssetSource
     {

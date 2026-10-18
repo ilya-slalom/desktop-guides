@@ -3,6 +3,7 @@ namespace DesktopGuides.Infrastructure.Import;
 public enum StaticAssetKind
 {
     EntryHtml,
+    Page,
     StyleSheet,
     Image,
     Other
@@ -14,7 +15,9 @@ public enum StaticReferenceStatus
     Missing,
     Unsupported,
     Unsafe,
-    Remote
+    Remote,
+    // T21.2: a stylesheet found by role that isn't readable CSS.
+    Invalid
 }
 
 public enum StaticScanLimit
@@ -25,7 +28,10 @@ public enum StaticScanLimit
     AssetCount,
     ReferenceCount,
     CssDepth,
-    CssRuleCount
+    CssRuleCount,
+    PageCount,
+    GuideBytes,
+    GuideAssetCount
 }
 
 /// <summary>
@@ -50,7 +56,25 @@ public sealed record StaticAssetReference(
 public sealed record StaticHtmlManifest(
     IReadOnlyList<StaticAsset> Assets,
     IReadOnlyList<StaticAssetReference> References,
-    long TotalBytes);
+    long TotalBytes,
+    IReadOnlyList<StaticPage> Pages);
+
+/// <summary>
+/// T21.2: one page of the guide, in reading order. Pages[0] is the entry.
+/// OriginalUrl is the address the saved page recorded, when it did.
+/// </summary>
+public sealed record StaticPage(
+    string RelativePath, string RequestRelativePath, string? OriginalUrl, string? Title);
+
+/// <summary>
+/// T21.2: a source that can list the saved pages beside the entry, by
+/// top-level file name. Names are candidates only; every read still goes
+/// through OpenReadAsync.
+/// </summary>
+public interface IStaticHtmlPageDirectory
+{
+    IReadOnlyList<string> ListPages();
+}
 
 public sealed record StaticHtmlScanLimits(
     long MaxEntryBytes = 16L * 1024 * 1024,
@@ -59,7 +83,10 @@ public sealed record StaticHtmlScanLimits(
     int MaxAssets = 2048,
     int MaxReferences = 8192,
     int MaxCssDepth = 16,
-    int MaxCssRules = 10000);
+    int MaxCssRules = 10000,
+    int MaxPages = 200,
+    long MaxGuideBytes = 1024L * 1024 * 1024,
+    int MaxGuideAssets = 16384);
 
 public sealed class StaticHtmlScanException(
     StaticScanLimit limit,
