@@ -1735,6 +1735,43 @@ try {
             return $null
         }
 
+        # T21.2: the link itself. A list item takes its link's name and comes
+        # first in the tree, and its centre lies beside a short link's text.
+        function Find-PageLink([string] $name) {
+            $condition = [System.Windows.Automation.AndCondition]::new(
+                [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::NameProperty, $name),
+                [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                    [System.Windows.Automation.ControlType]::Hyperlink))
+            foreach ($page in Get-PageRoots) {
+                try {
+                    $element = $page.FindFirst($scope, $condition)
+                    if ($element) { return $element }
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                    # A closing session's window can vanish mid-search.
+                }
+            }
+            return $null
+        }
+
+        function Wait-PageLink([string] $name) {
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $element = Find-PageLink $name
+                try {
+                    if ($element -and -not $element.Current.IsOffscreen) { return $element }
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                    # The page tree was rebuilt; find the link again.
+                }
+                Start-Sleep -Milliseconds 250
+            } while ((Get-Date) -lt $deadline)
+            [void](Save-WindowScreenshot 'html-page-link-missing')
+            throw "The guide page showed no visible link '$name'."
+        }
+
         function Wait-PageName([string] $name) {
             $deadline = (Get-Date).AddSeconds(15)
             do {
@@ -5014,9 +5051,9 @@ try {
                 Wait-StatusClosed
                 [void](Wait-HtmlPosition { param($p) $p.document -eq 'Sample Quest - Guides Example.html' } 'the first page')
                 # A link by the page's website address opens the imported copy.
-                Click-Element (Wait-PageVisible 'Chapter 1')
+                Click-Element (Wait-PageLink 'Chapter 1')
                 [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 1 - Guides Example.html' } 'chapter 1 by its link')
-                Click-Element (Wait-PageVisible 'On to chapter 3')
+                Click-Element (Wait-PageLink 'On to chapter 3')
                 [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 3 - Guides Example.html' } 'chapter 3 by its link')
                 # The toolbar follows the reading order, not the links.
                 Invoke-Element (Find-ByName 'Previous page')
@@ -5035,7 +5072,7 @@ try {
                 Invoke-Element (Find-ByName 'Go to start')
                 [void](Wait-HtmlPosition { param($p) $p.document -eq 'Sample Quest - Guides Example.html' } 'the first page again')
                 # A page that wasn't saved stays on the website.
-                Click-Element (Wait-PageVisible 'Chapter 4, not saved')
+                Click-Element (Wait-PageLink 'Chapter 4, not saved')
                 [void](Wait-VisibleById 'ReaderExternalLinkBar')
                 $report.htmlPagesLinksScreenshot = Save-WindowScreenshot 'html-pages-links'
                 $report.phases += 'html-pages-links'
