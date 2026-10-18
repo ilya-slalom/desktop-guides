@@ -51,4 +51,36 @@ public sealed class HtmlGuidePagesTests
         Assert.Throws<ArgumentException>(() => new HtmlGuidePages(Id, []));
         Assert.Throws<ArgumentException>(() => new HtmlGuidePages(Id, [new GuidePage(1, "a.html", null, null)]));
     }
+
+
+    // Review Focus 1: the same offset on two pages is two places.
+    [Fact]
+    public void TheSameOffsetOnTwoPagesIsTwoPlaces()
+    {
+        HtmlGuidePages pages = Pages();
+
+        Assert.NotEqual(pages.OrderOf(0, 10), pages.OrderOf(1, 10));
+        Assert.True(pages.OrderOf(1, 0) > pages.OrderOf(0, int.MaxValue));
+        Assert.Equal((2L << 32) + 5, pages.OrderOf(2, 5));
+        Assert.Throws<ArgumentOutOfRangeException>(() => pages.OrderOf(4, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => pages.OrderOf(0, -1));
+    }
+
+    [Fact]
+    public void DisplayTitlesDropTheSharedSuffix()
+    {
+        HtmlGuidePages pages = new(Id,
+        [
+            new GuidePage(0, "Start.html", null, "Sample Quest — Guides Example"),
+            new GuidePage(1, "One.html", null, "Chapter 1 — Guides Example"),
+            new GuidePage(2, "Two.html", null, "Chapter 2 — Guides Example"),
+        ]);
+
+        Assert.Equal(["Sample Quest", "Chapter 1", "Chapter 2"], pages.DisplayTitles);
+    }
+
+    [Fact]
+    public void APageWithoutATitleIsNamedByItsFile() =>
+        Assert.Equal(["Start", "Extra Page"], new HtmlGuidePages(Id,
+            [new GuidePage(0, "Start.html", null, "Start"), new GuidePage(1, "Extra Page.htm", null, null)]).DisplayTitles);
 }

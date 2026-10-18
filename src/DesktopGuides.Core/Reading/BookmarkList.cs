@@ -103,19 +103,23 @@ public static class BookmarkList
     public static string DisplayLabel(BookmarkItem item) =>
         item.IsDamaged ? DamagedLabel : item.Bookmark.Label;
 
-    public static string AccessibleName(BookmarkItem item)
+    public static string AccessibleName(BookmarkItem item) => AccessibleName(item, null);
+
+    // T21.2: in a guide of several pages, the page's title follows the label.
+    public static string AccessibleName(BookmarkItem item, string? pageTitle)
     {
         if (item.Location is not ReaderLocation place) return DamagedLabel;
+        string label = pageTitle is null ? item.Bookmark.Label : $"{item.Bookmark.Label}, {pageTitle}";
         if (place.Payload is PdfPosition pdf)
         {
-            return string.Create(CultureInfo.InvariantCulture, $"{item.Bookmark.Label}, page {pdf.PageIndex + 1}");
+            return string.Create(CultureInfo.InvariantCulture, $"{label}, page {pdf.PageIndex + 1}");
         }
         if (place.EstimatedFraction is double fraction && double.IsFinite(fraction))
         {
             int percent = (int)Math.Round(Math.Clamp(fraction, 0, 1) * 100, MidpointRounding.AwayFromZero);
-            return string.Create(CultureInfo.InvariantCulture, $"{item.Bookmark.Label}, {percent}% through");
+            return string.Create(CultureInfo.InvariantCulture, $"{label}, {percent}% through");
         }
-        return item.Bookmark.Label;
+        return label;
     }
 
     public static string? MessageFor(RestoreKind kind) => kind switch
