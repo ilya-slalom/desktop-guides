@@ -717,6 +717,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     // Off the UI thread, within GuideFind.Budget; out of time is null.
     private async Task<int[]?> CountPagesAsync(FindQuery query, CancellationToken token)
     {
+        if (delayFindForTest) await Task.Delay(TimeSpan.FromSeconds(2), token);
         GuideAsset[] files = [.. pages.DocumentPaths.Select(path => policy.AssetFor(path)!)];
         using CancellationTokenSource budget = CancellationTokenSource.CreateLinkedTokenSource(token);
         budget.CancelAfter(GuideFind.Budget);

@@ -1858,6 +1858,8 @@ function Run-NavigationScenarios {
     $report.htmlPagesContents = Invoke-ProgressPass 'html-pages-contents' 0 -HtmlPosition
     Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
     $report.htmlPagesFind = Invoke-ProgressPass 'html-pages-find' 0 -HtmlPosition
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.htmlPagesFindAgain = Invoke-ProgressPass 'html-pages-find-again' 0 -HtmlPosition
     $report.htmlPagesBookmark = Invoke-ProgressPass 'html-pages-bookmark' 0 -HtmlPosition
     Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
     $report.contentsPdf = Invoke-ProgressPass 'contents-pdf' 0
