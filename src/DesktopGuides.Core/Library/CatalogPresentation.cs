@@ -1,5 +1,6 @@
 using System.Globalization;
 using DesktopGuides.Core.Import;
+using DesktopGuides.Core.Maps;
 
 namespace DesktopGuides.Core.Library;
 
@@ -16,11 +17,17 @@ public static class CatalogPresentation
             labels.Add(summary.Game.Platform.Trim());
         }
         labels.Add(summary.Game.Link is null ? "Manual" : "IGDB");
-        labels.Add(summary.GuideCount switch
+        string guides = summary.GuideCount switch
         {
             0 => "No guides",
             1 => "1 guide",
             int count => $"{count} guides"
+        };
+        labels.Add(summary.MapCount switch
+        {
+            0 => guides,
+            1 => $"{guides}, 1 map",
+            int maps => $"{guides}, {maps} maps"
         });
         if (attentionCount > 0)
         {
@@ -45,6 +52,14 @@ public static class CatalogPresentation
         {
             string status = GuideFilePresentation.StatusLabel(fileStatus);
             facts.Add(new(status, status));
+        }
+        // T21.2: a map has no reading state, only its type and size.
+        if (summary.Guide is { Format: GuideFormat.Image, PixelWidth: int width, PixelHeight: int height })
+        {
+            string kind = MapPresentation.KindOf(summary.Guide).Label();
+            facts.Add(new(kind, kind));
+            facts.Add(MapPresentation.SizeFact(width, height));
+            return facts;
         }
         facts.Add(new(format, format));
         facts.Add(ReadingStateFact(summary.State));

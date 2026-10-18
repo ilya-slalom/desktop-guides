@@ -76,6 +76,7 @@ public sealed class AppIconCatalogTests
     [InlineData(GuideFormat.Txt, false, "\uE8A5", "ic_fluent_document_text_24_color.svg")]
     [InlineData(GuideFormat.Html, false, "\uE774", "ic_fluent_globe_24_color.svg")]
     [InlineData(GuideFormat.Pdf, false, "\uEA90", "dg_document_pdf_color.png")]
+    [InlineData(GuideFormat.Image, false, "\uE8B9", "ic_fluent_image_24_color.svg")]
     [InlineData(GuideFormat.Txt, true, "\uE7BA", "ic_fluent_warning_24_color.svg")]
     [InlineData(GuideFormat.Pdf, true, "\uE7BA", "ic_fluent_warning_24_color.svg")]
     public void EachGuideRowKeepsItsGlyphAndGetsItsAsset(

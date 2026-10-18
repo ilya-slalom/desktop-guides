@@ -57,4 +57,11 @@ public sealed class GuideTitleTests
         Assert.True(GuideTitle.TryCreate(" Guide ", out string title));
         Assert.Equal("Guide", title);
     }
+
+    [Theory]
+    [InlineData("castle-floor-1.png", "castle floor 1")]
+    [InlineData("Dragon_Quest_V__World.JPG", "Dragon Quest V World")]
+    [InlineData("  -_- .png", "Untitled map")]
+    public void MapTitlesReadDashesAndUnderscoresAsSpaces(string file, string title) =>
+        Assert.Equal(title, GuideTitle.SuggestMap(file));
 }

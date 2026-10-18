@@ -1,4 +1,5 @@
 using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Maps;
 
 namespace DesktopGuides.Core.Import;
 
@@ -23,6 +24,18 @@ public sealed record PdfImportManifest(
     ImportSource Source, string SuggestedTitle, int PageCount, bool HasText, string Fingerprint,
     bool PasswordRequired = false)
     : ImportManifest(Source, GuideFormat.Pdf, SuggestedTitle, Fingerprint);
+
+// T21.2: the size and kind come from the header; the fingerprint is the file's bytes.
+public sealed record MapImportManifest(
+    ImportSource Source, string SuggestedTitle, MapImageKind Kind, int PixelWidth, int PixelHeight,
+    string Fingerprint)
+    : ImportManifest(Source, GuideFormat.Image, SuggestedTitle, Fingerprint);
+
+// Proves a map decodes. It runs off the UI thread and never throws for a bad image.
+public interface IMapImageDecoder
+{
+    Task<bool> DecodesAsync(string fullPath, MapImageSize expected, CancellationToken token);
+}
 
 public sealed record ImportWarning(string RelativePath, string Message);
 

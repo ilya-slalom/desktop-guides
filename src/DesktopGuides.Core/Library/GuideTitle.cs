@@ -17,6 +17,16 @@ public static class GuideTitle
         return trimmed.Length is >= 1 and <= TitleLimit;
     }
 
+    public const string MapFallback = "Untitled map";
+
+    // T21.2: a saved map's name uses - and _ for spaces.
+    public static string SuggestMap(string fileName)
+    {
+        string name = string.Join(' ', Path.GetFileNameWithoutExtension(fileName)
+            .Split([' ', '-', '_'], StringSplitOptions.RemoveEmptyEntries));
+        return name.Length == 0 ? MapFallback : Suggest(name);
+    }
+
     public static string Suggest(string fileName)
     {
         string name = Path.GetFileNameWithoutExtension(fileName).Trim();
