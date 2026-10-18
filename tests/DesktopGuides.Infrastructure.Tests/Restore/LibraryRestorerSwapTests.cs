@@ -32,7 +32,7 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
     public async Task AVersionFiveBackupRestoresAndMigrates()
     {
         string backup = fixture.RewriteDatabase(
-            RestoreFixture.ReaderPreferencesBeforeVersionSix() + " PRAGMA user_version = 5;",
+            RestoreFixture.GuideAssetsBeforeVersionSeven() + RestoreFixture.ReaderPreferencesBeforeVersionSix() + " PRAGMA user_version = 5;",
             manifest => manifest with { SchemaVersion = 5 });
         LibraryRestoreStage stage = await fixture.StageAsync(backup);
 
@@ -50,7 +50,7 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
     public async Task AVersionFourBackupRestoresAndMigrates()
     {
         string backup = fixture.RewriteDatabase(
-            RestoreFixture.ReaderPreferencesBeforeVersionSix() + " DROP TABLE Bookmarks; PRAGMA user_version = 4;",
+            RestoreFixture.GuideAssetsBeforeVersionSeven() + RestoreFixture.ReaderPreferencesBeforeVersionSix() + " DROP TABLE Bookmarks; PRAGMA user_version = 4;",
             manifest => manifest with { SchemaVersion = 4 });
         LibraryRestoreStage stage = await fixture.StageAsync(backup);
 

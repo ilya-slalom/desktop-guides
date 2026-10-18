@@ -1286,7 +1286,7 @@ public sealed class SqliteLibraryRepositoryTests
         await using SqliteLibraryRepository repository = new(directory.Paths);
         await repository.InitializeAsync();
 
-        Assert.Equal(6L, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.Equal((long)LibrarySchema.CurrentVersion, ReadUserVersion(directory.Paths.DatabasePath));
         Assert.Equal(TextViewMode.Original, (await repository.GetReaderPreferencesAsync(guideId))?.TextView);
     }
 
@@ -1670,6 +1670,92 @@ public sealed class SqliteLibraryRepositoryTests
                 () => repository.RenameBookmarkAsync(Guid.NewGuid(), "   "));
             Assert.Empty(await repository.ListBookmarksAsync(guide));
         }
+    }
+
+    [Fact]
+    public async Task UpgradesPopulatedVersionSixWithOnePagePerHtmlGuide()
+    {
+        using TestLibrary directory = new();
+        Guid gameId = Guid.NewGuid();
+        Guid guideId = Guid.NewGuid();
+        CreatePopulatedVersionSix(directory, gameId, guideId);
+        InsertAsset(directory.Paths.DatabasePath, guideId, "guide.html", "EntryHtml");
+        InsertAsset(directory.Paths.DatabasePath, guideId, "styles/main.css", "StyleSheet");
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+
+        Assert.Equal(7L, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.Equal("0|guide.html||", ScalarText(directory.Paths.DatabasePath,
+            "SELECT PageOrder || '|' || RequestPath || '|' || IFNULL(OriginalUrl, '') || '|' || IFNULL(Title, '') FROM GuidePages"));
+        Assert.Equal("EntryHtml,StyleSheet", ScalarText(directory.Paths.DatabasePath,
+            "SELECT group_concat(Kind, ',') FROM (SELECT Kind FROM GuideAssets ORDER BY RequestPath)"));
+    }
+
+    [Fact]
+    public async Task FailedVersionSevenMigrationStaysAtVersionSix()
+    {
+        using TestLibrary directory = new();
+        CreatePopulatedVersionSix(directory, Guid.NewGuid(), Guid.NewGuid());
+
+        await using (SqliteLibraryRepository failing = new(directory.Paths, null, version =>
+        {
+            if (version == 7) throw new IOException("Injected after the v7 tables were rebuilt.");
+        }))
+        {
+            LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(() => failing.InitializeAsync());
+            Assert.Equal(LibraryOpenIssue.MigrationFailed, error.Issue);
+        }
+
+        Assert.Equal(6L, ReadUserVersion(directory.Paths.DatabasePath));
+    }
+
+    [Fact]
+    public async Task APageRowNeedsItsAssetAndLeavesWithItsGuide()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Pages", null, null);
+        Guid guide = Guid.NewGuid();
+        InsertGuide(directory.Paths.DatabasePath, guide, game.Id);
+        InsertAsset(directory.Paths.DatabasePath, guide, "Chapter 1.html", "Page");
+
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand insert = connection.CreateCommand();
+        insert.CommandText = "INSERT INTO GuidePages (GuideId, PageOrder, RequestPath) VALUES ($g, $o, $r)";
+        insert.Parameters.AddWithValue("$g", guide.ToString("N"));
+        insert.Parameters.AddWithValue("$o", 1);
+        insert.Parameters.AddWithValue("$r", "Chapter 1.html");
+        insert.ExecuteNonQuery();
+        insert.Parameters["$o"].Value = 2;
+        insert.Parameters["$r"].Value = "Missing.html";
+        Assert.Throws<SqliteException>(() => insert.ExecuteNonQuery());
+        insert.Parameters["$o"].Value = -1;
+        insert.Parameters["$r"].Value = "Chapter 1.html";
+        Assert.Throws<SqliteException>(() => insert.ExecuteNonQuery());
+
+        using SqliteCommand remove = connection.CreateCommand();
+        remove.CommandText = $"DELETE FROM Guides WHERE Id = '{guide:N}'";
+        remove.ExecuteNonQuery();
+        Assert.Equal("0", ScalarText(directory.Paths.DatabasePath, "SELECT COUNT(*) FROM GuidePages"));
+    }
+
+    private static void CreatePopulatedVersionSix(TestLibrary directory, Guid gameId, Guid guideId)
+    {
+        CreatePopulatedVersionFive(directory, gameId, guideId);
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = LibrarySchema.Version6;
+        command.ExecuteNonQuery();
+    }
+
+    private static string ScalarText(string databasePath, string sql)
+    {
+        using SqliteConnection connection = OpenWithForeignKeys(databasePath);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = sql;
+        return Convert.ToString(command.ExecuteScalar(), CultureInfo.InvariantCulture) ?? "";
     }
 
     private static void CreatePopulatedVersionFive(TestLibrary directory, Guid gameId, Guid guideId)

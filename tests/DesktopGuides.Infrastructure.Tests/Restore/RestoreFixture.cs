@@ -115,6 +115,15 @@ internal sealed class RestoreFixture : IAsyncDisposable
 
     // T19.2: ReaderPreferences as versions 1 to 5 created it, before schema
     // 6's TextView column, for backups from before schema 6.
+    // T21.2: GuideAssets exactly as versions 4 to 6 had it, without GuidePages.
+    // Version 4's own statement rebuilds it, so the stored schema text
+    // matches what migrations 1 to 6 produce. A rename would store
+    // CREATE TABLE "GuideAssets" instead, and validation would refuse it.
+    public static string GuideAssetsBeforeVersionSeven() =>
+        "DROP TABLE GuidePages; ALTER TABLE GuideAssets RENAME TO GuideAssetsOld; " +
+        LibrarySchema.Version4 +
+        " INSERT INTO GuideAssets SELECT * FROM GuideAssetsOld; DROP TABLE GuideAssetsOld;";
+
     public static string ReaderPreferencesBeforeVersionSix()
     {
         string first = LibrarySchema.Version1;

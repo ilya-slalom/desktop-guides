@@ -2,7 +2,7 @@ namespace DesktopGuides.Infrastructure.Storage;
 
 internal static class LibrarySchema
 {
-    public const int CurrentVersion = 6;
+    public const int CurrentVersion = 7;
 
     public const string Version1 = """
         CREATE TABLE Games (
@@ -125,6 +125,37 @@ internal static class LibrarySchema
         PRAGMA user_version = 6;
         """;
 
+    // T21.2: page assets, and each HTML guide's pages in reading order.
+    // SQLite can't change a CHECK, so GuideAssets is rebuilt; nothing
+    // references it yet. Every HTML guide gets its entry as page 0.
+    public const string Version7 = """
+        CREATE TABLE GuideAssets7 (
+            GuideId TEXT NOT NULL REFERENCES Guides(Id) ON DELETE CASCADE,
+            RequestPath TEXT NOT NULL,
+            RelativePath TEXT NOT NULL,
+            Kind TEXT NOT NULL CHECK (Kind IN ('EntryHtml', 'Page', 'StyleSheet', 'Image')),
+            ByteCount INTEGER NOT NULL CHECK (ByteCount >= 0),
+            Sha256 TEXT NOT NULL CHECK (length(Sha256) = 64),
+            PRIMARY KEY (GuideId, RequestPath)
+        );
+        INSERT INTO GuideAssets7 SELECT GuideId, RequestPath, RelativePath, Kind, ByteCount, Sha256 FROM GuideAssets;
+        DROP TABLE GuideAssets;
+        ALTER TABLE GuideAssets7 RENAME TO GuideAssets;
+        CREATE TABLE GuidePages (
+            GuideId TEXT NOT NULL REFERENCES Guides(Id) ON DELETE CASCADE,
+            PageOrder INTEGER NOT NULL CHECK (PageOrder >= 0),
+            RequestPath TEXT NOT NULL,
+            OriginalUrl TEXT CHECK (OriginalUrl IS NULL OR length(OriginalUrl) BETWEEN 1 AND 2048),
+            Title TEXT CHECK (Title IS NULL OR length(Title) BETWEEN 1 AND 512),
+            PRIMARY KEY (GuideId, PageOrder),
+            UNIQUE (GuideId, RequestPath),
+            FOREIGN KEY (GuideId, RequestPath) REFERENCES GuideAssets(GuideId, RequestPath) ON DELETE CASCADE
+        );
+        INSERT INTO GuidePages (GuideId, PageOrder, RequestPath)
+            SELECT GuideId, 0, RequestPath FROM GuideAssets WHERE Kind = 'EntryHtml';
+        PRAGMA user_version = 7;
+        """;
+
     public static readonly (int Version, string Sql)[] Migrations =
     [
         (1, Version1),
@@ -132,6 +163,7 @@ internal static class LibrarySchema
         (3, Version3),
         (4, Version4),
         (5, Version5),
-        (6, Version6)
+        (6, Version6),
+        (7, Version7)
     ];
 }
