@@ -1,6 +1,6 @@
 # T21.2 image maps: design
 
-Status: draft, 19 October 2026, for review. Builder check done.
+Status: approved in conversation, 19 October 2026.
 
 ## Intent
 
