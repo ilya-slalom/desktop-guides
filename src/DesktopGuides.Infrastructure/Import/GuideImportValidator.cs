@@ -1,7 +1,9 @@
+using System.Globalization;
 using System.Text;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Maps;
 using DesktopGuides.Core.Paths;
 using DesktopGuides.Core.Text;
 using UglyToad.PdfPig;
@@ -25,9 +27,12 @@ public sealed class GuideImportValidator : IGuideImportValidator
     private readonly GuideImportLimits limits;
     private readonly StaticHtmlImportValidator html;
 
-    public GuideImportValidator(GuideImportLimits? limits = null)
+    private readonly IMapImageDecoder? maps;
+
+    public GuideImportValidator(GuideImportLimits? limits = null, IMapImageDecoder? maps = null)
     {
         this.limits = limits ?? new GuideImportLimits();
+        this.maps = maps;
         html = new StaticHtmlImportValidator(this.limits.HtmlLimits);
     }
 
@@ -47,7 +52,7 @@ public sealed class GuideImportValidator : IGuideImportValidator
             throw Missing(name);
         }
         GuideFormat format = FormatOf(file.Extension) ??
-            throw new GuideImportException(ImportIssue.Unsupported, $"{name} isn't a TXT, HTML or PDF file.");
+            throw new GuideImportException(ImportIssue.Unsupported, $"{name} isn't a TXT, HTML, PDF, PNG or JPEG file.");
         if (file.Length == 0)
         {
             throw new GuideImportException(ImportIssue.Empty, "The file is empty.");
@@ -56,13 +61,14 @@ public sealed class GuideImportValidator : IGuideImportValidator
         ImportSource source = new(
             file.FullName, name, file.Length,
             new DateTimeOffset(file.LastWriteTimeUtc, TimeSpan.Zero));
-        string title = GuideTitle.Suggest(name);
+        string title = format == GuideFormat.Image ? GuideTitle.SuggestMap(name) : GuideTitle.Suggest(name);
         // Callers include the UI thread, and cached reads can complete
         // synchronously, so the work runs on the thread pool.
         return format switch
         {
             GuideFormat.Txt => await Task.Run(() => InspectTxtAsync(source, title, token), token).ConfigureAwait(false),
             GuideFormat.Html => await Task.Run(() => InspectHtmlAsync(source, title, token), token).ConfigureAwait(false),
+            GuideFormat.Image => await Task.Run(() => InspectMapAsync(source, title, token), token).ConfigureAwait(false),
             _ => await InspectPdfAsync(source, title, token).ConfigureAwait(false),
         };
     }
@@ -356,6 +362,7 @@ public sealed class GuideImportValidator : IGuideImportValidator
         {
             GuideFormat.Txt => (limits.MaxTxtBytes, "text files"),
             GuideFormat.Pdf => (limits.MaxPdfBytes, "PDFs"),
+            GuideFormat.Image => (limits.MaxMapBytes, "maps"),
             _ => (limits.HtmlLimits.MaxEntryBytes, ""),
         };
         if (length <= limit)
@@ -390,6 +397,56 @@ public sealed class GuideImportValidator : IGuideImportValidator
         };
     }
 
+    // T21.2: the header decides the kind and size; the limits apply before
+    // anything decodes it, and the slow decode check runs last.
+    private async Task<ImportInspection> InspectMapAsync(ImportSource source, string title, CancellationToken token)
+    {
+        IMapImageDecoder decoder = maps ?? throw new InvalidOperationException("Map import needs an image decoder.");
+        MapImageSize size;
+        string fingerprint;
+        using (FileStream stream = OpenSource(source.FullPath, source.FileName, asyncIo: false))
+        {
+            try
+            {
+                size = MapImageHeader.Read(stream) ??
+                    throw new GuideImportException(ImportIssue.Unsupported, $"{source.FileName} isn't a PNG or JPEG image.");
+                string pixels = string.Create(CultureInfo.CurrentCulture, $"{source.FileName} is {size.Width:N0} × {size.Height:N0} pixels.");
+                switch (MapImageLimits.Check(size))
+                {
+                    case MapLimit.Side:
+                        throw new GuideImportException(ImportIssue.TooLarge,
+                            $"{pixels} A map can be at most {MapImageLimits.MaxSide.ToString("N0", CultureInfo.CurrentCulture)} pixels on a side.");
+                    case MapLimit.Pixels:
+                        throw new GuideImportException(ImportIssue.TooLarge,
+                            $"{pixels} A map can have at most 268 million pixels.");
+                }
+                stream.Position = 0;
+                fingerprint = GuideFingerprint.OfStream(stream, token);
+            }
+            catch (IOException)
+            {
+                throw Unreadable(source.FileName);
+            }
+        }
+        if (!await decoder.DecodesAsync(source.FullPath, size, token).ConfigureAwait(false))
+        {
+            throw new GuideImportException(ImportIssue.Unreadable,
+                $"{source.FileName} can't be read as an image. It may be damaged or incomplete.");
+        }
+        return new ImportReady(new MapImportManifest(source, title, size.Kind, size.Width, size.Height, fingerprint));
+    }
+
+    // The staged copy's header must match what was inspected.
+    internal static void VerifyMap(string path, MapImportManifest map)
+    {
+        using FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (MapImageHeader.Read(stream) != new MapImageSize(map.Kind, map.PixelWidth, map.PixelHeight))
+        {
+            throw new GuideImportException(ImportIssue.Changed,
+                "The file changed after it was checked. Choose it again to see the new version.");
+        }
+    }
+
     private static FileStream OpenSource(string path, string name, bool asyncIo = true)
     {
         try
@@ -412,6 +469,7 @@ public sealed class GuideImportValidator : IGuideImportValidator
         ".txt" => GuideFormat.Txt,
         ".html" or ".htm" => GuideFormat.Html,
         ".pdf" => GuideFormat.Pdf,
+        ".png" or ".jpg" or ".jpeg" => GuideFormat.Image,
         _ => null,
     };
 
