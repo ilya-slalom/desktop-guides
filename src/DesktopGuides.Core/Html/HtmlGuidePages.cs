@@ -18,6 +18,8 @@ public sealed class HtmlGuidePages
             throw new ArgumentException("A guide's pages run from its entry, page 0, in order.", nameof(pages));
         }
         this.pages = [.. pages];
+        DisplayTitles = PageTitles.WithoutSharedSuffix(
+            [.. pages.Select(page => page.Title ?? Path.GetFileNameWithoutExtension(page.RequestPath))]);
         addresses = [.. pages.Select(page => GuideWebOrigin.EntryUri(guideId, page.RequestPath))];
         foreach (GuidePage page in pages)
         {
@@ -29,6 +31,21 @@ public sealed class HtmlGuidePages
     }
 
     public int Count => pages.Length;
+
+    // T21.2: each page's title for the contents and bookmarks, without the
+    // suffix every page shares; a page without one is named by its file.
+    public IReadOnlyList<string> DisplayTitles { get; }
+
+    // T21.2: a place's reading order across pages, so the same offset on
+    // two pages is two places.
+    public long OrderOf(int pageIndex, long textOffset)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(pageIndex);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(pageIndex, pages.Length);
+        ArgumentOutOfRangeException.ThrowIfNegative(textOffset);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(textOffset, uint.MaxValue);
+        return ((long)pageIndex << 32) | textOffset;
+    }
 
     public GuidePage this[int index] => pages[index];
 

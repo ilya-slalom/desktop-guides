@@ -32,6 +32,10 @@ public sealed record FindResult(
 
     // 1-based numbers of pages that couldn't be read (PDF); the scan goes on.
     public IReadOnlyList<int> UnreadablePages { get; init; } = [];
+
+    // T21.2: a guide of several pages was searched on its open page only,
+    // because counting the others ran out of time.
+    public bool OpenPageOnly { get; init; }
 }
 
 public interface IFindableReader

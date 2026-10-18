@@ -13,13 +13,16 @@ namespace DesktopGuides.Production;
 
 // T19.1: one row of the Bookmarks tab. Only the editor's visibility changes;
 // a rename reloads the list from the library.
-public sealed partial class BookmarkRow(BookmarkItem item) : INotifyPropertyChanged
+public sealed partial class BookmarkRow(BookmarkItem item, string? pageTitle = null) : INotifyPropertyChanged
 {
     private bool editing;
 
     public BookmarkItem Item { get; } = item;
     public string Label => BookmarkList.DisplayLabel(Item);
-    public string AccessibleName => BookmarkList.AccessibleName(Item);
+    // T21.2: the bookmark's page, in a guide of several pages.
+    public string PageTitle => pageTitle ?? string.Empty;
+    public Visibility PageTitleVisibility => pageTitle is null ? Visibility.Collapsed : Visibility.Visible;
+    public string AccessibleName => BookmarkList.AccessibleName(Item, pageTitle);
     public Visibility LabelVisibility => editing ? Visibility.Collapsed : Visibility.Visible;
     public Visibility EditorVisibility => editing ? Visibility.Visible : Visibility.Collapsed;
 
@@ -55,11 +58,11 @@ public sealed partial class BookmarksPane : UserControl
     public event EventHandler<BookmarkItem>? DeleteRequested;
 
     // The bookmark to select, or the first.
-    public void ShowItems(IReadOnlyList<BookmarkItem> items, Guid? select)
+    public void ShowItems(IReadOnlyList<BookmarkItem> items, Guid? select, Func<BookmarkItem, string?>? pageTitleOf = null)
     {
         ArgumentNullException.ThrowIfNull(items);
         rows.Clear();
-        foreach (BookmarkItem item in items) rows.Add(new BookmarkRow(item));
+        foreach (BookmarkItem item in items) rows.Add(new BookmarkRow(item, pageTitleOf?.Invoke(item)));
         Empty.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         List.Visibility = items.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
         List.SelectedItem = rows.FirstOrDefault(row => row.Item.Bookmark.Id == select) ?? rows.FirstOrDefault();

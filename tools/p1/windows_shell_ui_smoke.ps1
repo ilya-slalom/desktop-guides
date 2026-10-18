@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -1581,7 +1581,7 @@ try {
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark',
         'workflow-pdf-exit')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
@@ -5128,6 +5128,132 @@ try {
                 [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 2 - Guides Example.html' -and $p.kind -eq 'Exact' } 'chapter 2 restored')
                 $report.htmlPagesReopenScreenshot = Save-WindowScreenshot 'html-pages-reopen'
                 $report.phases += 'html-pages-reopen'
+            }
+            elseif ($Mode -eq 'html-pages-contents') {
+                # T21.2 PR c: every page in the contents, and another page by its entry.
+                Open-TextGuide 'Pages Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Sample Quest - Guides Example.html' } 'the first page')
+                Invoke-OverflowCommand 'Contents'
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                # The open page's own heading can follow its entry under the same name.
+                $names = @(Get-ContentsItems | ForEach-Object { $_.Current.Name } | Select-Object -Unique)
+                $report.htmlPagesContentsNames = $names
+                if (($names -join '|') -ne 'Sample Quest|Chapter 1|Chapter 2|Chapter 3') {
+                    throw "The contents read '$($names -join ', ')'."
+                }
+                $chapter2 = @(Get-ContentsItems | Where-Object { $_.Current.Name -eq 'Chapter 2' })[0]
+                $chapter2.SetFocus()
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 2 - Guides Example.html' } 'chapter 2 from its entry')
+                # The pane is rebuilt for the new page, and its entry is the current one.
+                Wait-ContentsSelected 'Chapter 2'
+                # A page's top is an exact place: no "near your last place" notice.
+                $deadline = (Get-Date).AddSeconds(1)
+                do {
+                    $notice = Find-ById 'ReaderNotice'
+                    if ($notice -and -not $notice.Current.IsOffscreen) {
+                        throw "Chapter 2's entry showed the notice '$($notice.Current.Name)'."
+                    }
+                    Start-Sleep -Milliseconds 100
+                } while ((Get-Date) -lt $deadline)
+                $report.htmlPagesContentsScreenshot = Save-WindowScreenshot 'html-pages-contents'
+                Invoke-Element (Wait-VisibleById 'ReaderContentsClose')
+                Wait-HiddenById 'ReaderContentsTree'
+                $report.phases += 'html-pages-contents'
+            }
+            elseif ($Mode -eq 'html-pages-find') {
+                # T21.2 PR c: search across the whole guide, without saving a place.
+                Open-TextGuide 'Pages Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Sample Quest - Guides Example.html' -and $p.locator } 'the first page')
+                Start-Sleep -Seconds 2
+                $baseline = Read-Saves
+                # Chapter 3's saved text has a "start" its stylesheet hides:
+                # it counts until the search reaches it, which then goes on.
+                Find-Next 'start' '1 of 4'
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Sample Quest - Guides Example.html' } 'the first match')
+                $steps = @(
+                    @('{ENTER}', '2 of 4', 'Chapter 1 - Guides Example.html'),
+                    @('{ENTER}', '3 of 4', 'Chapter 2 - Guides Example.html'),
+                    @('{ENTER}', '1 of 3', 'Sample Quest - Guides Example.html'),
+                    @('+{F3}', '3 of 3', 'Chapter 2 - Guides Example.html'))
+                foreach ($step in $steps) {
+                    [System.Windows.Forms.SendKeys]::SendWait($step[0])
+                    [void](Wait-Name 'FindCount' $step[1])
+                    $page = $step[2]
+                    [void](Wait-HtmlPosition { param($p) $p.document -eq $page } "match $($step[1]) on its page")
+                }
+                $report.htmlPagesFindScreenshot = Save-WindowScreenshot 'html-pages-find'
+                # Only chapter 1 has "ford": the steps wrap within it.
+                Find-Next 'ford' '1 of 2'
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 1 - Guides Example.html' } 'the first ford')
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                [void](Wait-Name 'FindCount' '2 of 2')
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                [void](Wait-Name 'FindCount' '1 of 2')
+                if ((Read-HtmlPosition).document -ne 'Chapter 1 - Guides Example.html') { throw 'A wrap in chapter 1 left the page.' }
+                if ((Read-Saves) -ne $baseline) { throw "Searching saved a place: $(Read-Saves) saves, from $baseline." }
+                [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                Wait-HiddenById 'ReaderFindBar'
+                $report.phases += 'html-pages-find'
+            }
+            elseif ($Mode -eq 'html-pages-find-again') {
+                # A second Enter while the pages are counted cancels the
+                # first step; the second still counts the whole guide. Each
+                # count waits 2 s first, and so does each match's show.
+                $delay = [System.Threading.EventWaitHandle]::new(
+                    $false, [System.Threading.EventResetMode]::ManualReset,
+                    "Local\$EventPrefix.HtmlFindDelay.$ProcessId")
+                try {
+                    Open-TextGuide 'Pages Web Guide'
+                    [void](Wait-Status 'Guide ready.')
+                    Wait-StatusClosed
+                    [void](Wait-HtmlPosition { param($p) $p.document -eq 'Sample Quest - Guides Example.html' -and $p.locator } 'the first page')
+                    [System.Windows.Forms.SendKeys]::SendWait('^f')
+                    [void](Wait-VisibleById 'ReaderFindBar')
+                    (Get-SearchPattern 'FindQueryInput').SetValue('start')
+                    (Wait-VisibleById 'FindQueryInput').SetFocus()
+                    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                    Start-Sleep -Seconds 1
+                    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                    [void](Wait-Name 'FindCount' '1 of 4')
+                    [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                    Wait-HiddenById 'ReaderFindBar'
+                    $report.phases += 'html-pages-find-again'
+                }
+                finally {
+                    $delay.Dispose()
+                }
+            }
+            elseif ($Mode -eq 'html-pages-bookmark') {
+                # T21.2 PR c: bookmarks on two pages at the same offset, named and followed.
+                Open-TextGuide 'Pages Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Sample Quest - Guides Example.html' -and $p.locator } 'the first page')
+                Invoke-OverflowCommand 'Add bookmark'
+                [void](Wait-Status 'Bookmark added.')
+                Invoke-Element (Find-ByName 'Next page')
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 1 - Guides Example.html' -and $p.locator } 'chapter 1')
+                Invoke-Element (Find-ByName 'Next page')
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 2 - Guides Example.html' -and $p.locator } 'chapter 2')
+                # Review Focus 1: the top of another page is another place.
+                Invoke-OverflowCommand 'Add bookmark'
+                [void](Wait-Status 'Bookmark added.')
+                [void](Wait-BookmarkNames @('*Sample Quest*', '*Chapter 2*') 'a bookmark on each page')
+                Invoke-Element (Find-ByName 'Go to start')
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Sample Quest - Guides Example.html' -and $p.locator } 'the first page again')
+                # Adding left the pane on Bookmarks; the command for the tab showing would close it.
+                if (@(Get-BookmarkItems).Count -eq 0) { Invoke-OverflowCommand 'Bookmarks' }
+                [void](Wait-BookmarkNames @('*Sample Quest*', '*Chapter 2*') 'opening the Bookmarks tab')
+                Select-Bookmark '*Chapter 2*'
+                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 2 - Guides Example.html' } 'following the chapter 2 bookmark')
+                $report.htmlPagesBookmarkScreenshot = Save-WindowScreenshot 'html-pages-bookmark'
+                $report.phases += 'html-pages-bookmark'
             }
             elseif ($Mode -eq 'contents-html-headings') {
                 # Long Web Guide has no contents list, and names that shadow DOM members.

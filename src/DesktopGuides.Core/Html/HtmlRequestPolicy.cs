@@ -50,6 +50,9 @@ public sealed class HtmlRequestPolicy
     public GuideAsset Entry { get; }
     public Uri EntryUri { get; }
 
+    // T21.2: a recorded file by its request path, or null.
+    public GuideAsset? AssetFor(string requestPath) => assets.GetValueOrDefault(requestPath);
+
     public HtmlRequestDecision Decide(string method, string uri)
     {
         if (!Uri.TryCreate(uri, UriKind.Absolute, out Uri? target)) return Deny(HtmlDenyReason.Malformed);

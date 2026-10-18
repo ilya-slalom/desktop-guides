@@ -27,9 +27,14 @@
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="local:BookmarkRow">
                     <Grid>
-                        <TextBlock Text="{x:Bind Label}" VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis"
-                                   Visibility="{x:Bind LabelVisibility, Mode=OneWay}" />
+                        <!-- T21.2: in a guide of several pages, the page under the label. -->
+                        <StackPanel VerticalAlignment="Center"
+                                    Visibility="{x:Bind LabelVisibility, Mode=OneWay}">
+                            <TextBlock Text="{x:Bind Label}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{x:Bind PageTitle}" TextTrimming="CharacterEllipsis"
+                                       Style="{StaticResource DesktopGuidesMetadataStyle}"
+                                       Visibility="{x:Bind PageTitleVisibility}" />
+                        </StackPanel>
                         <TextBox MaxLength="80"
                                  Visibility="{x:Bind EditorVisibility, Mode=OneWay}"
                                  KeyDown="EditorKeyDown" LostFocus="EditorLostFocus"

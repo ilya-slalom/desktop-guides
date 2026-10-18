@@ -141,4 +141,15 @@ public sealed class BookmarkListTests
     [InlineData(RestoreKind.Unavailable, "This bookmark's place couldn't be found.")]
     public void EachRestoreOutcomeHasItsMessage(RestoreKind kind, string? message) =>
         Assert.Equal(message, BookmarkList.MessageFor(kind));
+
+
+    // T21.2: a bookmark in a guide of several pages names its page.
+    [Fact]
+    public void AMultipageBookmarkNamesItsPage()
+    {
+        BookmarkItem through = Arrange(At("Ford", Text(5, fraction: 0.375)))[0];
+
+        Assert.Equal("Ford, Chapter 1, 38% through", BookmarkList.AccessibleName(through, "Chapter 1"));
+        Assert.Equal("Ford, 38% through", BookmarkList.AccessibleName(through));
+    }
 }

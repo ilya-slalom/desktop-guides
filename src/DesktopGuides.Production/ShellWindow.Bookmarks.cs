@@ -122,7 +122,7 @@ public sealed partial class ShellWindow
     private async Task RefreshBookmarksAsync(Guid? select, bool focus)
     {
         if (await LoadBookmarksAsync() is not IReadOnlyList<BookmarkItem> items) return;
-        ReaderContents.BookmarksTab.ShowItems(items, select);
+        ReaderContents.BookmarksTab.ShowItems(items, select, BookmarkPageTitleOf());
         if (focus) await ReaderContents.BookmarksTab.FocusContentAsync();
     }
 
@@ -311,4 +311,13 @@ public sealed partial class ShellWindow
             // Test diagnostics must never affect reading.
         }
     }
+
+    // T21.2: a guide of several pages names each bookmark's page.
+    private Func<BookmarkItem, string?>? BookmarkPageTitleOf() =>
+        readerSession is HtmlReaderSession { Pages.Count: > 1 } html
+            ? item => item.Location?.Payload is HtmlPosition position &&
+                html.Pages.IndexOfDocument(position.DocumentPath) is int page
+                    ? html.Pages.DisplayTitles[page]
+                    : null
+            : null;
 }
