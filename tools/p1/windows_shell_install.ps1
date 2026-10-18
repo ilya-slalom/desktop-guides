@@ -1835,6 +1835,24 @@ function Run-NavigationScenarios {
     }
     Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
     $report.contentsHtmlHeadings = Invoke-ProgressPass 'contents-html-headings' 0 -HtmlPosition
+    # T21.2: a web guide of several pages.
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.htmlPagesLinks = Invoke-ProgressPass 'html-pages-links' 0 -HtmlPosition
+    $diagnostics = Join-Path (Get-HtmlCacheRoot) 'diagnostics'
+    Remove-Item -Path (Join-Path $diagnostics 'html-session-*.json') -ErrorAction SilentlyContinue
+    $report.htmlPagesStyle = Invoke-ProgressPass 'html-pages-style' 0 -HtmlPosition -HtmlDiagnostics
+    $served = @(Get-ChildItem -LiteralPath $diagnostics -Filter 'html-session-*.json' |
+        ForEach-Object { (Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json).served })
+    foreach ($sheet in @('Sample Quest - Guides Example_files/load.php', 'Chapter 1 - Guides Example_files/load.php')) {
+        if ($served -notcontains $sheet) { throw "The page's stylesheet $sheet was not served." }
+    }
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.htmlPagesRestart = Invoke-ProgressPass 'html-pages-restart' 0 -HtmlPosition
+    $estimate = & $estimateOf 'Pages Web Guide'
+    if ($null -eq $estimate -or $estimate -lt 0.5 -or $estimate -gt 0.75) {
+        throw "A place on page 3 of 4 stored progress $estimate; expected 0.5 to 0.75."
+    }
+    $report.htmlPagesReopen = Invoke-ProgressPass 'html-pages-reopen' 0 -HtmlPosition
     Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
     $report.contentsPdf = Invoke-ProgressPass 'contents-pdf' 0
     if ($null -eq (& $estimateOf 'Outline PDF Guide')) {
@@ -1871,11 +1889,12 @@ function Run-NavigationScenarios {
 }
 
 function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $Kill, [string] $resultName = $mode,
-    [switch] $HtmlPosition) {
+    [switch] $HtmlPosition, [switch] $HtmlDiagnostics) {
     Start-InstalledShell
     $processId = $report.launchedProcessId
     $names = @('ProgressDiagnostics', 'ProgressOverride')
     if ($HtmlPosition) { $names += 'HtmlPosition' }
+    if ($HtmlDiagnostics) { $names += 'HtmlDiagnostics' }
     $gates = @(
         foreach ($name in $names) {
             [System.Threading.EventWaitHandle]::new(
