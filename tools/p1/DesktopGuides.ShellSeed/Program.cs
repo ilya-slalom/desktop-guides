@@ -186,6 +186,12 @@ if (args.Length == 2 && args[0] == "describe-import")
         command.CommandText = sql;
         return (long)command.ExecuteScalar()!;
     }
+    string Text(string sql)
+    {
+        using SqliteCommand command = importConnection.CreateCommand();
+        command.CommandText = sql;
+        return (string)command.ExecuteScalar()!;
+    }
     int CountEntries(string root) => Directory.Exists(root)
         ? Directory.EnumerateFileSystemEntries(root).Count()
         : 0;
@@ -200,6 +206,22 @@ if (args.Length == 2 && args[0] == "describe-import")
         ReaderPreferences = Scalar("SELECT COUNT(*) FROM ReaderPreferences"),
         LegacyTextGuides = Scalar("SELECT COUNT(*) FROM Guides WHERE Format = 'Txt' AND TextCodePage = 437"),
         MostGuidePages = Scalar("SELECT COALESCE(MAX(Pages), 0) FROM (SELECT COUNT(*) AS Pages FROM GuidePages GROUP BY GuideId)"),
+        // T21.2: maps, and any sign that opening one counted as reading.
+        MapGuides = Scalar("SELECT COUNT(*) FROM Guides WHERE Format = 'Image'"),
+        MapReadings = Scalar("""
+            SELECT COUNT(*) FROM ReadingStates rs JOIN Guides gu ON gu.Id = rs.GuideId
+            WHERE gu.Format = 'Image' AND (rs.LastOpenedUtcMs IS NOT NULL OR rs.LocatorJson IS NOT NULL
+                OR rs.EstimatedFraction IS NOT NULL OR rs.CompletedUtcMs IS NOT NULL)
+            """),
+        MapSizes = Text("""
+            SELECT IFNULL(group_concat(Size, ','), '') FROM (
+                SELECT PixelWidth || 'x' || PixelHeight AS Size FROM Guides
+                WHERE Format = 'Image' ORDER BY Title COLLATE NOCASE, Id)
+            """),
+        LastActiveIsMap = Scalar("""
+            SELECT COUNT(*) FROM Settings st JOIN Guides gu ON gu.Id = st.Value
+            WHERE st.Key = 'LastActiveGuideId' AND gu.Format = 'Image'
+            """) > 0,
     }));
     return 0;
 }

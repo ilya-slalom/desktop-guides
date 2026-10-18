@@ -45,6 +45,62 @@ def png(width: int, height: int) -> bytes:
     )
 
 
+# ITU T.81 Annex K.3: the standard luminance Huffman tables.
+DC_COUNTS = bytes([0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0])
+DC_VALUES = bytes(range(12))
+AC_COUNTS = bytes([0, 2, 1, 3, 3, 2, 4, 3, 5, 5, 4, 4, 0, 0, 1, 0x7D])
+AC_VALUES = bytes.fromhex(
+    "01020300041105122131410613516107227114328191a1082342b1c11552d1f0"
+    "2433627282090a161718191a25262728292a3435363738393a434445464748494a"
+    "535455565758595a636465666768696a737475767778797a838485868788898a"
+    "92939495969798999aa2a3a4a5a6a7a8a9aab2b3b4b5b6b7b8b9bac2c3c4c5c6"
+    "c7c8c9cad2d3d4d5d6d7d8d9dae1e2e3e4e5e6e7e8e9eaf1f2f3f4f5f6f7f8f9fa"
+)
+
+
+def tiny_jpeg(width: int, height: int) -> bytes:
+    """A grey baseline JPEG with no library: every block is DC 0, then EOB."""
+
+    def segment(marker: int, data: bytes) -> bytes:
+        return bytes([0xFF, marker]) + struct.pack(">H", len(data) + 2) + data
+
+    blocks = ((width + 7) // 8) * ((height + 7) // 8)
+    bits = "001010" * blocks
+    bits += "1" * (-len(bits) % 8)
+    scan = bytearray()
+    for index in range(0, len(bits), 8):
+        byte = int(bits[index : index + 8], 2)
+        scan.append(byte)
+        if byte == 0xFF:
+            scan.append(0x00)
+    return (
+        b"\xff\xd8"
+        + segment(0xDB, b"\x00" + b"\x01" * 64)
+        + segment(0xC0, struct.pack(">BHHB", 8, height, width, 1) + b"\x01\x11\x00")
+        + segment(0xC4, b"\x00" + DC_COUNTS + DC_VALUES)
+        + segment(0xC4, b"\x10" + AC_COUNTS + AC_VALUES)
+        + segment(0xDA, b"\x01\x01\x00\x00\x3f\x00")
+        + bytes(scan)
+        + b"\xff\xd9"
+    )
+
+
+def huge_header_png(width: int, height: int) -> bytes:
+    """A header that claims a huge image, with almost no data behind it."""
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(
+            ">I", zlib.crc32(kind + data) & 0xFFFFFFFF
+        )
+
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(b"\0"))
+        + chunk(b"IEND", b"")
+    )
+
+
 def write_pdf(objects: list[bytes], trailer_details: bytes = b"") -> bytes:
     output = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
     offsets = [0]
@@ -453,6 +509,29 @@ def main() -> None:
         locked_pdf(),
         "pdf",
         "Password-protected PDF asks for a password; test password is guide",
+    )
+
+    # T21.2: maps for the import-maps mode.
+    castle = png(640, 480)
+    add("generated/maps/castle-floor-1.png", castle, "png", "A map: imports with its size, 640 x 480")
+    add("generated/maps/catacombs.jpg", tiny_jpeg(64, 48), "jpeg", "A map: a baseline JPEG, 64 x 48")
+    add(
+        "generated/maps/strip-map.png",
+        png(20000, 400),
+        "png",
+        "A map wider than the 16384-pixel texture limit; imports by Ctrl+O",
+    )
+    add(
+        "generated/maps/broken-map.png",
+        castle[: len(castle) // 2],
+        "png",
+        "A truncated map: its header reads, but it doesn't decode",
+    )
+    add(
+        "generated/maps/huge-header.png",
+        huge_header_png(40000, 40000),
+        "png",
+        "A decompression bomb: refused from its header, never decoded",
     )
 
     manifest = {"schemaVersion": 1, "fixtures": FILES}
