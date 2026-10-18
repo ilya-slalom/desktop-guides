@@ -318,22 +318,36 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         await restoreTurn.WaitAsync();
         restoring = true;
         moving = true;
+        // Hidden until the reader's style is on the new page, as at the open,
+        // so a Dark reader never flashes the page's own colors.
+        View.Opacity = 0;
         try
         {
             pageIndex = index;
+            entry = HtmlEntryState.NotRequested;
             document = pages.AddressOf(index);
             documentNavigated = false;
             applied = null;
             current = Start;
             lastScroll = null;
             ResetFind();
-            bool navigated = await NavigateDocumentAsync();
-            TraceForTest($"move {index} navigated={navigated} entry={entry}");
+            bool navigated = false;
+            for (int attempt = 0; attempt < 2 && !navigated && !disposed && !failed; attempt++)
+            {
+                documentNavigated = false;
+                entry = HtmlEntryState.NotRequested;
+                (navigated, bool interrupted) = await NavigateDocumentAsync();
+                TraceForTest($"move {index} attempt {attempt} navigated={navigated} interrupted={interrupted} entry={entry}");
+                if (!interrupted) break;
+            }
             if (!navigated)
             {
                 if (!disposed)
                 {
-                    Failed?.Invoke(this, HtmlGuideLoadMessages.ForFailedOpen(entry, failed));
+                    // The page file itself, or else the view, stopped the move.
+                    Failed?.Invoke(this, entry is HtmlEntryState.Changed or HtmlEntryState.Missing
+                        ? HtmlGuideLoadMessages.ForFailedOpen(entry, failed)
+                        : HtmlGuideLoadError.Crashed);
                 }
                 return false;
             }
@@ -348,6 +362,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         finally
         {
             moving = false;
+            if (!disposed) View.Opacity = 1;
             restoring = false;
             restoreTurn.Release();
         }
@@ -355,14 +370,20 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
 
     // The open's wait, for a later page: the view must load and serve the
     // page within the open's budget.
-    private async Task<bool> NavigateDocumentAsync()
+    // Interrupted is true when the load was aborted or cancelled, as a
+    // click on the page being left can do; the move tries once more.
+    private async Task<(bool Loaded, bool Interrupted)> NavigateDocumentAsync()
     {
         TaskCompletionSource<bool> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        bool interrupted = false;
         void Completed(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
         {
             TraceForTest($"completed {args.NavigationId} success={args.IsSuccess} {args.WebErrorStatus}");
             // A cancelled click completes too, after the move began.
-            if (args.NavigationId == documentNavigationId) completion.TrySetResult(args.IsSuccess);
+            if (args.NavigationId != documentNavigationId) return;
+            interrupted = args.WebErrorStatus is CoreWebView2WebErrorStatus.ConnectionAborted or
+                CoreWebView2WebErrorStatus.OperationCanceled;
+            completion.TrySetResult(args.IsSuccess);
         }
         documentNavigationId = 0;
         core!.NavigationCompleted += Completed;
@@ -370,11 +391,13 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         {
             pendingNavigation = completion;
             core.Navigate(document.AbsoluteUri);
-            return await completion.Task.WaitAsync(EntryNavigationTimeout) && entry == HtmlEntryState.Served;
+            bool loaded = await completion.Task.WaitAsync(EntryNavigationTimeout) && entry == HtmlEntryState.Served;
+            return (loaded, !loaded && interrupted);
         }
-        catch (Exception error) when (error is TimeoutException or COMException)
+        // A crash reaches the wait as HtmlGuideLoadException (OnProcessFailed).
+        catch (Exception error) when (error is TimeoutException or COMException or HtmlGuideLoadException)
         {
-            return false;
+            return (false, false);
         }
         finally
         {
@@ -1003,6 +1026,15 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     {
         HtmlNavigation navigation = HtmlNavigationPolicy.Classify(
             args.Uri, document, documentNavigated, args.IsUserInitiated, pages);
+        // T21.2: mid-move, only the move's own load (which can carry the
+        // click's gesture) and its fragment may run; another click on the page
+        // being left would replace the move's navigation.
+        if (moving && navigation.Kind is not (HtmlNavigationKind.Entry or HtmlNavigationKind.SameDocument))
+        {
+            args.Cancel = true;
+            TraceForTest($"nav cancelled mid-move {navigation.Kind} {args.Uri}");
+            return;
+        }
         TraceForTest($"nav {navigation.Kind} {navigation.PageIndex} user={args.IsUserInitiated} {args.Uri}");
         switch (navigation.Kind)
         {
