@@ -1,4 +1,5 @@
 using System.Text;
+using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Paths;
@@ -171,10 +172,17 @@ public sealed class GuideImportValidator : IGuideImportValidator
         ImportWarning[] warnings = preview.Warnings
             .Select(warning => new ImportWarning(warning.RelativePath ?? warning.RawTarget, warning.Message))
             .ToArray();
+        StaticHtmlManifest scanned = preview.Manifest;
+        string[] titles = scanned.Pages
+            .Select((page, index) => page.Title ?? Path.GetFileNameWithoutExtension(
+                index == 0 ? source.FileName : page.RelativePath))
+            .ToArray();
         return new ImportReady(new HtmlImportManifest(
             source, title, preview.EntryRelativePath,
-            preview.Manifest.Assets.Count - 1, preview.Manifest.TotalBytes, warnings,
-            GuideFingerprint.OfHtml(preview.Manifest.Assets.Select(asset => (asset.RelativePath, asset.Sha256)))));
+            scanned.Assets.Count(asset => asset.Kind is not (StaticAssetKind.EntryHtml or StaticAssetKind.Page)),
+            scanned.TotalBytes, warnings,
+            GuideFingerprint.OfHtml(scanned.Assets.Select(asset => (asset.RelativePath, asset.Sha256))),
+            PageTitles.WithoutSharedSuffix(titles)));
     }
 
     internal async Task<StaticHtmlImportPreview> PreviewHtmlAsync(ImportSource source, CancellationToken token)
@@ -374,6 +382,10 @@ public sealed class GuideImportValidator : IGuideImportValidator
             StaticScanLimit.ReferenceCount => $"The web page has more than {html.MaxReferences:N0} links to other files.",
             StaticScanLimit.CssDepth => $"The web page's style sheets nest more than {html.MaxCssDepth:N0} levels deep.",
             StaticScanLimit.CssRuleCount => $"The web page's style sheets have more than {html.MaxCssRules:N0} rules.",
+            StaticScanLimit.PageCount => $"The guide links more than {html.MaxPages:N0} saved pages.",
+            StaticScanLimit.GuideBytes =>
+                $"The guide's pages and their linked files are larger than the {ImportPresentation.FormatSize(html.MaxGuideBytes)} limit.",
+            StaticScanLimit.GuideAssetCount => $"The guide's pages link more than {html.MaxGuideAssets:N0} files.",
             _ => throw new ArgumentOutOfRangeException(nameof(limit)),
         };
     }

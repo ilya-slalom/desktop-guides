@@ -19,7 +19,7 @@ internal interface IStaticHtmlRootPathMap
 /// a read outside the requested path.
 /// </summary>
 internal sealed class RootedStaticHtmlAssetSource
-    : IStaticHtmlAssetSource, IStaticHtmlRootPathMap
+    : IStaticHtmlAssetSource, IStaticHtmlRootPathMap, IStaticHtmlPageDirectory
 {
     internal const string ManagedCompanionFolder = "__desktop_guides_files";
 
@@ -131,6 +131,19 @@ internal sealed class RootedStaticHtmlAssetSource
         }
         return managedRelativePath;
     }
+
+    // T21.2: the saved pages beside the selected one, by name. Every read
+    // still goes through OpenReadAsync and its checks.
+    public IReadOnlyList<string> ListPages() =>
+        Directory.EnumerateFiles(root, "*", SearchOption.TopDirectoryOnly)
+            .Select(Path.GetFileName)
+            .OfType<string>()
+            .Where(name =>
+                (name.EndsWith(".html", StringComparison.OrdinalIgnoreCase) ||
+                 name.EndsWith(".htm", StringComparison.OrdinalIgnoreCase)) &&
+                !string.Equals(name, sourceEntryName, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(name, entryAlias, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
 
     public ValueTask<Stream?> OpenReadAsync(
         string safeRelativePath,
