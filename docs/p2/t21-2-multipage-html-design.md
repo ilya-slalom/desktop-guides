@@ -1,7 +1,7 @@
 # T21.2 multi-page HTML: design
 
-Status: approved in conversation, 18 October 2026. PR a (import, storage
-and backup) implemented on `feat/p2-t21-2-multipage-import`.
+Status: approved in conversation, 18 October 2026. PR a merged as #133.
+PR b (reading) implemented on `feat/p2-t21-2-multipage-reading`.
 
 ## Intent
 
@@ -237,6 +237,13 @@ Multi-page HTML is listed as supported only after PR c.
 4. **Downloading a guide from its URL** stays in S22. T21.2 only shapes
    its input for it.
 
+5. **The page keys** (the user's choice, 18 October 2026):
+   - Page Up/Down and Ctrl+Home/End keep scrolling the open page;
+   - Ctrl+Page Up/Down move between pages;
+   - the toolbar's four page buttons follow the reading order.
+6. **The page being left isn't captured first.** A guide has one place,
+   and it moves to the new page.
+
 ## PR a verification record
 
 See the [PR a plan](t21-2-multipage-import-plan.md).
@@ -285,3 +292,61 @@ See the [PR a plan](t21-2-multipage-import-plan.md).
      now skipped while indexing.
 
   The 8 minors are deferred and listed in the PR.
+
+## PR b verification record
+
+See the [PR b plan](t21-2-multipage-reading-plan.md).
+
+- **Core,** each test failing first and then passing on the host:
+  - `HtmlGuidePagesTests`: pages found by guide or website address, the
+    steps that stop at the ends, and a guide's first page;
+  - `HtmlNavigationPolicyTests`: a click on another page, the open
+    page's own address, an unsaved page staying external, and only a
+    person's click moving;
+  - progress across pages, a place on any page, and a place on a page
+    the guide doesn't have;
+  - `ReaderCommandPolicyTests`: one-page guides keep today's toolbar, and
+    the page keys for TXT and PDF and for a guide of several pages;
+  - the two new shortcuts.
+
+  The full suite passes, 1373/1373.
+- **Infrastructure:** the loader hands over the pages in order, and
+  refuses a page row on a stylesheet. The full suite passes, 872/872.
+- **Production:** it builds with 0 warnings, with warnings as errors, and
+  so does the toolbar smoke project.
+- **Installed:** the `navigation` group passes on both lanes (runs
+  39108624736, MSIX, and 39108630005, portable):
+  - `html-pages-links`:
+    - links by website address open the imported pages, including a
+      quick second click;
+    - a link to the open page's own address only scrolls;
+    - the toolbar and Ctrl+Page Up/Down follow the reading order and stop
+      at the ends, and plain Page Down stays on the page;
+    - an unsaved page's link raises the website bar;
+  - `html-pages-style`: each page's `load.php` stylesheet was served;
+  - `html-pages-restart` and `html-pages-reopen`: a place on page 3
+    returns after a restart, with progress between 0.5 and 0.75.
+
+  Screenshots: [html-pages-links](evidence/ci/t21-2/html-pages-links.png)
+  and [html-pages-reopen](evidence/ci/t21-2/html-pages-reopen.png).
+- **Found by the installed runs,** with a page-move trace added to the
+  test position file:
+  - **The smoke** first clicked a link's list item rather than the link,
+    so it now finds the hyperlink itself;
+  - **WebView2 completes a cancelled click's navigation** after the move
+    has begun, and the move took that failed completion for its own. It
+    now waits for the navigation it started.
+- **Final review:** 0 Critical and 4 Important.
+  - **A second click during a move aborted its load and closed the
+    guide.** Other navigations are now cancelled mid-move, and an aborted
+    load is retried once. The step failed first, then passed.
+  - **A renderer crash during a move was swallowed.** It's now reported.
+  - **Each move flashed the page's own colors.** The view now stays
+    hidden until the reader's style is on.
+
+    The crash and the flash can't be triggered on demand in the installed
+    harness, so these two fixes have no failing test.
+  - **Review Focus 1 had no installed step.** Its step, a link to the
+    open page's own address, is added and passes.
+
+  The minors are deferred and listed in the PR.

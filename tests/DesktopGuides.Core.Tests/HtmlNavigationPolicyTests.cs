@@ -130,4 +130,50 @@ public sealed class HtmlNavigationPolicyTests
     [InlineData("not a uri")]
     public void EverythingElseIsDenied(string uri) =>
         Assert.Equal(HtmlNavigationKind.Deny, Kind(uri));
+
+    // T21.2: clicks between a guide's pages.
+    private static readonly HtmlGuidePages GuidePages = HtmlGuidePagesTests.Pages();
+    private static readonly Uri Start = GuidePages.AddressOf(0);
+
+    [Fact]
+    public void AClickOnAnotherPageByItsWebsiteAddressOpensIt()
+    {
+        HtmlNavigation navigation = HtmlNavigationPolicy.Classify(
+            "https://guides.example/wiki/Sample_Quest:Chapter_2#top", Start, documentNavigated: true,
+            userInitiated: true, GuidePages);
+
+        Assert.Equal((HtmlNavigationKind.Page, 2, "#top"), (navigation.Kind, navigation.PageIndex, navigation.Fragment));
+    }
+
+    [Fact]
+    public void AClickOnAnotherPageByItsGuideAddressOpensIt() =>
+        Assert.Equal(3, HtmlNavigationPolicy.Classify(
+            GuidePages.AddressOf(3).AbsoluteUri, Start, true, true, GuidePages).PageIndex);
+
+    // Review Focus 1: the open page's own website address is that page; the session only scrolls.
+    [Fact]
+    public void TheOpenPageByItsAddressIsThatPage()
+    {
+        HtmlNavigation navigation = HtmlNavigationPolicy.Classify(
+            "https://guides.example/wiki/Sample_Quest#contents", Start, true, true, GuidePages);
+
+        Assert.Equal((HtmlNavigationKind.Page, 0, "#contents"), (navigation.Kind, navigation.PageIndex, navigation.Fragment));
+    }
+
+    // Review Focus 2.
+    [Fact]
+    public void AnUnsavedPageOnTheSiteIsExternal() =>
+        Assert.Equal(HtmlNavigationKind.External, HtmlNavigationPolicy.Classify(
+            "https://guides.example/wiki/Sample_Quest/Chapter_4", Start, true, true, GuidePages).Kind);
+
+    [Fact]
+    public void OnlyAPersonsClickOpensAnotherPage() =>
+        Assert.Equal(HtmlNavigationKind.Deny, HtmlNavigationPolicy.Classify(
+            GuidePages.AddressOf(1).AbsoluteUri, Start, true, userInitiated: false, GuidePages).Kind);
+
+    [Fact]
+    public void TheSessionsOwnMoveToAPageIsItsFirstLoad() =>
+        Assert.Equal(HtmlNavigationKind.Entry, HtmlNavigationPolicy.Classify(
+            GuidePages.AddressOf(2).AbsoluteUri, GuidePages.AddressOf(2), documentNavigated: false,
+            userInitiated: false, GuidePages).Kind);
 }

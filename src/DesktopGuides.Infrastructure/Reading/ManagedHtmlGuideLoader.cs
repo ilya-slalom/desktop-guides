@@ -5,7 +5,8 @@ using DesktopGuides.Infrastructure.Storage;
 namespace DesktopGuides.Infrastructure.Reading;
 
 public abstract record HtmlGuideLoad;
-public sealed record HtmlGuideLoaded(HtmlRequestPolicy Policy, ManagedHtmlAssetReader Reader, string EntryFilePath) : HtmlGuideLoad;
+public sealed record HtmlGuideLoaded(
+    HtmlRequestPolicy Policy, ManagedHtmlAssetReader Reader, string EntryFilePath, HtmlGuidePages Pages) : HtmlGuideLoad;
 public sealed record HtmlGuideLoadFailed(HtmlGuideLoadError Error) : HtmlGuideLoad;
 
 public sealed class ManagedHtmlGuideLoader(SqliteLibraryRepository repository, ManagedPathResolver paths)
@@ -17,6 +18,25 @@ public sealed class ManagedHtmlGuideLoader(SqliteLibraryRepository repository, M
         GuideAsset[] entries = [.. assets.Where(asset => asset.Kind == GuideAssetKind.EntryHtml)];
         if (entries.Length != 1 ||
             !string.Equals(entries[0].RelativePath, guide.PrimaryRelativePath, StringComparison.Ordinal))
+        {
+            return new HtmlGuideLoadFailed(HtmlGuideLoadError.Changed);
+        }
+        // T21.2: the pages start at the entry, and each one is a page file.
+        IReadOnlyList<GuidePage> rows = await repository.GetGuidePagesAsync(guide.Id, token);
+        Dictionary<string, GuideAsset> byRequest = assets.ToDictionary(asset => asset.RequestPath, StringComparer.Ordinal);
+        if (rows.Count == 0 ||
+            rows[0].RequestPath != entries[0].RequestPath ||
+            rows.Any(row => !byRequest.TryGetValue(row.RequestPath, out GuideAsset? asset) ||
+                asset.Kind is not (GuideAssetKind.EntryHtml or GuideAssetKind.Page)))
+        {
+            return new HtmlGuideLoadFailed(HtmlGuideLoadError.Changed);
+        }
+        HtmlGuidePages pages;
+        try
+        {
+            pages = new HtmlGuidePages(guide.Id, rows);
+        }
+        catch (ArgumentException)
         {
             return new HtmlGuideLoadFailed(HtmlGuideLoadError.Changed);
         }
@@ -52,6 +72,6 @@ public sealed class ManagedHtmlGuideLoader(SqliteLibraryRepository repository, M
         {
             return new HtmlGuideLoadFailed(HtmlGuideLoadError.Changed);
         }
-        return new HtmlGuideLoaded(new HtmlRequestPolicy(guide.Id, assets), reader, entryFile);
+        return new HtmlGuideLoaded(new HtmlRequestPolicy(guide.Id, assets), reader, entryFile, pages);
     }
 }

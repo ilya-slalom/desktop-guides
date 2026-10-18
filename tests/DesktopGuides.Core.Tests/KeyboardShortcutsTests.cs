@@ -18,6 +18,8 @@ public sealed class KeyboardShortcutsTests
                 (ShortcutContext.Reader, "Page Down", ShortcutCommand.NextPage, "Next page (TXT, PDF)"),
                 (ShortcutContext.Reader, "Ctrl+Home", ShortcutCommand.PageStart, "Go to start (TXT, PDF)"),
                 (ShortcutContext.Reader, "Ctrl+End", ShortcutCommand.PageEnd, "Go to end (TXT, PDF)"),
+                (ShortcutContext.Reader, "Ctrl+Page Up", ShortcutCommand.PreviousGuidePage, "Previous page (web guides of several pages)"),
+                (ShortcutContext.Reader, "Ctrl+Page Down", ShortcutCommand.NextGuidePage, "Next page (web guides of several pages)"),
                 (ShortcutContext.Reader, "Ctrl+G", ShortcutCommand.GoToPage, "Go to page (PDF)"),
                 (ShortcutContext.Reader, "Ctrl+Plus", ShortcutCommand.ZoomIn, "Zoom in (PDF) or larger text"),
                 (ShortcutContext.Reader, "Ctrl+Minus", ShortcutCommand.ZoomOut, "Zoom out (PDF) or smaller text"),

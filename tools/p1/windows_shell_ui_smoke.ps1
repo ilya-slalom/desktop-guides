@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -1581,13 +1581,13 @@ try {
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen',
         'workflow-pdf-exit')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
             elseif ($Mode -like 'html-theme-*') { 'Web Theme Game' }
             elseif ($Mode -like 'pdf-*') { 'PDF Reader Game' }
-            elseif ($Mode -like 'progress-*' -or $Mode -like 'completion-*' -or $Mode -like 'find-*' -or $Mode -like 'contents-*' -or $Mode -like 'bookmark-*' -or $Mode -like 'reflow-*') { 'Progress Game' }
+            elseif ($Mode -like 'progress-*' -or $Mode -like 'completion-*' -or $Mode -like 'find-*' -or $Mode -like 'contents-*' -or $Mode -like 'bookmark-*' -or $Mode -like 'reflow-*' -or $Mode -like 'html-pages-*') { 'Progress Game' }
             elseif ($Mode -like 'text-size-*') { 'Text Size Game' }
             elseif ($Mode -like 'workflow-*') { 'Workflow Game' }
             else { 'Text Reader Game' }
@@ -1735,6 +1735,43 @@ try {
             return $null
         }
 
+        # T21.2: the link itself. A list item takes its link's name and comes
+        # first in the tree, and its centre lies beside a short link's text.
+        function Find-PageLink([string] $name) {
+            $condition = [System.Windows.Automation.AndCondition]::new(
+                [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::NameProperty, $name),
+                [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                    [System.Windows.Automation.ControlType]::Hyperlink))
+            foreach ($page in Get-PageRoots) {
+                try {
+                    $element = $page.FindFirst($scope, $condition)
+                    if ($element) { return $element }
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                    # A closing session's window can vanish mid-search.
+                }
+            }
+            return $null
+        }
+
+        function Wait-PageLink([string] $name) {
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $element = Find-PageLink $name
+                try {
+                    if ($element -and -not $element.Current.IsOffscreen) { return $element }
+                }
+                catch [System.Windows.Automation.ElementNotAvailableException] {
+                    # The page tree was rebuilt; find the link again.
+                }
+                Start-Sleep -Milliseconds 250
+            } while ((Get-Date) -lt $deadline)
+            [void](Save-WindowScreenshot 'html-page-link-missing')
+            throw "The guide page showed no visible link '$name'."
+        }
+
         function Wait-PageName([string] $name) {
             $deadline = (Get-Date).AddSeconds(15)
             do {
@@ -1780,17 +1817,19 @@ try {
                 return $null
             }
             $position = [ordered]@{
-                locator = $file.locator; offset = $null; quote = $null
+                locator = $file.locator; offset = $null; quote = $null; document = $null
                 kind = $file.kind; step = $file.step; reason = $file.reason
                 appearanceKind = $file.appearanceKind; appearanceStep = $file.appearanceStep
                 appearanceScale = $file.appearanceScale
                 appearanceRestores = [int] $file.appearanceRestores
                 findHighlighted = [bool] $file.findHighlighted
+                trace = [string] $file.trace
             }
             if ($file.locator) {
                 $payload = ($file.locator | ConvertFrom-Json).payload
                 $position.offset = [int] $payload.textOffset
                 $position.quote = [string] $payload.textQuote
+                $position.document = [string] $payload.documentPath
             }
             return [pscustomobject] $position
         }
@@ -1804,7 +1843,7 @@ try {
                 Start-Sleep -Milliseconds 250
             } while ((Get-Date) -lt $deadline)
             [void](Save-WindowScreenshot 'html-position-timeout')
-            throw "The HTML position never showed $what. Last: offset=$($position.offset) kind=$($position.kind) step=$($position.step)."
+            throw "The HTML position never showed $what. Last: offset=$($position.offset) kind=$($position.kind) step=$($position.step) document=$($position.document) trace=$($position.trace)."
         }
 
         function Read-ProgressCounts {
@@ -4323,7 +4362,7 @@ try {
                 $report.phases += 'workflow-restored-places'
             }
         }
-        elseif ($Mode -like 'find-*' -or $Mode -like 'contents-*' -or $Mode -like 'bookmark-*' -or $Mode -like 'reflow-*') {
+        elseif ($Mode -like 'find-*' -or $Mode -like 'contents-*' -or $Mode -like 'bookmark-*' -or $Mode -like 'reflow-*' -or $Mode -like 'html-pages-*') {
             # T18.1: in-guide search. Searching must never save the reading place.
             function Read-Saves { return [int] (Read-ProgressCounts).saves }
             # The MARK number of the page's top line, within a range.
@@ -5004,6 +5043,91 @@ try {
                 Invoke-Element (Wait-VisibleById 'ReaderContentsClose')
                 Wait-HiddenById 'ReaderContentsTree'
                 $report.phases += 'contents-html'
+            }
+            elseif ($Mode -eq 'html-pages-links') {
+                # T21.2: links and the page commands move between the guide's pages.
+                Open-TextGuide 'Pages Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Sample Quest - Guides Example.html' } 'the first page')
+                # A link by the page's website address opens the imported copy.
+                # Final review: a quick second click lands mid-move; it must not break the move.
+                $chapter1 = Wait-PageLink 'Chapter 1'
+                Click-Element $chapter1
+                Click-Element $chapter1
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 1 - Guides Example.html' } 'chapter 1 by its link')
+                # Review Focus 1: the open page's own website address with a fragment scrolls; no reload.
+                Click-Element (Wait-PageLink 'To the end of this chapter')
+                Start-Sleep -Milliseconds 1500
+                $after = Read-HtmlPosition
+                # The trace keeps its last entries; after the same-page move, a reload would log a new entry navigation.
+                $at = $after.trace.LastIndexOf('move 1 from 1')
+                if ($at -lt 0) { throw "The link to the open page wasn't handled as that page: $($after.trace)" }
+                $tail = $after.trace.Substring($at)
+                if ($after.document -ne 'Chapter 1 - Guides Example.html' -or $tail -like '*nav Entry*') {
+                    throw "A link to the open page reloaded it: $tail"
+                }
+                Click-Element (Wait-PageLink 'On to chapter 3')
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 3 - Guides Example.html' } 'chapter 3 by its link')
+                # The toolbar follows the reading order, not the links.
+                Invoke-Element (Find-ByName 'Previous page')
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 2 - Guides Example.html' } 'chapter 2 before chapter 3')
+                [System.Windows.Forms.SendKeys]::SendWait('^{PGUP}')
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 1 - Guides Example.html' } 'chapter 1 by Ctrl+Page Up')
+                # Plain Page Down scrolls the page; it never changes page.
+                [System.Windows.Forms.SendKeys]::SendWait('{PGDN}')
+                Start-Sleep -Seconds 1
+                if ((Read-HtmlPosition).document -ne 'Chapter 1 - Guides Example.html') { throw 'Page Down changed page.' }
+                Invoke-Element (Find-ByName 'Go to end')
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 3 - Guides Example.html' } 'the last page')
+                [System.Windows.Forms.SendKeys]::SendWait('^{PGDN}')
+                Start-Sleep -Seconds 1
+                if ((Read-HtmlPosition).document -ne 'Chapter 3 - Guides Example.html') { throw 'Ctrl+Page Down on the last page moved.' }
+                Invoke-Element (Find-ByName 'Go to start')
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Sample Quest - Guides Example.html' } 'the first page again')
+                # A page that wasn't saved stays on the website.
+                Click-Element (Wait-PageLink 'Chapter 4, not saved')
+                [void](Wait-VisibleById 'ReaderExternalLinkBar')
+                $report.htmlPagesLinksScreenshot = Save-WindowScreenshot 'html-pages-links'
+                $report.phases += 'html-pages-links'
+            }
+            elseif ($Mode -eq 'html-pages-style') {
+                # T21.2: the install side checks each page's load.php was served.
+                Open-TextGuide 'Pages Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Sample Quest - Guides Example.html' } 'the first page')
+                [System.Windows.Forms.SendKeys]::SendWait('^{PGDN}')
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 1 - Guides Example.html' } 'chapter 1')
+                $report.htmlPagesStyleScreenshot = Save-WindowScreenshot 'html-pages-style'
+                # Closing the guide writes the session's diagnostics.
+                Back-ToTextGame
+                $report.phases += 'html-pages-style'
+            }
+            elseif ($Mode -eq 'html-pages-restart') {
+                Open-TextGuide 'Pages Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Sample Quest - Guides Example.html' } 'the first page')
+                $baseline = Read-Saves
+                [System.Windows.Forms.SendKeys]::SendWait('^{PGDN}')
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 1 - Guides Example.html' } 'chapter 1')
+                [System.Windows.Forms.SendKeys]::SendWait('^{PGDN}')
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 2 - Guides Example.html' } 'chapter 2')
+                $deadline = (Get-Date).AddSeconds(8)
+                do {
+                    Start-Sleep -Milliseconds 250
+                    $saves = Read-Saves
+                } while ($saves -le $baseline -and (Get-Date) -lt $deadline)
+                if ($saves -le $baseline) { throw 'Moving to page 3 saved no place.' }
+                $report.phases += 'html-pages-restart'
+            }
+            elseif ($Mode -eq 'html-pages-reopen') {
+                Open-TextGuide 'Pages Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-HtmlPosition { param($p) $p.document -eq 'Chapter 2 - Guides Example.html' -and $p.kind -eq 'Exact' } 'chapter 2 restored')
+                $report.htmlPagesReopenScreenshot = Save-WindowScreenshot 'html-pages-reopen'
+                $report.phases += 'html-pages-reopen'
             }
             elseif ($Mode -eq 'contents-html-headings') {
                 # Long Web Guide has no contents list, and names that shadow DOM members.

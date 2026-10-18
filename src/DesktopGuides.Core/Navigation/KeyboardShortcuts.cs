@@ -5,7 +5,7 @@ public enum ShortcutContext { Everywhere, Library, LibrarySearch, Game, Reader, 
 public enum ShortcutCommand
 {
     Back, FocusLibrarySearch, ClearLibrarySearch, ImportGuide, PreviousPage, NextPage,
-    PageStart, PageEnd, GoToPage, ZoomIn, ZoomOut, ZoomReset, FindInGuide, FindNext, FindPrevious,
+    PageStart, PageEnd, PreviousGuidePage, NextGuidePage, GoToPage, ZoomIn, ZoomOut, ZoomReset, FindInGuide, FindNext, FindPrevious,
     ShowContents, AddBookmark, ShowBookmarks, CloseDialog
 }
 
@@ -29,6 +29,8 @@ public static class KeyboardShortcuts
         new(ShortcutContext.Reader, "Page Down", ShortcutCommand.NextPage, "Next page (TXT, PDF)"),
         new(ShortcutContext.Reader, "Ctrl+Home", ShortcutCommand.PageStart, "Go to start (TXT, PDF)"),
         new(ShortcutContext.Reader, "Ctrl+End", ShortcutCommand.PageEnd, "Go to end (TXT, PDF)"),
+        new(ShortcutContext.Reader, "Ctrl+Page Up", ShortcutCommand.PreviousGuidePage, "Previous page (web guides of several pages)"),
+        new(ShortcutContext.Reader, "Ctrl+Page Down", ShortcutCommand.NextGuidePage, "Next page (web guides of several pages)"),
         new(ShortcutContext.Reader, "Ctrl+G", ShortcutCommand.GoToPage, "Go to page (PDF)"),
         new(ShortcutContext.Reader, "Ctrl+Plus", ShortcutCommand.ZoomIn, "Zoom in (PDF) or larger text"),
         new(ShortcutContext.Reader, "Ctrl+Minus", ShortcutCommand.ZoomOut, "Zoom out (PDF) or smaller text"),

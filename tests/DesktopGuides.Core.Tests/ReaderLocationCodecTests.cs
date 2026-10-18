@@ -128,4 +128,18 @@ public sealed class ReaderLocationCodecTests
             new HtmlPosition("guide.html", "chapter-2", "bridge", 12, 0.6), 0.6), "guide.html" },
         { new(GuideFormat.Pdf, 1, Hash, new PdfPosition(8, 0.37), 0.37), null }
     };
+
+    [Fact]
+    public void AnHtmlPlaceNeedsTheGuidesDocuments()
+    {
+        string sha = new('a', 64);
+        string json = ReaderLocationCodec.Serialize(new ReaderLocation(
+            GuideFormat.Html, ReaderLocationCodec.CurrentVersion, sha,
+            new HtmlPosition("Chapter 1.html", null, null, 0, 0), 0));
+
+        Assert.Equal(LocationDecodeStatus.Valid,
+            ReaderLocationCodec.Deserialize(json, GuideFormat.Html, sha, (IReadOnlyCollection<string>)["Start.html", "Chapter 1.html"]).Status);
+        Assert.Equal(LocationDecodeStatus.Invalid,
+            ReaderLocationCodec.Deserialize(json, GuideFormat.Html, sha, (IReadOnlyCollection<string>?)null).Status);
+    }
 }

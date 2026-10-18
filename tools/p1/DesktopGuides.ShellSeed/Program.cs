@@ -749,6 +749,14 @@ if (args.Length == 3 && args[0] == "seed-find")
     GuideImportPublisher findPublisher = new(findRepository, findPaths);
     Guid search = await findPublisher.PublishAsync(
         ready.Manifest, findGame.Id, "Search Web Guide", false, null, CancellationToken.None);
+    // T21.2: the multi-page fixture, for the html-pages modes.
+    string pagesFixture = Path.Combine(Path.GetFullPath(args[2]), "p2", "html-multipage", "Sample Quest - Guides Example.html");
+    if (await new GuideImportValidator().InspectAsync(pagesFixture, CancellationToken.None) is not ImportReady pagesReady)
+    {
+        throw new InvalidOperationException("The html-multipage fixture failed the import preview.");
+    }
+    await findPublisher.PublishAsync(
+        pagesReady.Manifest, findGame.Id, "Pages Web Guide", false, null, CancellationToken.None);
     // T18.1 PR c: one image-only page, for the find bar's note.
     string scannedFixture = Path.Combine(Path.GetFullPath(args[2]), "p0", "pdf-scan.pdf");
     if (await new GuideImportValidator().InspectAsync(scannedFixture, CancellationToken.None) is not ImportReady scannedReady)

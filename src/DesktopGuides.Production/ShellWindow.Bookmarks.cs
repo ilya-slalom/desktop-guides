@@ -17,7 +17,7 @@ public sealed partial class ShellWindow
     private Guid? bookmarkGuide;
     private GuideFormat bookmarkFormat;
     private string bookmarkSha = string.Empty;
-    private string? bookmarkEntry;
+    private IReadOnlyCollection<string>? bookmarkDocuments;
     private IReadOnlyList<BookmarkItem> bookmarks = [];
     private bool addingBookmark;
     private Func<Task>? undoAction;
@@ -51,12 +51,12 @@ public sealed partial class ShellWindow
     }
 
     // Called by StartContents, once the guide's tracking has started.
-    private void StartBookmarks(Guide guide, string contentSha256, string? htmlEntry)
+    private void StartBookmarks(Guide guide, string contentSha256, IReadOnlyCollection<string>? htmlDocuments)
     {
         bookmarkGuide = guide.Id;
         bookmarkFormat = guide.Format;
         bookmarkSha = contentSha256;
-        bookmarkEntry = htmlEntry;
+        bookmarkDocuments = htmlDocuments;
         bookmarks = [];
         ReaderContents.BookmarksTab.Clear();
     }
@@ -114,7 +114,7 @@ public sealed partial class ShellWindow
         // The guide was left, or another opened, while the list loaded.
         if (bookmarkGuide != guide || !ReferenceEquals(reader, readerSession)) return null;
         bookmarks = BookmarkList.Arrange(stored,
-            json => ReaderLocationCodec.Deserialize(json, bookmarkFormat, bookmarkSha, bookmarkEntry),
+            json => ReaderLocationCodec.Deserialize(json, bookmarkFormat, bookmarkSha, bookmarkDocuments),
             reader.OrderOf);
         return bookmarks;
     }

@@ -2,6 +2,7 @@ using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Infrastructure.Reading;
 using DesktopGuides.Infrastructure.Tests.Import;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace DesktopGuides.Infrastructure.Tests.Reading;
@@ -134,5 +135,54 @@ public sealed class ManagedHtmlGuideLoaderTests
 
         Assert.Equal(HtmlGuideLoadError.Changed,
             await FailedAsync(harness, guide with { PrimaryRelativePath = "styles/main.css" }));
+    }
+
+    [Fact]
+    public async Task LoadsAMultipageGuideWithItsPagesInOrder()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        P2Fixtures.CopyTree("html-multipage", harness.Sources.Root);
+        Guid id = await harness.PublishAsync(harness.Publisher(), await harness.InspectAsync(
+            Path.Combine(harness.Sources.Root, "Sample Quest - Guides Example.html")));
+        Guide guide = (await harness.Repository.GetGuideAsync(id))!;
+
+        HtmlGuideLoaded loaded = Assert.IsType<HtmlGuideLoaded>(await LoadAsync(harness, guide));
+
+        Assert.Equal(
+            ["Sample Quest - Guides Example.html", "Chapter 1 - Guides Example.html",
+                "Chapter 2 - Guides Example.html", "Chapter 3 - Guides Example.html"],
+            loaded.Pages.DocumentPaths);
+        Assert.IsType<HtmlServe>(loaded.Policy.Decide("GET", loaded.Pages.AddressOf(2).AbsoluteUri));
+    }
+
+    [Fact]
+    public async Task AOnePageGuideHasItsEntryAsItsPage()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        Guide guide = await PublishAsync(harness);
+
+        HtmlGuideLoaded loaded = Assert.IsType<HtmlGuideLoaded>(await LoadAsync(harness, guide));
+
+        Assert.Equal(["guide.html"], loaded.Pages.DocumentPaths);
+    }
+
+    [Fact]
+    public async Task APageRowOnAStylesheetIsChanged()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        await using PublisherHarness harness = await PublisherHarness.CreateAsync();
+        Guide guide = await PublishAsync(harness);
+        using (SqliteConnection connection = new($"Data Source={harness.Paths.DatabasePath};Pooling=False"))
+        {
+            connection.Open();
+            using SqliteCommand insert = connection.CreateCommand();
+            insert.CommandText =
+                $"INSERT INTO GuidePages (GuideId, PageOrder, RequestPath) VALUES ('{guide.Id:N}', 1, 'styles/main.css')";
+            insert.ExecuteNonQuery();
+        }
+
+        Assert.Equal(HtmlGuideLoadError.Changed, await FailedAsync(harness, guide));
     }
 }

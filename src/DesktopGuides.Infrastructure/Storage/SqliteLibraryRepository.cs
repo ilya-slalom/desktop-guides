@@ -383,6 +383,29 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             return assets;
         }, token);
 
+    // T21.2: an HTML guide's pages in reading order; page 0 is the entry.
+    public Task<IReadOnlyList<GuidePage>> GetGuidePagesAsync(Guid guideId, CancellationToken token = default) =>
+        ReadAsync<IReadOnlyList<GuidePage>>(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT PageOrder, RequestPath, OriginalUrl, Title
+                FROM GuidePages WHERE GuideId = $id ORDER BY PageOrder
+                """;
+            command.Parameters.AddWithValue("$id", guideId.ToString("N"));
+            using SqliteDataReader reader = command.ExecuteReader();
+            List<GuidePage> pages = [];
+            while (reader.Read())
+            {
+                pages.Add(new GuidePage(
+                    reader.GetInt32(0), reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.IsDBNull(3) ? null : reader.GetString(3)));
+            }
+            return pages;
+        }, token);
+
     private static Guide? GetGuide(SqliteConnection connection, Guid guideId)
     {
         using SqliteCommand command = connection.CreateCommand();

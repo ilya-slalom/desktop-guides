@@ -20,7 +20,7 @@ internal sealed record DevToolsEvaluateParams(string Expression, bool ReturnByVa
 internal sealed record HtmlPositionForTest(
     string? Locator, string? Kind, string? Step, string? Reason,
     string? AppearanceKind, string? AppearanceStep, double? AppearanceScale, int AppearanceRestores,
-    bool FindHighlighted);
+    bool FindHighlighted, string? Trace = null);
 
 internal sealed record ProgressCountsForTest(
     int Saves, int SkippedUnchanged, int Failures, int Opens, int OpenFailures,
