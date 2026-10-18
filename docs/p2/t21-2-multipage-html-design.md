@@ -1,7 +1,7 @@
 # T21.2 multi-page HTML: design
 
 Status: approved in conversation, 18 October 2026. PR a (import, storage
-and backup) is next, on `feat/p2-t21-2-multipage-import`.
+and backup) implemented on `feat/p2-t21-2-multipage-import`.
 
 ## Intent
 
@@ -236,3 +236,52 @@ Multi-page HTML is listed as supported only after PR c.
    extension.
 4. **Downloading a guide from its URL** stays in S22. T21.2 only shapes
    its input for it.
+
+## PR a verification record
+
+See the [PR a plan](t21-2-multipage-import-plan.md).
+
+- **Core,** each test failing first and then passing on the host:
+  `SavedPageUrlTests` and `PageTitlesTests`, serving by kind in
+  `HtmlRequestPolicyTests`, and the page count and list in
+  `ImportPresentationTests`. The full suite passes, 1344/1344.
+- **Infrastructure,** each new test failing first and then passing:
+  - the scanner: stylesheets by role (`load.php` taken, a saved error
+    page, HTML or NUL bytes skipped), breadth-first page order, the host
+    rule, two saves of one page, an unsafe name, many links, budgets per
+    page, and the three guide limits;
+  - schema 7: the migration from a populated version 6, a failed
+    migration, and the page rows' foreign keys;
+  - the import journal's page rows;
+  - the fixture's preview and publish end to end;
+  - backup: the snapshot's pages, broken page rows stopping an export
+    and a restore, and a version 6 backup restoring with one page per
+    HTML guide.
+
+  The full suite passes, 869/869.
+- **Production:** it builds with 0 warnings, with warnings as errors.
+- **Installed:** the `import` group passes on both lanes, with
+  `import-html-pages`: the preview shows "4 pages" and the reading order,
+  the guide publishes, and the library holds 4 page rows (runs
+  39090402363, MSIX, and 39090407334, portable). Screenshot:
+  [import-html-pages](evidence/ci/t21-2/import-html-pages.png).
+- **Plan deviations** (approved at handoff, 18 October 2026):
+  1. saved pages whose names aren't safe managed paths, such as one with
+     `%`, aren't candidates;
+  2. the installed mode is `import-html-pages`, so it shares the import
+     group's picker helpers.
+- **Rulings:**
+  1. **The version 6 backup helper moved into Task 3:** the existing
+     version 4 and 5 backup tests needed it once `GuideAssets` was rebuilt.
+  2. **The multi-page import runs after the guide removal runs,** which
+     count Import Test Game's guides.
+- **Final review:** 0 Critical and 2 Important, both fixed with a failing
+  test first:
+  1. **A second save of the first page joined as another page** through
+     any "back to the start" link. The first page now claims its own
+     address before the folder is indexed.
+  2. **An unreadable `.html` beside the picked page,** whether locked,
+     denied or reached through a link, **failed the whole preview.** It's
+     now skipped while indexing.
+
+  The 8 minors are deferred and listed in the PR.

@@ -1,6 +1,6 @@
 # P2 implementation plan and exit gates
 
-Status: M7 complete, 15 October 2026 (T18.1: #113, #116 and #117). M8 complete, 16 October 2026 (T18.2: #118 and #119). M9 complete, 16 October 2026 (T19.1: #126 and #129). M10 complete, 17 October 2026 (T19.2: #130 and #131). T21.1 (the format survey) in review; T21.2 is limited to multi-page HTML and image maps. P1 is complete (54 of 54 tasks; v1.0.1
+Status: M7 complete, 15 October 2026 (T18.1: #113, #116 and #117). M8 complete, 16 October 2026 (T18.2: #118 and #119). M9 complete, 16 October 2026 (T19.1: #126 and #129). M10 complete, 17 October 2026 (T19.2: #130 and #131). T21.1 complete, 17 October 2026 (#132): T21.2 is limited to multi-page HTML and image maps. T21.2 PR a (multi-page HTML import) in review. P1 is complete (54 of 54 tasks; v1.0.1
 published). This plan orders the **3 P2 stories and 6 tasks** in the
 [work breakdown](../work-breakdown.md#p2--reader-depth-and-local-ownership).
 
