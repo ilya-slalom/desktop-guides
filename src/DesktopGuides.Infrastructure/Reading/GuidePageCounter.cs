@@ -13,14 +13,14 @@ namespace DesktopGuides.Infrastructure.Reading;
 /// </summary>
 public static class GuidePageCounter
 {
-    // The reader runs pages with scripts off, so <noscript> content is
-    // shown, and counted.
+    // Text the reader's find walk skips doesn't count: the same four
+    // elements. Text a stylesheet hides counts until its page is searched.
     public static string TextOf(byte[] html)
     {
         ArgumentNullException.ThrowIfNull(html);
         using MemoryStream stream = new(html, writable: false);
         IDocument document = new HtmlParser().ParseDocument(stream);
-        foreach (IElement hidden in document.QuerySelectorAll("script, style, template").ToArray())
+        foreach (IElement hidden in document.QuerySelectorAll("script, style, template, noscript").ToArray())
         {
             hidden.Remove();
         }

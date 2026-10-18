@@ -27,11 +27,12 @@ public sealed class GuidePageCounterTests
         Assert.Equal([2, 0, 1], GuidePageCounter.Count(pages, Reads(text), new FindQuery("ford"), CancellationToken.None));
     }
 
+    // The reader's own find walk skips the same four elements.
     [Fact]
     public void ScriptsAndStylesDontCount() =>
         Assert.Equal([1], GuidePageCounter.Count([Page("a.html")], Reads(new()
         {
-            ["a.html"] = "<script>ford</script><style>.ford{}</style><template>ford</template><p>ford</p>",
+            ["a.html"] = "<body><script>ford</script><style>.ford{}</style><template>ford</template><noscript>ford</noscript><p>ford</p>",
         }), new FindQuery("ford"), CancellationToken.None));
 
     // Review Focus 3.
