@@ -39,6 +39,8 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     // that page's guide address; documentNavigated is documentNavigated's
     // meaning for whichever page is open.
     private readonly HtmlGuidePages pages;
+    // Test gate only (T21.2): the last navigations and page moves, newest last.
+    private readonly List<string> pageTrace = [];
     private int pageIndex;
     private Uri document;
     private HtmlEntryState entry;
@@ -302,6 +304,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         // A click's own NavigationStarting calls here: the new navigation
         // starts once that handler has returned and cancelled the click.
         await Task.Yield();
+        TraceForTest($"move {index} from {pageIndex} {fragment}");
         if (disposed || failed || core is null || index < 0 || index >= pages.Count) return false;
         if (index == pageIndex)
         {
@@ -319,7 +322,9 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
             current = Start;
             lastScroll = null;
             ResetFind();
-            if (!await NavigateDocumentAsync())
+            bool navigated = await NavigateDocumentAsync();
+            TraceForTest($"move {index} navigated={navigated} entry={entry}");
+            if (!navigated)
             {
                 if (!disposed)
                 {
@@ -986,6 +991,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     {
         HtmlNavigation navigation = HtmlNavigationPolicy.Classify(
             args.Uri, document, documentNavigated, args.IsUserInitiated, pages);
+        TraceForTest($"nav {navigation.Kind} {navigation.PageIndex} user={args.IsUserInitiated} {args.Uri}");
         switch (navigation.Kind)
         {
             case HtmlNavigationKind.Entry:
@@ -1165,6 +1171,14 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
 
     // Test gate only: the current point as the codec writes it. Written to
     // a temporary file and moved, so the smoke never reads half a file.
+    private void TraceForTest(string step)
+    {
+        if (!positionForTest) return;
+        pageTrace.Add(step);
+        if (pageTrace.Count > 12) pageTrace.RemoveAt(0);
+        WritePositionForTest();
+    }
+
     private void WritePositionForTest()
     {
         if (!positionForTest || disposed) return;
@@ -1182,7 +1196,8 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
                     appearanceStep?.ToString(),
                     appearanceScale,
                     appearanceRestores,
-                    findHighlighted),
+                    findHighlighted,
+                    string.Join(" | ", pageTrace)),
                 ProductionJsonContext.Default.HtmlPositionForTest);
             string folder = Path.Combine(cacheRoot, "diagnostics");
             Directory.CreateDirectory(folder);

@@ -1786,6 +1786,7 @@ try {
                 appearanceScale = $file.appearanceScale
                 appearanceRestores = [int] $file.appearanceRestores
                 findHighlighted = [bool] $file.findHighlighted
+                trace = [string] $file.trace
             }
             if ($file.locator) {
                 $payload = ($file.locator | ConvertFrom-Json).payload
@@ -1805,7 +1806,7 @@ try {
                 Start-Sleep -Milliseconds 250
             } while ((Get-Date) -lt $deadline)
             [void](Save-WindowScreenshot 'html-position-timeout')
-            throw "The HTML position never showed $what. Last: offset=$($position.offset) kind=$($position.kind) step=$($position.step)."
+            throw "The HTML position never showed $what. Last: offset=$($position.offset) kind=$($position.kind) step=$($position.step) document=$($position.document) trace=$($position.trace)."
         }
 
         function Read-ProgressCounts {
