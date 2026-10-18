@@ -32,4 +32,9 @@ public sealed class FindResultTextTests
     [Fact]
     public void BothNotesAreJoined() =>
         Assert.Equal("2 image-only pages \u00B7 Couldn't search page 9", FindResultText.Note(With(2, 9)));
+
+    // T21.2: search in a guide of several pages ran out of time for the others.
+    [Fact]
+    public void OpenPageOnlyIsNoted() =>
+        Assert.Equal("Searched this page only", FindResultText.Note(FindResult.None with { OpenPageOnly = true }));
 }

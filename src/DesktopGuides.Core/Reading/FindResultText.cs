@@ -30,6 +30,7 @@ public static class FindResultText
                 ? $"Couldn't search pages {listed} and {unreadable.Count - ListedPages} more"
                 : $"Couldn't search pages {listed}");
         }
+        if (result.OpenPageOnly) parts.Add("Searched this page only");
         return parts.Count == 0 ? null : string.Join(" \u00B7 ", parts);
     }
 }
