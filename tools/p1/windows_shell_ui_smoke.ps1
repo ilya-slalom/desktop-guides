@@ -5207,7 +5207,8 @@ try {
                 [void](Wait-BookmarkNames @('*Sample Quest*', '*Chapter 2*') 'a bookmark on each page')
                 Invoke-Element (Find-ByName 'Go to start')
                 [void](Wait-HtmlPosition { param($p) $p.document -eq 'Sample Quest - Guides Example.html' -and $p.locator } 'the first page again')
-                Invoke-OverflowCommand 'Bookmarks'
+                # Adding left the pane on Bookmarks; the command for the tab showing would close it.
+                if (@(Get-BookmarkItems).Count -eq 0) { Invoke-OverflowCommand 'Bookmarks' }
                 [void](Wait-BookmarkNames @('*Sample Quest*', '*Chapter 2*') 'opening the Bookmarks tab')
                 Select-Bookmark '*Chapter 2*'
                 [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
