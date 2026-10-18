@@ -19,7 +19,9 @@ internal sealed record LibraryArchivePlan(int Games, int Guides, IReadOnlyList<P
 {
     private sealed record GuideRow(Guid Id, string Format, string Primary, string Sha256, long Bytes);
 
-    private sealed record AssetRow(string RelativePath, long Bytes, string Sha256);
+    private sealed record AssetRow(string Request, string RelativePath, string Kind, long Bytes, string Sha256);
+
+    private sealed record PageRow(long Order, string Request);
 
     public static LibraryArchivePlan Read(
         string snapshotPath, ILibraryPaths paths, int maxEntries = LibraryArchiveManifest.MaxEntries)
@@ -42,9 +44,16 @@ internal sealed record LibraryArchivePlan(int Games, int Guides, IReadOnlyList<P
             reader => new GuideRow(Guid.ParseExact(reader.GetString(0), "N"), reader.GetString(1),
                 reader.GetString(2), reader.GetString(3), reader.GetInt64(4)));
         ILookup<Guid, AssetRow> assets = Query(snapshot,
-            "SELECT GuideId, RelativePath, ByteCount, Sha256 FROM GuideAssets ORDER BY GuideId, RequestPath",
+            "SELECT GuideId, RequestPath, RelativePath, Kind, ByteCount, Sha256 FROM GuideAssets ORDER BY GuideId, RequestPath",
             reader => (Guid.ParseExact(reader.GetString(0), "N"),
-                new AssetRow(reader.GetString(1), reader.GetInt64(2), reader.GetString(3))))
+                new AssetRow(reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetInt64(4), reader.GetString(5))))
+            .ToLookup(row => row.Item1, row => row.Item2);
+        // T21.2: pages exist from schema 7; an older snapshot has none to check.
+        bool hasPages = Query(snapshot, "PRAGMA user_version", reader => reader.GetInt64(0)).Single() >= 7;
+        ILookup<Guid, PageRow> pages = (hasPages
+                ? Query(snapshot, "SELECT GuideId, PageOrder, RequestPath FROM GuidePages ORDER BY GuideId, PageOrder",
+                    reader => (Guid.ParseExact(reader.GetString(0), "N"), new PageRow(reader.GetInt64(1), reader.GetString(2))))
+                : [])
             .ToLookup(row => row.Item1, row => row.Item2);
 
         List<PlannedArchiveFile> files = [];
@@ -52,7 +61,7 @@ internal sealed record LibraryArchivePlan(int Games, int Guides, IReadOnlyList<P
         SortedSet<Guid> damagedGames = [];
         foreach (GuideRow guide in guides)
         {
-            if (!TryPlanGuide(guide, assets[guide.Id].ToArray(), paths, files))
+            if (!TryPlanGuide(guide, assets[guide.Id].ToArray(), hasPages ? pages[guide.Id].ToArray() : null, paths, files))
             {
                 damagedGuides.Add(guide.Id);
             }
@@ -79,7 +88,7 @@ internal sealed record LibraryArchivePlan(int Games, int Guides, IReadOnlyList<P
     }
 
     private static bool TryPlanGuide(
-        GuideRow guide, AssetRow[] assets, ILibraryPaths paths, List<PlannedArchiveFile> files)
+        GuideRow guide, AssetRow[] assets, PageRow[]? pageRows, ILibraryPaths paths, List<PlannedArchiveFile> files)
     {
         AssetRow[] planned;
         if (guide.Format == "Html")
@@ -92,6 +101,10 @@ internal sealed record LibraryArchivePlan(int Games, int Guides, IReadOnlyList<P
             {
                 return false;
             }
+            if (pageRows is not null && !PagesMatch(guide, assets, pageRows))
+            {
+                return false;
+            }
             IGrouping<string, AssetRow>[] byPath = assets.GroupBy(asset => asset.RelativePath, StringComparer.Ordinal).ToArray();
             if (byPath.Any(group => group.Select(asset => (asset.Bytes, asset.Sha256)).Distinct().Count() != 1))
             {
@@ -101,7 +114,7 @@ internal sealed record LibraryArchivePlan(int Games, int Guides, IReadOnlyList<P
         }
         else
         {
-            planned = [new AssetRow(guide.Primary, guide.Bytes, guide.Sha256)];
+            planned = [new AssetRow(guide.Primary, guide.Primary, "", guide.Bytes, guide.Sha256)];
         }
 
         List<PlannedArchiveFile> resolved = [];
@@ -148,6 +161,29 @@ internal sealed record LibraryArchivePlan(int Games, int Guides, IReadOnlyList<P
         {
             return false;
         }
+    }
+
+    // T21.2: the pages run 0…n−1, match the page assets one to one, and
+    // start at the guide's one entry.
+    private static bool PagesMatch(GuideRow guide, AssetRow[] assets, PageRow[] pages)
+    {
+        if (pages.Length == 0 || pages.Where((page, index) => page.Order != index).Any())
+        {
+            return false;
+        }
+        string[] pageAssets = assets
+            .Where(asset => asset.Kind is "EntryHtml" or "Page")
+            .Select(asset => asset.Request)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (!pageAssets.SequenceEqual(pages.Select(page => page.Request).Order(StringComparer.Ordinal)))
+        {
+            return false;
+        }
+        AssetRow? first = assets.FirstOrDefault(asset => asset.Request == pages[0].Request);
+        return first is { Kind: "EntryHtml" } &&
+            first.RelativePath == guide.Primary &&
+            assets.Count(asset => asset.Kind == "EntryHtml") == 1;
     }
 
     private static List<T> Query<T>(SqliteConnection connection, string sql, Func<SqliteDataReader, T> read)

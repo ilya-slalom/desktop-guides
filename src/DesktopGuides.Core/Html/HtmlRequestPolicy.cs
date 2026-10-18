@@ -73,7 +73,7 @@ public sealed class HtmlRequestPolicy
             return Deny(HtmlDenyReason.Malformed);
         }
         if (!assets.TryGetValue(requestPath, out GuideAsset? asset)) return Deny(HtmlDenyReason.NotInManifest);
-        return ContentTypeFor(asset.RelativePath) is { } type
+        return ContentTypeFor(asset) is { } type
             ? new HtmlServe(asset, type)
             : Deny(HtmlDenyReason.UnsupportedType);
     }
@@ -82,18 +82,23 @@ public sealed class HtmlRequestPolicy
         $"Content-Type: {contentType}\r\nX-Content-Type-Options: nosniff\r\nCache-Control: no-store\r\n" +
         $"Content-Security-Policy: {ContentSecurityPolicy}";
 
+    // T21.2: the kind the import recorded decides the type, so a MediaWiki
+    // load.php stylesheet is CSS. An image still needs a known image type.
     // No charset: legacy guides keep their own meta charset or BOM.
-    private static string? ContentTypeFor(string relativePath) =>
-        Path.GetExtension(relativePath).ToLowerInvariant() switch
+    private static string? ContentTypeFor(GuideAsset asset) => asset.Kind switch
+    {
+        GuideAssetKind.EntryHtml or GuideAssetKind.Page => "text/html",
+        GuideAssetKind.StyleSheet => "text/css",
+        GuideAssetKind.Image => Path.GetExtension(asset.RelativePath).ToLowerInvariant() switch
         {
-            ".html" or ".htm" => "text/html",
-            ".css" => "text/css",
             ".png" => "image/png",
             ".jpg" or ".jpeg" => "image/jpeg",
             ".gif" => "image/gif",
             ".webp" => "image/webp",
             _ => null
-        };
+        },
+        _ => null
+    };
 
     private static HtmlDeny Deny(HtmlDenyReason reason) => new(reason);
 }

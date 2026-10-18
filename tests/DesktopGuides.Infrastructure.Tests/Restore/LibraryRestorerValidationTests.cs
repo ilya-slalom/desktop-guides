@@ -131,4 +131,15 @@ public sealed class LibraryRestorerValidationTests : IAsyncLifetime
         await Refused(fixture.RewriteDatabase(
                 $"UPDATE Guides SET ContentBytes = ContentBytes + 1 WHERE Id = '{fixture.Source.HtmlGuide:N}';"),
             LibraryRestoreIssue.ReferencesInvalid);
+
+    [Fact]
+    public async Task AGuideWithoutItsPagesIsRefused()
+    {
+        string backup = fixture.RewriteDatabase(
+            $"DELETE FROM GuidePages WHERE GuideId = '{fixture.Source.HtmlGuide:N}';");
+
+        LibraryRestoreException error = await Refused(backup, LibraryRestoreIssue.ReferencesInvalid);
+
+        Assert.Equal([fixture.Source.HtmlGuide], error.GuideIds);
+    }
 }

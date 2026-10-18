@@ -152,6 +152,15 @@ public sealed class GuideImportValidatorHtmlPdfTests
     };
 
     [Theory]
+    [InlineData(StaticScanLimit.PageCount, "The guide links more than 2 saved pages.")]
+    [InlineData(StaticScanLimit.GuideBytes, "The guide's pages and their linked files are larger than the 5 bytes limit.")]
+    [InlineData(StaticScanLimit.GuideAssetCount, "The guide's pages link more than 3 files.")]
+    public void GuideLimitsHaveTheirMessages(StaticScanLimit limit, string message) =>
+        Assert.Equal(message, new GuideImportValidator(new GuideImportLimits(
+                Html: new StaticHtmlScanLimits(MaxPages: 2, MaxGuideBytes: 5, MaxGuideAssets: 3)))
+            .HtmlLimitMessage(limit));
+
+    [Theory]
     [MemberData(nameof(HtmlLimitCases))]
     public async Task HtmlLimitsMapToTooLarge(StaticScanLimit limit, string message)
     {

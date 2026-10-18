@@ -1291,6 +1291,29 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                 row.Parameters.AddWithValue("$sha", asset.Sha256);
                 row.ExecuteNonQuery();
             }
+            // T21.2: every HTML guide has its pages; without a list, the entry
+            // is the only page.
+            IReadOnlyList<GuidePage> pages = guide.Pages ?? (guide.Format == GuideFormat.Html
+                ? (guide.Assets ?? [])
+                    .Where(asset => asset.Kind == GuideAssetKind.EntryHtml)
+                    .Select(asset => new GuidePage(0, asset.RequestPath, null, null))
+                    .ToArray()
+                : []);
+            foreach (GuidePage page in pages)
+            {
+                using SqliteCommand row = connection.CreateCommand();
+                row.Transaction = transaction;
+                row.CommandText = """
+                    INSERT INTO GuidePages (GuideId, PageOrder, RequestPath, OriginalUrl, Title)
+                    VALUES ($id, $order, $request, $url, $title)
+                    """;
+                row.Parameters.AddWithValue("$id", id);
+                row.Parameters.AddWithValue("$order", page.Order);
+                row.Parameters.AddWithValue("$request", page.RequestPath);
+                row.Parameters.AddWithValue("$url", (object?)page.OriginalUrl ?? DBNull.Value);
+                row.Parameters.AddWithValue("$title", (object?)page.Title ?? DBNull.Value);
+                row.ExecuteNonQuery();
+            }
             using SqliteCommand remove = connection.CreateCommand();
             remove.Transaction = transaction;
             remove.CommandText = """

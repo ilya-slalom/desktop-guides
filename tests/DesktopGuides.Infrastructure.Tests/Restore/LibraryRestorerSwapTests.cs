@@ -1,3 +1,4 @@
+using System.Globalization;
 using DesktopGuides.Core.Backup;
 using DesktopGuides.Infrastructure.Storage;
 using Xunit;
@@ -32,7 +33,7 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
     public async Task AVersionFiveBackupRestoresAndMigrates()
     {
         string backup = fixture.RewriteDatabase(
-            RestoreFixture.ReaderPreferencesBeforeVersionSix() + " PRAGMA user_version = 5;",
+            RestoreFixture.GuideAssetsBeforeVersionSeven() + RestoreFixture.ReaderPreferencesBeforeVersionSix() + " PRAGMA user_version = 5;",
             manifest => manifest with { SchemaVersion = 5 });
         LibraryRestoreStage stage = await fixture.StageAsync(backup);
 
@@ -50,7 +51,7 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
     public async Task AVersionFourBackupRestoresAndMigrates()
     {
         string backup = fixture.RewriteDatabase(
-            RestoreFixture.ReaderPreferencesBeforeVersionSix() + " DROP TABLE Bookmarks; PRAGMA user_version = 4;",
+            RestoreFixture.GuideAssetsBeforeVersionSeven() + RestoreFixture.ReaderPreferencesBeforeVersionSix() + " DROP TABLE Bookmarks; PRAGMA user_version = 4;",
             manifest => manifest with { SchemaVersion = 4 });
         LibraryRestoreStage stage = await fixture.StageAsync(backup);
 
@@ -285,5 +286,22 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
         Assert.Equal(markerBefore, File.ReadAllText(fixture.MarkerPath));
         Assert.Equal(before, fixture.LiveEntries());
         Assert.True(Directory.Exists(RestoreMarker.StagedLibrary(fixture.Target.Paths, stage.StageId)));
+    }
+
+    // A backup from before schema 7 has no pages; it restores, and migration gives each HTML guide its entry page.
+    [Fact]
+    public async Task AVersionSixBackupRestoresWithOnePagePerHtmlGuide()
+    {
+        string backup = fixture.RewriteDatabase(
+            RestoreFixture.GuideAssetsBeforeVersionSeven() + " PRAGMA user_version = 6;",
+            manifest => manifest with { SchemaVersion = 6 });
+        LibraryRestoreStage stage = await fixture.StageAsync(backup);
+
+        await fixture.Restorer().ReplaceAsync(stage, CancellationToken.None);
+        await fixture.Target.RestartAsync();
+
+        Assert.Equal(LibrarySchema.CurrentVersion.ToString(CultureInfo.InvariantCulture), fixture.Target.Scalar("PRAGMA user_version"));
+        Assert.Equal("1", fixture.Target.Scalar(
+            $"SELECT COUNT(*) FROM GuidePages WHERE GuideId = '{fixture.Source.HtmlGuide:N}' AND PageOrder = 0"));
     }
 }

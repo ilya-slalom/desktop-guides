@@ -9,7 +9,7 @@ param(
         'reader-render-error-observed', 'reader-render-error-result',
         'late-guide-after-close', 'waiting-handoff', 'material', 'icons', 'keyboard', 'keyboard-txt', 'catalog', 'catalog-facts', 'library-search', 'stable-navigation',
         'provider-none', 'provider-offline', 'provider-settings',
-        'import-preview', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
+        'import-preview', 'import-html-pages', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
         'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted', 'txt-reader',
         'txt-load-paused', 'txt-back-during-load', 'txt-load-released', 'html-reader',
@@ -7068,6 +7068,22 @@ try {
             Wait-PickerClosed $picker
         }
 
+        $p2FixtureRoot = (Resolve-Path -LiteralPath (
+            Join-Path $PSScriptRoot '..\..\tests\fixtures\p2')).Path
+
+        function Choose-P2PickerFile([string] $relativePath) {
+            $picker = Wait-FilePicker
+            $path = Join-Path $p2FixtureRoot $relativePath
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+                Send-PickerCommand $picker 2
+                Wait-PickerClosed $picker
+                throw "The fixture '$relativePath' does not exist."
+            }
+            [DesktopGuidesForegroundProbe]::SetText((Find-InPicker $picker '1148' 'Edit'), $path)
+            Send-PickerCommand $picker 1
+            Wait-PickerClosed $picker
+        }
+
         function Select-ById([string] $id) {
             $element = Wait-VisibleById $id
             $element.GetCurrentPattern(
@@ -7098,7 +7114,33 @@ try {
             throw "Expected '$id' named '$expected'."
         }
 
-        if ($Mode -eq 'import-preview') {
+        if ($Mode -eq 'import-html-pages') {
+            # T21.2: one picked page brings the guide's other saved pages, in reading order.
+            Select-Element 'Import Test Game'
+            [void](Wait-Name 'GameHeading' 'Import Test Game')
+            [void](Wait-Status 'Game ready.')
+            Click-Element (Wait-EnabledById 'ImportGuideButton')
+            Choose-P2PickerFile 'html-multipage\Sample Quest - Guides Example.html'
+            [void](Wait-VisibleById 'ImportGuideDialog')
+            [void](Wait-Text 'ImportFormat' 'Web page (HTML)')
+            [void](Wait-Text 'ImportPages' '4 pages')
+            $order = ((Wait-PresentById 'ImportPageList').Current.Name -replace "`r", '')
+            $expectedOrder = "1. Sample Quest`n2. Chapter 1`n3. Chapter 2`n4. Chapter 3"
+            if ($order -ne $expectedOrder) { throw "The reading order was '$order'." }
+            $assets = (Wait-PresentById 'ImportAssets').Current.Name
+            if ($assets -notlike '4 linked files, * in total') { throw "The linked files row was '$assets'." }
+            $report.importHtmlPagesScreenshot = Save-WindowScreenshot 'import-html-pages'
+            $report.phases += 'import-html-pages-preview'
+
+            $pagesTitle = 'Sample Quest ' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+            Set-Text 'GuideTitleInput' $pagesTitle
+            Invoke-Element (Wait-EnabledById 'PrimaryButton')
+            [void](Wait-HiddenById 'ImportGuideDialog')
+            [void](Wait-SelectedGuide $pagesTitle)
+            $report.importedPagesTitle = $pagesTitle
+            $report.phases += 'import-html-pages-published'
+        }
+        elseif ($Mode -eq 'import-preview') {
             Select-Element 'Import Test Game'
             [void](Wait-Name 'GameHeading' 'Import Test Game')
             [void](Wait-Status 'Game ready.')

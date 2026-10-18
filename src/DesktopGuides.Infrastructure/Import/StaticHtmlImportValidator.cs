@@ -157,6 +157,8 @@ public sealed class StaticHtmlImportValidator(
                     "An unsafe asset path will be blocked.",
                 StaticReferenceStatus.Unsupported =>
                     "An unsupported asset will be blocked.",
+                StaticReferenceStatus.Invalid =>
+                    "A linked style sheet isn't readable CSS and will be skipped.",
                 _ => throw new ArgumentOutOfRangeException(nameof(reference))
             });
 

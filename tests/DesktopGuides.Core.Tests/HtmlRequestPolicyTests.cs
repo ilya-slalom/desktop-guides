@@ -196,4 +196,22 @@ public sealed class HtmlRequestPolicyTests
             "object-src 'none'; base-uri 'none'",
             headers);
     }
+
+    // T21.2: what the import recorded decides the type, not the file name.
+    [Fact]
+    public void FilesAreServedByTheirKind()
+    {
+        HtmlRequestPolicy policy = new(Id,
+        [
+            .. Assets,
+            new GuideAsset("Guide_files/load.php", "Guide_files/load.php", GuideAssetKind.StyleSheet, 10, Hash),
+            new GuideAsset("Chapter 1.htm", "Chapter 1.htm", GuideAssetKind.Page, 10, Hash),
+            new GuideAsset("Guide_files/icon.php", "Guide_files/icon.php", GuideAssetKind.Image, 10, Hash),
+        ]);
+
+        Assert.Equal("text/css", Assert.IsType<HtmlServe>(policy.Decide("GET", Origin + "/Guide_files/load.php")).ContentType);
+        Assert.Equal("text/html", Assert.IsType<HtmlServe>(policy.Decide("GET", Origin + "/Chapter%201.htm")).ContentType);
+        Assert.Equal(HtmlDenyReason.UnsupportedType,
+            Assert.IsType<HtmlDeny>(policy.Decide("GET", Origin + "/Guide_files/icon.php")).Reason);
+    }
 }

@@ -3,6 +3,8 @@ namespace DesktopGuides.Core.Html;
 public enum GuideAssetKind
 {
     EntryHtml,
+    // T21.2: a guide page after the first.
+    Page,
     StyleSheet,
     Image
 }

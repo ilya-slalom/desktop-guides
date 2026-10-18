@@ -4,6 +4,7 @@ Merged P2 work, in the [P1 results](../p1/results.md) format.
 
 | PR | Merged | Commit | Task | Final CI run | Core | Infra | Record | Caveats |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [#132](https://github.com/ilya-slalom/desktop-guides/pull/132) | 2026-10-17 | `e3c9a71` | T21.1 | — (docs only) | — | — | [format-survey](format-survey.md) | The format survey; T21.2 limited to multi-page HTML and image maps. |
 | [#131](https://github.com/ilya-slalom/desktop-guides/pull/131) | 2026-10-17 | `eea78d7` | T19.2 (PR b) | [39001210654](https://github.com/ilya-slalom/desktop-guides/actions/runs/39001210654) | 1324 | 837 | [t19-2-reflow-design](t19-2-reflow-design.md#pr-b-verification-record) | The reflow view; T19.2 and M10 complete. Attempt 2: attempt 1 lost two jobs to #121. |
 | [#130](https://github.com/ilya-slalom/desktop-guides/pull/130) | 2026-10-16 | `09b6bf9` | T19.2 (PR a) | [38905245907](https://github.com/ilya-slalom/desktop-guides/actions/runs/38905245907) | 1317 | 837 | [t19-2-reflow-design](t19-2-reflow-design.md#pr-a-verification-record) | The reflow planner and the view preference. Passed on the first attempt. |
 | [#129](https://github.com/ilya-slalom/desktop-guides/pull/129) | 2026-10-16 | `9313feb` | T19.1 (PR b) | [38894293081](https://github.com/ilya-slalom/desktop-guides/actions/runs/38894293081) | 1295 | 829 | [t19-1-bookmarks-design](t19-1-bookmarks-design.md#pr-b-verification-record) | The Bookmarks tab; T19.1 and M9 complete. Passed on the first attempt. |

@@ -2279,6 +2279,7 @@ function Run-ImportScenarios {
             throw "After an import, a copy and Open existing, $name was $($state.$name); expected $($expected[$name])."
         }
     }
+
 }
 
 function Assert-RemovalState([string] $label, $expected) {
@@ -2289,6 +2290,19 @@ function Assert-RemovalState([string] $label, $expected) {
         }
     }
     return $state
+}
+
+# T21.2: after the removal runs, which count Import Test Game's guides.
+function Run-MultipageImportScenario {
+    # T21.2: a multi-page guide imports with its four pages.
+    Start-InstalledShell
+    $report.importHtmlPages = Run-ShellSmoke 'import-html-pages' -ResultName 'import-html-pages'
+    Close-InstalledShell
+    $pagesState = Invoke-ShellSeed @('describe-import', $dataRoot) | ConvertFrom-Json
+    $report.importHtmlPagesState = $pagesState
+    if ($pagesState.MostGuidePages -ne 4) {
+        throw "The multi-page guide stored $($pagesState.MostGuidePages) pages; expected 4."
+    }
 }
 
 function Run-RemovalScenarios {
@@ -3277,6 +3291,7 @@ try {
     if (Enter-ScenarioGroup 'import') {
         Run-ImportScenarios
         Run-RemovalScenarios
+        Run-MultipageImportScenario
     }
 
     if (Enter-ScenarioGroup 'game-actions') { Run-GameActionsScenarios }

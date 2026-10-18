@@ -16,7 +16,7 @@ public sealed record TxtImportManifest(
 public sealed record HtmlImportManifest(
     ImportSource Source, string SuggestedTitle, string EntryRelativePath,
     int AssetCount, long TotalBytes, IReadOnlyList<ImportWarning> Warnings,
-    string Fingerprint)
+    string Fingerprint, IReadOnlyList<string> PageTitles)   // T21.2: in reading order
     : ImportManifest(Source, GuideFormat.Html, SuggestedTitle, Fingerprint);
 
 public sealed record PdfImportManifest(

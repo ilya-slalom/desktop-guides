@@ -440,6 +440,7 @@ public sealed partial class ImportGuideDialog : ContentDialog
         ImportEncodingRow.Visibility = Visibility.Collapsed;
         ImportAssetsRow.Visibility = Visibility.Collapsed;
         ImportPagesRow.Visibility = Visibility.Collapsed;
+        ImportPageListRow.Visibility = Visibility.Collapsed;
         ImportProtectedRow.Visibility = Visibility.Collapsed;
         ImportPdfPasswordStep.Visibility = Visibility.Collapsed;
         ImportPdfPasswordError.Visibility = Visibility.Collapsed;
@@ -559,6 +560,14 @@ public sealed partial class ImportGuideDialog : ContentDialog
                 string files = html.AssetCount == 1 ? "1 linked file" : $"{html.AssetCount} linked files";
                 ImportAssets.Text = $"{files}, {ImportPresentation.FormatSize(html.TotalBytes)} in total";
                 ImportAssetsRow.Visibility = Visibility.Visible;
+                // T21.2: a guide of several saved pages lists them in reading order.
+                if (html.PageTitles.Count > 1)
+                {
+                    ImportPages.Text = ImportPresentation.PageCount(html.PageTitles.Count);
+                    ImportPagesRow.Visibility = Visibility.Visible;
+                    ImportPageList.Text = ImportPresentation.PageList(html.PageTitles);
+                    ImportPageListRow.Visibility = Visibility.Visible;
+                }
                 ShowWarnings(html.Warnings);
                 break;
             case PdfImportManifest pdf:

@@ -124,7 +124,8 @@ public sealed class GuideImportPublisher
                     operationId, guideId, gameId, title, manifest.Format, plan.PrimaryRelativePath,
                     fingerprint, plan.TotalBytes, manifest.Source.FileName,
                     (manifest as TxtImportManifest)?.CodePage,
-                    plan.Html?.Manifest.Assets.Select(ToGuideAsset).ToArray() ?? []),
+                    plan.Html?.Manifest.Assets.Select(ToGuideAsset).ToArray() ?? [],
+                    plan.Html?.Manifest.Pages.Select(ToGuidePage).ToArray()),
                 () => checkpoint(ImportCheckpoint.InCommit));
         }
         catch (Exception error)
@@ -159,11 +160,18 @@ public sealed class GuideImportPublisher
         asset.Kind switch
         {
             StaticAssetKind.EntryHtml => GuideAssetKind.EntryHtml,
+            StaticAssetKind.Page => GuideAssetKind.Page,
             StaticAssetKind.StyleSheet => GuideAssetKind.StyleSheet,
             StaticAssetKind.Image => GuideAssetKind.Image,
             _ => throw new InvalidDataException("An HTML asset has no reader kind.")
         },
         asset.ByteCount, asset.Sha256);
+
+    // An address too long to store is left out; a long title is shortened.
+    private static GuidePage ToGuidePage(StaticPage page, int order) => new(
+        order, page.RequestRelativePath,
+        page.OriginalUrl is { Length: <= 2048 } url ? url : null,
+        page.Title is { Length: > 512 } title ? title[..512] : page.Title);
 
     private static void CheckNotDuplicate(IImportJournal journal, ImportManifest manifest, Guid gameId)
     {

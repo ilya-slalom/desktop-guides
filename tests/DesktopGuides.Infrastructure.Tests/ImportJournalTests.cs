@@ -1,3 +1,4 @@
+using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Library;
 using DesktopGuides.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
@@ -178,6 +179,46 @@ public sealed class ImportJournalTests : IAsyncLifetime
 
         Assert.Equal(id, found);
         Assert.Null(otherFormat);
+    }
+
+    [Fact]
+    public async Task AnHtmlGuideKeepsItsPagesInOrder()
+    {
+        Guid operation = Guid.NewGuid();
+        Guid id = Guid.NewGuid();
+        GuideAsset[] assets =
+        [
+            new("Start.html", "Start.html", GuideAssetKind.EntryHtml, 10, Hash),
+            new("One.html", "One.html", GuideAssetKind.Page, 10, Hash),
+        ];
+        await Run(journal =>
+        {
+            journal.Prepare(operation, id);
+            journal.Publish(new NewImportedGuide(operation, id, game.Id, "Pages", GuideFormat.Html, "Start.html",
+                Hash, 20, "Start.html", null, assets,
+                [new GuidePage(0, "Start.html", "https://guides.example/q", "Start"), new GuidePage(1, "One.html", null, null)]),
+                () => { });
+        });
+
+        Assert.Equal("0:Start.html:https://guides.example/q:Start;1:One.html::", Scalar(
+            $"SELECT group_concat(PageOrder || ':' || RequestPath || ':' || IFNULL(OriginalUrl, '') || ':' || IFNULL(Title, ''), ';') " +
+            $"FROM (SELECT * FROM GuidePages WHERE GuideId = '{id:N}' ORDER BY PageOrder)"));
+    }
+
+    [Fact]
+    public async Task AnHtmlGuideWithoutAPageListHasItsEntry()
+    {
+        Guid operation = Guid.NewGuid();
+        Guid id = Guid.NewGuid();
+        await Run(journal =>
+        {
+            journal.Prepare(operation, id);
+            journal.Publish(new NewImportedGuide(operation, id, game.Id, "One", GuideFormat.Html, "guide.html",
+                Hash, 10, "guide.html", null, [new("guide.html", "guide.html", GuideAssetKind.EntryHtml, 10, Hash)]),
+                () => { });
+        });
+
+        Assert.Equal("0:guide.html", Scalar($"SELECT PageOrder || ':' || RequestPath FROM GuidePages WHERE GuideId = '{id:N}'"));
     }
 
     private NewImportedGuide Guide() => new(

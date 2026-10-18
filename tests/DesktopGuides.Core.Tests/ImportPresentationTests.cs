@@ -92,4 +92,24 @@ public sealed class ImportPresentationTests
         Assert.Equal("images/x.png: A local asset is missing and will not appear offline.",
             ImportPresentation.WarningLine(new ImportWarning(
                 "images/x.png", "A local asset is missing and will not appear offline.")));
+
+    [Fact]
+    public void PagesAreCountedAndListedInOrder()
+    {
+        Assert.Equal("1 page", ImportPresentation.PageCount(1));
+        Assert.Equal("4 pages", ImportPresentation.PageCount(4));
+        Assert.Equal("1. Sample Quest\n2. Chapter 1", ImportPresentation.PageList(["Sample Quest", "Chapter 1"]));
+    }
+
+    [Fact]
+    public void ALongPageListShowsTwentyAndCountsTheRest()
+    {
+        string[] titles = Enumerable.Range(1, 23).Select(n => $"Page {n}").ToArray();
+
+        string[] lines = ImportPresentation.PageList(titles).Split('\n');
+
+        Assert.Equal(21, lines.Length);
+        Assert.Equal("20. Page 20", lines[19]);
+        Assert.Equal("and 3 more", lines[20]);
+    }
 }
