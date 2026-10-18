@@ -199,6 +199,7 @@ if (args.Length == 2 && args[0] == "describe-import")
         ReadingStates = Scalar("SELECT COUNT(*) FROM ReadingStates"),
         ReaderPreferences = Scalar("SELECT COUNT(*) FROM ReaderPreferences"),
         LegacyTextGuides = Scalar("SELECT COUNT(*) FROM Guides WHERE Format = 'Txt' AND TextCodePage = 437"),
+        MostGuidePages = Scalar("SELECT COALESCE(MAX(Pages), 0) FROM (SELECT COUNT(*) AS Pages FROM GuidePages GROUP BY GuideId)"),
     }));
     return 0;
 }
