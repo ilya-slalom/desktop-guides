@@ -1,7 +1,8 @@
 # T21.2 multi-page HTML: design
 
 Status: approved in conversation, 18 October 2026. PR a merged as #133.
-PR b (reading) implemented on `feat/p2-t21-2-multipage-reading`.
+PR b merged as #134. PR c (contents, search and bookmarks) implemented on
+`feat/p2-t21-2-multipage-panes`. Multi-page HTML is supported.
 
 ## Intent
 
@@ -348,5 +349,65 @@ See the [PR b plan](t21-2-multipage-reading-plan.md).
     harness, so these two fixes have no failing test.
   - **Review Focus 1 had no installed step.** Its step, a link to the
     open page's own address, is added and passes.
+
+  The minors are deferred and listed in the PR.
+
+## PR c verification record
+
+See the [PR c plan](t21-2-multipage-panes-plan.md).
+
+- **Core,** each test failing first and then passing on the host:
+  - `HtmlGuidePagesTests`: display titles without the shared suffix, and
+    an order across pages, so the same offset on two pages is two places;
+  - `HtmlGuideOutlineTests`: every page by title, the open page's
+    headings under it, and a one-page guide's own outline;
+  - `GuideFindTests`: steps within a page, the next page with a match
+    (wrapping, or none), and a count across pages;
+  - `BookmarkListTests` and `FindResultTextTests`: a bookmark's page in
+    its accessible name, and the "Searched this page only" note;
+  - `HtmlLocationRulesTests`: a page's top on unchanged bytes is an
+    exact place.
+
+  The full suite passes, 1396/1396.
+- **Infrastructure:** `GuidePageCounterTests` count each page's saved
+  text off the UI thread, skipping what the reader's find walk skips
+  (script, style, template and noscript). An unreadable page counts
+  nothing, and a cancelled count is no count. `HtmlRequestPolicyTests`
+  cover a page's asset. The full suite passes, 876/876.
+- **Production:** it builds with 0 warnings, with warnings as errors.
+- **Installed:** the `navigation` group passes on both lanes (runs
+  39131754587, MSIX, and 39131760105, portable):
+  - `html-pages-contents`: every page in reading order, another page's
+    entry opens it with no moved-place notice, and the pane follows the
+    page;
+  - `html-pages-find`: Next and Previous cross pages and wrap, the count
+    spans the guide, a match its stylesheet hides is passed over, a
+    query on one page wraps within it, and searching saves no place;
+  - `html-pages-find-again`: a second Enter while the pages are counted
+    still searches the whole guide;
+  - `html-pages-bookmark`: bookmarks at the same offset on two pages,
+    named with their pages, and followed.
+
+  Screenshots: [html-pages-contents](evidence/ci/t21-2/html-pages-contents.png),
+  [html-pages-find](evidence/ci/t21-2/html-pages-find.png) and
+  [html-pages-bookmark](evidence/ci/t21-2/html-pages-bookmark.png).
+- **Found by the installed runs:**
+  - **The bookmark step** pressed the Bookmarks command with the tab
+    already open, which closed the pane. It now opens the tab only when
+    it isn't showing.
+  - **Another page's contents entry** said "Opened near your last place.
+    The guide changed since you were here." A page's top has no quote,
+    so its restore took the fraction step and was graded approximate. A
+    fraction of 0 on unchanged bytes is now exact.
+- **Final review:** 0 Critical and 2 Important. Each failed first in an
+  installed run, then passed.
+  - **A second Enter while the pages were counted** left the query with
+    no counts, so search covered the open page only ("1 of 1"). The
+    query and its counts are now set together.
+  - **Saved text the reader hides counted as matches.** A wiki's site
+    menu hidden by its stylesheet sent Next to a page with "No matches".
+    A page's live count now replaces its saved one, and the step goes
+    on. Noscript text no longer counts, which reverses a ruling made
+    while implementing.
 
   The minors are deferred and listed in the PR.

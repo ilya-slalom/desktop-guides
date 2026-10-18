@@ -44,7 +44,7 @@ matching every feature.
 | ID | Requirement | Observable behavior |
 | --- | --- | --- |
 | R1 | Organize by game | Search an external game-metadata provider and add a selected edition with a locally cached metadata/artwork snapshot, or create a game manually while offline or when no result fits. Rename and remove games; attach multiple independently tracked guides to each one. |
-| R2 | Import local guides | Pick TXT, HTML, or PDF files; copy content and supported local HTML assets into managed storage; show a clear error for unsupported, missing, or unreadable files. |
+| R2 | Import local guides | Pick TXT, HTML, or PDF files, or the first page of a guide saved as several web pages; copy content and supported local HTML assets into managed storage; show a clear error for unsupported, missing, or unreadable files. |
 | R3 | Browse the library | See games, their guides, format, last opened date, and reading state; find a game or guide by title. |
 | R4 | Read offline | Open any successfully imported guide after disconnecting from the network. No reader view should need a remote resource. |
 | R5 | Resume accurately | Reopen each guide near its last visible position after closing the guide, restarting the app, changing window size, or changing text size. |
@@ -58,7 +58,8 @@ matching every feature.
 1. **Navigation:** in-guide search for TXT/HTML, HTML heading navigation, TXT
    table-of-contents detection, bookmarks, and optional smart TXT reflow. Keep
    a preformatted mode so diagrams remain legible.
-2. **More material:** multi-page offline HTML imports and image maps in P2;
+2. **More material:** multi-page offline HTML imports (supported since T21.2, 18 October 2026)
+   and image maps in P2;
    CBZ and other manual formats after the final milestone (the
    [format survey](p2/format-survey.md), 17 October 2026). Add PDF text
    search only with a PDF engine that exposes text; the proposed MVP
