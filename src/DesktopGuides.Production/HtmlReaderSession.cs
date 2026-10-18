@@ -41,6 +41,10 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     private readonly HtmlGuidePages pages;
     // Test gate only (T21.2): the last navigations and page moves, newest last.
     private readonly List<string> pageTrace = [];
+    // T21.2: the open page's own navigation, so a cancelled click's
+    // completion isn't taken for it; and whether a page move is under way.
+    private ulong documentNavigationId;
+    private bool moving;
     private int pageIndex;
     private Uri document;
     private HtmlEntryState entry;
@@ -313,6 +317,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         }
         await restoreTurn.WaitAsync();
         restoring = true;
+        moving = true;
         try
         {
             pageIndex = index;
@@ -334,6 +339,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
             }
             await WriteAppearanceAsync();
             if (fragment is not null) core.Navigate(document.AbsoluteUri + fragment);
+            moving = false;
             current = await CaptureAsync() ?? Start;
             WritePositionForTest();
             RaiseLocationChanged();
@@ -341,6 +347,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         }
         finally
         {
+            moving = false;
             restoring = false;
             restoreTurn.Release();
         }
@@ -351,8 +358,13 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     private async Task<bool> NavigateDocumentAsync()
     {
         TaskCompletionSource<bool> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        void Completed(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args) =>
-            completion.TrySetResult(args.IsSuccess);
+        void Completed(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
+        {
+            TraceForTest($"completed {args.NavigationId} success={args.IsSuccess} {args.WebErrorStatus}");
+            // A cancelled click completes too, after the move began.
+            if (args.NavigationId == documentNavigationId) completion.TrySetResult(args.IsSuccess);
+        }
+        documentNavigationId = 0;
         core!.NavigationCompleted += Completed;
         try
         {
@@ -995,6 +1007,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         switch (navigation.Kind)
         {
             case HtmlNavigationKind.Entry:
+                documentNavigationId = args.NavigationId;
                 diagnostics?.RecordEntryNavigation();
                 if (!documentNavigated) HtmlOpenTimelineForTest.Mark("navigation-starting");
                 documentNavigated = true;
@@ -1184,7 +1197,8 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         if (!positionForTest || disposed) return;
         try
         {
-            string? locator = current is null ? null : ReaderLocationCodec.Serialize(
+            // Mid-move, the page isn't the reader's place yet.
+            string? locator = current is null || moving ? null : ReaderLocationCodec.Serialize(
                 HtmlLocationRules.Capture(contentSha256 ?? string.Empty, pages[pageIndex].RequestPath, current, pageIndex, pages.Count));
             string json = JsonSerializer.Serialize(
                 new HtmlPositionForTest(
