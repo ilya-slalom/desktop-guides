@@ -214,4 +214,12 @@ public sealed class HtmlRequestPolicyTests
         Assert.Equal(HtmlDenyReason.UnsupportedType,
             Assert.IsType<HtmlDeny>(policy.Decide("GET", Origin + "/Guide_files/icon.php")).Reason);
     }
+
+    // T21.2: search reads a guide's other pages by their recorded rows.
+    [Fact]
+    public void AssetForFindsARecordedFile()
+    {
+        Assert.Equal(Assets[1], Policy().AssetFor("styles/main.css"));
+        Assert.Null(Policy().AssetFor("nope.css"));
+    }
 }

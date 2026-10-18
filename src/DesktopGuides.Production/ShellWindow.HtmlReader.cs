@@ -51,6 +51,7 @@ public sealed partial class ShellWindow
         session.ExternalLinkRequested += OnExternalLinkRequested;
         session.UnavailableLinkRequested += OnUnavailableLinkRequested;
         session.Failed += OnReaderSessionFailed;
+        session.PageChanged += OnHtmlPageChanged;
         session.AppearanceRestored += OnAppearanceRestored;
         MarkReaderGuide(GuideFileStatus.Ok);
         ShowReaderSurface(loading: false, view: session.View);

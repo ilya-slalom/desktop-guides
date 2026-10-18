@@ -135,6 +135,11 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     // dies after the guide opened.
     public event EventHandler<HtmlGuideLoadError>? Failed;
 
+    // T21.2: another of the guide's pages is showing; its outline changed.
+    public event EventHandler? PageChanged;
+
+    public HtmlGuidePages Pages => pages;
+
     public static HtmlSessionDiagnostics? DiagnosticsForTest() =>
         TestGate.IsOpen(AppLane.Current.LocalEvent("HtmlDiagnostics", Environment.ProcessId))
             ? new HtmlSessionDiagnostics()
@@ -317,6 +322,23 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         }
         await restoreTurn.WaitAsync();
         restoring = true;
+        try
+        {
+            return await MoveToPageAsync(index, fragment, forFind: false);
+        }
+        finally
+        {
+            restoring = false;
+            restoreTurn.Release();
+        }
+    }
+
+    // The move itself, for a caller that holds the restore turn. Search
+    // (forFind) keeps its query and counts, and its moves raise no
+    // LocationChanged: search never moves the saved place.
+    private async Task<bool> MoveToPageAsync(int index, string? fragment, bool forFind)
+    {
+        if (disposed || failed || core is null) return false;
         moving = true;
         // Hidden until the reader's style is on the new page, as at the open,
         // so a Dark reader never flashes the page's own colors.
@@ -330,7 +352,7 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
             applied = null;
             current = Start;
             lastScroll = null;
-            ResetFind();
+            if (!forFind) ResetFind();
             bool navigated = false;
             for (int attempt = 0; attempt < 2 && !navigated && !disposed && !failed; attempt++)
             {
@@ -356,15 +378,26 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
             moving = false;
             current = await CaptureAsync() ?? Start;
             WritePositionForTest();
-            RaiseLocationChanged();
+            if (!forFind) RaiseLocationChanged();
+            RaisePageChanged();
             return true;
         }
         finally
         {
             moving = false;
             if (!disposed) View.Opacity = 1;
-            restoring = false;
-            restoreTurn.Release();
+        }
+    }
+
+    private void RaisePageChanged()
+    {
+        try
+        {
+            PageChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception)
+        {
+            // A throwing handler must not stop the move.
         }
     }
 
@@ -607,43 +640,90 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
     // Test diagnostics: whether the last find script drew a match.
     private bool findHighlighted;
 
+    // T21.2: in a guide of several pages, each page's saved-text count for
+    // the query, or null when counting them ran out of time.
+    private int[]? pageCounts;
+
     public async Task<FindResult> FindAsync(FindQuery query, FindDirection direction, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(query);
         if (!await entryLoad.Task.WaitAsync(token) || disposed) return FindResult.Failure;
         await restoreTurn.WaitAsync(token);
         restoring = true;
+        bool guide = pages.Count > 1;
         try
         {
             if (query.Text != findText)
             {
-                HtmlFindText? text = HtmlFindText.Parse(await RunScriptAsync(HtmlFindScripts.ReadText));
-                if (text is null)
+                if (!await ReadMatchesAsync(query, token))
                 {
                     ResetFind();
                     return FindResult.Failure;
                 }
-                matches = await Task.Run(
-                    () => TextMatcher.FindAll(text.Text, query, TextMatcher.MaxMatches, text.Breaks), token);
                 findText = query.Text;
                 matchIndex = null;
+                pageCounts = guide ? await CountPagesAsync(query, token) : null;
             }
             token.ThrowIfCancellationRequested();
-            matchIndex = TextMatcher.Step(matches, matchIndex, current?.Offset ?? 0, direction);
-            if (matchIndex is not int index)
+            bool across = guide && pageCounts is not null;
+            int? index = across
+                ? GuideFind.StepInPage(matches, matchIndex, current?.Offset ?? 0, direction)
+                : TextMatcher.Step(matches, matchIndex, current?.Offset ?? 0, direction);
+            if (index is null && across)
+            {
+                if (GuideFind.NextPage(pageCounts!, pageIndex, direction) is int page)
+                {
+                    if (!await MoveToPageAsync(page, null, forFind: true) || !await ReadMatchesAsync(query, token))
+                    {
+                        return FindResult.Failure;
+                    }
+                    matchIndex = null;
+                    index = matches.Count == 0 ? null : direction == FindDirection.Next ? 0 : matches.Count - 1;
+                }
+                else
+                {
+                    // No other page matches: wrap within the open page, as one page does.
+                    index = TextMatcher.Step(matches, matchIndex, current?.Offset ?? 0, direction);
+                }
+            }
+            matchIndex = index;
+            if (matchIndex is not int at)
             {
                 await RunScriptAsync(HtmlFindScripts.Clear);
-                return FindResult.None;
+                return FindResult.None with { OpenPageOnly = guide && pageCounts is null };
             }
-            return await ShowMatchAsync(matches[index], token)
-                ? new FindResult(FindOutcome.Found, index + 1, matches.Count, false, 0)
-                : FindResult.Failure;
+            if (!await ShowMatchAsync(matches[at], token)) return FindResult.Failure;
+            (int number, int total) = across
+                ? GuideFind.Count(pageCounts!, pageIndex, matches.Count, at)
+                : (at + 1, matches.Count);
+            return new FindResult(FindOutcome.Found, number, total, false, 0) { OpenPageOnly = guide && pageCounts is null };
         }
         finally
         {
             restoring = false;
             restoreTurn.Release();
         }
+    }
+
+    private async Task<bool> ReadMatchesAsync(FindQuery query, CancellationToken token)
+    {
+        HtmlFindText? text = HtmlFindText.Parse(await RunScriptAsync(HtmlFindScripts.ReadText));
+        if (text is null) return false;
+        matches = await Task.Run(
+            () => TextMatcher.FindAll(text.Text, query, TextMatcher.MaxMatches, text.Breaks), token);
+        return true;
+    }
+
+    // Off the UI thread, within GuideFind.Budget; out of time is null.
+    private async Task<int[]?> CountPagesAsync(FindQuery query, CancellationToken token)
+    {
+        GuideAsset[] files = [.. pages.DocumentPaths.Select(path => policy.AssetFor(path)!)];
+        using CancellationTokenSource budget = CancellationTokenSource.CreateLinkedTokenSource(token);
+        budget.CancelAfter(GuideFind.Budget);
+        int[]? counts = await Task.Run(
+            () => GuidePageCounter.Count(files, reader.Read, query, budget.Token), CancellationToken.None);
+        token.ThrowIfCancellationRequested();
+        return counts;
     }
 
     // A resize or a restyle during the step reflowed the page: show the
@@ -702,17 +782,22 @@ internal sealed class HtmlReaderSession : IReaderSession, IFindableReader, IOutl
         if (!await entryLoad.Task.WaitAsync(token) || disposed || contentSha256 is null) return Outline.Empty;
         string? reply = await RunScriptAsync(HtmlOutlineScripts.Collect);
         token.ThrowIfCancellationRequested();
-        return HtmlOutlineRules.Build(reply, contentSha256, pages[pageIndex].RequestPath);
+        return HtmlGuideOutline.Build(
+            pages, pageIndex, HtmlOutlineRules.Build(reply, contentSha256, pages[pageIndex].RequestPath), contentSha256);
     }
 
+    // T21.2: across pages, so the same offset on two pages is two places.
     public long OrderOf(ReaderLocation location) =>
-        location.Payload is HtmlPosition position ? position.TextOffset : 0;
+        location.Payload is HtmlPosition position
+            ? pages.OrderOf(pages.IndexOfDocument(position.DocumentPath) ?? 0, position.TextOffset)
+            : 0;
 
     private void ResetFind()
     {
         findText = null;
         matches = [];
         matchIndex = null;
+        pageCounts = null;
     }
 
     // Runs a fixed host script in the entry document only. Any failure,

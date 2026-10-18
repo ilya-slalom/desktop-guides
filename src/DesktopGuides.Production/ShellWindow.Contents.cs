@@ -209,4 +209,19 @@ public sealed partial class ShellWindow
         };
         if (!focused) ReaderActions.Focus(FocusState.Programmatic);
     }
+
+    // T21.2: another page of the guide is showing, so its contents change:
+    // the outline is built again, and an open pane shows it.
+    private void OnHtmlPageChanged(object? sender, EventArgs args)
+    {
+        if (sender is not HtmlReaderSession session || !ReferenceEquals(session, readerSession) || outlineCancel is null)
+        {
+            return;
+        }
+        outlineCancel.Cancel();
+        outlineCancel.Dispose();
+        CancellationTokenSource cancel = new();
+        outlineCancel = cancel;
+        _ = BuildOutlineAsync(session, session, cancel.Token);
+    }
 }
