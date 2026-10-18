@@ -1853,6 +1853,12 @@ function Run-NavigationScenarios {
         throw "A place on page 3 of 4 stored progress $estimate; expected 0.5 to 0.75."
     }
     $report.htmlPagesReopen = Invoke-ProgressPass 'html-pages-reopen' 0 -HtmlPosition
+    # T21.2 PR c: contents, search and bookmarks across the pages.
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.htmlPagesContents = Invoke-ProgressPass 'html-pages-contents' 0 -HtmlPosition
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.htmlPagesFind = Invoke-ProgressPass 'html-pages-find' 0 -HtmlPosition
+    $report.htmlPagesBookmark = Invoke-ProgressPass 'html-pages-bookmark' 0 -HtmlPosition
     Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
     $report.contentsPdf = Invoke-ProgressPass 'contents-pdf' 0
     if ($null -eq (& $estimateOf 'Outline PDF Guide')) {
