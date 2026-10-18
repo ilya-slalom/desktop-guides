@@ -4324,7 +4324,7 @@ try {
                 $report.phases += 'workflow-restored-places'
             }
         }
-        elseif ($Mode -like 'find-*' -or $Mode -like 'contents-*' -or $Mode -like 'bookmark-*' -or $Mode -like 'reflow-*') {
+        elseif ($Mode -like 'find-*' -or $Mode -like 'contents-*' -or $Mode -like 'bookmark-*' -or $Mode -like 'reflow-*' -or $Mode -like 'html-pages-*') {
             # T18.1: in-guide search. Searching must never save the reading place.
             function Read-Saves { return [int] (Read-ProgressCounts).saves }
             # The MARK number of the page's top line, within a range.
