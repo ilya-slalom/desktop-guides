@@ -627,6 +627,36 @@ public sealed class StaticHtmlDependencyScannerTests
         Assert.Equal(["Start.html", "One (1).html"], manifest.Pages.Select(page => page.RelativePath));
     }
 
+    // Final review: a second save of the entry page never joins as another page.
+    [Fact]
+    public async Task ASecondSaveOfTheEntryDoesNotJoin()
+    {
+        MemoryFolder folder = new(
+            ("Start.html", SavedPage("https://guides.example/q", "Start", """<a href="https://guides.example/q/1">1</a>""")),
+            ("Start (1).html", SavedPage("https://guides.example/q", "Start again", "")),
+            ("One.html", SavedPage("https://guides.example/q/1", "One", """<a href="https://guides.example/q">Back</a>""")));
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner().ScanAsync("Start.html", folder);
+
+        Assert.Equal(["Start.html", "One.html"], manifest.Pages.Select(page => page.RelativePath));
+    }
+
+    // Final review: a sibling page that can't be read is not a candidate; it
+    // never blocks the import.
+    [Fact]
+    public async Task AnUnreadableSiblingIsSkipped()
+    {
+        MemoryFolder folder = new(
+            ("Start.html", SavedPage("https://guides.example/q", "Start", """<a href="https://guides.example/q/1">1</a>""")),
+            ("Locked.html", SavedPage("https://guides.example/q/locked", "Locked", "")),
+            ("One.html", SavedPage("https://guides.example/q/1", "One", "")));
+        folder.Unreadable.Add("Locked.html");
+
+        StaticHtmlManifest manifest = await new StaticHtmlDependencyScanner().ScanAsync("Start.html", folder);
+
+        Assert.Equal(["Start.html", "One.html"], manifest.Pages.Select(page => page.RelativePath));
+    }
+
     // Review Focus 4: '%' isn't a safe managed name, so the page is never opened.
     [Fact]
     public async Task AnUnsafePageNameIsNotACandidate()
@@ -712,10 +742,15 @@ public sealed class StaticHtmlDependencyScannerTests
 
         public List<string> Reads => source.Reads;
 
+        // Names whose open fails, as a locked or link-reached file does.
+        public HashSet<string> Unreadable { get; } = new(StringComparer.Ordinal);
+
         public IReadOnlyList<string> ListPages() => pages;
 
         public ValueTask<Stream?> OpenReadAsync(string safeRelativePath, CancellationToken cancellationToken = default) =>
-            source.OpenReadAsync(safeRelativePath, cancellationToken);
+            Unreadable.Contains(safeRelativePath)
+                ? throw new IOException("The file is in use.")
+                : source.OpenReadAsync(safeRelativePath, cancellationToken);
     }
 
     private static string SavedPage(string url, string title, string body) =>

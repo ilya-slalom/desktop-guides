@@ -553,7 +553,12 @@ public sealed class StaticHtmlDependencyScanner
                 .Order(StringComparer.Ordinal)
                 .Take(MaxCandidates)
                 .ToArray();
-            Dictionary<string, string> byKey = new(StringComparer.Ordinal);
+            // The entry claims its own address first, so a second save of it
+            // never joins as another page.
+            Dictionary<string, string> byKey = new(StringComparer.Ordinal)
+            {
+                [SavedPageUrl.Key(entryUrl)] = entryPath
+            };
             foreach (string name in names)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -608,7 +613,21 @@ public sealed class StaticHtmlDependencyScanner
         }
 
         // Reads only the start of a candidate; it isn't part of the guide yet.
+        // A candidate that can't be read (locked, denied, reached through a
+        // link) is skipped: it isn't part of the guide, so it never blocks it.
         private async Task<IReadOnlyList<Uri>> ReadPageUrlsAsync(string name)
+        {
+            try
+            {
+                return await ReadPageUrlsUncheckedAsync(name);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException)
+            {
+                return [];
+            }
+        }
+
+        private async Task<IReadOnlyList<Uri>> ReadPageUrlsUncheckedAsync(string name)
         {
             await using Stream? input = await source.OpenReadAsync(name, cancellationToken);
             if (input is null) return [];
