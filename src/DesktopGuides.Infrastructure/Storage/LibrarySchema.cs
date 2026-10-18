@@ -2,7 +2,7 @@ namespace DesktopGuides.Infrastructure.Storage;
 
 internal static class LibrarySchema
 {
-    public const int CurrentVersion = 7;
+    public const int CurrentVersion = 8;
 
     public const string Version1 = """
         CREATE TABLE Games (
@@ -156,6 +156,40 @@ internal static class LibrarySchema
         PRAGMA user_version = 7;
         """;
 
+    // T21.2: maps. SQLite can't change a CHECK, so Guides is rebuilt. Five
+    // tables reference it with ON DELETE CASCADE: migrations run with
+    // foreign keys off, so the drop removes none of their rows.
+    public const string Version8 = """
+        CREATE TABLE Guides8 (
+            Id TEXT PRIMARY KEY CHECK (length(Id) = 32),
+            GameId TEXT NOT NULL REFERENCES Games(Id) ON DELETE CASCADE,
+            Title TEXT NOT NULL CHECK (length(Title) BETWEEN 1 AND 200),
+            Format TEXT NOT NULL CHECK (Format IN ('Txt', 'Html', 'Pdf', 'Image')),
+            ManagedRelativeRoot TEXT NOT NULL UNIQUE
+                CHECK (ManagedRelativeRoot = 'content/' || Id),
+            PrimaryRelativePath TEXT NOT NULL CHECK (length(PrimaryRelativePath) > 0),
+            ContentSha256 TEXT NOT NULL CHECK (length(ContentSha256) = 64),
+            ContentBytes INTEGER NOT NULL CHECK (ContentBytes >= 0),
+            SourceLabel TEXT CHECK (SourceLabel IS NULL OR length(SourceLabel) <= 255),
+            TextCodePage INTEGER CHECK (
+                TextCodePage IS NULL OR (Format = 'Txt' AND TextCodePage IN (437, 1252))
+            ),
+            ImportedUtcMs INTEGER NOT NULL CHECK (ImportedUtcMs >= 0),
+            UpdatedUtcMs INTEGER NOT NULL CHECK (UpdatedUtcMs >= 0),
+            PixelWidth INTEGER CHECK (PixelWidth IS NULL OR PixelWidth BETWEEN 1 AND 32768),
+            PixelHeight INTEGER CHECK (PixelHeight IS NULL OR PixelHeight BETWEEN 1 AND 32768),
+            CHECK ((Format = 'Image') = (PixelWidth IS NOT NULL AND PixelHeight IS NOT NULL))
+        );
+        INSERT INTO Guides8 (Id, GameId, Title, Format, ManagedRelativeRoot, PrimaryRelativePath,
+            ContentSha256, ContentBytes, SourceLabel, TextCodePage, ImportedUtcMs, UpdatedUtcMs)
+            SELECT Id, GameId, Title, Format, ManagedRelativeRoot, PrimaryRelativePath,
+            ContentSha256, ContentBytes, SourceLabel, TextCodePage, ImportedUtcMs, UpdatedUtcMs FROM Guides;
+        DROP TABLE Guides;
+        ALTER TABLE Guides8 RENAME TO Guides;
+        CREATE INDEX IX_Guides_GameId ON Guides(GameId);
+        PRAGMA user_version = 8;
+        """;
+
     public static readonly (int Version, string Sql)[] Migrations =
     [
         (1, Version1),
@@ -164,6 +198,7 @@ internal static class LibrarySchema
         (4, Version4),
         (5, Version5),
         (6, Version6),
-        (7, Version7)
+        (7, Version7),
+        (8, Version8)
     ];
 }

@@ -96,7 +96,8 @@ internal sealed class ExportFixture : IAsyncDisposable
     private static string Sha(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
     public async Task<Guid> AddFileGuideAsync(
-        Guid game, string title, GuideFormat format, string name, byte[] bytes)
+        Guid game, string title, GuideFormat format, string name, byte[] bytes,
+        (int Width, int Height)? pixels = null)
     {
         Guid operation = Guid.NewGuid();
         Guid id = Guid.NewGuid();
@@ -105,7 +106,8 @@ internal sealed class ExportFixture : IAsyncDisposable
             journal.Prepare(operation, id);
             Write(id, name, bytes);
             journal.Publish(new NewImportedGuide(
-                operation, id, game, title, format, name, Sha(bytes), bytes.Length, name, null), () => { });
+                operation, id, game, title, format, name, Sha(bytes), bytes.Length, name, null,
+                PixelWidth: pixels?.Width, PixelHeight: pixels?.Height), () => { });
             return Task.FromResult(true);
         }, CancellationToken.None);
         return id;

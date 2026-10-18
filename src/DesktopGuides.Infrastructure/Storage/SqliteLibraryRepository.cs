@@ -246,7 +246,8 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             command.CommandText = """
                 SELECT Id, GameId, Title, Format, ManagedRelativeRoot,
                        PrimaryRelativePath, ContentSha256, ContentBytes,
-                       SourceLabel, TextCodePage, ImportedUtcMs, UpdatedUtcMs
+                       SourceLabel, TextCodePage, ImportedUtcMs, UpdatedUtcMs,
+                   PixelWidth, PixelHeight
                 FROM Guides WHERE GameId = $gameId ORDER BY Title, Id
                 """;
             command.Parameters.AddWithValue("$gameId", gameId.ToString("N"));
@@ -273,7 +274,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         {
             using SqliteConnection connection = OpenConnection();
             using SqliteTransaction transaction = connection.BeginTransaction(deferred: true);
-            List<(Game Game, int Count, DateTimeOffset Activity)> rows = [];
+            List<(Game Game, int Count, DateTimeOffset Activity, int Maps)> rows = [];
             using (SqliteCommand command = connection.CreateCommand())
             {
                 command.Transaction = transaction;
@@ -281,10 +282,11 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                     SELECT g.Id, g.Title, g.Platform, g.Notes, g.CreatedUtcMs, g.UpdatedUtcMs,
                            g.ProviderName, g.ProviderGameId, g.MetadataJson,
                            g.MetadataRetrievedUtcMs, g.ArtworkRelativePath,
-                           COUNT(gu.Id),
+                           COUNT(gu.Id) - COUNT(CASE WHEN gu.Format = 'Image' THEN 1 END),
                            MAX(g.CreatedUtcMs,
                                COALESCE(MAX(gu.ImportedUtcMs), 0),
-                               COALESCE(MAX(rs.LastOpenedUtcMs), 0)) AS LastActivityUtcMs
+                               COALESCE(MAX(rs.LastOpenedUtcMs), 0)) AS LastActivityUtcMs,
+                           COUNT(CASE WHEN gu.Format = 'Image' THEN 1 END)
                     FROM Games g
                     LEFT JOIN Guides gu ON gu.GameId = g.Id
                     LEFT JOIN ReadingStates rs ON rs.GuideId = gu.Id
@@ -294,7 +296,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                 using SqliteDataReader reader = command.ExecuteReader();
                 while (reader.Read())
                 {
-                    rows.Add((ReadGame(reader), reader.GetInt32(11), FromUnixMilliseconds(reader.GetInt64(12))));
+                    rows.Add((ReadGame(reader), reader.GetInt32(11), FromUnixMilliseconds(reader.GetInt64(12)), reader.GetInt32(13)));
                 }
             }
 
@@ -318,7 +320,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             transaction.Commit();
             return rows.Select(row => new LibraryGameSummary(
                     row.Game, row.Count, row.Activity,
-                    titles.TryGetValue(row.Game.Id, out List<string>? list) ? list : []))
+                    titles.TryGetValue(row.Game.Id, out List<string>? list) ? list : [], row.Maps))
                 .ToList();
         }, token);
 
@@ -333,7 +335,8 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                        gu.PrimaryRelativePath, gu.ContentSha256, gu.ContentBytes,
                        gu.SourceLabel, gu.TextCodePage, gu.ImportedUtcMs, gu.UpdatedUtcMs,
                        rs.GuideId, rs.LocatorJson, rs.EstimatedFraction,
-                       rs.LastOpenedUtcMs, rs.CompletedUtcMs
+                       rs.LastOpenedUtcMs, rs.CompletedUtcMs,
+                       gu.PixelWidth, gu.PixelHeight
                 FROM Guides gu
                 LEFT JOIN ReadingStates rs ON rs.GuideId = gu.Id
                 WHERE gu.GameId = $gameId
@@ -412,7 +415,8 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         command.CommandText = """
             SELECT Id, GameId, Title, Format, ManagedRelativeRoot,
                    PrimaryRelativePath, ContentSha256, ContentBytes,
-                   SourceLabel, TextCodePage, ImportedUtcMs, UpdatedUtcMs
+                   SourceLabel, TextCodePage, ImportedUtcMs, UpdatedUtcMs,
+                   PixelWidth, PixelHeight
             FROM Guides WHERE Id = $id
             """;
         command.Parameters.AddWithValue("$id", guideId.ToString("N"));
@@ -423,7 +427,8 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
     private const string FindGuideSql = """
         SELECT Id, GameId, Title, Format, ManagedRelativeRoot,
                PrimaryRelativePath, ContentSha256, ContentBytes,
-               SourceLabel, TextCodePage, ImportedUtcMs, UpdatedUtcMs
+               SourceLabel, TextCodePage, ImportedUtcMs, UpdatedUtcMs,
+                   PixelWidth, PixelHeight
         FROM Guides
         WHERE GameId = $gameId AND Format = $format AND ContentSha256 = $sha
         ORDER BY ImportedUtcMs, Id
@@ -1036,26 +1041,44 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                 journal.CommandText = "PRAGMA journal_mode=WAL";
                 journal.ExecuteNonQuery();
             }
-            using SqliteTransaction transaction = connection.BeginTransaction();
-            foreach ((int nextVersion, string sql) in LibrarySchema.Migrations)
+            // A migration that rebuilds a referenced table (Version8) must not
+            // cascade its drop. The pragma can't change inside a transaction,
+            // and ValidateDatabase's foreign_key_check is the gate.
+            SetForeignKeys(connection, on: false);
+            try
             {
-                if (nextVersion <= currentVersion)
+                using SqliteTransaction transaction = connection.BeginTransaction();
+                foreach ((int nextVersion, string sql) in LibrarySchema.Migrations)
                 {
-                    continue;
+                    if (nextVersion <= currentVersion)
+                    {
+                        continue;
+                    }
+                    using SqliteCommand migration = connection.CreateCommand();
+                    migration.Transaction = transaction;
+                    migration.CommandText = sql;
+                    migration.ExecuteNonQuery();
+                    migrationCheckpoint?.Invoke(nextVersion);
                 }
-                using SqliteCommand migration = connection.CreateCommand();
-                migration.Transaction = transaction;
-                migration.CommandText = sql;
-                migration.ExecuteNonQuery();
-                migrationCheckpoint?.Invoke(nextVersion);
+                ValidateDatabase(connection, transaction, LibrarySchema.CurrentVersion);
+                transaction.Commit();
             }
-            ValidateDatabase(connection, transaction, LibrarySchema.CurrentVersion);
-            transaction.Commit();
+            finally
+            {
+                SetForeignKeys(connection, on: true);
+            }
         }
         catch (Exception error) when (recoveryCopy is not null)
         {
             throw new LibraryOpenException(LibraryOpenIssue.MigrationFailed, recoveryCopy, error);
         }
+    }
+
+    private static void SetForeignKeys(SqliteConnection connection, bool on)
+    {
+        using SqliteCommand pragma = connection.CreateCommand();
+        pragma.CommandText = on ? "PRAGMA foreign_keys=ON" : "PRAGMA foreign_keys=OFF";
+        pragma.ExecuteNonQuery();
     }
 
     private string CreateRecoveryCopy(SqliteConnection connection, int version)
@@ -1277,10 +1300,10 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                 INSERT INTO Guides (
                     Id, GameId, Title, Format, ManagedRelativeRoot, PrimaryRelativePath,
                     ContentSha256, ContentBytes, SourceLabel, TextCodePage,
-                    ImportedUtcMs, UpdatedUtcMs
+                    ImportedUtcMs, UpdatedUtcMs, PixelWidth, PixelHeight
                 ) VALUES (
                     $id, $game, $title, $format, $root, $primary,
-                    $sha, $bytes, $label, $codePage, $now, $now
+                    $sha, $bytes, $label, $codePage, $now, $now, $width, $height
                 );
                 INSERT INTO ReadingStates (GuideId) VALUES ($id);
                 INSERT INTO ReaderPreferences (GuideId) VALUES ($id);
@@ -1296,6 +1319,8 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             insert.Parameters.AddWithValue("$bytes", guide.ContentBytes);
             insert.Parameters.AddWithValue("$label", (object?)guide.SourceLabel ?? DBNull.Value);
             insert.Parameters.AddWithValue("$codePage", (object?)guide.TextCodePage ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$width", (object?)guide.PixelWidth ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$height", (object?)guide.PixelHeight ?? DBNull.Value);
             insert.Parameters.AddWithValue("$now", owner.clock.GetUtcNow().ToUnixTimeMilliseconds());
             insert.ExecuteNonQuery();
             foreach (GuideAsset asset in guide.Assets ?? [])
@@ -1716,7 +1741,8 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         command.CommandText = """
             SELECT Id, GameId, Title, Format, ManagedRelativeRoot,
                    PrimaryRelativePath, ContentSha256, ContentBytes,
-                   SourceLabel, TextCodePage, ImportedUtcMs, UpdatedUtcMs
+                   SourceLabel, TextCodePage, ImportedUtcMs, UpdatedUtcMs,
+                   PixelWidth, PixelHeight
             FROM Guides ORDER BY Id
             """;
         using SqliteDataReader reader = command.ExecuteReader();
@@ -1765,6 +1791,11 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             NullableString(reader, 8),
             reader.IsDBNull(9) ? null : reader.GetInt32(9),
             FromUnixMilliseconds(reader.GetInt64(10)),
-            FromUnixMilliseconds(reader.GetInt64(11)));
+            FromUnixMilliseconds(reader.GetInt64(11)),
+            NullableInt(reader, reader.GetOrdinal("PixelWidth")),
+            NullableInt(reader, reader.GetOrdinal("PixelHeight")));
     }
+
+    private static int? NullableInt(SqliteDataReader reader, int ordinal) =>
+        reader.IsDBNull(ordinal) ? null : reader.GetInt32(ordinal);
 }

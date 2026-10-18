@@ -1685,7 +1685,7 @@ public sealed class SqliteLibraryRepositoryTests
         await using SqliteLibraryRepository repository = new(directory.Paths);
         await repository.InitializeAsync();
 
-        Assert.Equal(7L, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.Equal((long)LibrarySchema.CurrentVersion, ReadUserVersion(directory.Paths.DatabasePath));
         Assert.Equal("0|guide.html||", ScalarText(directory.Paths.DatabasePath,
             "SELECT PageOrder || '|' || RequestPath || '|' || IFNULL(OriginalUrl, '') || '|' || IFNULL(Title, '') FROM GuidePages"));
         Assert.Equal("EntryHtml,StyleSheet", ScalarText(directory.Paths.DatabasePath,
@@ -1740,6 +1740,126 @@ public sealed class SqliteLibraryRepositoryTests
         remove.ExecuteNonQuery();
         Assert.Equal("0", ScalarText(directory.Paths.DatabasePath, "SELECT COUNT(*) FROM GuidePages"));
     }
+
+    // Review Focus 5.
+    [Fact]
+    public async Task UpgradesPopulatedVersionSevenKeepingEveryRow()
+    {
+        using TestLibrary directory = new();
+        Guid gameId = Guid.NewGuid();
+        Guid guideId = Guid.NewGuid();
+        CreatePopulatedVersionSeven(directory, gameId, guideId);
+        string before = Census(directory.Paths.DatabasePath);
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+
+        Assert.Equal(8L, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.Equal(before, Census(directory.Paths.DatabasePath));
+        Assert.Equal("", ScalarText(directory.Paths.DatabasePath,
+            "SELECT IFNULL(group_concat(IFNULL(PixelWidth, '') || IFNULL(PixelHeight, ''), ''), '') FROM Guides"));
+    }
+
+    [Fact]
+    public async Task FailedVersionEightMigrationStaysAtVersionSeven()
+    {
+        using TestLibrary directory = new();
+        CreatePopulatedVersionSeven(directory, Guid.NewGuid(), Guid.NewGuid());
+        string before = Census(directory.Paths.DatabasePath);
+
+        await using (SqliteLibraryRepository failing = new(directory.Paths, null, version =>
+        {
+            if (version == 8) throw new IOException("Injected after Guides was rebuilt.");
+        }))
+        {
+            LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(() => failing.InitializeAsync());
+            Assert.Equal(LibraryOpenIssue.MigrationFailed, error.Issue);
+        }
+
+        Assert.Equal(7L, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.Equal(before, Census(directory.Paths.DatabasePath));
+    }
+
+    [Fact]
+    public async Task AMapNeedsItsPixelSizeAndOnlyAMapHasOne()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Maps", null, null);
+
+        InsertGuide(directory.Paths.DatabasePath, Guid.NewGuid(), game.Id, format: "Image", pixels: (640, 480));
+        Assert.Throws<SqliteException>(() =>
+            InsertGuide(directory.Paths.DatabasePath, Guid.NewGuid(), game.Id, format: "Image", pixels: null));
+        Assert.Throws<SqliteException>(() =>
+            InsertGuide(directory.Paths.DatabasePath, Guid.NewGuid(), game.Id, format: "Txt", pixels: (640, 480)));
+        Assert.Throws<SqliteException>(() =>
+            InsertGuide(directory.Paths.DatabasePath, Guid.NewGuid(), game.Id, format: "Image", pixels: (32769, 1)));
+    }
+
+    [Fact]
+    public async Task RemovingAGuideStillCascadesAfterTheUpgrade()
+    {
+        using TestLibrary directory = new();
+        Guid guideId = Guid.NewGuid();
+        CreatePopulatedVersionSeven(directory, Guid.NewGuid(), guideId);
+        await using (SqliteLibraryRepository repository = new(directory.Paths))
+        {
+            await repository.InitializeAsync();
+        }
+
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand remove = connection.CreateCommand();
+        remove.CommandText = $"DELETE FROM Guides WHERE Id = '{guideId:N}'";
+        remove.ExecuteNonQuery();
+        Assert.Equal("0|0|0|0", ScalarText(directory.Paths.DatabasePath,
+            $"SELECT (SELECT COUNT(*) FROM ReadingStates WHERE GuideId = '{guideId:N}') || '|' || " +
+            $"(SELECT COUNT(*) FROM Bookmarks WHERE GuideId = '{guideId:N}') || '|' || " +
+            $"(SELECT COUNT(*) FROM GuideAssets WHERE GuideId = '{guideId:N}') || '|' || " +
+            $"(SELECT COUNT(*) FROM GuidePages WHERE GuideId = '{guideId:N}')"));
+    }
+
+    [Fact]
+    public async Task AGameCountsItsGuidesAndMapsApart()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Maps", null, null);
+        InsertGuide(directory.Paths.DatabasePath, Guid.NewGuid(), game.Id, title: "Walkthrough");
+        InsertGuide(directory.Paths.DatabasePath, Guid.NewGuid(), game.Id, title: "castle", format: "Image", pixels: (640, 480));
+        InsertGuide(directory.Paths.DatabasePath, Guid.NewGuid(), game.Id, title: "catacombs", format: "Image", pixels: (64, 48));
+
+        LibraryGameSummary summary = Assert.Single(await repository.ListGameSummariesAsync());
+        Assert.Equal((1, 2), (summary.GuideCount, summary.MapCount));
+        // GuideTitles are in SQLite's binary title order, as before maps.
+        Assert.Equal(["Walkthrough", "castle", "catacombs"], summary.GuideTitles);
+    }
+
+    // Version 6 plus Version 7, with a bookmark and an entry page, so every table that references Guides has a row.
+    private static void CreatePopulatedVersionSeven(TestLibrary directory, Guid gameId, Guid guideId)
+    {
+        CreatePopulatedVersionSix(directory, gameId, guideId);
+        InsertAsset(directory.Paths.DatabasePath, guideId, "guide.html", "EntryHtml");
+        using SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = LibrarySchema.Version7 + $"""
+            INSERT INTO Bookmarks (Id, GuideId, LocatorJson, Label, CreatedUtcMs, UpdatedUtcMs)
+            VALUES ('{Guid.NewGuid():N}', '{guideId:N}', 'bookmark', 'Boss', 1, 1);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    // Each table's rows, in key order, over the columns every version has.
+    private static string Census(string databasePath) => string.Join("\n",
+        ScalarText(databasePath, "SELECT group_concat(Id || Title, ',') FROM (SELECT * FROM Games ORDER BY Id)"),
+        ScalarText(databasePath, "SELECT group_concat(Id || Title || Format || PrimaryRelativePath || ContentSha256, ',') FROM (SELECT * FROM Guides ORDER BY Id)"),
+        ScalarText(databasePath, "SELECT group_concat(GuideId || IFNULL(LocatorJson, '') || IFNULL(CompletedUtcMs, ''), ',') FROM (SELECT * FROM ReadingStates ORDER BY GuideId)"),
+        ScalarText(databasePath, "SELECT group_concat(GuideId || IFNULL(TextScale, ''), ',') FROM (SELECT * FROM ReaderPreferences ORDER BY GuideId)"),
+        ScalarText(databasePath, "SELECT group_concat(Id || GuideId || Label, ',') FROM (SELECT * FROM Bookmarks ORDER BY Id)"),
+        ScalarText(databasePath, "SELECT group_concat(GuideId || RequestPath || Kind, ',') FROM (SELECT * FROM GuideAssets ORDER BY GuideId, RequestPath)"),
+        ScalarText(databasePath, "SELECT group_concat(GuideId || PageOrder || RequestPath, ',') FROM (SELECT * FROM GuidePages ORDER BY GuideId, PageOrder)"),
+        ScalarText(databasePath, "SELECT group_concat(Key || Value, ',') FROM (SELECT * FROM Settings ORDER BY Key)"));
 
     private static void CreatePopulatedVersionSix(TestLibrary directory, Guid gameId, Guid guideId)
     {
@@ -2039,22 +2159,28 @@ public sealed class SqliteLibraryRepositoryTests
     }
 
     private static void InsertGuide(
-        string databasePath, Guid guideId, Guid gameId, string? managedRoot = null)
+        string databasePath, Guid guideId, Guid gameId, string? managedRoot = null,
+        string title = "Walkthrough", string format = "Txt", (int Width, int Height)? pixels = null)
     {
+        bool v8 = ReadUserVersion(databasePath) >= 8;
         using SqliteConnection connection = OpenWithForeignKeys(databasePath);
         using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = """
+        command.CommandText = $"""
             INSERT INTO Guides (
                 Id, GameId, Title, Format, ManagedRelativeRoot, PrimaryRelativePath,
                 ContentSha256, ContentBytes, SourceLabel, TextCodePage,
-                ImportedUtcMs, UpdatedUtcMs
+                ImportedUtcMs, UpdatedUtcMs{(v8 ? ", PixelWidth, PixelHeight" : "")}
             ) VALUES (
-                $id, $game, 'Walkthrough', 'Txt', $root, 'guide.txt',
-                $hash, 100, NULL, NULL, $now, $now
+                $id, $game, $title, $format, $root, 'guide.txt',
+                $hash, 100, NULL, NULL, $now, $now{(v8 ? ", $width, $height" : "")}
             );
             INSERT INTO ReadingStates (GuideId) VALUES ($id);
             INSERT INTO ReaderPreferences (GuideId) VALUES ($id);
             """;
+        command.Parameters.AddWithValue("$title", title);
+        command.Parameters.AddWithValue("$format", format);
+        command.Parameters.AddWithValue("$width", (object?)pixels?.Width ?? DBNull.Value);
+        command.Parameters.AddWithValue("$height", (object?)pixels?.Height ?? DBNull.Value);
         command.Parameters.AddWithValue("$id", guideId.ToString("N"));
         command.Parameters.AddWithValue("$game", gameId.ToString("N"));
         command.Parameters.AddWithValue(
