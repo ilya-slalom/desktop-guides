@@ -527,8 +527,6 @@ public sealed partial class ReaderToolbar : UserControl
     // Raised before the pane shows, so the shell can load the game's maps.
     public event EventHandler? MapsOpening;
 
-    public event EventHandler? MapsClosed;
-
     public void SetMaps(bool any)
     {
         mapsAvailable = any;
@@ -579,7 +577,6 @@ public sealed partial class ReaderToolbar : UserControl
     private void MapsFlyoutClosed(object? sender, object args)
     {
         mapsClosedAt = DateTimeOffset.UtcNow;
-        MapsClosed?.Invoke(this, EventArgs.Empty);
     }
 
     private async void GoToPageClicked(object sender, RoutedEventArgs args) =>

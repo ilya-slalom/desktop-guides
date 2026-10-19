@@ -18,10 +18,8 @@ public sealed partial class ShellWindow
     private void InitializeMaps()
     {
         ReaderActions.MapsOpening += (_, _) => _ = FillMapsPaneAsync();
-        ReaderActions.MapsClosed += (_, _) =>
-        {
-            if (navigator.Current is ReaderRoute) FocusReaderContent();
-        };
+        // Closing returns focus where it was (the flyout does this), so the
+        // guide keeps its place: refocusing its list would scroll to the top.
         ReaderActions.Maps.OpenRequested += (_, mapId) => _ = OpenMapFromPaneAsync(mapId);
         ReaderActions.Maps.LoadPreview = LoadMapPreviewAsync;
     }
