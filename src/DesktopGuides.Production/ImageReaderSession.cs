@@ -72,6 +72,8 @@ internal sealed class ImageReaderSession : IReaderSession
         View.Loaded += (_, _) =>
         {
             if (View.XamlRoot is not null) View.XamlRoot.Changed += (_, _) => Resized();
+            // The arrow keys pan the open map.
+            View.Focus(FocusState.Programmatic);
         };
         View.PointerPressed += OnPointerPressed;
         View.PointerMoved += OnPointerMoved;
@@ -100,7 +102,6 @@ internal sealed class ImageReaderSession : IReaderSession
 #pragma warning restore CS0067
     public event EventHandler<LocationChangedEventArgs>? LocationChanged;
     public event EventHandler? ZoomChanged;
-    public event EventHandler? Prepared;
 
     public async Task OpenAsync(ManagedGuideSource source, CancellationToken token)
     {
@@ -118,11 +119,7 @@ internal sealed class ImageReaderSession : IReaderSession
         Preparing = !build.Overview.IsCompleted;
         string overviewPath = await build.Overview.WaitAsync(token);
         Show(await LoadAsync(overviewPath, token));
-        if (Preparing)
-        {
-            Preparing = false;
-            Prepared?.Invoke(this, EventArgs.Empty);
-        }
+        Preparing = false;
         _ = WaitForTilesAsync(build.Complete);
     }
 

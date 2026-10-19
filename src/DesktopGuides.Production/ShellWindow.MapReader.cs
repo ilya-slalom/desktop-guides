@@ -8,6 +8,8 @@ public sealed partial class ShellWindow
 {
     private const string MapLoadMessage = "This map can't be shown. Its file may be missing or damaged.";
 
+    private const string PreparingMapText = "Preparing the map…";
+
     private async Task<bool> OpenMapAsync(Guide guide, int generation)
     {
         ShowReaderSurface(loading: true);
@@ -17,7 +19,13 @@ public sealed partial class ShellWindow
         try
         {
             string path = libraryPaths!.ResolveExistingGuideFile(guide.Id, guide.PrimaryRelativePath);
-            await session.OpenAsync(new ManagedGuideSource(guide, path), token);
+            Task open = session.OpenAsync(new ManagedGuideSource(guide, path), token);
+            // An uncached map waits for its overview to be built.
+            if (session.Preparing && !open.IsCompleted)
+            {
+                ShowReaderSurface(loading: true, loadingText: PreparingMapText);
+            }
+            await open;
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -47,6 +55,20 @@ public sealed partial class ShellWindow
         MarkReaderGuide(GuideFileStatus.Ok);
         ShowReaderSurface(loading: false, view: session.View);
         ReaderActions.SetSession(session);
-        return true;
+        // SetSession resets these, so they follow it.
+        ReaderActions.KeysEnabled = true;
+        ReaderActions.SetZoomAvailability(session.CanZoomIn, session.CanZoomOut);
+        session.ZoomChanged += OnMapZoomChanged;
+        // T21.2: back to the saved view, with no notice and no open recorded.
+        return await OpenAtSavedPlaceAsync(
+            guide, session, generation, guide.ContentSha256, null, token, quiet: true, recordOpen: false);
+    }
+
+    private void OnMapZoomChanged(object? sender, EventArgs args)
+    {
+        if (sender is ImageReaderSession session && ReferenceEquals(session, readerSession))
+        {
+            ReaderActions.SetZoomAvailability(session.CanZoomIn, session.CanZoomOut);
+        }
     }
 }

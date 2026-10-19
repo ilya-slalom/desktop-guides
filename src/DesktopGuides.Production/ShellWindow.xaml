@@ -691,7 +691,8 @@
                                               Width="{StaticResource DesktopGuidesInlineProgressSize}"
                                               Height="{StaticResource DesktopGuidesInlineProgressSize}"
                                               AutomationProperties.AccessibilityView="Raw" />
-                                <TextBlock Text="Opening guide…"
+                                <TextBlock x:Name="ReaderLoadingText"
+                                           Text="Opening guide…"
                                            Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
                                            AutomationProperties.AccessibilityView="Raw" />
                             </StackPanel>

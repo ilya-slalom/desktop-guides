@@ -1654,11 +1654,16 @@ public sealed partial class ShellWindow : Window
     private bool IsSupersededGameGuideIntent(long? intentVersion) =>
         intentVersion is long version && version != gameGuideIntentVersion;
 
+    private const string OpeningGuideText = "Opening guide…";
+
     private void ShowReaderSurface(
         bool loading, string? error = null, UIElement? view = null,
-        GuideLoadAction action = GuideLoadAction.None)
+        GuideLoadAction action = GuideLoadAction.None, string loadingText = OpeningGuideText)
     {
         ReaderLoading.Visibility = loading ? Visibility.Visible : Visibility.Collapsed;
+        // T21.2: an uncached map says it's being prepared.
+        ReaderLoadingText.Text = loadingText;
+        AutomationProperties.SetName(ReaderLoading, loadingText);
         ReaderLoadingRing.IsActive = loading;
         ReaderLoadError.Text = error ?? string.Empty;
         ReaderLoadError.Visibility = error is null ? Visibility.Collapsed : Visibility.Visible;
