@@ -2332,6 +2332,19 @@ function Run-MultipageImportScenario {
     }
 }
 
+# T21.2: maps, several at once, then one by Ctrl+O; none counts as reading.
+function Run-MapImportScenario {
+    Start-InstalledShell
+    $report.importMaps = Run-ShellSmoke 'import-maps' -ResultName 'import-maps'
+    Close-InstalledShell
+    $mapsState = Invoke-ShellSeed @('describe-import', $dataRoot) | ConvertFrom-Json
+    $report.importMapsState = $mapsState
+    if ($mapsState.MapGuides -ne 3) { throw "The library stored $($mapsState.MapGuides) maps; expected 3." }
+    if ($mapsState.MapReadings -ne 0) { throw "Opening a map recorded reading on $($mapsState.MapReadings) maps." }
+    if ($mapsState.MapSizes -ne '640x480,64x48,20000x400') { throw "The maps' sizes were '$($mapsState.MapSizes)'." }
+    if ($mapsState.LastActiveIsMap) { throw 'Opening a map set Resume to it.' }
+}
+
 function Run-RemovalScenarios {
     $title = $report.importPublishLight.importedTitle
     if (-not $title) {
@@ -3319,6 +3332,7 @@ try {
         Run-ImportScenarios
         Run-RemovalScenarios
         Run-MultipageImportScenario
+        Run-MapImportScenario
     }
 
     if (Enter-ScenarioGroup 'game-actions') { Run-GameActionsScenarios }

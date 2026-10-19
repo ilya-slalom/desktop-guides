@@ -230,7 +230,7 @@ public sealed class GuideImportValidatorTests
         GuideImportException error = await Rejected(files.Write(name, "text"));
 
         Assert.Equal(ImportIssue.Unsupported, error.Issue);
-        Assert.Equal($"{name} isn't a TXT, HTML or PDF file.", error.Message);
+        Assert.Equal($"{name} isn't a TXT, HTML, PDF, PNG or JPEG file.", error.Message);
     }
 
     [Fact]

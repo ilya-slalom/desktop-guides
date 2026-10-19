@@ -1,3 +1,4 @@
+using DesktopGuides.Core.Library;
 using System.Globalization;
 using DesktopGuides.Core.Backup;
 using DesktopGuides.Infrastructure.Storage;
@@ -33,7 +34,7 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
     public async Task AVersionFiveBackupRestoresAndMigrates()
     {
         string backup = fixture.RewriteDatabase(
-            RestoreFixture.GuideAssetsBeforeVersionSeven() + RestoreFixture.ReaderPreferencesBeforeVersionSix() + " PRAGMA user_version = 5;",
+            RestoreFixture.GuidesBeforeVersionEight() + RestoreFixture.GuideAssetsBeforeVersionSeven() + RestoreFixture.ReaderPreferencesBeforeVersionSix() + " PRAGMA user_version = 5;",
             manifest => manifest with { SchemaVersion = 5 });
         LibraryRestoreStage stage = await fixture.StageAsync(backup);
 
@@ -51,7 +52,7 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
     public async Task AVersionFourBackupRestoresAndMigrates()
     {
         string backup = fixture.RewriteDatabase(
-            RestoreFixture.GuideAssetsBeforeVersionSeven() + RestoreFixture.ReaderPreferencesBeforeVersionSix() + " DROP TABLE Bookmarks; PRAGMA user_version = 4;",
+            RestoreFixture.GuidesBeforeVersionEight() + RestoreFixture.GuideAssetsBeforeVersionSeven() + RestoreFixture.ReaderPreferencesBeforeVersionSix() + " DROP TABLE Bookmarks; PRAGMA user_version = 4;",
             manifest => manifest with { SchemaVersion = 4 });
         LibraryRestoreStage stage = await fixture.StageAsync(backup);
 
@@ -288,12 +289,46 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
         Assert.True(Directory.Exists(RestoreMarker.StagedLibrary(fixture.Target.Paths, stage.StageId)));
     }
 
+    [Fact]
+    public async Task AMapIsBackedUpAndRestored()
+    {
+        byte[] bytes = [0x89, 0x50, 0x4E, 0x47, 1, 2, 3];
+        Guid map = Guid.Empty;
+        await using RestoreFixture withMap = await RestoreFixture.CreateAsync(async source =>
+            map = await source.AddFileGuideAsync(source.PlainGame, "castle", GuideFormat.Image, "map.png", bytes, (640, 480)));
+        LibraryRestoreStage stage = await withMap.StageAsync();
+
+        await withMap.Restorer().ReplaceAsync(stage, CancellationToken.None);
+        await withMap.Target.RestartAsync();
+
+        Assert.Equal("Image|640|480|map.png", withMap.Target.Scalar(
+            $"SELECT Format || '|' || PixelWidth || '|' || PixelHeight || '|' || PrimaryRelativePath FROM Guides WHERE Id = '{map:N}'"));
+        Assert.Equal(bytes, File.ReadAllBytes(withMap.Target.Paths.GetPlannedGuideFile(map, "map.png")));
+    }
+
+    // A backup from before schema 8 restores, and migration keeps its guides.
+    [Fact]
+    public async Task AVersionSevenBackupRestores()
+    {
+        string backup = fixture.RewriteDatabase(
+            RestoreFixture.GuidesBeforeVersionEight() + " PRAGMA user_version = 7;",
+            manifest => manifest with { SchemaVersion = 7 });
+        LibraryRestoreStage stage = await fixture.StageAsync(backup);
+
+        await fixture.Restorer().ReplaceAsync(stage, CancellationToken.None);
+        await fixture.Target.RestartAsync();
+
+        Assert.Equal(LibrarySchema.CurrentVersion.ToString(CultureInfo.InvariantCulture), fixture.Target.Scalar("PRAGMA user_version"));
+        Assert.Equal("1", fixture.Target.Scalar(
+            $"SELECT COUNT(*) FROM Guides WHERE Id = '{fixture.Source.HtmlGuide:N}'"));
+    }
+
     // A backup from before schema 7 has no pages; it restores, and migration gives each HTML guide its entry page.
     [Fact]
     public async Task AVersionSixBackupRestoresWithOnePagePerHtmlGuide()
     {
         string backup = fixture.RewriteDatabase(
-            RestoreFixture.GuideAssetsBeforeVersionSeven() + " PRAGMA user_version = 6;",
+            RestoreFixture.GuidesBeforeVersionEight() + RestoreFixture.GuideAssetsBeforeVersionSeven() + " PRAGMA user_version = 6;",
             manifest => manifest with { SchemaVersion = 6 });
         LibraryRestoreStage stage = await fixture.StageAsync(backup);
 

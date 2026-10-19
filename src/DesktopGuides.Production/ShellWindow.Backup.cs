@@ -483,7 +483,7 @@ public sealed partial class ShellWindow
         try
         {
             IReadOnlyList<LibraryGameSummary> games = await library.ListGameSummariesAsync();
-            return (games.Count, games.Sum(game => game.GuideCount));
+            return (games.Count, games.Sum(game => game.GuideCount + game.MapCount));
         }
         catch (Exception)
         {

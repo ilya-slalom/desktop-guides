@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Maps;
 using DesktopGuides.Core.Paths;
 using DesktopGuides.Core.Text;
 using DesktopGuides.Infrastructure.Storage;
@@ -125,7 +126,9 @@ public sealed class GuideImportPublisher
                     fingerprint, plan.TotalBytes, manifest.Source.FileName,
                     (manifest as TxtImportManifest)?.CodePage,
                     plan.Html?.Manifest.Assets.Select(ToGuideAsset).ToArray() ?? [],
-                    plan.Html?.Manifest.Pages.Select(ToGuidePage).ToArray()),
+                    plan.Html?.Manifest.Pages.Select(ToGuidePage).ToArray(),
+                    (manifest as MapImportManifest)?.PixelWidth,
+                    (manifest as MapImportManifest)?.PixelHeight),
                 () => checkpoint(ImportCheckpoint.InCommit));
         }
         catch (Exception error)
@@ -206,6 +209,8 @@ public sealed class GuideImportPublisher
                 return Single("guide.txt", manifest.Source);
             case PdfImportManifest:
                 return Single("guide.pdf", manifest.Source);
+            case MapImportManifest map:
+                return Single(map.Kind.StoredName(), manifest.Source);
             case HtmlImportManifest html:
                 // The manifest carries only counts, so scan again for the file list.
                 StaticHtmlImportPreview preview = await validator.PreviewHtmlAsync(html.Source, token);
@@ -327,6 +332,9 @@ public sealed class GuideImportPublisher
                 break;
             case PdfImportManifest pdf:
                 VerifyPdf(primary, pdf, token);
+                break;
+            case MapImportManifest map:
+                GuideImportValidator.VerifyMap(primary, map);
                 break;
             case HtmlImportManifest:
                 try

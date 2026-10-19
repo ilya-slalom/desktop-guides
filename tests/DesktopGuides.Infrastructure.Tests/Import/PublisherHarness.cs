@@ -17,7 +17,7 @@ internal sealed class PublisherHarness : IAsyncDisposable
     public SqliteLibraryRepository Repository { get; private set; } = null!;
     public Game Game { get; private set; } = null!;
     public ImportTestDirectory Sources { get; } = new();
-    public GuideImportValidator Validator { get; } = new();
+    public GuideImportValidator Validator { get; } = new(null, new FakeMapDecoder(decodes: true));
     public Guid OperationId { get; private set; }
     public Guid GuideId { get; private set; }
 

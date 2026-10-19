@@ -289,4 +289,25 @@ public sealed class CatalogPresentationTests
             Labels(CatalogPresentation.GuideFacts(
                 new GuideSummary(GuideWith(GuideFormat.Txt), null), AtNow, EnGb, GuideFileStatus.Ok)));
     }
+
+    private static Guide MapGuide(string path, int width, int height) => new(
+        Guid.NewGuid(), Guid.NewGuid(), "castle", GuideFormat.Image, "content/x", path,
+        "hash", 1, null, null, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, width, height);
+
+    [Theory]
+    [InlineData(3, 2, "3 guides, 2 maps")]
+    [InlineData(0, 1, "No guides, 1 map")]
+    [InlineData(1, 0, "1 guide")]
+    public void AGameRowCountsGuidesAndMaps(int guides, int maps, string expected) =>
+        Assert.Contains(expected, CatalogPresentation.GameFacts(
+            new LibraryGameSummary(GameWith(null), guides, Now, [], maps)).Select(fact => fact.Label));
+
+    [Fact]
+    public void AMapRowShowsItsTypeAndSizeOnly()
+    {
+        GuideSummary map = new(MapGuide("map.png", 15456, 10304), State(estimate: 0.5, opened: Now));
+        IReadOnlyList<CatalogFact> facts = CatalogPresentation.GuideFacts(map, AtNow, EnGb);
+        Assert.Equal(["PNG", "15456 × 10304"], facts.Select(fact => fact.Label));
+        Assert.Equal("PNG, 15456 by 10304 pixels", CatalogPresentation.AccessibleText(facts));
+    }
 }

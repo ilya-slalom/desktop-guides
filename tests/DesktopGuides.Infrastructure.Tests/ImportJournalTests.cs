@@ -221,6 +221,21 @@ public sealed class ImportJournalTests : IAsyncLifetime
         Assert.Equal("0:guide.html", Scalar($"SELECT PageOrder || ':' || RequestPath FROM GuidePages WHERE GuideId = '{id:N}'"));
     }
 
+    [Fact]
+    public async Task AMapKeepsItsPixelSize()
+    {
+        Guid operation = Guid.NewGuid();
+        Guid id = Guid.NewGuid();
+        await Run(journal =>
+        {
+            journal.Prepare(operation, id);
+            journal.Publish(new NewImportedGuide(operation, id, game.Id, "castle", GuideFormat.Image, "map.png",
+                Hash, 10, "castle.png", null, PixelWidth: 640, PixelHeight: 480), () => { });
+        });
+
+        Assert.Equal("Image|640|480", Scalar($"SELECT Format || '|' || PixelWidth || '|' || PixelHeight FROM Guides WHERE Id = '{id:N}'"));
+    }
+
     private NewImportedGuide Guide() => new(
         operationId, guideId, game.Id, "Imported", GuideFormat.Txt, "guide.txt",
         new string('a', 64), 20, "notes.txt", 437);

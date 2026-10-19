@@ -32,6 +32,7 @@ public static class ImportPresentation
         GuideFormat.Txt => "Text (TXT)",
         GuideFormat.Html => "Web page (HTML)",
         GuideFormat.Pdf => "PDF",
+        GuideFormat.Image => "Map image",
         _ => throw new ArgumentOutOfRangeException(nameof(format)),
     };
 

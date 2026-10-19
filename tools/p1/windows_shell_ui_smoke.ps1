@@ -9,7 +9,7 @@ param(
         'reader-render-error-observed', 'reader-render-error-result',
         'late-guide-after-close', 'waiting-handoff', 'material', 'icons', 'keyboard', 'keyboard-txt', 'catalog', 'catalog-facts', 'library-search', 'stable-navigation',
         'provider-none', 'provider-offline', 'provider-settings',
-        'import-preview', 'import-html-pages', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
+        'import-preview', 'import-html-pages', 'import-maps', 'import-publish', 'import-duplicate-copy', 'import-duplicate-open',
         'remove-guide-cancel', 'remove-guide',
         'provider-live', 'provider-remove', 'game-actions', 'game-actions-persisted', 'txt-reader',
         'txt-load-paused', 'txt-back-during-load', 'txt-load-released', 'html-reader',
@@ -7334,6 +7334,46 @@ try {
             Wait-PickerClosed $picker
         }
 
+        # T21.2: several files at once. The name box first takes the folder,
+        # which navigates, then the quoted names.
+        function Choose-PickerFiles([string] $relativeFolder, [string[]] $names) {
+            $picker = Wait-FilePicker
+            $folder = Join-Path $fixtureRoot $relativeFolder
+            foreach ($name in $names) {
+                if (-not (Test-Path -LiteralPath (Join-Path $folder $name) -PathType Leaf)) {
+                    Send-PickerCommand $picker 2
+                    Wait-PickerClosed $picker
+                    throw "The fixture '$relativeFolder\$name' does not exist."
+                }
+            }
+            [DesktopGuidesForegroundProbe]::SetText((Find-InPicker $picker '1148' 'Edit'), $folder)
+            Send-PickerCommand $picker 1
+            Start-Sleep -Milliseconds 800
+            $quoted = ($names | ForEach-Object { '"' + $_ + '"' }) -join ' '
+            [DesktopGuidesForegroundProbe]::SetText((Find-InPicker $picker '1148' 'Edit'), $quoted)
+            Send-PickerCommand $picker 1
+            Wait-PickerClosed $picker
+        }
+
+        function Get-MapItems {
+            $list = Find-ById 'MapList'
+            if (-not $list -or $list.Current.IsOffscreen) { return @() }
+            $condition = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::ListItem)
+            return @($list.FindAll($scope, $condition))
+        }
+
+        function Wait-MapNames([string[]] $expected) {
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $names = @(Get-MapItems | ForEach-Object { $_.Current.Name })
+                if (($names -join '|') -eq ($expected -join '|')) { return }
+                Start-Sleep -Milliseconds 200
+            } while ((Get-Date) -lt $deadline)
+            throw "The Maps list read '$($names -join ', ')'; expected '$($expected -join ', ')'."
+        }
+
         function Select-ById([string] $id) {
             $element = Wait-VisibleById $id
             $element.GetCurrentPattern(
@@ -7389,6 +7429,80 @@ try {
             [void](Wait-SelectedGuide $pagesTitle)
             $report.importedPagesTitle = $pagesTitle
             $report.phases += 'import-html-pages-published'
+        }
+        elseif ($Mode -eq 'import-maps') {
+            # T21.2: maps, several at once, in their own section.
+            Select-Element 'Import Test Game'
+            [void](Wait-Name 'GameHeading' 'Import Test Game')
+            [void](Wait-Status 'Game ready.')
+            [void](Wait-Name 'MapsEmpty' 'No maps yet.')
+            Click-Element (Wait-EnabledById 'ImportMapsButton')
+            Choose-PickerFiles 'generated\maps' @('castle-floor-1.png', 'catacombs.jpg', 'broken-map.png', 'huge-header.png')
+            [void](Wait-VisibleById 'ImportMapsDialog')
+            $condition = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'MapRow')
+            $deadline = (Get-Date).AddSeconds(30)
+            do {
+                $rows = @($root.FindAll($scope, $condition))
+                if ($rows.Count -ge 4) { break }
+                Start-Sleep -Milliseconds 250
+            } while ((Get-Date) -lt $deadline)
+            $help = @{}
+            foreach ($row in $rows) { $help[$row.Current.Name] = $row.Current.HelpText }
+            $report.importMapsRows = $help
+            if ($rows.Count -ne 4) { throw "The dialog showed $($rows.Count) map rows: $($help.Keys -join ', ')." }
+            $times = [char]0x00D7
+            $dot = [char]0x00B7
+            if ($help['castle-floor-1.png'] -notlike "PNG $dot 640 $times 480 $dot *") { throw "castle read '$($help['castle-floor-1.png'])'." }
+            if ($help['catacombs.jpg'] -notlike "JPEG $dot 64 $times 48 $dot *") { throw "catacombs read '$($help['catacombs.jpg'])'." }
+            if ($help['broken-map.png'] -ne "broken-map.png can't be read as an image. It may be damaged or incomplete.") {
+                throw "broken read '$($help['broken-map.png'])'."
+            }
+            if ($help['huge-header.png'] -ne "huge-header.png is 40,000 $times 40,000 pixels. A map can be at most 32,768 pixels on a side.") {
+                throw "huge read '$($help['huge-header.png'])'."
+            }
+            $primary = Wait-EnabledById 'PrimaryButton'
+            if ($primary.Current.Name -ne 'Import 2 maps') { throw "The import button read '$($primary.Current.Name)'." }
+            $report.importMapsScreenshot = Save-WindowScreenshot 'import-maps'
+            $report.phases += 'import-maps-dialog'
+
+            Invoke-Element $primary
+            Wait-HiddenById 'ImportMapsDialog'
+            [void](Wait-Status 'Imported 2 maps.')
+            Wait-MapNames @('castle floor 1', 'catacombs')
+            Wait-HiddenById 'MapsEmptyState'
+            foreach ($item in Get-MapItems) {
+                if ($item.Current.HelpText -match 'Not started|In progress|Opened|%') {
+                    throw "The map row '$($item.Current.Name)' showed a reading state: '$($item.Current.HelpText)'."
+                }
+            }
+            $report.phases += 'import-maps-published'
+
+            # One map by Ctrl+O.
+            Click-Element (Wait-EnabledById 'ImportGuideButton')
+            Choose-PickerFile 'generated\maps\strip-map.png'
+            [void](Wait-VisibleById 'ImportGuideDialog')
+            [void](Wait-Text 'ImportFormat' 'Map image')
+            [void](Wait-Text 'ImportPixels' "20000 $times 400 pixels")
+            Invoke-Element (Wait-EnabledById 'PrimaryButton')
+            Wait-HiddenById 'ImportGuideDialog'
+            Wait-MapNames @('castle floor 1', 'catacombs', 'strip map')
+            # A guide import leaves Import maps usable too.
+            [void](Wait-EnabledById 'ImportMapsButton')
+            $report.importMapsSectionScreenshot = Save-WindowScreenshot 'import-maps-section'
+            $report.phases += 'import-maps-single'
+
+            # A map opens fitted, without completion.
+            $castle = @(Get-MapItems | Where-Object { $_.Current.Name -eq 'castle floor 1' })[0]
+            $castle.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+            $view = Wait-VisibleById 'MapImageView'
+            if ($view.Current.Name -ne 'castle floor 1') { throw "The map view was named '$($view.Current.Name)'." }
+            $completion = Find-ById 'CompletionChoice'
+            if ($completion -and -not $completion.Current.IsOffscreen) { throw 'A map showed the completion choice.' }
+            $report.importMapsOpenScreenshot = Save-WindowScreenshot 'import-maps-open'
+            Go-Back
+            [void](Wait-Name 'GameHeading' 'Import Test Game')
+            $report.phases += 'import-maps-open'
         }
         elseif ($Mode -eq 'import-preview') {
             Select-Element 'Import Test Game'

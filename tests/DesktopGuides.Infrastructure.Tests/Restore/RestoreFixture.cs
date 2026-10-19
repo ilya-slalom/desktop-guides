@@ -29,9 +29,10 @@ internal sealed class RestoreFixture : IAsyncDisposable
 
     public string StagingParent => Path.Combine(Target.Paths.DataRoot, LibraryRestorer.StagingFolderName);
 
-    public static async Task<RestoreFixture> CreateAsync()
+    public static async Task<RestoreFixture> CreateAsync(Func<ExportFixture, Task>? arrange = null)
     {
         ExportFixture source = await ExportFixture.CreateAsync();
+        if (arrange is not null) await arrange(source);
         string folder = Path.Combine(source.Library.Root, "backups");
         Directory.CreateDirectory(folder);
         LibraryExportResult result = await new LibraryExporter(
@@ -123,6 +124,25 @@ internal sealed class RestoreFixture : IAsyncDisposable
         "DROP TABLE GuidePages; ALTER TABLE GuideAssets RENAME TO GuideAssetsOld; " +
         LibrarySchema.Version4 +
         " INSERT INTO GuideAssets SELECT * FROM GuideAssetsOld; DROP TABLE GuideAssetsOld;";
+
+    // T21.2: schema 8 rebuilt Guides for maps; this is the table before it.
+    public static string GuidesBeforeVersionEight()
+    {
+        string first = LibrarySchema.Version1;
+        int start = first.IndexOf("CREATE TABLE Guides", StringComparison.Ordinal);
+        int end = first.IndexOf(");", start, StringComparison.Ordinal) + 2;
+        return $"""
+            PRAGMA foreign_keys = OFF;
+            PRAGMA legacy_alter_table = ON;
+            ALTER TABLE Guides RENAME TO GuidesAfter;
+            {first[start..end]}
+            INSERT INTO Guides SELECT Id, GameId, Title, Format, ManagedRelativeRoot, PrimaryRelativePath,
+                ContentSha256, ContentBytes, SourceLabel, TextCodePage, ImportedUtcMs, UpdatedUtcMs FROM GuidesAfter;
+            DROP TABLE GuidesAfter;
+            CREATE INDEX IX_Guides_GameId ON Guides(GameId);
+            PRAGMA legacy_alter_table = OFF;
+            """;
+    }
 
     public static string ReaderPreferencesBeforeVersionSix()
     {

@@ -60,6 +60,7 @@ public static class AppIconCatalog
             // Fluent has no colour PDF or game controller; the dg_ icons are the
             // project's own, generated in Fluent's style (see SOURCE.md).
             [GuideFormat.Pdf] = ("\uEA90", "dg_document_pdf_color.png"),
+            [GuideFormat.Image] = ("\uE8B9", "ic_fluent_image_24_color.svg"),
         };
 
     private static readonly (string Glyph, string Asset) MissingGuide =

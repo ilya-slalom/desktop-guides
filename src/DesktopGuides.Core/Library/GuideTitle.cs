@@ -17,14 +17,27 @@ public static class GuideTitle
         return trimmed.Length is >= 1 and <= TitleLimit;
     }
 
-    public static string Suggest(string fileName)
+    public const string MapFallback = "Untitled map";
+
+    // T21.2: a saved map's name uses - and _ for spaces.
+    public static string SuggestMap(string fileName)
     {
-        string name = Path.GetFileNameWithoutExtension(fileName).Trim();
+        string name = string.Join(' ', Path.GetFileNameWithoutExtension(fileName)
+            .Split([' ', '-', '_'], StringSplitOptions.RemoveEmptyEntries));
+        return Shorten(name, MapFallback);
+    }
+
+    public static string Suggest(string fileName) =>
+        Shorten(Path.GetFileNameWithoutExtension(fileName).Trim(), Fallback);
+
+    // The extension is already gone: a dot in what's left is part of the name.
+    private static string Shorten(string name, string fallback)
+    {
         if (name.Length > TitleLimit)
         {
             int cut = char.IsHighSurrogate(name[TitleLimit - 1]) ? TitleLimit - 1 : TitleLimit;
             name = name[..cut].TrimEnd();
         }
-        return name.Length == 0 ? Fallback : name;
+        return name.Length == 0 ? fallback : name;
     }
 }

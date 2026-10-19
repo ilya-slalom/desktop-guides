@@ -6,7 +6,9 @@ public enum GuideFormat
 {
     Txt,
     Html,
-    Pdf
+    Pdf,
+    // T21.2: a map, a PNG or JPEG with no progress or completion.
+    Image
 }
 
 public enum ThemePreference
@@ -39,7 +41,9 @@ public sealed record Guide(
     string? SourceLabel,
     int? TextCodePage,
     DateTimeOffset ImportedUtc,
-    DateTimeOffset UpdatedUtc);
+    DateTimeOffset UpdatedUtc,
+    int? PixelWidth = null,   // T21.2: a map's size; null for every other format
+    int? PixelHeight = null);
 
 public sealed record ReadingState(
     Guid GuideId,
