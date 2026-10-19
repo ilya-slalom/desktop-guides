@@ -8033,12 +8033,14 @@ try {
             function Mark([string] $step) { $timeline.Add("${step}: $(Get-TopLineName)") }
             $firstLine = Get-TopLineName
             Mark 'opened'
-            Focus-Guide
-            Mark 'focused'
-            Send-Keys '{PGDN}'
-            Mark 'page down 1'
-            Send-Keys '{PGDN}'
-            Mark 'page down 2'
+            # The reader's own paging, as the TXT modes page; focusing a row
+            # would let the list scroll it into view when focus comes back.
+            Invoke-Element (Find-ByName 'Next page')
+            Start-Sleep -Milliseconds 400
+            Mark 'next page 1'
+            Invoke-Element (Find-ByName 'Next page')
+            Start-Sleep -Milliseconds 400
+            Mark 'next page 2'
             $deadline = (Get-Date).AddSeconds(10)
             while ((Get-TopLineName) -eq $firstLine -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
             $place = Get-TopLineName
@@ -8051,6 +8053,16 @@ try {
 
             # 2. The pane, by pointer: nothing shown until a map is pointed at.
             Click-Element (Wait-VisibleById 'ShowMaps')
+            [void](Wait-VisibleById 'MapsList')
+            Start-Sleep -Milliseconds 500
+            $report.mapsPopupBounds = [ordered]@{
+                window = $root.Current.BoundingRectangle.ToString()
+                list = (Find-ById 'MapsList').Current.BoundingRectangle.ToString()
+                message = (Find-ById 'MapsPreviewMessage').Current.BoundingRectangle.ToString()
+                messageOffscreen = (Find-ById 'MapsPreviewMessage').Current.IsOffscreen
+                showMaps = (Find-ById 'ShowMaps').Current.BoundingRectangle.ToString()
+            }
+            $report.mapsPopupOpenScreenshot = Save-WindowScreenshot 'maps-popup-open'
             $names = @((Wait-VisibleById 'MapsList').FindAll($scope, $rowCondition) | ForEach-Object { $_.Current.Name })
             if (($names -join '|') -ne 'big map|castle floor 1') { throw "The Maps pane listed '$($names -join ', ')'." }
             [void](Wait-Name 'MapsPreviewMessage' 'Point to a map to see it.')
