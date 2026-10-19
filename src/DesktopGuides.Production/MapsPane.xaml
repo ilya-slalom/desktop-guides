@@ -4,7 +4,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:maps="using:DesktopGuides.Core.Maps">
     <!-- T21.2 PR c: the game's maps and the one pointed at, side by side in
-         one flyout, so moving the pointer between them never closes it. -->
+         one flyout, so moving the pointer between them never closes it. It
+         uses only the typography styles and tokens, so the toolbar still
+         compiles without the Toolkit. -->
     <Grid ColumnSpacing="{StaticResource DesktopGuidesSpacing16}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="280" />
@@ -64,7 +66,6 @@
                     Content="Open map"
                     IsEnabled="False"
                     HorizontalAlignment="Right"
-                    Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
                     Click="OpenMapClicked"
                     AutomationProperties.AutomationId="OpenMapFromMaps" />
         </Grid>

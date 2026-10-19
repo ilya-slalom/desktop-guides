@@ -27,6 +27,13 @@
           Link="ReaderToolbar.xaml" />
     <Compile Include="../../../src/DesktopGuides.Production/ReaderToolbar.xaml.cs"
              Link="ReaderToolbar.xaml.cs" />
+    <!-- T21.2 PR c: the toolbar's Maps pane. -->
+    <Page Include="../../../src/DesktopGuides.Production/MapsPane.xaml"
+          Link="MapsPane.xaml" />
+    <Compile Include="../../../src/DesktopGuides.Production/MapsPane.xaml.cs"
+             Link="MapsPane.xaml.cs" />
+    <Page Include="../../../src/DesktopGuides.Production/Styles/Typography.xaml"
+          Link="Styles/Typography.xaml" />
     <Page Include="../../../src/DesktopGuides.Production/Styles/Dialogs.xaml"
           Link="Styles/Dialogs.xaml" />
     <Compile Include="../../../src/DesktopGuides.Production/Materials/DialogSurface.cs"

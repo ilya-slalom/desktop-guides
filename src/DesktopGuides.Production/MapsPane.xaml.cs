@@ -36,6 +36,7 @@ public sealed partial class MapsPane : UserControl
         ArgumentNullException.ThrowIfNull(items);
         MapsList.ItemsSource = items;
         FirstFocus = items.Count == 0 ? -1 : MapsMenu.FirstFocus(items, openGuideId);
+        if (focusPending) TryFocusFirstRow(attempts: 5);
         if (shown is MapsMenuItem current && !items.Any(item => item.Id == current.Id))
         {
             Clear();
@@ -45,18 +46,39 @@ public sealed partial class MapsPane : UserControl
     // The row the keyboard starts on.
     public int FirstFocus { get; private set; } = -1;
 
-    // Alt+M: the keyboard lands on a row, and its map shows.
+    // Alt+M: the keyboard lands on a row, and its map shows. The list is
+    // read when the pane opens, so the focus waits for its rows if need be.
     public void FocusFirstRow()
     {
-        if (FirstFocus < 0) return;
+        focusPending = true;
+        TryFocusFirstRow(attempts: 5);
+    }
+
+    private bool focusPending;
+
+    public void CancelFocus() => focusPending = false;
+
+    private void TryFocusFirstRow(int attempts)
+    {
+        if (!focusPending || FirstFocus < 0) return;
         MapsList.SelectedIndex = FirstFocus;
         MapsList.ScrollIntoView(MapsList.SelectedItem);
         MapsList.UpdateLayout();
-        (MapsList.ContainerFromIndex(FirstFocus) as ListViewItem)?.Focus(FocusState.Keyboard);
+        if (MapsList.ContainerFromIndex(FirstFocus) is ListViewItem row && row.Focus(FocusState.Keyboard))
+        {
+            focusPending = false;
+            return;
+        }
+        if (attempts > 1)
+        {
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                () => TryFocusFirstRow(attempts - 1));
+        }
     }
 
     public void Forget()
     {
+        focusPending = false;
         loading?.Cancel();
         previews.Clear();
         Clear();
