@@ -7898,7 +7898,20 @@ try {
         [void](Wait-VisibleById 'RemoveGuideDialog')
         Invoke-Element (Wait-EnabledById 'PrimaryButton')
         [void](Wait-HiddenById 'RemoveGuideDialog')
-        [void](Wait-Name 'ShellStatus' 'Removed second big map.')
+        # The removal first stops the build; the row leaving the list is the
+        # outcome, and how long that took is recorded.
+        $removeClock = [System.Diagnostics.Stopwatch]::StartNew()
+        $condition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::NameProperty, 'second big map')
+        do {
+            $status = Find-ById 'ShellStatus'
+            if ($status -and $status.Current.Name -like '*couldn''t be removed*') { throw "The removal failed: $($status.Current.Name)" }
+            $row = (Find-ById 'MapList').FindFirst($scope, $condition)
+            if (-not $row) { break }
+            Start-Sleep -Milliseconds 200
+        } while ($removeClock.Elapsed.TotalSeconds -lt 60)
+        $report.mapsReaderRemoveBuildingMs = $removeClock.ElapsedMilliseconds
+        if ($row) { throw "The second big map was still listed $($removeClock.ElapsedMilliseconds) ms after its removal." }
         $report.phases += 'maps-reader-remove-building'
     }
     elseif ($Mode -like 'remove-*') {
