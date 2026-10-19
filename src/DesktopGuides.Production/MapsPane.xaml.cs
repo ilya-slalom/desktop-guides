@@ -56,7 +56,14 @@ public sealed partial class MapsPane : UserControl
 
     private bool focusPending;
 
-    public void CancelFocus() => focusPending = false;
+    // On close: the next opening reads the list again, and its focus must
+    // wait for those rows, not land on these.
+    public void Closed()
+    {
+        focusPending = false;
+        MapsList.ItemsSource = null;
+        FirstFocus = -1;
+    }
 
     private void TryFocusFirstRow(int attempts)
     {

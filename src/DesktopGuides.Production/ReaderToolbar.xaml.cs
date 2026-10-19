@@ -582,7 +582,7 @@ public sealed partial class ReaderToolbar : UserControl
 
     private void MapsFlyoutClosed(object? sender, object args)
     {
-        MapsPaneView.CancelFocus();
+        MapsPaneView.Closed();
         mapsClosedAt = DateTimeOffset.UtcNow;
     }
 
