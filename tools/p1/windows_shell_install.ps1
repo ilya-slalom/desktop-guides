@@ -1923,6 +1923,24 @@ function Run-MapReaderScenario([string] $fixtureRoot) {
     finally {
         foreach ($gate in $gates) { $gate.Dispose() }
     }
+    # T21.2 PR c: a glance at a map from the guide, by pointer, then by keyboard.
+    foreach ($mode in @('maps-popup', 'maps-keyboard')) {
+        Start-InstalledShell
+        $processId = $report.launchedProcessId
+        $gates = @(
+            foreach ($name in @('ProgressDiagnostics', 'MapDiagnostics')) {
+                [System.Threading.EventWaitHandle]::new(
+                    $false, [System.Threading.EventResetMode]::ManualReset,
+                    "Local\$eventPrefix.$name.$processId")
+            })
+        try {
+            $report[$mode] = Run-ShellSmoke $mode -ResultName $mode -AppDataRoot $dataRoot -AppCacheRoot $cacheRoot
+            Close-InstalledShell
+        }
+        finally {
+            foreach ($gate in $gates) { $gate.Dispose() }
+        }
+    }
     $timings = Join-Path $cacheRoot 'diagnostics\map-cache.json'
     if (Test-Path -LiteralPath $timings) {
         $report.mapsReaderBuilds = Get-Content -LiteralPath $timings -Raw | ConvertFrom-Json

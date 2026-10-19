@@ -803,7 +803,7 @@ if (args.Length == 3 && args[0] == "seed-maps-reader")
     Guid walkthrough = Guid.NewGuid();
     await InsertTextGuideAsync(mapPaths, mapGame.Id, walkthrough, "Walkthrough",
         DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-        File.ReadAllBytes(Path.Combine(mapFixtures, "txt-ascii.txt")));
+        File.ReadAllBytes(Path.Combine(mapFixtures, "generated", "txt-long.txt")));
     (Guid castle, _) = await PublishMapAsync("castle-floor-1.png", "castle floor 1");
     (Guid strip, string stripSha) = await PublishMapAsync("strip-map.png", "strip map");
     (Guid big, string bigSha) = await PublishMapAsync("big-map.png", "big map");
