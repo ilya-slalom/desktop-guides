@@ -4,6 +4,7 @@ Merged P2 work, in the [P1 results](../p1/results.md) format.
 
 | PR | Merged | Commit | Task | Final CI run | Core | Infra | Record | Caveats |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [#135](https://github.com/ilya-slalom/desktop-guides/pull/135) | 2026-10-18 | `c0addf1` | T21.2 (PR c) | [39133678906](https://github.com/ilya-slalom/desktop-guides/actions/runs/39133678906) | 1396 | 876 | [t21-2-multipage-html-design](t21-2-multipage-html-design.md#pr-c-verification-record) | Contents, search and bookmarks across pages; multi-page HTML supported. Passed on the first attempt. |
 | [#134](https://github.com/ilya-slalom/desktop-guides/pull/134) | 2026-10-18 | `07af06e` | T21.2 (PR b) | [39119742284](https://github.com/ilya-slalom/desktop-guides/actions/runs/39119742284) | 1373 | 872 | [t21-2-multipage-html-design](t21-2-multipage-html-design.md#pr-b-verification-record) | Reading a multi-page guide. Passed on the first attempt. |
 | [#133](https://github.com/ilya-slalom/desktop-guides/pull/133) | 2026-10-18 | `59810e0` | T21.2 (PR a) | [39092396556](https://github.com/ilya-slalom/desktop-guides/actions/runs/39092396556) | 1344 | 869 | [t21-2-multipage-html-design](t21-2-multipage-html-design.md#pr-a-verification-record) | Multi-page HTML import, storage and backup. Passed on the first attempt. |
 | [#132](https://github.com/ilya-slalom/desktop-guides/pull/132) | 2026-10-17 | `e3c9a71` | T21.1 | — (docs only) | — | — | [format-survey](format-survey.md) | The format survey; T21.2 limited to multi-page HTML and image maps. |

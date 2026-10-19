@@ -1,6 +1,7 @@
 # T21.2 image maps: design
 
-Status: approved in conversation, 19 October 2026.
+Status: approved in conversation, 19 October 2026. PR a (import maps and
+the Maps section) in review; see the [PR a verification record](#pr-a-verification-record).
 
 ## Intent
 
@@ -327,3 +328,57 @@ Image maps are listed as supported only after PR c.
    tiles) lives outside the library.
    The originals stay untouched.
 4. **Several files import at once,** but only through Import maps.
+
+## PR a verification record
+
+See the [PR a plan](t21-2-image-maps-import-plan.md).
+
+- **Core,** each test failing first and then passing on the host:
+  - `MapImageHeaderTests`: PNG and JPEG sizes from the header (a 64 KiB
+    EXIF segment, a progressive JPEG, fill bytes, a stream that can't
+    seek), and completeness: a PNG must reach IEND, a JPEG its end after
+    its first scan, found by segment lengths so an EXIF thumbnail's own
+    scan and end don't count;
+  - `MapImageLimits`, `MapPresentationTests` (stored name, label, size
+    fact, sort by title then id) and `MapBatchTests` (the button label,
+    the summary, and Import waiting for every file's check);
+  - map titles from file names, keeping a dot that isn't the extension;
+    "N guides, M maps"; the map icon; `GamePageLayout` leaving a row of
+    each list and the Maps header.
+
+  The full suite passes, 1444/1444.
+- **Infrastructure:**
+  - schema 8: a populated schema 7 library keeps every row through the
+    `Guides` rebuild, a failed migration stays at schema 7, deletes still
+    cascade, and the pixel columns are required for maps only;
+  - `MapImportTests`: each limit's refusal, a decompression bomb refused
+    from its header before any decode, a truncated map that still decodes,
+    a mismatched extension, upper-case extensions, duplicates by bytes and
+    not by title, and publishing `content/<id>/map.png`;
+  - a map backed up and restored, and a schema 7 backup restored.
+
+  The full suite passes, 901/901.
+- **Production:** it builds with 0 warnings, with warnings as errors.
+- **Installed:** the `import` group passes on both lanes (runs
+  39182497573, MSIX, and 39182499716, portable). `import-maps` picks four
+  files at once; two import, and a damaged file and a 40,000 × 40,000
+  header are refused with their reasons. A strip map imports by Ctrl+O,
+  the Maps section lists all three by title with no reading state, and a
+  map opens fitted. The library then holds 3 maps (640 × 480, 64 × 48 and
+  20000 × 400) with no reading state, and Resume isn't a map.
+
+  Screenshots: [import-maps](evidence/ci/t21-2/import-maps.png),
+  [import-maps-section](evidence/ci/t21-2/import-maps-section.png) and
+  [import-maps-open](evidence/ci/t21-2/import-maps-open.png).
+- **Found by the installed runs:**
+  - **A truncated PNG decoded** with its missing rows filled in, so it
+    showed as ready. Completeness is now checked apart from decoding.
+  - **Import maps stayed disabled** after a Ctrl+O import, and **the Maps
+    list ran off a short window**. Both are fixed, and the smoke checks
+    the button.
+- **Found by the final review:** Import could start before every file was
+  checked, a dotted file name lost its tail in the title, and a JPEG cut
+  after its EXIF thumbnail counted as whole. Each is fixed with a test
+  that failed first.
+- **Deferred:** map removal and in-batch duplicate copy still say
+  "guide"; focus after cancelling Remove map. Both are polish for PR c.
