@@ -7753,17 +7753,28 @@ try {
             $list = Find-ById 'MapList'
             $condition = [System.Windows.Automation.PropertyCondition]::new(
                 [System.Windows.Automation.AutomationElement]::NameProperty, $title)
-            $item = $list.FindFirst($scope, $condition)
-            if (-not $item) {
-                # A short list makes only the rows it shows; realize the one asked for.
-                $container = $list.GetCurrentPattern([System.Windows.Automation.ItemContainerPattern]::Pattern)
-                $item = $container.FindItemByProperty($null, [System.Windows.Automation.AutomationElement]::NameProperty, $title)
-                if ($item) {
-                    $item.GetCurrentPattern([System.Windows.Automation.VirtualizedItemPattern]::Pattern).Realize()
-                    $item.GetCurrentPattern([System.Windows.Automation.ScrollItemPattern]::Pattern).ScrollIntoView()
+            # A short list makes only the rows near its view; scroll toward the
+            # one asked for, as Show-TextGuide does for guides.
+            $deadline = (Get-Date).AddSeconds(15)
+            do {
+                $item = $list.FindFirst($scope, $condition)
+                if ($item) { break }
+                $scroll = $list.GetCurrentPattern([System.Windows.Automation.ScrollPattern]::Pattern)
+                if ($scroll.Current.VerticallyScrollable) {
+                    $scroll.Scroll([System.Windows.Automation.ScrollAmount]::NoAmount, [System.Windows.Automation.ScrollAmount]::SmallIncrement)
                 }
+                Start-Sleep -Milliseconds 200
+            } while ((Get-Date) -lt $deadline)
+            if (-not $item) {
+                $rows = @($list.FindAll($scope, [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                    [System.Windows.Automation.ControlType]::ListItem)) | ForEach-Object { $_.Current.Name })
+                [void](Save-WindowScreenshot 'maps-reader-missing-row')
+                throw "The Maps list had no '$title'; it showed '$($rows -join ', ')' in $($list.Current.BoundingRectangle)."
             }
-            if (-not $item) { throw "The Maps list had no '$title'." }
+            if ($item.Current.IsOffscreen) {
+                $item.GetCurrentPattern([System.Windows.Automation.ScrollItemPattern]::Pattern).ScrollIntoView()
+            }
             $selection = $item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)
             # Back leaves the map selected, and selecting it again changes nothing.
             if ($selection.Current.IsSelected) {
