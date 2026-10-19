@@ -54,6 +54,7 @@ internal sealed class FakeRepository : ILibraryRepository
     public Task<Game> UpdateGameAsync(Guid gameId, string title, string? platform, string? notes, CancellationToken token = default) => throw new NotSupportedException();
     public Task<IReadOnlyList<Game>> ListGamesAsync(CancellationToken token = default) => throw new NotSupportedException();
     public Task<IReadOnlyList<Guide>> ListGuidesAsync(Guid gameId, CancellationToken token = default) => throw new NotSupportedException();
+    public Task<IReadOnlySet<string>> ListMapHashesAsync(CancellationToken token = default) => throw new NotSupportedException();
     public Task<IReadOnlyList<LibraryGameSummary>> ListGameSummariesAsync(CancellationToken token = default) => throw new NotSupportedException();
     public Task<IReadOnlyList<GuideSummary>> ListGuideSummariesAsync(Guid gameId, CancellationToken token = default) => throw new NotSupportedException();
     public Task<Guide?> GetGuideAsync(Guid guideId, CancellationToken token = default) => throw new NotSupportedException();

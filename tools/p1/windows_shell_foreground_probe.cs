@@ -18,6 +18,9 @@ public static class DesktopGuidesForegroundProbe
     [DllImport("user32.dll")]
     private static extern bool SetCursorPos(int x, int y);
 
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int index);
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, string lParam);
 
@@ -72,6 +75,36 @@ public static class DesktopGuidesForegroundProbe
         }
         mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
         mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+    }
+
+    // T21.2: a left-button drag in steps, as a person pans a map. The moves
+    // are mouse input (absolute, over the virtual desktop), not SetCursorPos,
+    // which repositions the cursor without sending the app a pointer move.
+    public static void Drag(int fromX, int fromY, int toX, int toY)
+    {
+        if (!SetCursorPos(fromX, fromY))
+        {
+            throw new InvalidOperationException("Could not position the foreground probe cursor.");
+        }
+        mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+        for (int step = 1; step <= 10; step++)
+        {
+            System.Threading.Thread.Sleep(20);
+            MoveTo(fromX + (toX - fromX) * step / 10, fromY + (toY - fromY) * step / 10);
+        }
+        System.Threading.Thread.Sleep(50);
+        mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+    }
+
+    private static void MoveTo(int x, int y)
+    {
+        // SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN.
+        int left = GetSystemMetrics(76), top = GetSystemMetrics(77);
+        int width = Math.Max(2, GetSystemMetrics(78)), height = Math.Max(2, GetSystemMetrics(79));
+        uint ax = (uint)((x - left) * 65535L / (width - 1));
+        uint ay = (uint)((y - top) * 65535L / (height - 1));
+        // MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK.
+        mouse_event(0x0001 | 0x8000 | 0x4000, ax, ay, 0, UIntPtr.Zero);
     }
 
     public static void Resize(IntPtr window, int x, int y, int width, int height)

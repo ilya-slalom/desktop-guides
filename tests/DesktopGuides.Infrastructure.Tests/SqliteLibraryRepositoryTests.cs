@@ -1836,6 +1836,23 @@ public sealed class SqliteLibraryRepositoryTests
         Assert.Equal(["Walkthrough", "castle", "catacombs"], summary.GuideTitles);
     }
 
+    // T21.2: the hashes the map cache keeps; the same map in two games is one.
+    [Fact]
+    public async Task MapHashesAreThoseOfImageGuidesOnly()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game first = await repository.AddGameAsync("First", null, null);
+        Game second = await repository.AddGameAsync("Second", null, null);
+        string map = new('c', 64);
+        InsertGuide(directory.Paths.DatabasePath, Guid.NewGuid(), first.Id, hash: new string('d', 64));
+        InsertGuide(directory.Paths.DatabasePath, Guid.NewGuid(), first.Id, title: "castle", format: "Image", pixels: (8000, 6000), hash: map);
+        InsertGuide(directory.Paths.DatabasePath, Guid.NewGuid(), second.Id, title: "castle", format: "Image", pixels: (8000, 6000), hash: map);
+
+        Assert.Equal(new HashSet<string> { map }, await repository.ListMapHashesAsync());
+    }
+
     // Version 6 plus Version 7, with a bookmark and an entry page, so every table that references Guides has a row.
     private static void CreatePopulatedVersionSeven(TestLibrary directory, Guid gameId, Guid guideId)
     {
@@ -2160,7 +2177,8 @@ public sealed class SqliteLibraryRepositoryTests
 
     private static void InsertGuide(
         string databasePath, Guid guideId, Guid gameId, string? managedRoot = null,
-        string title = "Walkthrough", string format = "Txt", (int Width, int Height)? pixels = null)
+        string title = "Walkthrough", string format = "Txt", (int Width, int Height)? pixels = null,
+        string? hash = null)
     {
         bool v8 = ReadUserVersion(databasePath) >= 8;
         using SqliteConnection connection = OpenWithForeignKeys(databasePath);
@@ -2185,7 +2203,7 @@ public sealed class SqliteLibraryRepositoryTests
         command.Parameters.AddWithValue("$game", gameId.ToString("N"));
         command.Parameters.AddWithValue(
             "$root", managedRoot ?? "content/" + guideId.ToString("N"));
-        command.Parameters.AddWithValue("$hash", new string('a', 64));
+        command.Parameters.AddWithValue("$hash", hash ?? new string('a', 64));
         command.Parameters.AddWithValue("$now", Now.ToUnixTimeMilliseconds());
         command.ExecuteNonQuery();
     }

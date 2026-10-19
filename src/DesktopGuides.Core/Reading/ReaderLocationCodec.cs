@@ -41,6 +41,12 @@ public static class ReaderLocationCodec
                     writer.WriteNumber("pageIndex", pdf.PageIndex);
                     writer.WriteNumber("pageFraction", pdf.PageFraction);
                     break;
+                case ImagePosition image:
+                    if (image.Zoom is double zoom) writer.WriteNumber("zoom", zoom);
+                    else writer.WriteNull("zoom");
+                    writer.WriteNumber("centerX", image.CenterX);
+                    writer.WriteNumber("centerY", image.CenterY);
+                    break;
             }
             writer.WriteEndObject();
             if (location.EstimatedFraction is double estimate)
@@ -122,6 +128,10 @@ public static class ReaderLocationCodec
                 GuideFormat.Pdf => new PdfPosition(
                     RequireInt(payload, "pageIndex"),
                     RequireFraction(payload, "pageFraction")),
+                GuideFormat.Image => new ImagePosition(
+                    OptionalZoom(payload),
+                    RequireFraction(payload, "centerX"),
+                    RequireFraction(payload, "centerY")),
                 _ => throw new InvalidDataException("Unknown reader format.")
             };
             ReaderLocation location = new(
@@ -198,6 +208,11 @@ public static class ReaderLocationCodec
                 ValidHtmlPosition(html),
             (GuideFormat.Pdf, PdfPosition pdf) =>
                 pdf.PageIndex >= 0 && ValidFraction(pdf.PageFraction),
+            (GuideFormat.Image, ImagePosition image) =>
+                location.EstimatedFraction is null &&
+                (image.Zoom is null ||
+                 (double.IsFinite(image.Zoom.Value) && image.Zoom > 0 && image.Zoom <= ImagePosition.MaxZoom)) &&
+                ValidFraction(image.CenterX) && ValidFraction(image.CenterY),
             _ => false
         };
         if (!valid)
@@ -284,6 +299,21 @@ public static class ReaderLocationCodec
             throw new InvalidDataException($"Reader locator field {name} is not a fraction.");
         }
         return number;
+    }
+
+    // The zoom is required, and null when the map is fitted.
+    private static double? OptionalZoom(JsonElement payload)
+    {
+        if (!payload.TryGetProperty("zoom", out JsonElement value))
+        {
+            throw new InvalidDataException("Reader locator field zoom is missing.");
+        }
+        if (value.ValueKind == JsonValueKind.Null) return null;
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out double zoom))
+        {
+            throw new InvalidDataException("Reader locator field zoom is invalid.");
+        }
+        return zoom;
     }
 
     private static string? OptionalString(JsonElement parent, string name)

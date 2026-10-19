@@ -85,13 +85,15 @@ public sealed class ProgressCoordinator
 
     // restoredJson is the locator the guide was restored from, or the
     // position captured after opening, so an unmoved guide isn't rewritten.
-    public IProgressTracking Track(Guid guideId, IReaderSession session, string? restoredJson)
+    // T21.2: a map is tracked without recording an open, so it isn't
+    // reading activity.
+    public IProgressTracking Track(Guid guideId, IReaderSession session, string? restoredJson, bool recordOpen = true)
     {
         ArgumentNullException.ThrowIfNull(session);
         Tracking tracking = new(this, guideId, session, restoredJson, SynchronizationContext.Current);
         Interlocked.Exchange(ref current, tracking)?.End();
         // The open is the tracking's first turn, so a save waits for it.
-        _ = tracking.RecordOpenAsync(clock.GetUtcNow());
+        if (recordOpen) _ = tracking.RecordOpenAsync(clock.GetUtcNow());
         return tracking;
     }
 

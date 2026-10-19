@@ -9,6 +9,7 @@ using DesktopGuides.Core.Reading;
 using DesktopGuides.Core.Text;
 using DesktopGuides.Infrastructure.Artwork;
 using DesktopGuides.Infrastructure.Import;
+using DesktopGuides.Infrastructure.Maps;
 using DesktopGuides.Infrastructure.Reading;
 using DesktopGuides.Infrastructure.Storage;
 using DesktopGuides.Production.Materials;
@@ -85,6 +86,9 @@ public sealed partial class ShellWindow : Window
     private ManagedHtmlGuideLoader? htmlLoader;
     private ManagedPdfGuideLoader? pdfLoader;
     private string? cacheRoot;
+    // T21.2: large maps' levels and tiles, under the cache folder.
+    private MapTileStore? mapStore;
+    private MapCacheQueue? mapCache;
     private string? dataRoot;
     private CancellationTokenSource? readerLoad;
     private IReaderSession? readerSession;
@@ -432,6 +436,10 @@ public sealed partial class ShellWindow : Window
                 AppDataRoot.HasPackageIdentity(),
                 () => ApplicationData.Current.LocalCacheFolder.Path,
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+            mapCache?.CancelAll();
+            mapStore = new MapTileStore(cacheRoot);
+            mapCache = new MapCacheQueue(mapStore, cacheRoot);
+            PruneMapCacheSoon();
             // The library lease is held, so no live session owns a profile here.
             string sweptRoot = cacheRoot;
             await Task.Run(() => WebView2ProfileSweeper.Sweep(sweptRoot));
@@ -525,6 +533,7 @@ public sealed partial class ShellWindow : Window
         activeImportDialog?.Hide();
         activeMapsDialog?.Hide();
         activeRemoveDialog?.Hide();
+        mapCache?.CancelAll();
         refreshCancel?.Cancel();
         backupCancel?.Cancel();
         ProviderSettings.Cancel();
@@ -1187,7 +1196,7 @@ public sealed partial class ShellWindow : Window
                     (manifest, token) => library.FindGuideByFingerprintAsync(
                         game.Id, manifest.Format, manifest.Fingerprint, token),
                     (manifest, title, allowDuplicate, progress, token) =>
-                        publisher.PublishAsync(manifest, game.Id, title, allowDuplicate, progress, token))
+                        PublishAndQueueMapAsync(publisher, manifest, game.Id, title, allowDuplicate, progress, token))
                 {
                     XamlRoot = Navigation.XamlRoot
                 };
@@ -1312,6 +1321,7 @@ public sealed partial class ShellWindow : Window
                 GuideRemovalResult result;
                 try
                 {
+                    await StopMapBuildAsync(guide.Id);
                     result = await remover.RemoveAsync(guide.Id);
                 }
                 catch (Exception error)
@@ -1319,6 +1329,7 @@ public sealed partial class ShellWindow : Window
                     ShowRemovalError(error, guide.Title);
                     return;
                 }
+                PruneMapCacheSoon();
                 guideHealth.Forget(guide.Id);
                 if (!closeRequested && navigator.Current is GameRoute shown && shown.GameId == route.GameId)
                 {
@@ -1425,6 +1436,7 @@ public sealed partial class ShellWindow : Window
                 GuideRemovalResult result;
                 try
                 {
+                    await StopMapBuildAsync(route.GuideId);
                     result = await remover.RemoveAsync(route.GuideId);
                 }
                 catch (Exception error)
@@ -1432,6 +1444,7 @@ public sealed partial class ShellWindow : Window
                     ShowRemovalError(error, title);
                     return;
                 }
+                PruneMapCacheSoon();
                 guideHealth.Forget(route.GuideId);
                 if (!closeRequested && navigator.Current == route)
                 {
@@ -1542,6 +1555,8 @@ public sealed partial class ShellWindow : Window
                     }
                     try
                     {
+                        // Its maps may be building; the others rebuild on their next open.
+                        await StopMapBuildsAsync();
                         result = await remover.RemoveAsync(preview.GameId, preview.GuideCount);
                     }
                     catch (Exception error)
@@ -1565,6 +1580,7 @@ public sealed partial class ShellWindow : Window
                     preview = result.Current!;
                     countChanged = true;
                 }
+                PruneMapCacheSoon();
                 rendered = true;
                 // Clearing the back stack keeps Back from reaching the removed page.
                 navigator.ResetToLibrary();
@@ -1642,11 +1658,16 @@ public sealed partial class ShellWindow : Window
     private bool IsSupersededGameGuideIntent(long? intentVersion) =>
         intentVersion is long version && version != gameGuideIntentVersion;
 
+    private const string OpeningGuideText = "Opening guide…";
+
     private void ShowReaderSurface(
         bool loading, string? error = null, UIElement? view = null,
-        GuideLoadAction action = GuideLoadAction.None)
+        GuideLoadAction action = GuideLoadAction.None, string loadingText = OpeningGuideText)
     {
         ReaderLoading.Visibility = loading ? Visibility.Visible : Visibility.Collapsed;
+        // T21.2: an uncached map says it's being prepared.
+        ReaderLoadingText.Text = loadingText;
+        AutomationProperties.SetName(ReaderLoading, loadingText);
         ReaderLoadingRing.IsActive = loading;
         ReaderLoadError.Text = error ?? string.Empty;
         ReaderLoadError.Visibility = error is null ? Visibility.Collapsed : Visibility.Visible;

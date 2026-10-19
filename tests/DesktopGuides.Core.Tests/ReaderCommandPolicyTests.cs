@@ -50,4 +50,10 @@ public sealed class ReaderCommandPolicyTests
     [Fact]
     public void WithoutPagesNoKeyPages() =>
         Assert.Null(PageKeyRouting.For(Html, PageKey.PageDown, false));
+
+    // T21.2: a map zooms and fits, and nothing else.
+    [Fact]
+    public void AMapShowsZoomAndFitOnly() =>
+        Assert.Equal([ReaderCommand.Zoom, ReaderCommand.FitView], ReaderCommandPolicy.VisibleCommands(
+            ReaderCapabilities.Zoom | ReaderCapabilities.FitView));
 }

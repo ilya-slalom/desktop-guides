@@ -15,6 +15,13 @@ public sealed record HtmlPosition(
 
 public sealed record PdfPosition(int PageIndex, double PageFraction) : ReaderPosition;
 
+// T21.2: a map's view. A null zoom is fitted; the centre is a fraction of
+// the image. It's a convenience, never progress.
+public sealed record ImagePosition(double? Zoom, double CenterX, double CenterY) : ReaderPosition
+{
+    public const double MaxZoom = 4;
+}
+
 public sealed record ReaderLocation(
     GuideFormat Format,
     int SchemaVersion,

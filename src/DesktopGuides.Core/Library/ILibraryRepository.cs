@@ -17,6 +17,7 @@ public interface ILibraryRepository : IReadingLocationStore, IGuideCompletionSto
     Task<IReadOnlyList<Guide>> ListGuidesAsync(
         Guid gameId, CancellationToken token = default);
     // Newest activity first, then title, then ID. Reads only SQLite.
+    Task<IReadOnlySet<string>> ListMapHashesAsync(CancellationToken token = default);
     Task<IReadOnlyList<LibraryGameSummary>> ListGameSummariesAsync(
         CancellationToken token = default);
     Task<IReadOnlyList<GuideSummary>> ListGuideSummariesAsync(

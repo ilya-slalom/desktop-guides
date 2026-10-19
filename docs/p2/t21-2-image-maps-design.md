@@ -1,7 +1,8 @@
 # T21.2 image maps: design
 
 Status: approved in conversation, 19 October 2026. PR a (import maps and
-the Maps section) in review; see the [PR a verification record](#pr-a-verification-record).
+the Maps section) merged (#136); see the [PR a verification record](#pr-a-verification-record).
+PR b (the reader) in review; see the [PR b verification record](#pr-b-verification-record).
 
 ## Intent
 
@@ -245,6 +246,13 @@ These would make it a failure even if it works:
   - The builder chooses the decoder (WIC via `BitmapDecoder` with a
     transform, or another) and the tile size. It records the choice
     here.
+
+    **The choice (PR b):** WinRT `BitmapDecoder`, since a trimmed build
+    rules out hand-written COM interop. The overview is one Fant-scaled
+    decode. Then level 0 is decoded in bands of 512 rows through
+    `BitmapTransform.Bounds`, into a 2×2 box pyramid of 512-pixel PNG
+    tiles. For the 15456 × 10304 test map on the CI host, the overview
+    took 0.4–0.8 s and its 875 tiles 6.1–9.3 s.
   - **A tile cache on disk is allowed.** PNG decodes from the top down,
     so a big map's levels and tiles would cost a full decode on every
     open. They may be saved once to the same local cache folder as the
@@ -382,3 +390,93 @@ See the [PR a plan](t21-2-image-maps-import-plan.md).
   that failed first.
 - **Deferred:** map removal and in-batch duplicate copy still say
   "guide"; focus after cancelling Remove map. Both are polish for PR c.
+
+## PR b verification record
+
+See the [PR b plan](t21-2-image-maps-reader-plan.md).
+
+- **Core,** each test failing first and then passing on the host:
+  - `ReaderLocationCodecTests`: `ImagePosition` round trips, refused
+    bounds, never an estimate, and a changed map with no restore
+    candidates;
+  - `ReaderCommandPolicyTests`: a map shows Zoom and Fit map only;
+  - `ProgressCoordinatorTests`: tracking without an open still saves;
+  - `MapViewportTests`:
+    - fit (at most 4×), zoom about a point, the 1.25 step, the 1% snap;
+    - pan clamping, arrow steps, a strip centred vertically, and resize
+      keeping the centre;
+    - places round-tripping, the level, visible tiles, and a tile plan
+      within the budget on a 4K view;
+  - `MapPyramidTests`: levels stopping at the 2048 overview, a strip's
+    single tile row, every tile emitted once, 2×2 averaging and odd
+    edges;
+  - `MapTileMemoryTests` and `MapSessionDiagnosticsTests`.
+
+  The full suite passes, 1498/1498.
+- **Infrastructure:**
+  - `MapTileStoreTests`:
+    - a committed build is complete;
+    - an interrupted build, a missing level folder or overview, another
+      size, or an unreadable manifest is incomplete;
+    - a rebuild replaces the old cache;
+    - prune keeps a hash another guide uses;
+    - trim drops the least recently opened, never a kept map;
+    - a bad hash builds no path;
+  - `MapHashesAreThoseOfImageGuidesOnly`.
+
+  The full suite passes, 917/917.
+- **Production:** it builds with 0 warnings, with warnings as errors.
+- **Installed:** the PR run [39231269680](https://github.com/ilya-slalom/desktop-guides/actions/runs/39231269680)
+  passes on both lanes, with the new `maps-reader` mode:
+  - the 15456 × 10304 map showed fitted in 764 ms on its first, uncached
+    open;
+  - eight zoom steps, then panning by the arrow keys and by a drag, drew
+    15 tiles from level 2 within the budget;
+  - Back and reopen showed the same view from the cache in 13 ms;
+  - Ctrl+0 fitted, and the fitted view was saved;
+  - the 20000-pixel strip displayed, its largest surface 1250 pixels;
+  - removing it removed its cache.
+
+  Afterwards no map had an open time or an estimate, and Resume was still
+  the text guide.
+
+  Screenshots: [maps-reader-zoomed](evidence/ci/t21-2/maps-reader-zoomed.png)
+  and [maps-reader-strip](evidence/ci/t21-2/maps-reader-strip.png).
+- **Found by the installed runs:** each was a fault in the mode, not the
+  reader.
+  - It sat inside the import block, so it ran no steps.
+  - An integer `[Math]::Min(4, …)` expected a zoom of 0.
+  - A map still selected after Back didn't reopen when selected again.
+  - The short Maps list hadn't made its third row.
+- **Found by the final review:**
+  - Visible tiles on a 1440p or 4K display could exceed the tile budget
+    and evict one another forever. The reader now gives up the margin,
+    then detail, to stay within the budget.
+  - The mode didn't check that panning moved the view. Once it did, it
+    showed that the drag never panned: the probe moved the cursor with
+    `SetCursorPos`, which sends the app no pointer moves. The probe now
+    sends mouse moves, and the reader applies a drag's release point, so
+    a drag whose moves were merged still pans. In the final runs the
+    arrow keys and the drag each moved the view.
+
+  All are fixed; the tile budget with tests that failed first.
+- **Found by the PR runs:**
+  - Removing a map while its cache was being built failed ("couldn't be
+    removed"), because the build held the map's file open. Removal now
+    stops the build first. A game's removal stops every build.
+  - That stop then waited for the whole build (7–25 s): WinRT's decode
+    and encode run to the end once started, and the band loop never
+    checked its token. It now checks before each band and tile, and a
+    mid-build removal took 0.3–0.7 s.
+
+  `maps-reader` removes a second large map while its tiles build, and
+  requires it within 5 s.
+- **Deferred:**
+  - a changed map's place restores exactly rather than fitting;
+  - a part-deleted cache can read as complete;
+  - a cache-build failure blames the original file;
+  - one `XamlRoot.Changed` handler is left per open;
+  - a restore's old build can overlap the new queue;
+  - an open during a build reads the overview from `.building`;
+  - the build's peak memory is about 150 MiB, not 64;
+  - the smoke has no final `else`.

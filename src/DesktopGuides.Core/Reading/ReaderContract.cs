@@ -18,7 +18,9 @@ public enum ReaderCapabilities
     // T19.2: TXT's Original or Reflow view.
     Reflow = 512,
     // T21.2: a web guide of several pages; its page commands move between them.
-    GuidePages = 1024
+    GuidePages = 1024,
+    // T21.2: a map fits itself to the reader.
+    FitView = 2048
 }
 
 public enum ReaderCommand
@@ -33,7 +35,8 @@ public enum ReaderCommand
     Find,
     Contents,
     Bookmarks,
-    AddBookmark
+    AddBookmark,
+    FitView
 }
 
 public abstract record ReaderAction(ReaderCommand Command);
@@ -57,6 +60,8 @@ public sealed record FitWidthAction()
     : ReaderAction(ReaderCommand.FitWidth);
 public sealed record ZoomAction(double Factor)
     : ReaderAction(ReaderCommand.Zoom);
+public sealed record FitViewAction()
+    : ReaderAction(ReaderCommand.FitView);
 // The target scale, not a factor: the shell steps, the sessions apply.
 public sealed record TextSizeAction(double Scale)
     : ReaderAction(ReaderCommand.TextSize)
@@ -80,6 +85,7 @@ public static class ReaderCommandPolicy
         (ReaderCommand.PageJump, ReaderCapabilities.PageJump),
         (ReaderCommand.FitWidth, ReaderCapabilities.FitWidth),
         (ReaderCommand.Zoom, ReaderCapabilities.Zoom),
+        (ReaderCommand.FitView, ReaderCapabilities.FitView),
         (ReaderCommand.TextSize, ReaderCapabilities.TextSize),
         (ReaderCommand.Find, ReaderCapabilities.Find),
         (ReaderCommand.Contents, ReaderCapabilities.Outline),

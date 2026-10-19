@@ -142,7 +142,8 @@ public sealed partial class ShellWindow
     // newer render took over.
     private async Task<bool> OpenAtSavedPlaceAsync(
         Guide guide, IReaderSession session, int generation, string contentSha256,
-        IReadOnlyCollection<string>? htmlDocuments, CancellationToken token)
+        IReadOnlyCollection<string>? htmlDocuments, CancellationToken token,
+        bool quiet = false, bool recordOpen = true)
     {
         string? stored;
         RestoreKind? kind = null;
@@ -195,7 +196,8 @@ public sealed partial class ShellWindow
                 }
             }
         }
-        ShowRestoreStatus(kind);
+        // T21.2: a map restores or fits without a notice.
+        if (!quiet) ShowRestoreStatus(kind);
         // An exact restore is already at the stored place; any other outcome
         // compares against where the reader actually is, so an unmoved guide
         // keeps its stored locator.
@@ -206,7 +208,8 @@ public sealed partial class ShellWindow
         {
             return false;
         }
-        progressTracking = progress!.Track(guide.Id, session, baseline);
+        // T21.2: a map isn't reading activity, so its open isn't recorded.
+        progressTracking = progress!.Track(guide.Id, session, baseline, recordOpen);
         StartContents(session, guide, contentSha256, htmlDocuments);
         HtmlOpenTimelineForTest.Mark("ready");
         return true;
