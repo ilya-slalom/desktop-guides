@@ -7767,7 +7767,7 @@ try {
             }
         }
         function Assert-Close([double] $actual, [double] $expected, [string] $what) {
-            if ([Math]::Abs($actual - $expected) -gt 1e-6 * [Math]::Max(1, [Math]::Abs($expected))) {
+            if ([Math]::Abs($actual - $expected) -gt 1e-6 * [Math]::Max(1.0, [Math]::Abs($expected))) {
                 throw "$what was $actual; expected $expected."
             }
         }
@@ -7805,7 +7805,7 @@ try {
         Start-Sleep -Milliseconds 1500
         $zoomed = Wait-MapFacts { param($f) $f.tilesShown -gt 0 } 'its tiles on screen'
         $report.mapsReaderZoomed = $zoomed
-        $expectedZoom = [Math]::Min(4, $first.fit * [Math]::Pow(1.25, 8))
+        $expectedZoom = [Math]::Min(4.0, $first.fit * [Math]::Pow(1.25, 8))
         Assert-Close $zoomed.zoom $expectedZoom 'The zoom'
         if ($zoomed.maxSurfaceSide -gt 4096) { throw "A surface was $($zoomed.maxSurfaceSide) pixels." }
         if ($zoomed.peakTileBytes -gt $zoomed.maxTileBytes) { throw "Tiles took $($zoomed.peakTileBytes) bytes." }
