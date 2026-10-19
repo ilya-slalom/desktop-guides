@@ -7755,7 +7755,14 @@ try {
                 [System.Windows.Automation.AutomationElement]::NameProperty, $title)
             $item = $list.FindFirst($scope, $condition)
             if (-not $item) { throw "The Maps list had no '$title'." }
-            $item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+            $selection = $item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)
+            # Back leaves the map selected, and selecting it again changes nothing.
+            if ($selection.Current.IsSelected) {
+                Invoke-Element (Wait-EnabledById 'OpenSelectedMap')
+            }
+            else {
+                $selection.Select()
+            }
             $view = Wait-VisibleById 'MapImageView'
             if ($view.Current.Name -ne $title) { throw "The map view was named '$($view.Current.Name)'." }
             return $view
