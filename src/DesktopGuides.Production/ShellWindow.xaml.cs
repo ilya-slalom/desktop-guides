@@ -175,6 +175,7 @@ public sealed partial class ShellWindow : Window
         InitializeFind();
         InitializeContents();
         InitializeBookmarks();
+        InitializeMaps();
         InitializeTextView();
         InitializeShortcutList();
     }
@@ -2278,6 +2279,11 @@ public sealed partial class ShellWindow : Window
                     await ProviderSettings.ReloadIfUnreadableAsync();
                     AnnounceStatus("Settings ready.");
                     break;
+            }
+            // T21.2 PR c: Maps on the reader, once the game is known to have some.
+            if (navigator.Current is ReaderRoute shownReader && readerSession is not null)
+            {
+                RefreshMapsButton(shownReader.GameId, generation);
             }
             return true;
         }

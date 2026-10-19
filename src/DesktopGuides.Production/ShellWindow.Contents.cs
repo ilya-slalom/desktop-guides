@@ -205,6 +205,7 @@ public sealed partial class ShellWindow
             TextReaderSession text => text.FocusSurface(),
             PdfReaderSession pdf => pdf.View.FocusPreview(),
             HtmlReaderSession html => html.View.Focus(FocusState.Programmatic),
+            ImageReaderSession map => map.View.Focus(FocusState.Programmatic),
             _ => false
         };
         if (!focused) ReaderActions.Focus(FocusState.Programmatic);
