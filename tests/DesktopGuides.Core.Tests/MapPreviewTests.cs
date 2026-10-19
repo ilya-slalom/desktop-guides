@@ -12,16 +12,18 @@ public sealed class MapPreviewTests
     public void APreviewDecodesToAtMost2048(int w, int h, int width) =>
         Assert.Equal(width, MapPreview.DecodeWidth(w, h));
 
+    // The pane gets the space below and right of the Maps button.
     [Fact]
-    public void ThePaneFillsALargeWindowUpToItsCap() =>
-        Assert.Equal((1200.0, 900.0), MapPreview.PaneSize(2560, 1400));
+    public void ThePaneFillsTheSpaceLeftUpToItsCap() =>
+        Assert.Equal((1200.0, 900.0), MapPreview.PaneSize(2400, 1300));
 
-    // Review Focus 4.
+    // Review Focus 4: the CI window leaves about 680 × 310 below the toolbar,
+    // and the pane must stay inside it.
     [Fact]
-    public void ASmallWindowKeepsTheMinimumPane()
+    public void ASmallWindowsPaneStaysInsideIt()
     {
-        Assert.Equal((672.0, 424.0), MapPreview.PaneSize(768, 520));
-        Assert.Equal((520.0, 320.0), MapPreview.PaneSize(400, 300));
+        Assert.Equal((632.0, 262.0), MapPreview.PaneSize(680, 310));
+        Assert.Equal((0.0, 0.0), MapPreview.PaneSize(20, 30));
     }
 
     // Review Focus 3.

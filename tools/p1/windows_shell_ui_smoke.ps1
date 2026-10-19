@@ -8028,28 +8028,41 @@ try {
 
         if ($Mode -eq 'maps-popup') {
             # 1. A place in the guide, saved.
+            # Where the guide's top line is at each step, to place any move.
+            $timeline = [System.Collections.Generic.List[string]]::new()
+            function Mark([string] $step) { $timeline.Add("${step}: $(Get-TopLineName)") }
             $firstLine = Get-TopLineName
+            Mark 'opened'
             Focus-Guide
-            Send-Keys '{PGDN}{PGDN}'
+            Mark 'focused'
+            Send-Keys '{PGDN}'
+            Mark 'page down 1'
+            Send-Keys '{PGDN}'
+            Mark 'page down 2'
             $deadline = (Get-Date).AddSeconds(10)
             while ((Get-TopLineName) -eq $firstLine -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
             $place = Get-TopLineName
             if ($place -eq $firstLine) { throw 'Page Down left the guide on its first line.' }
             Start-Sleep -Milliseconds 1500
             $saves = Read-SaveCount
+            Mark 'settled'
             $report.mapsPopupPlace = $place
+            $report.mapsPopupTimeline = $timeline
 
             # 2. The pane, by pointer: nothing shown until a map is pointed at.
             Click-Element (Wait-VisibleById 'ShowMaps')
             $names = @((Wait-VisibleById 'MapsList').FindAll($scope, $rowCondition) | ForEach-Object { $_.Current.Name })
             if (($names -join '|') -ne 'big map|castle floor 1') { throw "The Maps pane listed '$($names -join ', ')'." }
             [void](Wait-Name 'MapsPreviewMessage' 'Point to a map to see it.')
+            Mark 'pane open'
 
             # 3-4. Hovering a name shows its map; another swaps it.
             Hover-Element (Get-MapRow 'castle floor 1')
             [void](Wait-Preview 'castle floor 1')
+            Mark 'castle shown'
             Hover-Element (Get-MapRow 'big map')
             $image = Wait-Preview 'big map'
+            Mark 'big map shown'
             $report.phases += 'maps-popup-hover'
 
             # 5. Onto the map, across it, and away: nothing closes.
@@ -8064,13 +8077,15 @@ try {
             if ($pane.Left -le $window.Left + 40) { throw "The Maps pane reached the window's left edge ($($pane.Left))." }
             Hover-At ([int]($window.Left + 20)) ([int](($window.Top + $window.Bottom) / 2))
             Assert-PaneShows 'big map' 'moving away from the pane'
+            Mark 'pointer away'
             $report.mapsPopupScreenshot = Save-WindowScreenshot 'maps-popup'
             $report.phases += 'maps-popup-stays'
 
             # 6. Esc closes; the glance saved nothing and moved nothing.
             Send-Keys '{ESC}'
             Wait-HiddenById 'MapsList'
-            Wait-TopLineName $place 'closing the pane'
+            Mark 'closed'
+            Wait-TopLineName $place "closing the pane (timeline: $($timeline -join '; '))"
             if ((Read-SaveCount) -ne $saves) { throw "Glancing at maps saved the guide's place ($saves to $(Read-SaveCount))." }
             $report.phases += 'maps-popup-esc'
 
