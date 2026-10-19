@@ -7924,16 +7924,26 @@ try {
         $rowCondition = [System.Windows.Automation.PropertyCondition]::new(
             [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
             [System.Windows.Automation.ControlType]::ListItem)
-        function Get-TopLineName {
+        function Get-TopLineRow {
             $lines = Find-ById 'ReaderTextLines'
-            if (-not $lines) { return '' }
+            if (-not $lines) { return $null }
             $top = $lines.Current.BoundingRectangle.Top
             foreach ($row in @($lines.FindAll($scope, $rowCondition) | Where-Object { -not $_.Current.IsOffscreen } |
                     Sort-Object { $_.Current.BoundingRectangle.Top })) {
                 $bounds = $row.Current.BoundingRectangle
-                if ($bounds.Top + $bounds.Height / 2 -ge $top) { return $row.Current.Name }
+                if ($bounds.Top + $bounds.Height / 2 -ge $top) { return $row }
             }
-            return ''
+            return $null
+        }
+        function Get-TopLineName {
+            $row = Get-TopLineRow
+            if ($row) { return $row.Current.Name } else { return '' }
+        }
+        # The rows take focus; their list doesn't.
+        function Focus-Guide {
+            $row = Get-TopLineRow
+            if (-not $row) { throw 'The guide showed no rows to focus.' }
+            $row.SetFocus()
         }
         function Wait-TopLineName([string] $expected, [string] $step) {
             $deadline = (Get-Date).AddSeconds(10)
@@ -8019,7 +8029,7 @@ try {
         if ($Mode -eq 'maps-popup') {
             # 1. A place in the guide, saved.
             $firstLine = Get-TopLineName
-            (Find-ById 'ReaderTextLines').SetFocus()
+            Focus-Guide
             Send-Keys '{PGDN}{PGDN}'
             $deadline = (Get-Date).AddSeconds(10)
             while ((Get-TopLineName) -eq $firstLine -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
@@ -8085,7 +8095,7 @@ try {
         }
         else {
             # 1-2. Alt+M lands on the first row; Down moves, and the map follows.
-            (Find-ById 'ReaderTextLines').SetFocus()
+            Focus-Guide
             Send-Keys '%m'
             Wait-FocusedRow 'big map' 'Alt+M'
             [void](Wait-Preview 'big map')
