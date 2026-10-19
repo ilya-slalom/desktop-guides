@@ -77,7 +77,7 @@ public sealed partial class ShellWindow
                     (manifest, token) => library.FindGuideByFingerprintAsync(
                         game.Id, manifest.Format, manifest.Fingerprint, token),
                     (manifest, title, allowDuplicate, progress, token) =>
-                        publisher.PublishAsync(manifest, game.Id, title, allowDuplicate, progress, token))
+                        PublishAndQueueMapAsync(publisher, manifest, game.Id, title, allowDuplicate, progress, token))
                 {
                     XamlRoot = Navigation.XamlRoot
                 };
