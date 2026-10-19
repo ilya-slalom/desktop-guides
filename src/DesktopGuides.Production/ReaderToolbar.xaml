@@ -85,6 +85,20 @@
                           DynamicOverflowOrder="2"
                           Visibility="Collapsed"
                           Click="ZoomOutClicked" />
+            <!-- T21.2: a map fits itself, between its zoom commands. -->
+            <AppBarButton x:Name="FitMap"
+                          Label="Fit map"
+                          ToolTipService.ToolTip="Fit map (Ctrl+0)"
+                          AutomationProperties.AcceleratorKey="Ctrl+0"
+                          AutomationProperties.AutomationId="FitMap"
+                          DynamicOverflowOrder="2"
+                          Visibility="Collapsed"
+                          Click="FitMapClicked">
+                <AppBarButton.Icon>
+                    <!-- FitPage, as Fit to width. -->
+                    <FontIcon Glyph="&#xE9A6;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
             <AppBarButton x:Name="ZoomIn"
                           Icon="ZoomIn"
                           Label="Zoom in"

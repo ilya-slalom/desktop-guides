@@ -13,4 +13,5 @@ namespace DesktopGuides.Core;
 [JsonSerializable(typeof(HtmlFindArgs))]
 [JsonSerializable(typeof(HtmlSessionDiagnosticsJson))]
 [JsonSerializable(typeof(PdfSessionDiagnostics))]
+[JsonSerializable(typeof(DesktopGuides.Core.Maps.MapSessionDiagnostics))]
 internal sealed partial class CoreJsonContext : JsonSerializerContext;

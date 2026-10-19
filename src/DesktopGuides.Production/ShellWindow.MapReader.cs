@@ -13,7 +13,7 @@ public sealed partial class ShellWindow
         ShowReaderSurface(loading: true);
         readerLoad = new CancellationTokenSource();
         CancellationToken token = readerLoad.Token;
-        ImageReaderSession session = new(guide);
+        ImageReaderSession session = new(guide, mapStore!, mapCache!, cacheRoot!, ImageReaderSession.DiagnosticsEnabledForTest());
         try
         {
             string path = libraryPaths!.ResolveExistingGuideFile(guide.Id, guide.PrimaryRelativePath);

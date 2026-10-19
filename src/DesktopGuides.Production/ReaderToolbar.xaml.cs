@@ -147,6 +147,7 @@ public sealed partial class ReaderToolbar : UserControl
         bool zoom = supported.Contains(ReaderCommand.Zoom);
         bool pageJump = supported.Contains(ReaderCommand.PageJump);
         bool fitWidth = supported.Contains(ReaderCommand.FitWidth);
+        bool fitView = supported.Contains(ReaderCommand.FitView);
         bool find = supported.Contains(ReaderCommand.Find);
         bool contents = supported.Contains(ReaderCommand.Contents);
         bool bookmarks = supported.Contains(ReaderCommand.Bookmarks);
@@ -171,13 +172,14 @@ public sealed partial class ReaderToolbar : UserControl
         ZoomIn.Visibility = Show(zoom);
         GoToPage.Visibility = Show(pageJump);
         FitToWidth.Visibility = Show(fitWidth);
+        FitMap.Visibility = Show(fitView);
         FindInGuide.Visibility = Show(find);
         ShowContents.Visibility = Show(contents);
         ShowBookmarks.Visibility = Show(bookmarks);
         AddBookmark.Visibility = Show(addBookmark);
         GroupSeparator.Visibility = Show(ReaderCommandPolicy.ShowsGroupSeparator(supported));
         Commands.Visibility = Show(
-            pages || edges || textSize || zoom || pageJump || fitWidth || find || contents ||
+            pages || edges || textSize || zoom || pageJump || fitWidth || fitView || find || contents ||
             bookmarks || addBookmark);
     }
 
@@ -245,7 +247,8 @@ public sealed partial class ReaderToolbar : UserControl
             (VirtualKey.Add or EqualsKey, Ctrl) => ZoomOr(ZoomIn, LargerText),
             (EqualsKey, Ctrl | VirtualKeyModifiers.Shift) => ZoomOr(ZoomIn, LargerText),
             (VirtualKey.Subtract or MinusKey, Ctrl) => ZoomOr(ZoomOut, SmallerText),
-            (VirtualKey.Number0 or VirtualKey.NumberPad0, Ctrl) => ZoomOr(FitToWidth, ResetTextSize),
+            (VirtualKey.Number0 or VirtualKey.NumberPad0, Ctrl) =>
+                FitMap.Visibility == Visibility.Visible ? FitMap : ZoomOr(FitToWidth, ResetTextSize),
             _ => null
         };
     }
@@ -266,6 +269,7 @@ public sealed partial class ReaderToolbar : UserControl
         if (command == ZoomOut) return ExecuteAsync(new ZoomAction(0.9), "zoom out");
         if (command == ZoomIn) return ExecuteAsync(new ZoomAction(1.1), "zoom in");
         if (command == FitToWidth) return ExecuteAsync(new FitWidthAction(), "fit to width");
+        if (command == FitMap) return ExecuteAsync(new FitViewAction(), "fit the map");
         if (command == SmallerText) return StepTextAsync(TextSizeSteps.Smaller(textScale), "make the text smaller");
         if (command == LargerText) return StepTextAsync(TextSizeSteps.Larger(textScale), "make the text larger");
         if (command == ResetTextSize) return StepTextAsync(TextSizeSteps.Default, "reset the text size");
@@ -458,7 +462,7 @@ public sealed partial class ReaderToolbar : UserControl
             foreach (Control command in new Control[]
             {
                 PageStart, PreviousPage, NextPage, PageEnd, SmallerText, LargerText,
-                ZoomOut, ZoomIn, GoToPage, FitToWidth, ResetTextSize, ShowContents, ShowBookmarks, AddBookmark,
+                ZoomOut, FitMap, ZoomIn, GoToPage, FitToWidth, ResetTextSize, ShowContents, ShowBookmarks, AddBookmark,
                 FindInGuide
             })
             {
@@ -500,6 +504,9 @@ public sealed partial class ReaderToolbar : UserControl
 
     private async void FitToWidthClicked(object sender, RoutedEventArgs args) =>
         await RunAsync(FitToWidth);
+
+    private async void FitMapClicked(object sender, RoutedEventArgs args) =>
+        await RunAsync(FitMap);
 
     private async void GoToPageClicked(object sender, RoutedEventArgs args) =>
         await RunAsync(GoToPage);
