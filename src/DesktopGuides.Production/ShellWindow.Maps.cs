@@ -7,7 +7,7 @@ using Microsoft.UI.Xaml.Media.Imaging;
 namespace DesktopGuides.Production;
 
 // T21.2 PR c: the game's maps from any reader. The button shows once the
-// game is known to have maps; the list is read again each time the pane
+// game is known to have maps (after a render, or after a PDF unlock); the list is read again each time the pane
 // opens, so a map imported or removed meanwhile is current. Showing a
 // preview saves no place and records no open; only Open map opens a map,
 // as any guide switch does.
@@ -62,7 +62,9 @@ public sealed partial class ShellWindow
     {
         ReaderActions.CloseMaps();
         if (navigator.Current is ReaderRoute route && route.GuideId == mapId) return;
-        await OpenGuideAsync(mapId);
+        // Queued like every other guide switch, so Back or closing the window
+        // can't run beside it.
+        await RunNavigationAsync(() => OpenGuideAsync(mapId));
     }
 
     // A large map's preview is its cache's overview; a small map's is its
