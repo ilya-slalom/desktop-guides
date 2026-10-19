@@ -539,7 +539,9 @@ public sealed partial class ReaderToolbar : UserControl
     {
         if (!mapsAvailable || ShowMaps.Visibility != Visibility.Visible || MapsFlyout.IsOpen) return;
         focusMapsRow = fromKeyboard;
-        FlyoutBase.ShowAttachedFlyout(ShowMaps);
+        // Under the toolbar's left edge, not the button, which may sit at the
+        // bar's right end: the pane gets the reader's width.
+        MapsFlyout.ShowAt(this, new FlyoutShowOptions { Placement = FlyoutPlacementMode.BottomEdgeAlignedLeft });
     }
 
     public void CloseMaps()
@@ -561,9 +563,9 @@ public sealed partial class ReaderToolbar : UserControl
     {
         if (XamlRoot is not null)
         {
-            // The space from the button's bottom-left corner to the window's edges.
-            Windows.Foundation.Point corner = ShowMaps.TransformToVisual(null)
-                .TransformPoint(new Windows.Foundation.Point(0, ShowMaps.ActualHeight));
+            // The space from the toolbar's bottom-left corner to the window's edges.
+            Windows.Foundation.Point corner = TransformToVisual(null)
+                .TransformPoint(new Windows.Foundation.Point(0, ActualHeight));
             (double width, double height) = MapPreview.PaneSize(
                 XamlRoot.Size.Width - corner.X, XamlRoot.Size.Height - corner.Y);
             MapsPaneView.Width = width;
