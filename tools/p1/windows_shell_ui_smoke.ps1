@@ -7754,6 +7754,15 @@ try {
             $condition = [System.Windows.Automation.PropertyCondition]::new(
                 [System.Windows.Automation.AutomationElement]::NameProperty, $title)
             $item = $list.FindFirst($scope, $condition)
+            if (-not $item) {
+                # A short list makes only the rows it shows; realize the one asked for.
+                $container = $list.GetCurrentPattern([System.Windows.Automation.ItemContainerPattern]::Pattern)
+                $item = $container.FindItemByProperty($null, [System.Windows.Automation.AutomationElement]::NameProperty, $title)
+                if ($item) {
+                    $item.GetCurrentPattern([System.Windows.Automation.VirtualizedItemPattern]::Pattern).Realize()
+                    $item.GetCurrentPattern([System.Windows.Automation.ScrollItemPattern]::Pattern).ScrollIntoView()
+                }
+            }
             if (-not $item) { throw "The Maps list had no '$title'." }
             $selection = $item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)
             # Back leaves the map selected, and selecting it again changes nothing.
