@@ -374,8 +374,15 @@ internal sealed class ImageReaderSession : IReaderSession
 
     private void OnPointerEnded(object sender, PointerRoutedEventArgs args)
     {
-        if (dragFrom is null) return;
+        if (dragFrom is not Point from) return;
         dragFrom = null;
+        // Moves can be merged; the release point finishes the drag.
+        if (viewport is not null && View.XamlRoot is not null)
+        {
+            Point to = args.GetCurrentPoint(View).Position;
+            double scale = View.XamlRoot.RasterizationScale;
+            if (to != from) Apply(viewport.PanBy((to.X - from.X) * scale, (to.Y - from.Y) * scale), raise: false);
+        }
         View.ReleasePointerCapture(args.Pointer);
         Settled();
     }
