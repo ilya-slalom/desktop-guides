@@ -8,7 +8,9 @@ namespace DesktopGuides.Production;
 // Fant-scaled decode; the tiles come from level 0 in bands of one tile row,
 // cropped by BitmapTransform.Bounds, through MapPyramidBuilder. Decoding
 // ignores EXIF orientation, as the import check does, so sizes match the
-// header. A band is at most 32768 × 512 × 4 bytes (64 MiB).
+// header. A band is at most 32768 × 512 × 4 bytes (64 MiB). WinRT's decode
+// and encode run to the end once started, so a stop is checked before each
+// band and each tile: removing a map waits for one band, not the build.
 internal static class WicMapTileBuilder
 {
     public static async Task WriteOverviewAsync(
@@ -22,6 +24,7 @@ internal static class WicMapTileBuilder
             InterpolationMode = BitmapInterpolationMode.Fant,
         };
         byte[] pixels = await DecodeAsync(sourcePath, pyramid, transform, token);
+        token.ThrowIfCancellationRequested();
         await WritePngAsync(overviewPath, width, height, pixels, token);
     }
 
@@ -37,6 +40,7 @@ internal static class WicMapTileBuilder
         int written = 0;
         for (int top = 0; top < pyramid.Height; top += pyramid.TileSize)
         {
+            token.ThrowIfCancellationRequested();
             int rows = Math.Min(pyramid.TileSize, pyramid.Height - top);
             BitmapTransform band = new()
             {
@@ -49,6 +53,7 @@ internal static class WicMapTileBuilder
             if (top + rows == pyramid.Height) builder.Complete();
             foreach (var tile in ready)
             {
+                token.ThrowIfCancellationRequested();
                 await WritePngAsync(tilePath(tile.Key), tile.Width, tile.Height, tile.Pixels, token);
                 written++;
             }

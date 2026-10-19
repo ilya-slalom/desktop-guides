@@ -7912,6 +7912,8 @@ try {
         } while ($removeClock.Elapsed.TotalSeconds -lt 60)
         $report.mapsReaderRemoveBuildingMs = $removeClock.ElapsedMilliseconds
         if ($row) { throw "The second big map was still listed $($removeClock.ElapsedMilliseconds) ms after its removal." }
+        # Stopping the build waits for at most one band, so removal is prompt.
+        if ($removeClock.ElapsedMilliseconds -gt 5000) { throw "Removing a map mid-build took $($removeClock.ElapsedMilliseconds) ms." }
         $report.phases += 'maps-reader-remove-building'
     }
     elseif ($Mode -like 'remove-*') {
