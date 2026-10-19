@@ -142,4 +142,51 @@ public sealed class ReaderLocationCodecTests
         Assert.Equal(LocationDecodeStatus.Invalid,
             ReaderLocationCodec.Deserialize(json, GuideFormat.Html, sha, (IReadOnlyCollection<string>?)null).Status);
     }
+
+    // T21.2: a map's view place.
+    [Theory]
+    [InlineData(null, 0.5, 0.5)]
+    [InlineData(2.5, 0.0, 1.0)]
+    [InlineData(4.0, 0.25, 0.75)]
+    public void AnImagePlaceRoundTrips(double? zoom, double x, double y)
+    {
+        ReaderLocation location = new(GuideFormat.Image, 1, Hash, new ImagePosition(zoom, x, y), null);
+        LocationDecodeResult result = ReaderLocationCodec.Deserialize(
+            ReaderLocationCodec.Serialize(location), GuideFormat.Image, Hash);
+        Assert.Equal(LocationDecodeStatus.Valid, result.Status);
+        Assert.Equal(location, result.Location);
+    }
+
+    [Theory]
+    [InlineData(0.0, 0.5, 0.5)]
+    [InlineData(-1.0, 0.5, 0.5)]
+    [InlineData(4.01, 0.5, 0.5)]
+    [InlineData(1.0, -0.1, 0.5)]
+    [InlineData(1.0, 0.5, 1.1)]
+    [InlineData(double.NaN, 0.5, 0.5)]
+    public void AnImagePlaceOutOfBoundsIsRefused(double zoom, double x, double y) =>
+        Assert.Throws<InvalidDataException>(() => ReaderLocationCodec.Serialize(
+            new(GuideFormat.Image, 1, Hash, new ImagePosition(zoom, x, y), null)));
+
+    [Fact]
+    public void AnImagePlaceNeverCarriesAnEstimate() =>
+        Assert.Throws<InvalidDataException>(() => ReaderLocationCodec.Serialize(
+            new(GuideFormat.Image, 1, Hash, new ImagePosition(null, 0.5, 0.5), 0.3)));
+
+    [Fact]
+    public void AStoredImagePlaceWithAnEstimateIsInvalid() =>
+        Assert.Equal(LocationDecodeStatus.Invalid, ReaderLocationCodec.Deserialize(
+            $$"""{"format":"Image","schemaVersion":1,"contentSha256":"{{Hash}}","payload":{"zoom":null,"centerX":0.5,"centerY":0.5},"estimatedFraction":0.4}""",
+            GuideFormat.Image, Hash).Status);
+
+    [Fact]
+    public void AChangedMapHasNoRestoreCandidates()
+    {
+        string json = ReaderLocationCodec.Serialize(
+            new(GuideFormat.Image, 1, Hash, new ImagePosition(2, 0.3, 0.3), null));
+        Assert.Equal([RestoreKind.Exact], ReaderLocationCodec.RestoreCandidates(
+            ReaderLocationCodec.Deserialize(json, GuideFormat.Image, Hash)));
+        Assert.Empty(ReaderLocationCodec.RestoreCandidates(
+            ReaderLocationCodec.Deserialize(json, GuideFormat.Image, ChangedHash)));
+    }
 }

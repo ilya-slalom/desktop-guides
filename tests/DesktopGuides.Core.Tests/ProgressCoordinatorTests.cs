@@ -29,6 +29,23 @@ public sealed class ProgressCoordinatorTests
         GC.KeepAlive(tracking);
     }
 
+    // T21.2: a map saves its view but isn't reading activity.
+    [Fact]
+    public void TrackingWithoutAnOpenRecordsNoOpenButStillSaves()
+    {
+        ProgressCoordinator coordinator = new(store, clock);
+        FakeSession session = new();
+        IProgressTracking tracking = Track(coordinator, GuideA, session, null, recordOpen: false);
+
+        session.Move();
+        clock.Advance(ProgressCoordinator.Quiet);
+
+        Assert.Empty(store.Opens);
+        Assert.Single(store.Writes);
+        Assert.Equal(new ProgressCounts(1, 0, 0, 0), coordinator.Counts);
+        GC.KeepAlive(tracking);
+    }
+
     [Fact]
     public void BurstSavesAtDeadlinesThenAfterQuiet()
     {
@@ -586,13 +603,13 @@ public sealed class ProgressCoordinatorTests
 
     private static IProgressTracking Track(
         ProgressCoordinator coordinator, Guid guideId, FakeSession session,
-        string? restoredJson, SynchronizationContext? context = null)
+        string? restoredJson, SynchronizationContext? context = null, bool recordOpen = true)
     {
         SynchronizationContext? previous = SynchronizationContext.Current;
         SynchronizationContext.SetSynchronizationContext(context);
         try
         {
-            return coordinator.Track(guideId, session, restoredJson);
+            return coordinator.Track(guideId, session, restoredJson, recordOpen);
         }
         finally
         {
