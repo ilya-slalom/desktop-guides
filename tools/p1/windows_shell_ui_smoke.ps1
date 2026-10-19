@@ -7959,12 +7959,18 @@ try {
             if (-not (Test-Path -LiteralPath $path)) { return 0 }
             return [int] (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).saves
         }
+        # The pane reads its list as it opens, so its rows can follow the list.
         function Get-MapRow([string] $title) {
             $list = Wait-VisibleById 'MapsList'
-            $row = $list.FindFirst($scope, [System.Windows.Automation.PropertyCondition]::new(
-                [System.Windows.Automation.AutomationElement]::NameProperty, $title))
-            if (-not $row) { throw "The Maps pane had no '$title'." }
-            return $row
+            $condition = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::NameProperty, $title)
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                $row = $list.FindFirst($scope, $condition)
+                if ($row) { return $row }
+                Start-Sleep -Milliseconds 200
+            } while ((Get-Date) -lt $deadline)
+            throw "The Maps pane had no '$title'."
         }
         function Hover-At([int] $x, [int] $y) {
             [DesktopGuidesForegroundProbe]::Hover($x, $y)
@@ -8053,8 +8059,7 @@ try {
 
             # 2. The pane, by pointer: nothing shown until a map is pointed at.
             Click-Element (Wait-VisibleById 'ShowMaps')
-            [void](Wait-VisibleById 'MapsList')
-            Start-Sleep -Milliseconds 500
+            [void](Get-MapRow 'castle floor 1')
             $report.mapsPopupBounds = [ordered]@{
                 window = $root.Current.BoundingRectangle.ToString()
                 list = (Find-ById 'MapsList').Current.BoundingRectangle.ToString()
