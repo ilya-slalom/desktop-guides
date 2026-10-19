@@ -432,11 +432,12 @@
                 </StackPanel>
 
                 <!-- T21.2: the guides and the game's maps share the list area. -->
-                <Grid Grid.Row="3" RowSpacing="{StaticResource DesktopGuidesSpacing12}">
+                <Grid x:Name="GameListsArea" Grid.Row="3" RowSpacing="{StaticResource DesktopGuidesSpacing12}">
+                    <!-- MinHeight is GamePageLayout.MinGuideListHeight: one row of each. -->
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="2*" MinHeight="112" />
+                        <RowDefinition Height="2*" MinHeight="96" />
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" MinHeight="112" />
+                        <RowDefinition Height="*" MinHeight="96" />
                     </Grid.RowDefinitions>
                 <Grid>
                     <Border x:Name="GameEmptyState"
@@ -462,6 +463,7 @@
                     <Grid x:Name="GameMapsHeader"
                           Grid.Row="1"
                           ColumnSpacing="{StaticResource DesktopGuidesSpacing16}"
+                          SizeChanged="GamePageSizeChanged"
                           AutomationProperties.AutomationId="GameMapsHeader">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />

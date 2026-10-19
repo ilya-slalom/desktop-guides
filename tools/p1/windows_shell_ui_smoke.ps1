@@ -7487,6 +7487,8 @@ try {
             Invoke-Element (Wait-EnabledById 'PrimaryButton')
             Wait-HiddenById 'ImportGuideDialog'
             Wait-MapNames @('castle floor 1', 'catacombs', 'strip map')
+            # A guide import leaves Import maps usable too.
+            [void](Wait-EnabledById 'ImportMapsButton')
             $report.importMapsSectionScreenshot = Save-WindowScreenshot 'import-maps-section'
             $report.phases += 'import-maps-single'
 

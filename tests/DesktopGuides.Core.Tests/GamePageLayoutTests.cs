@@ -36,6 +36,26 @@ public sealed class GamePageLayoutTests
             GamePageLayout.DetailsMaxHeight(panelHeight, 80, 32, 16));
 
     [Fact]
+    public void ListAreaHoldsARowOfEachListAndTheMapsHeader() =>
+        // T21.2: guides, the Maps header and maps, with the two gaps between.
+        Assert.Equal(
+            2 * GamePageLayout.MinGuideListHeight + 32 + 2 * 12,
+            GamePageLayout.ListAreaMinHeight(32, 12));
+
+    [Fact]
+    public void MapsSectionShrinksTheDetailsInsteadOfEitherList() =>
+        // The CI window: 190 left for the details and both lists.
+        Assert.Equal(
+            GamePageLayout.MinDetailsHeight,
+            GamePageLayout.DetailsMaxHeight(370, 100, 32, 16, GamePageLayout.ListAreaMinHeight(32, 12)));
+
+    [Fact]
+    public void TallPageLeavesBothListsTheirMinimum() =>
+        Assert.Equal(
+            740 - GamePageLayout.ListAreaMinHeight(32, 12),
+            GamePageLayout.DetailsMaxHeight(900, 80, 32, 16, GamePageLayout.ListAreaMinHeight(32, 12)));
+
+    [Fact]
     public void GuideListMinimumHoldsOneRow() =>
         // A catalog row is a 60 px tile with 8 px padding above and below.
         Assert.True(GamePageLayout.MinGuideListHeight >= 76);

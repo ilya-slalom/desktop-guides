@@ -9,7 +9,7 @@
     AutomationProperties.AutomationId="ImportMapsDialog">
     <ScrollViewer MaxHeight="520"
                   VerticalScrollBarVisibility="Auto">
-        <StackPanel Width="520"
+        <StackPanel Width="480"
                     Spacing="{StaticResource DesktopGuidesSpacing12}">
             <StackPanel x:Name="ImportMapsBusy"
                         Style="{StaticResource DesktopGuidesBusyRowStyle}"

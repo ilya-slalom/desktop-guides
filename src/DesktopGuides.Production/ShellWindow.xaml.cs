@@ -359,7 +359,8 @@ public sealed partial class ShellWindow : Window
             GamePanel.ActualHeight,
             GameHeader.ActualHeight,
             GameGuidesHeader.ActualHeight,
-            GamePanel.RowSpacing);
+            GamePanel.RowSpacing,
+            GamePageLayout.ListAreaMinHeight(GameMapsHeader.ActualHeight, GameListsArea.RowSpacing));
 
     public Task InitializeAsync()
     {
@@ -1142,6 +1143,7 @@ public sealed partial class ShellWindow : Window
         }
         importRequested = true;
         ImportGuideButton.IsEnabled = false;
+        ImportMapsButton.IsEnabled = false;
         bool imported = false;
         try
         {
@@ -1223,6 +1225,7 @@ public sealed partial class ShellWindow : Window
             if (!closeRequested && navigator.Current is GameRoute)
             {
                 ImportGuideButton.IsEnabled = true;
+                ImportMapsButton.IsEnabled = true;
                 if (!imported)
                 {
                     ImportGuideButton.Focus(FocusState.Programmatic);
@@ -1252,6 +1255,7 @@ public sealed partial class ShellWindow : Window
         OpenSelectedMapButton.IsEnabled = false;
         RemoveSelectedMapButton.IsEnabled = false;
         ImportGuideButton.IsEnabled = false;
+        ImportMapsButton.IsEnabled = false;
         bool rendered = false;
         try
         {
@@ -1342,6 +1346,7 @@ public sealed partial class ShellWindow : Window
                     GuideList.IsEnabled = true;
                     MapList.IsEnabled = true;
                     ImportGuideButton.IsEnabled = !importRequested;
+                    ImportMapsButton.IsEnabled = !importRequested;
                     UpdateOpenSelectedGuideAction();
                     RemoveSelectedGuideButton.Focus(FocusState.Programmatic);
                 }
@@ -1480,6 +1485,7 @@ public sealed partial class ShellWindow : Window
         EditGameButton.IsEnabled = false;
         RefreshMetadataButton.IsEnabled = false;
         ImportGuideButton.IsEnabled = false;
+        ImportMapsButton.IsEnabled = false;
         RemoveGameButton.IsEnabled = false;
         bool rendered = false;
         try
@@ -1580,6 +1586,7 @@ public sealed partial class ShellWindow : Window
                 {
                     EditGameButton.IsEnabled = true;
                     ImportGuideButton.IsEnabled = !importRequested;
+                    ImportMapsButton.IsEnabled = !importRequested;
                     RefreshMetadataButton.IsEnabled = refreshCancel is null;
                 }
                 UpdateRemoveGameAction();

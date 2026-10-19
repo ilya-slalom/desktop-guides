@@ -106,7 +106,7 @@ public sealed partial class ImportMapsDialog : ContentDialog
         // Panels have no automation peer, so the row is named on its facts line.
         TextBlock facts = new()
         {
-            Text = map is null ? $"{file}: {text}" : text,
+            Text = text,
             TextWrapping = TextWrapping.Wrap,
             Style = (Style)Application.Current.Resources["DesktopGuidesMetadataStyle"],
         };
