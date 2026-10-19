@@ -35,6 +35,9 @@ internal sealed class ImageReaderSession : IReaderSession
     private readonly Dictionary<MapTileKey, Image> shown = [];
     private readonly HashSet<MapTileKey> failed = [];
     private readonly MapTileMemory<BitmapImage> memory = new();
+    // The tiles a full budget holds: 96 of 512 × 512.
+    private static readonly int MaxTiles =
+        (int)(MapTileMemory<BitmapImage>.DefaultMaxBytes / ((long)MapPyramid.DefaultTileSize * MapPyramid.DefaultTileSize * 4));
     private readonly Stopwatch openClock = new();
     private MapViewport? viewport;
     private ImagePosition? pendingPosition;
@@ -248,16 +251,24 @@ internal sealed class ImageReaderSession : IReaderSession
             openMs = openClock.ElapsedMilliseconds;
             WriteDiagnostics();
         }
-        level = view.Level(pyramid.Small ? 0 : pyramid.Levels);
         HashSet<MapTileKey> visible = [];
-        if (!pyramid.Small && tilesReady && level < pyramid.Levels)
+        if (pyramid.Small)
         {
-            (int firstColumn, int firstRow, int lastColumn, int lastRow) = view.VisibleTiles(level, pyramid.TileSize);
-            for (int row = firstRow; row <= lastRow; row++)
+            level = 0;
+        }
+        else
+        {
+            // Within the budget, so visible tiles never evict one another.
+            MapTilePlan plan = view.PlanTiles(pyramid.Levels, pyramid.TileSize, MaxTiles);
+            level = plan.Level;
+            if (tilesReady)
             {
-                for (int column = firstColumn; column <= lastColumn; column++)
+                for (int row = plan.FirstRow; row <= plan.LastRow; row++)
                 {
-                    visible.Add(new MapTileKey(level, column, row));
+                    for (int column = plan.FirstColumn; column <= plan.LastColumn; column++)
+                    {
+                        visible.Add(new MapTileKey(level, column, row));
+                    }
                 }
             }
         }

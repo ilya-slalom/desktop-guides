@@ -134,4 +134,40 @@ public sealed class MapViewportTests
         MapViewport view = MapViewport.Fitted(4096, 4096, 1024, 1024);
         Assert.Equal((0, 0, 1, 1), view.VisibleTiles(level: 2, tileSize: 512));
     }
+
+    // Final review: on a 4K view, zoomed just past a level's halfway, the
+    // visible tiles must fit the tile budget, or they evict each other.
+    [Fact]
+    public void ATilePlanOnA4kViewFitsTheBudget()
+    {
+        MapViewport view = MapViewport.Fitted(32768, 32768, 3840, 2160).ZoomBy(0.126 / (2160.0 / 32768), 1920, 1080);
+        MapTilePlan plan = view.PlanTiles(levelCount: 4, tileSize: 512, maxTiles: 96);
+        Assert.True(plan.Count <= 96, $"{plan.Count} tiles");
+        Assert.Equal(3, plan.Level);   // level 2 would need about 160
+    }
+
+    [Fact]
+    public void ATilePlanKeepsItsMarginWhenItFits()
+    {
+        MapViewport view = MapViewport.Fitted(4096, 4096, 1024, 1024).ZoomBy(4, 0, 0);
+        Assert.Equal(new MapTilePlan(0, 0, 0, 2, 2), view.PlanTiles(levelCount: 3, tileSize: 512, maxTiles: 96));
+    }
+
+    [Fact]
+    public void ATilePlanDropsItsMarginBeforeItsDetail()
+    {
+        // At zoom 1, a 1024 view shows 2 × 2 tiles; the margin would make 3 × 3.
+        MapViewport view = MapViewport.Fitted(4096, 4096, 1024, 1024).ZoomBy(4, 512, 512);
+        MapTilePlan plan = view.PlanTiles(levelCount: 3, tileSize: 512, maxTiles: 6);
+        Assert.Equal(0, plan.Level);
+        Assert.True(plan.Count <= 6, $"{plan.Count} tiles");
+    }
+
+    [Fact]
+    public void AnOverviewPlanHasNoTiles()
+    {
+        MapTilePlan plan = MapViewport.Fitted(16000, 16000, 100, 100).PlanTiles(levelCount: 3, tileSize: 512, maxTiles: 96);
+        Assert.Equal(3, plan.Level);
+        Assert.Equal(0, plan.Count);
+    }
 }

@@ -115,17 +115,41 @@ public sealed record MapViewport
     // The tiles of a level that the view touches, with one more on each side.
     public (int FirstColumn, int FirstRow, int LastColumn, int LastRow) VisibleTiles(int level, int tileSize)
     {
+        MapTilePlan plan = Tiles(level, tileSize, margin: 1);
+        return (plan.FirstColumn, plan.FirstRow, plan.LastColumn, plan.LastRow);
+    }
+
+    // The level and tiles to draw within a budget of maxTiles. Like PDF's
+    // raster budget, it gives up the margin first, then detail: when even
+    // the visible tiles don't fit, it draws from the next coarser level, so
+    // the visible set never evicts itself. levelCount means the overview.
+    public MapTilePlan PlanTiles(int levelCount, int tileSize, int maxTiles)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxTiles);
+        for (int level = Level(levelCount); level < levelCount; level++)
+        {
+            MapTilePlan withMargin = Tiles(level, tileSize, margin: 1);
+            if (withMargin.Count <= maxTiles) return withMargin;
+            MapTilePlan bare = Tiles(level, tileSize, margin: 0);
+            if (bare.Count <= maxTiles) return bare;
+        }
+        return new MapTilePlan(levelCount, 0, 0, -1, -1);
+    }
+
+    private MapTilePlan Tiles(int level, int tileSize, int margin)
+    {
         ArgumentOutOfRangeException.ThrowIfNegative(level);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(tileSize);
         double scale = Math.Pow(2, -level);
         int columns = (int)Math.Ceiling(Math.Ceiling(ImageWidth * scale) / tileSize);
         int rows = (int)Math.Ceiling(Math.Ceiling(ImageHeight * scale) / tileSize);
         (double x, double y, double width, double height) = ViewRect();
-        return (
-            Math.Max(0, (int)Math.Floor(x * scale / tileSize) - 1),
-            Math.Max(0, (int)Math.Floor(y * scale / tileSize) - 1),
-            Math.Min(columns - 1, (int)Math.Ceiling((x + width) * scale / tileSize)),
-            Math.Min(rows - 1, (int)Math.Ceiling((y + height) * scale / tileSize)));
+        return new MapTilePlan(
+            level,
+            Math.Max(0, (int)Math.Floor(x * scale / tileSize) - margin),
+            Math.Max(0, (int)Math.Floor(y * scale / tileSize) - margin),
+            Math.Min(columns - 1, (int)Math.Ceiling((x + width) * scale / tileSize) - 1 + margin),
+            Math.Min(rows - 1, (int)Math.Ceiling((y + height) * scale / tileSize) - 1 + margin));
     }
 
     private MapViewport With(double zoom, double fx, double fy) =>
@@ -144,4 +168,12 @@ public sealed record MapViewport
 
     private static double Positive(double value) =>
         double.IsFinite(value) && value > 0 ? value : throw new ArgumentOutOfRangeException(nameof(value));
+}
+
+/// <summary>A level and its tiles to draw; the overview has none.</summary>
+public sealed record MapTilePlan(int Level, int FirstColumn, int FirstRow, int LastColumn, int LastRow)
+{
+    public int Count => LastColumn < FirstColumn || LastRow < FirstRow
+        ? 0
+        : (LastColumn - FirstColumn + 1) * (LastRow - FirstRow + 1);
 }

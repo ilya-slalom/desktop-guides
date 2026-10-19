@@ -7824,11 +7824,15 @@ try {
         # 2. Zoom in to a tiled level, pan by keys and by a drag.
         $view.SetFocus()
         Send-MapKeys '^{ADD}' 8
+        $beforePan = Wait-MapFacts { param($f) $f.zoom -gt $first.fit * 5 } 'the zoom steps'
+        # Each pan moves the view right: the arrow keys, then a drag to the left.
         Send-MapKeys '{RIGHT}' 2
+        $afterKeys = Wait-MapFacts { param($f) $f.centerX -gt $beforePan.centerX + 1 } 'a pan by the arrow keys'
         $bounds = $view.Current.BoundingRectangle
         $x = [int](($bounds.Left + $bounds.Right) / 2)
         $y = [int](($bounds.Top + $bounds.Bottom) / 2)
         [DesktopGuidesForegroundProbe]::Drag($x, $y, $x - 200, $y)
+        [void](Wait-MapFacts { param($f) $f.centerX -gt $afterKeys.centerX + 1 } 'a pan by dragging')
         Start-Sleep -Milliseconds 1500
         $zoomed = Wait-MapFacts { param($f) $f.tilesShown -gt 0 } 'its tiles on screen'
         $report.mapsReaderZoomed = $zoomed
