@@ -807,12 +807,14 @@ if (args.Length == 3 && args[0] == "seed-maps-reader")
     (Guid castle, _) = await PublishMapAsync("castle-floor-1.png", "castle floor 1");
     (Guid strip, string stripSha) = await PublishMapAsync("strip-map.png", "strip map");
     (Guid big, string bigSha) = await PublishMapAsync("big-map.png", "big map");
+    (Guid secondBig, _) = await PublishMapAsync("second-big-map.png", "second big map");
     Console.WriteLine(JsonSerializer.Serialize(new
     {
         walkthrough = walkthrough.ToString("N"),
         castle = castle.ToString("N"),
         strip = strip.ToString("N"),
         big = big.ToString("N"),
+        secondBig = secondBig.ToString("N"),
         bigSha,
         stripSha,
     }));

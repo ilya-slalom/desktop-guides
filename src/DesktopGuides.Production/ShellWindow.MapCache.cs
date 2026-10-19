@@ -40,6 +40,36 @@ public sealed partial class ShellWindow
         }
     }
 
+    // A build holds the map's file open, which would make its removal fail.
+    private async Task StopMapBuildAsync(Guid guideId)
+    {
+        try
+        {
+            if (repository is null || mapCache is null) return;
+            Guide? map = await repository.GetGuideAsync(guideId);
+            if (map is { Format: GuideFormat.Image } && map.ContentSha256 is string sha)
+            {
+                await mapCache.StopAsync(hash => hash == sha);
+            }
+        }
+        catch (Exception)
+        {
+            // The removal reports its own failure.
+        }
+    }
+
+    private async Task StopMapBuildsAsync()
+    {
+        try
+        {
+            if (mapCache is not null) await mapCache.StopAsync(static _ => true);
+        }
+        catch (Exception)
+        {
+            // The removal reports its own failure.
+        }
+    }
+
     private async void PruneMapCacheSoon()
     {
         try

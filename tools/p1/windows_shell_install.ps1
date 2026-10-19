@@ -1939,6 +1939,7 @@ function Run-MapReaderScenario([string] $fixtureRoot) {
         if ($property.Value.LastOpened) { throw "Opening '$($property.Name)' was recorded as reading." }
     }
     if ($null -ne $state.Maps.'strip map') { throw 'The removed strip map is still in the library.' }
+    if ($null -ne $state.Maps.'second big map') { throw 'The map removed while building is still in the library.' }
     if ($state.LastActiveTitle -ne 'Walkthrough') { throw "Resume pointed to '$($state.LastActiveTitle)'." }
     if ($state.CacheFolders -ne 1) { throw "The cache held $($state.CacheFolders) maps; expected only the big map's." }
 }

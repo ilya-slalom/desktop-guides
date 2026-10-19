@@ -21,6 +21,7 @@ internal sealed class MapCacheQueue(MapTileStore store, string cacheRoot)
     // A prune waits for the build in progress, so it never deletes it.
     private readonly SemaphoreSlim work = new(1, 1);
     private bool running;
+    private Job? current;
 
     // The open map's hash, which a trim never drops.
     public string? OpenHash { get; set; }
@@ -65,6 +66,29 @@ internal sealed class MapCacheQueue(MapTileStore store, string cacheRoot)
 
     public void CancelAll() => cancel.Cancel();
 
+    // Stops the matching builds, queued or running, and waits until the
+    // running one has let go of the map's file, so the map can be removed.
+    public async Task StopAsync(Func<string, bool> matches)
+    {
+        ArgumentNullException.ThrowIfNull(matches);
+        Task? stopping = null;
+        lock (gate)
+        {
+            foreach (Job job in waiting.Where(job => matches(job.Sha)).ToList())
+            {
+                waiting.Remove(job.Node);
+                jobs.Remove(job.Sha);
+                job.Cancel();
+            }
+            if (current is Job building && matches(building.Sha))
+            {
+                building.Stop.Cancel();
+                stopping = building.Done.Task;
+            }
+        }
+        if (stopping is not null) await stopping.ConfigureAwait(false);
+    }
+
     // Removes caches no guide has, between builds.
     public async Task PruneAsync(Func<Task<IReadOnlySet<string>>> liveHashes)
     {
@@ -97,6 +121,7 @@ internal sealed class MapCacheQueue(MapTileStore store, string cacheRoot)
                 }
                 job = first.Value;
                 waiting.RemoveFirst();
+                current = job;
             }
             await work.WaitAsync().ConfigureAwait(false);
             try
@@ -110,13 +135,16 @@ internal sealed class MapCacheQueue(MapTileStore store, string cacheRoot)
             lock (gate)
             {
                 jobs.Remove(job.Sha);
+                current = null;
             }
+            job.Done.TrySetResult();
         }
     }
 
     private async Task BuildAsync(Job job)
     {
-        CancellationToken token = cancel.Token;
+        using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancel.Token, job.Stop.Token);
+        CancellationToken token = linked.Token;
         Stopwatch clock = Stopwatch.StartNew();
         try
         {
@@ -188,6 +216,9 @@ internal sealed class MapCacheQueue(MapTileStore store, string cacheRoot)
         public TaskCompletionSource<string> Overview { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Complete { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public LinkedListNode<Job> Node { get; set; } = null!;
+        public CancellationTokenSource Stop { get; } = new();
+        // Set once the build has ended and closed the map's file.
+        public TaskCompletionSource Done { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public MapCacheBuild Build => new(Overview.Task, Complete.Task);
 
         public void Cancel()

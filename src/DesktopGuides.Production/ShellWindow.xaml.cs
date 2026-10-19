@@ -1321,6 +1321,7 @@ public sealed partial class ShellWindow : Window
                 GuideRemovalResult result;
                 try
                 {
+                    await StopMapBuildAsync(guide.Id);
                     result = await remover.RemoveAsync(guide.Id);
                 }
                 catch (Exception error)
@@ -1435,6 +1436,7 @@ public sealed partial class ShellWindow : Window
                 GuideRemovalResult result;
                 try
                 {
+                    await StopMapBuildAsync(route.GuideId);
                     result = await remover.RemoveAsync(route.GuideId);
                 }
                 catch (Exception error)
@@ -1553,6 +1555,8 @@ public sealed partial class ShellWindow : Window
                     }
                     try
                     {
+                        // Its maps may be building; the others rebuild on their next open.
+                        await StopMapBuildsAsync();
                         result = await remover.RemoveAsync(preview.GameId, preview.GuideCount);
                     }
                     catch (Exception error)

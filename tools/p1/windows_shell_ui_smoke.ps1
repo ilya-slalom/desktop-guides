@@ -7884,6 +7884,21 @@ try {
         [void](Wait-HiddenById 'RemoveGuideDialog')
         [void](Wait-Status 'Removed strip map.')
         $report.phases += 'maps-reader-remove'
+
+        # 7. A map removed while its tiles are still being built (about 6 s)
+        # is removed: the build lets go of its file first.
+        [void](Open-Map 'second big map')
+        [void](Wait-MapFacts { param($f) $f.openMs -ge 0 } 'the second map''s first frame' 180)
+        $building = Read-MapFacts
+        if ($building.tilesReady) { throw 'The second map''s tiles were ready before the removal could race them.' }
+        Go-Back
+        [void](Wait-Name 'GameHeading' 'Map Reader Game')
+        Invoke-Element (Wait-Name 'RemoveSelectedMap' 'Remove second big map')
+        [void](Wait-VisibleById 'RemoveGuideDialog')
+        Invoke-Element (Wait-EnabledById 'PrimaryButton')
+        [void](Wait-HiddenById 'RemoveGuideDialog')
+        [void](Wait-Status 'Removed second big map.')
+        $report.phases += 'maps-reader-remove-building'
     }
     elseif ($Mode -like 'remove-*') {
         if (-not $ExpectedGuideTitle) {

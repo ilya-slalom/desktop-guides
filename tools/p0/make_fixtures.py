@@ -570,6 +570,12 @@ def main() -> None:
         "A large map, 15456 x 10304: opens from its levels and tiles",
     )
     add(
+        "generated/maps/second-big-map.png",
+        big_map_png(15000, 10000),
+        "png",
+        "A second large map, removed while its tiles are still being built",
+    )
+    add(
         "generated/maps/broken-map.png",
         castle[: len(castle) // 2],
         "png",
