@@ -74,6 +74,23 @@ public static class DesktopGuidesForegroundProbe
         mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
     }
 
+    // T21.2: a left-button drag in steps, as a person pans a map.
+    public static void Drag(int fromX, int fromY, int toX, int toY)
+    {
+        if (!SetCursorPos(fromX, fromY))
+        {
+            throw new InvalidOperationException("Could not position the foreground probe cursor.");
+        }
+        mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+        for (int step = 1; step <= 10; step++)
+        {
+            System.Threading.Thread.Sleep(20);
+            SetCursorPos(fromX + (toX - fromX) * step / 10, fromY + (toY - fromY) * step / 10);
+        }
+        System.Threading.Thread.Sleep(50);
+        mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+    }
+
     public static void Resize(IntPtr window, int x, int y, int width, int height)
     {
         if (!MoveWindow(window, x, y, width, height, true))

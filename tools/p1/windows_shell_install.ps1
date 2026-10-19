@@ -1894,6 +1894,53 @@ function Run-NavigationScenarios {
     Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
     Invoke-ShellSeed @('clear-bookmarks', $dataRoot) | Out-Null
     $report.reflowBookmark = Invoke-ProgressPass 'reflow-bookmark' 0
+
+    Run-MapReaderScenario $fixtureRoot
+}
+
+# T21.2 PR b: a map zooms, pans and reopens at its view; a strip over 16384
+# pixels wide displays; neither counts as reading; removing a map removes
+# its cache.
+function Run-MapReaderScenario([string] $fixtureRoot) {
+    if (-not (Test-Path -LiteralPath (Join-Path $fixtureRoot 'p0\generated\maps\big-map.png'))) {
+        throw 'big-map.png is missing; run tools/p0/make_fixtures.py first.'
+    }
+    $report.mapsReaderSeed = Invoke-ShellSeed @('seed-maps-reader', $dataRoot, $fixtureRoot) | ConvertFrom-Json
+    $cacheRoot = Get-HtmlCacheRoot
+    Start-InstalledShell
+    $processId = $report.launchedProcessId
+    $gates = @(
+        foreach ($name in @('ProgressDiagnostics', 'MapDiagnostics')) {
+            [System.Threading.EventWaitHandle]::new(
+                $false, [System.Threading.EventResetMode]::ManualReset,
+                "Local\$eventPrefix.$name.$processId")
+        })
+    try {
+        $report.mapsReader = Run-ShellSmoke 'maps-reader' -ResultName 'maps-reader' `
+            -AppDataRoot $dataRoot -AppCacheRoot $cacheRoot
+        Close-InstalledShell
+    }
+    finally {
+        foreach ($gate in $gates) { $gate.Dispose() }
+    }
+    $timings = Join-Path $cacheRoot 'diagnostics\map-cache.json'
+    if (Test-Path -LiteralPath $timings) {
+        $report.mapsReaderBuilds = Get-Content -LiteralPath $timings -Raw | ConvertFrom-Json
+    }
+    $state = Invoke-ShellSeed @('describe-maps', $dataRoot, $cacheRoot) | ConvertFrom-Json
+    $report.mapsReaderState = $state
+    $big = $state.Maps.'big map'
+    if (-not $big.HasPlace) { throw 'The big map stored no view.' }
+    if ($null -ne $big.Zoom) { throw "The big map, left fitted, stored zoom $($big.Zoom)." }
+    if ($null -ne $big.Estimate) { throw "The big map stored an estimate, $($big.Estimate)." }
+    if (-not $big.CacheComplete) { throw "The big map's cache isn't complete." }
+    if ($state.Maps.'castle floor 1'.HasPlace) { throw 'The unopened castle map stored a view.' }
+    foreach ($property in $state.Maps.PSObject.Properties) {
+        if ($property.Value.LastOpened) { throw "Opening '$($property.Name)' was recorded as reading." }
+    }
+    if ($null -ne $state.Maps.'strip map') { throw 'The removed strip map is still in the library.' }
+    if ($state.LastActiveTitle -ne 'Walkthrough') { throw "Resume pointed to '$($state.LastActiveTitle)'." }
+    if ($state.CacheFolders -ne 1) { throw "The cache held $($state.CacheFolders) maps; expected only the big map's." }
 }
 
 function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $Kill, [string] $resultName = $mode,

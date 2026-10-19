@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark', 'maps-reader',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -7503,6 +7503,129 @@ try {
             Go-Back
             [void](Wait-Name 'GameHeading' 'Import Test Game')
             $report.phases += 'import-maps-open'
+        }
+        elseif ($Mode -eq 'maps-reader') {
+            # T21.2 PR b: a map zooms, pans and reopens where it was left. Each
+            # check reads the session's own diagnostics, not the rendering.
+            $diagnosticsPath = Join-Path $AppCacheRoot "diagnostics\map-session-$ProcessId.json"
+            function Read-MapFacts {
+                if (-not (Test-Path -LiteralPath $diagnosticsPath)) { return $null }
+                try { return Get-Content -LiteralPath $diagnosticsPath -Raw | ConvertFrom-Json } catch { return $null }
+            }
+            function Wait-MapFacts([scriptblock] $test, [string] $what, [int] $seconds = 30) {
+                $deadline = (Get-Date).AddSeconds($seconds)
+                do {
+                    $facts = Read-MapFacts
+                    if ($facts -and (& $test $facts)) { return $facts }
+                    Start-Sleep -Milliseconds 200
+                } while ((Get-Date) -lt $deadline)
+                throw "The map never reached $what; last facts: $($facts | ConvertTo-Json -Compress)."
+            }
+            function Open-Map([string] $title) {
+                Remove-Item -LiteralPath $diagnosticsPath -ErrorAction SilentlyContinue
+                $list = Find-ById 'MapList'
+                $condition = [System.Windows.Automation.PropertyCondition]::new(
+                    [System.Windows.Automation.AutomationElement]::NameProperty, $title)
+                $item = $list.FindFirst($scope, $condition)
+                if (-not $item) { throw "The Maps list had no '$title'." }
+                $item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+                $view = Wait-VisibleById 'MapImageView'
+                if ($view.Current.Name -ne $title) { throw "The map view was named '$($view.Current.Name)'." }
+                return $view
+            }
+            function Send-MapKeys([string] $keys, [int] $times = 1) {
+                for ($i = 0; $i -lt $times; $i++) {
+                    [System.Windows.Forms.SendKeys]::SendWait($keys)
+                    Start-Sleep -Milliseconds 150
+                }
+            }
+            function Assert-Close([double] $actual, [double] $expected, [string] $what) {
+                if ([Math]::Abs($actual - $expected) -gt 1e-6 * [Math]::Max(1, [Math]::Abs($expected))) {
+                    throw "$what was $actual; expected $expected."
+                }
+            }
+
+            Select-Element 'Map Reader Game'
+            [void](Wait-Name 'GameHeading' 'Map Reader Game')
+            [void](Wait-Status 'Game ready.')
+            # The walkthrough becomes Resume; no map may take it.
+            Select-Element 'Walkthrough'
+            [void](Wait-Name 'ReaderHeading' 'Walkthrough')
+            Go-Back
+            [void](Wait-Name 'GameHeading' 'Map Reader Game')
+
+            # 1. The large map: built on first open, then fitted.
+            $view = Open-Map 'big map'
+            $first = Wait-MapFacts { param($f) $f.openMs -ge 0 } 'its first frame' 180
+            $report.mapsReaderFirstOpen = $first
+            foreach ($id in @('ZoomOut', 'FitMap', 'ZoomIn')) { [void](Wait-VisibleById $id) }
+            foreach ($id in @('CompletionChoice', 'LargerText', 'ShowContents')) {
+                $element = Find-ById $id
+                if ($element -and -not $element.Current.IsOffscreen) { throw "A map showed $id." }
+            }
+            if ((Find-ById 'ZoomOut').Current.IsEnabled) { throw 'Zoom out was enabled at fit.' }
+            [void](Wait-MapFacts { param($f) $f.tilesReady } 'its tiles' 300)
+            $report.phases += 'maps-reader-open'
+
+            # 2. Zoom in to a tiled level, pan by keys and by a drag.
+            $view.SetFocus()
+            Send-MapKeys '^{ADD}' 8
+            Send-MapKeys '{RIGHT}' 2
+            $bounds = $view.Current.BoundingRectangle
+            $x = [int](($bounds.Left + $bounds.Right) / 2)
+            $y = [int](($bounds.Top + $bounds.Bottom) / 2)
+            [DesktopGuidesForegroundProbe]::Drag($x, $y, $x - 200, $y)
+            Start-Sleep -Milliseconds 1500
+            $zoomed = Wait-MapFacts { param($f) $f.tilesShown -gt 0 } 'its tiles on screen'
+            $report.mapsReaderZoomed = $zoomed
+            $expectedZoom = [Math]::Min(4, $first.fit * [Math]::Pow(1.25, 8))
+            Assert-Close $zoomed.zoom $expectedZoom 'The zoom'
+            if ($zoomed.maxSurfaceSide -gt 4096) { throw "A surface was $($zoomed.maxSurfaceSide) pixels." }
+            if ($zoomed.peakTileBytes -gt $zoomed.maxTileBytes) { throw "Tiles took $($zoomed.peakTileBytes) bytes." }
+            if ($zoomed.level -ge 3) { throw "The zoomed map drew from level $($zoomed.level), not its tiles." }
+            $report.mapsReaderZoomedScreenshot = Save-WindowScreenshot 'maps-reader-zoomed'
+            $report.phases += 'maps-reader-zoom'
+
+            # 3. Back, and the map reopens at the same view, from its cache.
+            Go-Back
+            [void](Wait-Name 'GameHeading' 'Map Reader Game')
+            [void](Open-Map 'big map')
+            $reopened = Wait-MapFacts { param($f) $f.openMs -ge 0 -and $f.zoom -ne $f.fit } 'its saved view'
+            $report.mapsReaderReopened = $reopened
+            if (-not $reopened.fromCache) { throw 'The reopened map wasn''t drawn from its cache.' }
+            if ($reopened.openMs -gt 1000) { throw "The reopened map took $($reopened.openMs) ms to show." }
+            Assert-Close $reopened.zoom $zoomed.zoom 'The reopened zoom'
+            Assert-Close $reopened.centerX $zoomed.centerX 'The reopened centre X'
+            Assert-Close $reopened.centerY $zoomed.centerY 'The reopened centre Y'
+            $report.phases += 'maps-reader-reopen'
+
+            # 4. Ctrl+0 fits, and Back saves the fitted view.
+            Send-MapKeys '^0'
+            $fitted = Wait-MapFacts { param($f) $f.zoom -eq $f.fit } 'fit'
+            Start-Sleep -Milliseconds 1500
+            Go-Back
+            [void](Wait-Name 'GameHeading' 'Map Reader Game')
+            $report.phases += 'maps-reader-fit'
+
+            # 5. The strip, 20000 pixels wide, displays within the surface limit.
+            [void](Open-Map 'strip map')
+            [void](Wait-MapFacts { param($f) $f.openMs -ge 0 } 'the strip''s first frame' 120)
+            Send-MapKeys '^{ADD}'
+            $strip = Wait-MapFacts { param($f) $f.zoom -gt $f.fit } 'the strip zoomed'
+            $report.mapsReaderStrip = $strip
+            if ($strip.maxSurfaceSide -gt 4096) { throw "The strip's surface was $($strip.maxSurfaceSide) pixels." }
+            $report.mapsReaderStripScreenshot = Save-WindowScreenshot 'maps-reader-strip'
+            Go-Back
+            [void](Wait-Name 'GameHeading' 'Map Reader Game')
+            $report.phases += 'maps-reader-strip'
+
+            # 6. Removing the strip takes its cache with it.
+            Invoke-Element (Wait-Name 'RemoveSelectedMap' 'Remove strip map')
+            [void](Wait-VisibleById 'RemoveGuideDialog')
+            Invoke-Element (Wait-EnabledById 'PrimaryButton')
+            [void](Wait-HiddenById 'RemoveGuideDialog')
+            [void](Wait-Status 'Removed strip map.')
+            $report.phases += 'maps-reader-remove'
         }
         elseif ($Mode -eq 'import-preview') {
             Select-Element 'Import Test Game'

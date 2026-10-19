@@ -85,6 +85,47 @@ def tiny_jpeg(width: int, height: int) -> bytes:
     )
 
 
+def big_map_png(width: int, height: int) -> bytes:
+    """A large RGB map drawn from a few precomputed rows, compressed row by row.
+
+    512-pixel cells in six colours by (column + row) % 6, with a dark line
+    every 64 pixels, so each zoom level and tile looks different.
+    """
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(
+            ">I", zlib.crc32(kind + data) & 0xFFFFFFFF
+        )
+
+    colours = [(214, 196, 150), (150, 190, 120), (120, 160, 200), (200, 140, 120), (170, 150, 200), (220, 210, 120)]
+    line = bytes((40, 40, 48))
+    cells = (width + 511) // 512
+    rows: dict[tuple[int, bool], bytes] = {}
+    for shift in range(6):
+        for dark in (False, True):
+            pixels = bytearray()
+            for cell in range(cells):
+                span = min(512, width - cell * 512)
+                colour = line if dark else bytes(colours[(cell + shift) % 6])
+                block = bytearray(colour * span)
+                if not dark:
+                    for x in range(0, span, 64):
+                        block[x * 3 : x * 3 + 3] = line
+                pixels += block
+            rows[(shift, dark)] = b"\x00" + bytes(pixels)
+    compressor = zlib.compressobj(1)
+    data = bytearray()
+    for y in range(height):
+        data += compressor.compress(rows[((y // 512) % 6, y % 64 == 0)])
+    data += compressor.flush()
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", bytes(data))
+        + chunk(b"IEND", b"")
+    )
+
+
 def huge_header_png(width: int, height: int) -> bytes:
     """A header that claims a huge image, with almost no data behind it."""
 
@@ -520,6 +561,13 @@ def main() -> None:
         png(20000, 400),
         "png",
         "A map wider than the 16384-pixel texture limit; imports by Ctrl+O",
+    )
+    # T21.2 PR b: the survey's largest real map size, for levels and tiles.
+    add(
+        "generated/maps/big-map.png",
+        big_map_png(15456, 10304),
+        "png",
+        "A large map, 15456 x 10304: opens from its levels and tiles",
     )
     add(
         "generated/maps/broken-map.png",

@@ -143,6 +143,7 @@ internal sealed class ImageReaderSession : IReaderSession
         else
         {
             Apply(MapViewport.FromPosition(position, pyramid.Width, pyramid.Height, viewport.ViewWidth, viewport.ViewHeight), raise: false);
+            WriteDiagnostics();
         }
         return Task.FromResult(new RestoreOutcome(RestoreKind.Exact));
     }

@@ -226,6 +226,66 @@ if (args.Length == 2 && args[0] == "describe-import")
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "describe-maps")
+{
+    // T21.2 PR b: each map's saved view, that none counts as reading, and
+    // which caches exist.
+    ManagedPathResolver mapsPaths = new(args[1]);
+    string mapsCache = Path.Combine(Path.GetFullPath(args[2]), "maps");
+    using SqliteConnection mapsConnection = new(new SqliteConnectionStringBuilder
+    {
+        DataSource = mapsPaths.DatabasePath,
+        Mode = SqliteOpenMode.ReadOnly,
+        Pooling = false
+    }.ToString());
+    mapsConnection.Open();
+    Dictionary<string, object?> maps = [];
+    using (SqliteCommand command = mapsConnection.CreateCommand())
+    {
+        command.CommandText = """
+            SELECT gu.Title, rs.LocatorJson, rs.EstimatedFraction, rs.LastOpenedUtcMs, gu.ContentSha256
+            FROM Guides gu JOIN ReadingStates rs ON rs.GuideId = gu.Id
+            WHERE gu.Format = 'Image' ORDER BY gu.Title
+            """;
+        using SqliteDataReader reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            string? locator = reader.IsDBNull(1) ? null : reader.GetString(1);
+            double? zoom = null;
+            if (locator is not null)
+            {
+                JsonNode? payload = JsonNode.Parse(locator)?["payload"];
+                zoom = payload?["zoom"]?.GetValue<double>();
+            }
+            string sha = reader.GetString(4);
+            maps[reader.GetString(0)] = new
+            {
+                HasPlace = locator is not null,
+                Zoom = zoom,
+                Estimate = reader.IsDBNull(2) ? (double?)null : reader.GetDouble(2),
+                LastOpened = !reader.IsDBNull(3),
+                CacheComplete = File.Exists(Path.Combine(mapsCache, sha, "map-cache.json")),
+            };
+        }
+    }
+    string? lastActive;
+    using (SqliteCommand command = mapsConnection.CreateCommand())
+    {
+        command.CommandText = """
+            SELECT gu.Title FROM Settings st JOIN Guides gu ON gu.Id = st.Value
+            WHERE st.Key = 'LastActiveGuideId'
+            """;
+        lastActive = command.ExecuteScalar() as string;
+    }
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        Maps = maps,
+        LastActiveTitle = lastActive,
+        CacheFolders = Directory.Exists(mapsCache) ? Directory.EnumerateDirectories(mapsCache).Count() : 0,
+    }));
+    return 0;
+}
+
 if (args.Length == 2 && args[0] == "describe-actions")
 {
     // Read-only, without InitializeAsync: its artwork sweep would hide a
@@ -711,6 +771,54 @@ if (args.Length == 3 && args[0] == "seed-pdf-reader")
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "seed-maps-reader")
+{
+    // T21.2 PR b: a text guide and three maps (small, a strip, a large one),
+    // imported as a user would. The app builds the maps' caches.
+    ManagedPathResolver mapPaths = new(args[1]);
+    await using SqliteLibraryRepository mapRepository = new(mapPaths);
+    await mapRepository.InitializeAsync();
+    // It runs after the navigation seeds, in the same library.
+    if ((await mapRepository.ListGamesAsync()).Any(game => game.Title == "Map Reader Game"))
+    {
+        throw new InvalidOperationException("The map reader game is already seeded.");
+    }
+    string mapFixtures = Path.Combine(Path.GetFullPath(args[2]), "p0");
+    Game mapGame = await mapRepository.AddGameAsync("Map Reader Game", null, null);
+    GuideImportValidator mapValidator = new(null, new TrustedFixtureDecoder());
+    GuideImportPublisher mapPublisher = new(mapRepository, mapPaths);
+
+    async Task<(Guid Id, string Sha)> PublishMapAsync(string fixture, string title)
+    {
+        ImportInspection inspection = await mapValidator.InspectAsync(
+            Path.Combine(mapFixtures, "generated", "maps", fixture), CancellationToken.None);
+        if (inspection is not ImportReady { Manifest: MapImportManifest map })
+        {
+            throw new InvalidOperationException($"The {fixture} fixture failed the import preview: {inspection}.");
+        }
+        Guid id = await mapPublisher.PublishAsync(map, mapGame.Id, title, false, null, CancellationToken.None);
+        return (id, map.Fingerprint);
+    }
+
+    Guid walkthrough = Guid.NewGuid();
+    await InsertTextGuideAsync(mapPaths, mapGame.Id, walkthrough, "Walkthrough",
+        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+        File.ReadAllBytes(Path.Combine(mapFixtures, "txt-ascii.txt")));
+    (Guid castle, _) = await PublishMapAsync("castle-floor-1.png", "castle floor 1");
+    (Guid strip, string stripSha) = await PublishMapAsync("strip-map.png", "strip map");
+    (Guid big, string bigSha) = await PublishMapAsync("big-map.png", "big map");
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        walkthrough = walkthrough.ToString("N"),
+        castle = castle.ToString("N"),
+        strip = strip.ToString("N"),
+        big = big.ToString("N"),
+        bigSha,
+        stripSha,
+    }));
+    return 0;
+}
+
 if (args.Length == 3 && args[0] == "seed-progress")
 {
     ManagedPathResolver progressPaths = new(args[1]);
@@ -1192,7 +1300,8 @@ if (args.Length != 2 ||
         "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-search|seed-import|seed-actions|seed-navigation " +
         "<app-data-root> " +
         "or seed-linked-game|describe-providers|describe-import|describe-actions|describe-progress|describe-theme <app-data-root> " +
-        "or seed-txt-reader|seed-html-reader|seed-html-position|seed-html-theme|seed-pdf-reader|seed-progress|seed-find <app-data-root> <fixtures-root> " +
+        "or seed-txt-reader|seed-html-reader|seed-html-position|seed-html-theme|seed-pdf-reader|seed-maps-reader|seed-progress|seed-find <app-data-root> <fixtures-root> " +
+        "or describe-maps <app-data-root> <cache-root> " +
         "or set-html-appearance <app-data-root> <guide-id> <System|Light|Dark> <scale|default> " +
         "or check-igdb-fields <igdb-credential-file> <fixture-dir> " +
         "or invalidate-blocked-guide <app-data-root> " +
@@ -1766,4 +1875,13 @@ static uint Crc32(byte[] bytes)
         }
     }
     return ~crc;
+}
+
+// T21.2: the seed's maps are the repo's own fixtures; the header, limit and
+// completeness checks still run, and the app decodes them when it builds
+// their caches.
+sealed class TrustedFixtureDecoder : IMapImageDecoder
+{
+    public Task<bool> DecodesAsync(string fullPath, DesktopGuides.Core.Maps.MapImageSize expected, CancellationToken token) =>
+        Task.FromResult(true);
 }
