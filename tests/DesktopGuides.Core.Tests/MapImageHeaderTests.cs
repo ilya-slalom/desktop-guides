@@ -119,7 +119,8 @@ public sealed class MapImageHeaderTests
 
     private static byte[] WholeJpeg(bool exifThumbnail = false) =>
         [0xFF, 0xD8,
-            .. exifThumbnail ? [0xFF, 0xE1, 0x00, 0x08, 0xFF, 0xD8, 0xFF, 0xD9, 0x00, 0x00] : Array.Empty<byte>(),
+            // A real thumbnail is a whole JPEG, with its own scan and end.
+            .. exifThumbnail ? [0xFF, 0xE1, 0x00, 0x0C, 0xFF, 0xD8, 0xFF, 0xDA, 0x00, 0x02, 0x56, 0xFF, 0xD9, 0x00] : Array.Empty<byte>(),
             .. Sof(0xC0, 8, 8), .. Segment(0xDA, 8), 0x12, 0xFF, 0x00, 0x34, 0xFF, 0xD9];
 
     [Fact]
@@ -129,12 +130,19 @@ public sealed class MapImageHeaderTests
     public void AJpegCutBeforeItsEndIsIncomplete() =>
         Assert.False(Complete(WholeJpeg()[..^2], MapImageKind.Jpeg));
 
-    // An EXIF thumbnail's own end marker comes before the scan, so it doesn't count.
+    // An EXIF thumbnail's own scan and end come before the map's, so they don't count.
     [Fact]
     public void AThumbnailsEndIsNotTheMapsEnd()
     {
         byte[] cut = WholeJpeg(exifThumbnail: true)[..^2];
         Assert.False(Complete(cut, MapImageKind.Jpeg));
         Assert.True(Complete(WholeJpeg(exifThumbnail: true), MapImageKind.Jpeg));
+    }
+
+    [Fact]
+    public void AJpegCutAfterItsThumbnailIsIncomplete()
+    {
+        byte[] whole = WholeJpeg(exifThumbnail: true);
+        Assert.False(Complete(whole[..18], MapImageKind.Jpeg));
     }
 }

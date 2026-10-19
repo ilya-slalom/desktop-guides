@@ -24,17 +24,20 @@ public static class GuideTitle
     {
         string name = string.Join(' ', Path.GetFileNameWithoutExtension(fileName)
             .Split([' ', '-', '_'], StringSplitOptions.RemoveEmptyEntries));
-        return name.Length == 0 ? MapFallback : Suggest(name);
+        return Shorten(name, MapFallback);
     }
 
-    public static string Suggest(string fileName)
+    public static string Suggest(string fileName) =>
+        Shorten(Path.GetFileNameWithoutExtension(fileName).Trim(), Fallback);
+
+    // The extension is already gone: a dot in what's left is part of the name.
+    private static string Shorten(string name, string fallback)
     {
-        string name = Path.GetFileNameWithoutExtension(fileName).Trim();
         if (name.Length > TitleLimit)
         {
             int cut = char.IsHighSurrogate(name[TitleLimit - 1]) ? TitleLimit - 1 : TitleLimit;
             name = name[..cut].TrimEnd();
         }
-        return name.Length == 0 ? Fallback : name;
+        return name.Length == 0 ? fallback : name;
     }
 }

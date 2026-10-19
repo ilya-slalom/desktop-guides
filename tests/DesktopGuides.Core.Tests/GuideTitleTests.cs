@@ -62,6 +62,8 @@ public sealed class GuideTitleTests
     [InlineData("castle-floor-1.png", "castle floor 1")]
     [InlineData("Dragon_Quest_V__World.JPG", "Dragon Quest V World")]
     [InlineData("  -_- .png", "Untitled map")]
+    [InlineData("Super Mario Bros. 3 - World 1.png", "Super Mario Bros. 3 World 1")]
+    [InlineData("World 1.1.png", "World 1.1")]
     public void MapTitlesReadDashesAndUnderscoresAsSpaces(string file, string title) =>
         Assert.Equal(title, GuideTitle.SuggestMap(file));
 }

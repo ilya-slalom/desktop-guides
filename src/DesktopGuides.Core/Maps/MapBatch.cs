@@ -1,5 +1,6 @@
 using System.Globalization;
 using DesktopGuides.Core.Import;
+using DesktopGuides.Core.Library;
 
 namespace DesktopGuides.Core.Maps;
 
@@ -14,6 +15,14 @@ public static class MapBatch
         1 => "Import 1 map",
         _ => string.Create(CultureInfo.CurrentCulture, $"Import {ready} maps"),
     };
+
+    // Import waits for every picked file to be checked, so none is left out.
+    public static bool CanImport(bool checking, bool importing, IReadOnlyList<string> titles)
+    {
+        ArgumentNullException.ThrowIfNull(titles);
+        return !checking && !importing && titles.Count > 0 &&
+            titles.All(title => GuideTitle.TryCreate(title, out _));
+    }
 
     public static string Summary(int imported, IReadOnlyList<(string Title, string Reason)> failed)
     {

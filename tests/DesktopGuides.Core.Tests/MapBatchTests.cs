@@ -32,4 +32,19 @@ public sealed class MapBatchTests
 
     [Fact]
     public void ABatchHasAtMostAHundredFiles() => Assert.Equal(100, MapBatch.MaxFiles);
+
+    // Importing waits until every picked file has been checked.
+    [Theory]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    public void ImportWaitsForTheChecks(bool checking, bool importing, bool allowed) =>
+        Assert.Equal(allowed, MapBatch.CanImport(checking, importing, ["castle floor 1"]));
+
+    [Fact]
+    public void ImportNeedsAMapAndEveryTitle()
+    {
+        Assert.False(MapBatch.CanImport(false, false, []));
+        Assert.False(MapBatch.CanImport(false, false, ["castle floor 1", "  "]));
+    }
 }

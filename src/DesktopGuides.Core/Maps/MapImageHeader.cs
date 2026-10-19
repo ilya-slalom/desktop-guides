@@ -68,7 +68,8 @@ public static class MapImageHeader
 
     // A truncated map can still decode, with its missing rows filled in. A
     // PNG's chunks must run whole to IEND; a JPEG needs its end marker after
-    // the scan starts (an EXIF thumbnail's own end comes before it).
+    // its first scan, found by segment lengths so that a thumbnail inside
+    // EXIF, itself a whole JPEG, doesn't count.
     public static bool IsComplete(Stream stream, MapImageKind kind)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -95,25 +96,44 @@ public static class MapImageHeader
 
     private static bool JpegIsComplete(Stream stream)
     {
+        if (!SkipToFirstScan(stream)) return false;
         // Reads in blocks without wrapping the stream: the caller still uses it.
         byte[] buffer = new byte[81920];
         int previous = -1;
-        bool scanning = false;
         int read;
         while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
         {
             for (int i = 0; i < read; i++)
             {
                 int current = buffer[i];
-                if (previous == 0xFF)
-                {
-                    if (current == 0xDA) scanning = true;
-                    else if (current == 0xD9 && scanning) return true;
-                }
+                if (previous == 0xFF && current == 0xD9) return true;
                 previous = current;
             }
         }
         return false;
+    }
+
+    // Leaves the stream just past the first scan's header.
+    private static bool SkipToFirstScan(Stream stream)
+    {
+        using BufferedReader input = new(stream, []);
+        if (input.Next() != 0xFF || input.Next() != 0xD8) return false;
+        while (true)
+        {
+            if (input.Next() != 0xFF) return false;
+            int marker;
+            do
+            {
+                marker = input.Next();
+            }
+            while (marker == 0xFF);
+            if (marker is < 0 or 0xD9) return false;
+            int high = input.Next(), low = input.Next();
+            if (low < 0) return false;
+            int length = (high << 8) | low;
+            if (length < 2 || !input.Skip(length - 2)) return false;
+            if (marker == 0xDA) return true;
+        }
     }
 
     private static MapImageSize? Sized(MapImageKind kind, int width, int height) =>

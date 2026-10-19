@@ -21,6 +21,7 @@ public sealed partial class ImportMapsDialog : ContentDialog
     private readonly CancellationTokenSource cancel = new();
     private Task running = Task.CompletedTask;
     private bool importing;
+    private bool checking = true;
 
     internal ImportMapsDialog(
         string gameTitle, IReadOnlyList<string> paths, IGuideImportValidator validator,
@@ -78,6 +79,7 @@ public sealed partial class ImportMapsDialog : ContentDialog
             }
         }
         ImportMapsBusy.Visibility = Visibility.Collapsed;
+        checking = false;
         UpdatePrimary();
     }
 
@@ -135,8 +137,8 @@ public sealed partial class ImportMapsDialog : ContentDialog
     private void UpdatePrimary()
     {
         PrimaryButtonText = MapBatch.ImportLabel(ready.Count);
-        IsPrimaryButtonEnabled = !importing && ready.Count > 0 &&
-            ready.All(map => GuideTitle.TryCreate(map.Title.Text, out _));
+        IsPrimaryButtonEnabled = MapBatch.CanImport(
+            checking, importing, [.. ready.Select(map => map.Title.Text)]);
     }
 
     private void ImportClicked(ContentDialog sender, ContentDialogButtonClickEventArgs args)
