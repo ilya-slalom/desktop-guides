@@ -66,12 +66,24 @@ public sealed class MapImportTests : IDisposable
         Assert.EndsWith(" limit for maps.", error.Message, StringComparison.Ordinal);
     }
 
+    // WIC decodes a truncated PNG, filling the missing rows (39177728062).
+    [Fact]
+    public async Task ATruncatedMapIsRefusedEvenIfItDecodes()
+    {
+        byte[] whole = MapBytes.WholePng(64, 64);
+        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(
+            () => Validator().InspectAsync(Write("cut.png", whole[..(whole.Length / 2)]), default));
+        Assert.Equal((ImportIssue.Unreadable, "cut.png can't be read as an image. It may be damaged or incomplete."),
+            (error.Issue, error.Message));
+        Assert.Empty(decoder.Calls);
+    }
+
     [Fact]
     public async Task AnImageThatDoesntDecodeIsRefused()
     {
         decoder = new FakeMapDecoder(decodes: false);
         GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(
-            () => Validator().InspectAsync(Write("broken.png", MapBytes.Png(64, 64)), default));
+            () => Validator().InspectAsync(Write("broken.png", MapBytes.WholePng(64, 64)), default));
         Assert.Equal((ImportIssue.Unreadable, "broken.png can't be read as an image. It may be damaged or incomplete."),
             (error.Issue, error.Message));
     }
@@ -144,7 +156,7 @@ public sealed class MapImportTests : IDisposable
         string source = harness.Sources.Write("castle.png", MapBytes.Png(640, 480, padding: 20));
         ImportManifest manifest = await harness.InspectAsync(source);
         DateTime written = File.GetLastWriteTimeUtc(source);
-        byte[] jpeg = MapBytes.Jpeg(0xC0, 640, 480, padding: 36);   // the PNG's 53 bytes
+        byte[] jpeg = MapBytes.Jpeg(0xC0, 640, 480, padding: (int)new FileInfo(source).Length - 27);
         Assert.Equal(new FileInfo(source).Length, jpeg.Length);
         File.WriteAllBytes(source, jpeg);
         File.SetLastWriteTimeUtc(source, written);

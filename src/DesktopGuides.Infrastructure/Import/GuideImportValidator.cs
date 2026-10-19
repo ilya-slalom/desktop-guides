@@ -421,6 +421,11 @@ public sealed class GuideImportValidator : IGuideImportValidator
                             $"{pixels} A map can have at most 268 million pixels.");
                 }
                 stream.Position = 0;
+                if (!MapImageHeader.IsComplete(stream, size.Kind))
+                {
+                    throw NotAnImage(source.FileName);
+                }
+                stream.Position = 0;
                 fingerprint = GuideFingerprint.OfStream(stream, token);
             }
             catch (IOException)
@@ -430,11 +435,13 @@ public sealed class GuideImportValidator : IGuideImportValidator
         }
         if (!await decoder.DecodesAsync(source.FullPath, size, token).ConfigureAwait(false))
         {
-            throw new GuideImportException(ImportIssue.Unreadable,
-                $"{source.FileName} can't be read as an image. It may be damaged or incomplete.");
+            throw NotAnImage(source.FileName);
         }
         return new ImportReady(new MapImportManifest(source, title, size.Kind, size.Width, size.Height, fingerprint));
     }
+
+    private static GuideImportException NotAnImage(string name) =>
+        new(ImportIssue.Unreadable, $"{name} can't be read as an image. It may be damaged or incomplete.");
 
     // The staged copy's header must match what was inspected.
     internal static void VerifyMap(string path, MapImportManifest map)

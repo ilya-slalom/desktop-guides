@@ -88,4 +88,53 @@ public sealed class MapImageHeaderTests
     [InlineData(20000, 20000, MapLimit.Pixels)]
     public void LimitsRefuseASideOrTooManyPixels(int w, int h, MapLimit? expected) =>
         Assert.Equal(expected, MapImageLimits.Check(new MapImageSize(MapImageKind.Png, w, h)));
+
+    // A truncated map can still decode, with its missing rows filled in, so
+    // completeness is checked on its own.
+    private static byte[] Chunk(string kind, byte[] data)
+    {
+        byte[] chunk = new byte[12 + data.Length];
+        BinaryPrimitives.WriteInt32BigEndian(chunk, data.Length);
+        System.Text.Encoding.ASCII.GetBytes(kind).CopyTo(chunk, 4);
+        data.CopyTo(chunk, 8);
+        return chunk;
+    }
+
+    private static byte[] WholePng() =>
+        [.. Png(4, 4)[..8], .. Chunk("IHDR", Png(4, 4)[16..29]), .. Chunk("IDAT", new byte[40]), .. Chunk("IEND", [])];
+
+    private static bool Complete(byte[] bytes, MapImageKind kind) =>
+        MapImageHeader.IsComplete(new MemoryStream(bytes), kind);
+
+    [Fact]
+    public void AWholePngIsComplete() => Assert.True(Complete(WholePng(), MapImageKind.Png));
+
+    [Fact]
+    public void APngCutShortIsIncomplete()
+    {
+        byte[] whole = WholePng();
+        Assert.False(Complete(whole[..(whole.Length / 2)], MapImageKind.Png));
+        Assert.False(Complete(whole[..^12], MapImageKind.Png));   // no IEND
+    }
+
+    private static byte[] WholeJpeg(bool exifThumbnail = false) =>
+        [0xFF, 0xD8,
+            .. exifThumbnail ? [0xFF, 0xE1, 0x00, 0x08, 0xFF, 0xD8, 0xFF, 0xD9, 0x00, 0x00] : Array.Empty<byte>(),
+            .. Sof(0xC0, 8, 8), .. Segment(0xDA, 8), 0x12, 0xFF, 0x00, 0x34, 0xFF, 0xD9];
+
+    [Fact]
+    public void AWholeJpegIsComplete() => Assert.True(Complete(WholeJpeg(), MapImageKind.Jpeg));
+
+    [Fact]
+    public void AJpegCutBeforeItsEndIsIncomplete() =>
+        Assert.False(Complete(WholeJpeg()[..^2], MapImageKind.Jpeg));
+
+    // An EXIF thumbnail's own end marker comes before the scan, so it doesn't count.
+    [Fact]
+    public void AThumbnailsEndIsNotTheMapsEnd()
+    {
+        byte[] cut = WholeJpeg(exifThumbnail: true)[..^2];
+        Assert.False(Complete(cut, MapImageKind.Jpeg));
+        Assert.True(Complete(WholeJpeg(exifThumbnail: true), MapImageKind.Jpeg));
+    }
 }

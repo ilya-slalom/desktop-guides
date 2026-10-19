@@ -66,6 +66,56 @@ public static class MapImageHeader
         return null;
     }
 
+    // A truncated map can still decode, with its missing rows filled in. A
+    // PNG's chunks must run whole to IEND; a JPEG needs its end marker after
+    // the scan starts (an EXIF thumbnail's own end comes before it).
+    public static bool IsComplete(Stream stream, MapImageKind kind)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        return kind == MapImageKind.Png ? PngIsComplete(stream) : JpegIsComplete(stream);
+    }
+
+    private static bool PngIsComplete(Stream stream)
+    {
+        Span<byte> head = stackalloc byte[8];
+        if (ReadUpTo(stream, head) < 8 || !head.SequenceEqual(PngSignature)) return false;
+        Span<byte> chunk = stackalloc byte[8];
+        while (ReadUpTo(stream, chunk) == 8)
+        {
+            long length = BinaryPrimitives.ReadUInt32BigEndian(chunk);
+            if (chunk[4..8].SequenceEqual("IEND"u8))
+            {
+                return stream.Length - stream.Position >= length + 4;
+            }
+            if (stream.Position + length + 4 > stream.Length) return false;
+            stream.Seek(length + 4, SeekOrigin.Current);
+        }
+        return false;
+    }
+
+    private static bool JpegIsComplete(Stream stream)
+    {
+        // Reads in blocks without wrapping the stream: the caller still uses it.
+        byte[] buffer = new byte[81920];
+        int previous = -1;
+        bool scanning = false;
+        int read;
+        while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            for (int i = 0; i < read; i++)
+            {
+                int current = buffer[i];
+                if (previous == 0xFF)
+                {
+                    if (current == 0xDA) scanning = true;
+                    else if (current == 0xD9 && scanning) return true;
+                }
+                previous = current;
+            }
+        }
+        return false;
+    }
+
     private static MapImageSize? Sized(MapImageKind kind, int width, int height) =>
         width > 0 && height > 0 ? new MapImageSize(kind, width, height) : null;
 
