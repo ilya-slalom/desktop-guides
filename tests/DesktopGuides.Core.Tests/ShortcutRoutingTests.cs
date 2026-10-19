@@ -20,10 +20,13 @@ public sealed class ShortcutRoutingTests
         { ShortcutCommand.NextPage, Reader },
         { ShortcutCommand.GoToPage, Reader },
         { ShortcutCommand.ZoomIn, Reader },
+        { ShortcutCommand.ShowMaps, Reader },
     };
 
     public static TheoryData<ShortcutCommand, ShellRoute> WrongPlace() => new()
     {
+        { ShortcutCommand.ShowMaps, Library },
+        { ShortcutCommand.ShowMaps, Game },
         { ShortcutCommand.FocusLibrarySearch, Game },
         { ShortcutCommand.FocusLibrarySearch, Reader },
         { ShortcutCommand.FocusLibrarySearch, Settings },

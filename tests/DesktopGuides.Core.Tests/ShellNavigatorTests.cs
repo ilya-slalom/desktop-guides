@@ -266,4 +266,17 @@ public sealed class ShellNavigatorTests
 
         Assert.Equal(new GameRoute(gameId), navigator.Current);
     }
+
+    // T21.2: a map opened from a guide's Maps pane goes Back to the game page.
+    [Fact]
+    public void BackFromAMapOpenedFromAGuideIsTheGamePage()
+    {
+        ShellNavigator navigator = new();
+        Guid game = Guid.NewGuid(), guide = Guid.NewGuid(), map = Guid.NewGuid();
+        navigator.OpenGame(game);
+        navigator.OpenReader(guide, game);
+        navigator.OpenReader(map, game);
+        Assert.True(navigator.GoBack());
+        Assert.Equal(new GameRoute(game), navigator.Current);
+    }
 }
