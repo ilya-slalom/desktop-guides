@@ -426,9 +426,8 @@ See the [PR b plan](t21-2-image-maps-reader-plan.md).
 
   The full suite passes, 917/917.
 - **Production:** it builds with 0 warnings, with warnings as errors.
-- **Installed:** the `navigation` group passes on both lanes (runs
-  39210506699, MSIX, and 39210509779, portable), with the new
-  `maps-reader` mode:
+- **Installed:** the PR run [39231269680](https://github.com/ilya-slalom/desktop-guides/actions/runs/39231269680)
+  passes on both lanes, with the new `maps-reader` mode:
   - the 15456 × 10304 map showed fitted in 764 ms on its first, uncached
     open;
   - eight zoom steps, then panning by the arrow keys and by a drag, drew
@@ -461,6 +460,17 @@ See the [PR b plan](t21-2-image-maps-reader-plan.md).
     arrow keys and the drag each moved the view.
 
   All are fixed; the tile budget with tests that failed first.
+- **Found by the PR runs:**
+  - Removing a map while its cache was being built failed ("couldn't be
+    removed"), because the build held the map's file open. Removal now
+    stops the build first. A game's removal stops every build.
+  - That stop then waited for the whole build (7–25 s): WinRT's decode
+    and encode run to the end once started, and the band loop never
+    checked its token. It now checks before each band and tile, and a
+    mid-build removal took 0.3–0.7 s.
+
+  `maps-reader` removes a second large map while its tiles build, and
+  requires it within 5 s.
 - **Deferred:**
   - a changed map's place restores exactly rather than fitting;
   - a part-deleted cache can read as complete;
