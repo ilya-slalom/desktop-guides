@@ -7882,7 +7882,8 @@ try {
         [void](Wait-VisibleById 'RemoveGuideDialog')
         Invoke-Element (Wait-EnabledById 'PrimaryButton')
         [void](Wait-HiddenById 'RemoveGuideDialog')
-        [void](Wait-Status 'Removed strip map.')
+        # A quiet 'Game ready.' can follow at once, so read the shown status.
+        [void](Wait-Name 'ShellStatus' 'Removed strip map.')
         $report.phases += 'maps-reader-remove'
 
         # 7. A map removed while its tiles are still being built (about 6 s)
@@ -7897,7 +7898,7 @@ try {
         [void](Wait-VisibleById 'RemoveGuideDialog')
         Invoke-Element (Wait-EnabledById 'PrimaryButton')
         [void](Wait-HiddenById 'RemoveGuideDialog')
-        [void](Wait-Status 'Removed second big map.')
+        [void](Wait-Name 'ShellStatus' 'Removed second big map.')
         $report.phases += 'maps-reader-remove-building'
     }
     elseif ($Mode -like 'remove-*') {
