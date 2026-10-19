@@ -124,6 +124,20 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             return GetGame(connection, null, gameId);
         }, token);
 
+    // T21.2: every map's hash, for the map cache's prune. The same map in
+    // two games is one hash.
+    public Task<IReadOnlySet<string>> ListMapHashesAsync(CancellationToken token = default) =>
+        ReadAsync<IReadOnlySet<string>>(() =>
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = "SELECT DISTINCT ContentSha256 FROM Guides WHERE Format = 'Image'";
+            using SqliteDataReader reader = command.ExecuteReader();
+            HashSet<string> hashes = new(StringComparer.Ordinal);
+            while (reader.Read()) hashes.Add(reader.GetString(0));
+            return hashes;
+        }, token);
+
     public Task<IReadOnlyList<Game>> ListGamesAsync(CancellationToken token = default) =>
         ReadAsync<IReadOnlyList<Game>>(() =>
         {
