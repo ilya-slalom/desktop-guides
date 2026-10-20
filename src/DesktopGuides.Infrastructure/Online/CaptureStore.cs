@@ -38,6 +38,13 @@ public sealed class CaptureStore(string root, TimeProvider clock)
             .Select(draft => new CaptureDraft(this, draft.Folder, draft.File!))
             .FirstOrDefault();
 
+    /// <summary>The game's drafts, newest first; damaged drafts are skipped.</summary>
+    public IReadOnlyList<CaptureDraft> ListForGame(Guid gameId) =>
+        Drafts().Where(draft => draft.File is { } file && file.GameId == gameId)
+            .OrderByDescending(draft => draft.File!.TouchedUtc)
+            .Select(draft => new CaptureDraft(this, draft.Folder, draft.File!))
+            .ToArray();
+
     /// <summary>Deletes drafts untouched for 7 days, and damaged ones; returns how many.</summary>
     public int Sweep()
     {

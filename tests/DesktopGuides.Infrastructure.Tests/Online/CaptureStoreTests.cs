@@ -120,4 +120,19 @@ public sealed class CaptureStoreTests : IDisposable
         Assert.Null(store.Find(game, SourceSite.GameFaqs, "78736"));
         Assert.Empty(Directory.EnumerateDirectories(root));
     }
+
+    [Fact]
+    public void ListForGameReturnsItsDraftsNewestFirst()
+    {
+        CaptureStore store = new(root, clock);
+        Guid game = Guid.NewGuid();
+        CaptureDraft older = store.Begin(game, Saga("cairn", "cairn"));
+        clock.Now = clock.Now.AddMinutes(1);
+        GuidePageReading other = new NeoseekerAdapter().Read(
+            new Uri("https://www.neoseeker.com/example-quest/walkthrough"), P3Fixtures.Read("neoseeker/wiki-hub.html"))!;
+        CaptureDraft newer = store.Begin(game, other);
+        store.Begin(Guid.NewGuid(), Saga("cairn", "cairn"));
+
+        Assert.Equal([newer.Id, older.Id], store.ListForGame(game).Select(draft => draft.Id));
+    }
 }
