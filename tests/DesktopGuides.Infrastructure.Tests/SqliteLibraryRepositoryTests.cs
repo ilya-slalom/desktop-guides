@@ -55,12 +55,45 @@ public sealed class SqliteLibraryRepositoryTests
 
         Task save = repository.SaveReadingLocationAsync(guide, "{\"t\":2}", 0.5);
         await Task.Delay(100);
-        Assert.Equal(new RepositoryWriteTiming(-1, -1, -1), repository.LastWriteTiming);
+        Assert.Equal(new RepositoryWriteTiming(-1, -1, -1, -1, -1, -1), repository.LastWriteTiming);
 
         release.Release();
         await import;
         await save;
         Assert.True(repository.LastWriteTiming!.WorkMs >= 0);
+    }
+
+    // #94: a write stuck in its SQL shows the open steps it finished, and
+    // its handle still reports it, finished, after a later write.
+    [Fact]
+    public async Task AWriteHandleShowsTheStageAStalledWriteReachedAndWhenItFinished()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Game game = await repository.AddGameAsync("Timing", null, null);
+        Guid guide = Guid.NewGuid();
+        InsertGuide(directory.Paths.DatabasePath, guide, game.Id);
+        using SqliteConnection holder = new($"Data Source={directory.Paths.DatabasePath};Pooling=False");
+        holder.Open();
+        using SqliteCommand hold = holder.CreateCommand();
+        hold.CommandText = "BEGIN IMMEDIATE";
+        hold.ExecuteNonQuery();
+
+        Task save = repository.SaveReadingLocationAsync(guide, "{\"t\":3}", 0.5);
+        Func<RepositoryWriteTiming> stalled = Assert.IsType<Func<RepositoryWriteTiming>>(repository.LastWrite);
+        DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+        while (stalled().PragmaMs < 0 && DateTime.UtcNow < deadline) await Task.Delay(20);
+        await Task.Delay(200);
+        RepositoryWriteTiming during = stalled();
+        Assert.True(during.ValidateMs >= 0 && during.OpenMs >= 0 && during.PragmaMs >= 0, during.ToString());
+        Assert.Equal(-1, during.WorkMs);
+
+        hold.CommandText = "ROLLBACK";
+        hold.ExecuteNonQuery();
+        await save;
+        await repository.SaveReadingLocationAsync(guide, "{\"t\":4}", 0.5);
+        Assert.True(stalled().WorkMs >= 200, stalled().ToString());
     }
 
     [Fact]

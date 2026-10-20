@@ -3425,14 +3425,24 @@ try {
                 # is reported below with the latest failure's stage and type.
                 $counts = Read-ProgressCounts
                 if ($counts.failures -ne 0) {
+                    # #94: the timed-out write runs on; wait to learn how long it took.
+                    $deadline = (Get-Date).AddSeconds(42)
+                    while ($null -eq $counts.failureContext.finishedWorkMs -and (Get-Date) -lt $deadline) {
+                        Start-Sleep -Milliseconds 500
+                        $counts = Read-ProgressCounts
+                    }
                     $last = $counts.lastFailure
+                    $context = $counts.failureContext
                     throw ("$step had $($counts.failures) failed saves; the last failed at " +
                         "$($last.stage) with $($last.type) (0x$('{0:X8}' -f [int] $last.hresult)), " +
                         "started by $($last.trigger), after $($last.captureMs) ms capturing and " +
-                        "$($last.writeMs) ms writing. The write waited $($counts.failureContext.gateWaitMs) ms " +
-                        "for the gate and $($counts.failureContext.queueWaitMs) ms for a thread, and its SQL ran " +
-                        "$($counts.failureContext.workMs) ms (-1: not reached); the pool had " +
-                        "$($counts.failureContext.poolThreads) threads and $($counts.failureContext.poolPending) queued items.")
+                        "$($last.writeMs) ms writing. The write waited $($context.gateWaitMs) ms " +
+                        "for the gate and $($context.queueWaitMs) ms for a thread; then its connection took " +
+                        "$($context.validateMs) ms checking the path, $($context.openMs) ms opening and " +
+                        "$($context.pragmaMs) ms setting its pragma, and its work had run $($context.workMs) ms " +
+                        "(-1: not reached or not finished). It finished after $($context.finishedWorkMs) ms of work " +
+                        "(-1: not within 40 s; empty: unknown). The pool had " +
+                        "$($context.poolThreads) threads and $($context.poolPending) queued items.")
                 }
                 if ([int] $counts.openFailures -ne 0) {
                     $report.progressOpenFailures = [ordered]@{

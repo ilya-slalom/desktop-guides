@@ -9,9 +9,11 @@ using Microsoft.Data.Sqlite;
 namespace DesktopGuides.Infrastructure.Storage;
 
 // #94: how long the latest write waited for the write gate, waited for a
-// thread-pool thread, and ran its SQL. -1 marks a stage not reached yet, so
-// a write that is still stuck shows where.
-public sealed record RepositoryWriteTiming(long GateWaitMs, long QueueWaitMs, long WorkMs);
+// thread-pool thread, and did its work; and, within the work, how long its
+// connection took to check the database path, open, and set its pragma.
+// -1 marks a stage not reached yet, so a write that is still stuck shows where.
+public sealed record RepositoryWriteTiming(
+    long GateWaitMs, long QueueWaitMs, long WorkMs, long ValidateMs, long OpenMs, long PragmaMs);
 
 public sealed class SqliteLibraryRepository : ILibraryRepository
 {
@@ -1618,7 +1620,9 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
 
     private SqliteConnection OpenConnection(bool create = false)
     {
+        WriteMarks? marks = currentWrite;
         paths.ValidateDatabasePath();
+        marks?.MarkFirst(ref marks.Validated);
         SqliteConnection connection = new(new SqliteConnectionStringBuilder
         {
             DataSource = paths.DatabasePath,
@@ -1628,9 +1632,11 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         try
         {
             connection.Open();
+            marks?.MarkFirst(ref marks.Opened);
             using SqliteCommand pragma = connection.CreateCommand();
             pragma.CommandText = "PRAGMA foreign_keys=ON";
             pragma.ExecuteNonQuery();
+            marks?.MarkFirst(ref marks.Configured);
             return connection;
         }
         catch
@@ -1642,6 +1648,16 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
 
     /// <summary>The latest write's stage timings, or null before any write.</summary>
     public RepositoryWriteTiming? LastWriteTiming => Volatile.Read(ref lastWrite)?.Timing();
+
+    /// <summary>
+    /// Reads the latest write's timings now or later, after other writes
+    /// have started; null before any write.
+    /// </summary>
+    public Func<RepositoryWriteTiming>? LastWrite => Volatile.Read(ref lastWrite) is WriteMarks marks ? marks.Timing : null;
+
+    // The write this thread is running, for OpenConnection's stage marks.
+    [ThreadStatic]
+    private static WriteMarks? currentWrite;
 
     private Task WriteAsync(Action action, CancellationToken token) =>
         WriteAsync<bool>(() =>
@@ -1661,9 +1677,17 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             return await Task.Run(() =>
             {
                 marks.Mark(ref marks.Started);
-                T result = action();
-                marks.Mark(ref marks.Ended);
-                return result;
+                currentWrite = marks;
+                try
+                {
+                    T result = action();
+                    marks.Mark(ref marks.Ended);
+                    return result;
+                }
+                finally
+                {
+                    currentWrite = null;
+                }
             }, token);
         }
         finally
@@ -1677,19 +1701,34 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         private readonly long requested = Stopwatch.GetTimestamp();
         public long GateEntered;
         public long Started;
+        public long Validated;
+        public long Opened;
+        public long Configured;
         public long Ended;
 
         public void Mark(ref long stage) => Volatile.Write(ref stage, Stopwatch.GetTimestamp());
+
+        // A write that opens more than one connection is timed by its first.
+        public void MarkFirst(ref long stage)
+        {
+            if (Volatile.Read(ref stage) == 0) Mark(ref stage);
+        }
 
         public RepositoryWriteTiming Timing()
         {
             long gate = Volatile.Read(ref GateEntered);
             long started = Volatile.Read(ref Started);
+            long validated = Volatile.Read(ref Validated);
+            long opened = Volatile.Read(ref Opened);
+            long configured = Volatile.Read(ref Configured);
             long ended = Volatile.Read(ref Ended);
             return new(
                 Between(requested, gate),
                 gate == 0 ? -1 : Between(gate, started),
-                started == 0 ? -1 : Between(started, ended));
+                started == 0 ? -1 : Between(started, ended),
+                started == 0 ? -1 : Between(started, validated),
+                validated == 0 ? -1 : Between(validated, opened),
+                opened == 0 ? -1 : Between(opened, configured));
         }
 
         private static long Between(long from, long to) =>

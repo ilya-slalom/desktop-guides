@@ -32,4 +32,5 @@ internal sealed record ProgressFailureForTest(
     string Trigger, long CaptureMs, long WriteMs);
 
 internal sealed record ProgressFailureContext(
-    long? GateWaitMs, long? QueueWaitMs, long? WorkMs, int PoolThreads, long PoolPending);
+    long? GateWaitMs, long? QueueWaitMs, long? WorkMs, long? ValidateMs, long? OpenMs, long? PragmaMs,
+    long? FinishedWorkMs, int PoolThreads, long PoolPending);
