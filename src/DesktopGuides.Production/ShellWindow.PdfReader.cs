@@ -94,6 +94,8 @@ public sealed partial class ShellWindow
             return false;
         }
         ReaderActions.SetSession(session);
+        // An unlock opens the session outside a render, which would refresh Maps.
+        if (password is not null) RefreshMapsButton(guide.GameId, generation);
         // SetSession resets these, so they follow it.
         ReaderActions.PageCount = session.PageCount;
         ReaderActions.KeysEnabled = true;

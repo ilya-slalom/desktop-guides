@@ -1,10 +1,12 @@
 using DesktopGuides.Core.Library;
+using DesktopGuides.Core.Maps;
 using DesktopGuides.Core.Reading;
 using DesktopGuides.Production.Materials;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.System;
@@ -106,6 +108,10 @@ public sealed partial class ReaderToolbar : UserControl
         KeysEnabled = false;
         ZoomIn.IsEnabled = true;
         ZoomOut.IsEnabled = true;
+        // T21.2 PR c: the shell shows Maps once it knows the game has some.
+        mapsAvailable = false;
+        ShowMaps.Visibility = Visibility.Collapsed;
+        CloseMaps();
         ShowTextSize(TextSizeSteps.Default, announce: false);
         if (session is not null)
         {
@@ -179,7 +185,7 @@ public sealed partial class ReaderToolbar : UserControl
         AddBookmark.Visibility = Show(addBookmark);
         GroupSeparator.Visibility = Show(ReaderCommandPolicy.ShowsGroupSeparator(supported));
         Commands.Visibility = Show(
-            pages || edges || textSize || zoom || pageJump || fitWidth || fitView || find || contents ||
+            pages || edges || textSize || zoom || pageJump || fitWidth || fitView || find || contents || mapsAvailable ||
             bookmarks || addBookmark);
     }
 
@@ -507,6 +513,78 @@ public sealed partial class ReaderToolbar : UserControl
 
     private async void FitMapClicked(object sender, RoutedEventArgs args) =>
         await RunAsync(FitMap);
+
+    // T21.2 PR c: the Maps pane. The flyout closes itself on the press that
+    // lands on Maps, so a click just after it closed means "close", not "open".
+    private bool mapsAvailable;
+    private bool focusMapsRow;
+    private DateTimeOffset mapsClosedAt = DateTimeOffset.MinValue;
+
+    public MapsPane Maps => MapsPaneView;
+
+    public bool MapsOpen => MapsFlyout.IsOpen;
+
+    // Raised before the pane shows, so the shell can load the game's maps.
+    public event EventHandler? MapsOpening;
+
+    public void SetMaps(bool any)
+    {
+        mapsAvailable = any;
+        ShowMaps.Visibility = Show(any);
+        if (!any) CloseMaps();
+        RefreshCommands();
+    }
+
+    public void OpenMaps(bool fromKeyboard)
+    {
+        if (!mapsAvailable || ShowMaps.Visibility != Visibility.Visible || MapsFlyout.IsOpen) return;
+        focusMapsRow = fromKeyboard;
+        // Under the toolbar's left edge, not the button, which may sit at the
+        // bar's right end: the pane gets the reader's width.
+        MapsFlyout.ShowAt(this, new FlyoutShowOptions { Placement = FlyoutPlacementMode.BottomEdgeAlignedLeft });
+    }
+
+    public void CloseMaps()
+    {
+        if (MapsFlyout.IsOpen) MapsFlyout.Hide();
+    }
+
+    private void ShowMapsClicked(object sender, RoutedEventArgs args)
+    {
+        if (MapsFlyout.IsOpen || DateTimeOffset.UtcNow - mapsClosedAt < TimeSpan.FromMilliseconds(300))
+        {
+            CloseMaps();
+            return;
+        }
+        OpenMaps(fromKeyboard: false);
+    }
+
+    private void MapsFlyoutOpening(object? sender, object args)
+    {
+        if (XamlRoot is not null)
+        {
+            // The space from the toolbar's bottom-left corner to the window's edges.
+            Windows.Foundation.Point corner = TransformToVisual(null)
+                .TransformPoint(new Windows.Foundation.Point(0, ActualHeight));
+            (double width, double height) = MapPreview.PaneSize(
+                XamlRoot.Size.Width - corner.X, XamlRoot.Size.Height - corner.Y);
+            MapsPaneView.Width = width;
+            MapsPaneView.Height = height;
+        }
+        MapsOpening?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void MapsFlyoutOpened(object? sender, object args)
+    {
+        if (focusMapsRow) MapsPaneView.FocusFirstRow();
+        focusMapsRow = false;
+    }
+
+    private void MapsFlyoutClosed(object? sender, object args)
+    {
+        MapsPaneView.Closed();
+        mapsClosedAt = DateTimeOffset.UtcNow;
+    }
 
     private async void GoToPageClicked(object sender, RoutedEventArgs args) =>
         await RunAsync(GoToPage);

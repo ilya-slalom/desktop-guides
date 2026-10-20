@@ -1,6 +1,6 @@
 # P2 implementation plan and exit gates
 
-Status: M7 complete, 15 October 2026 (T18.1: #113, #116 and #117). M8 complete, 16 October 2026 (T18.2: #118 and #119). M9 complete, 16 October 2026 (T19.1: #126 and #129). M10 complete, 17 October 2026 (T19.2: #130 and #131). T21.1 complete, 17 October 2026 (#132): T21.2 is limited to multi-page HTML and image maps. T21.2 multi-page HTML complete (#133, #134 and #135): multi-page HTML is supported. T21.2 image maps designed ([design](t21-2-image-maps-design.md), 19 October 2026); PR a (import maps and the Maps section) merged (#136); PR b (the reader) in review. P1 is complete (54 of 54 tasks; v1.0.1
+Status: M7 complete, 15 October 2026 (T18.1: #113, #116 and #117). M8 complete, 16 October 2026 (T18.2: #118 and #119). M9 complete, 16 October 2026 (T19.1: #126 and #129). M10 complete, 17 October 2026 (T19.2: #130 and #131). T21.1 complete, 17 October 2026 (#132): T21.2 is limited to multi-page HTML and image maps. T21.2 multi-page HTML complete (#133, #134 and #135): multi-page HTML is supported. T21.2 image maps designed ([design](t21-2-image-maps-design.md), 19 October 2026); PR a and PR b merged (#136 and #137); PR c (the Maps pop-up) in review: image maps are supported. P2's tasks are complete. P1 is complete (54 of 54 tasks; v1.0.1
 published). This plan orders the **3 P2 stories and 6 tasks** in the
 [work breakdown](../work-breakdown.md#p2--reader-depth-and-local-ownership).
 

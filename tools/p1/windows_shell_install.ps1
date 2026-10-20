@@ -30,6 +30,7 @@ param(
     [switch] $RcOnly,
     # T18.1: in-guide search.
     [switch] $NavigationOnly,
+    [switch] $MapsOnly,
 
     # Or name several groups, as CI shards do. They still run in the order
     # listed below. Don't combine with an *Only switch.
@@ -93,6 +94,7 @@ $scenarioGroups = [ordered]@{
     'backup' = $BackupOnly.IsPresent
     'workflow' = $WorkflowOnly.IsPresent
     'navigation' = $NavigationOnly.IsPresent
+    'maps' = $MapsOnly.IsPresent
     'rc' = $RcOnly.IsPresent
 }
 $selectedGroups = @($scenarioGroups.Keys | Where-Object { $scenarioGroups[$_] })
@@ -1894,8 +1896,6 @@ function Run-NavigationScenarios {
     Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
     Invoke-ShellSeed @('clear-bookmarks', $dataRoot) | Out-Null
     $report.reflowBookmark = Invoke-ProgressPass 'reflow-bookmark' 0
-
-    Run-MapReaderScenario $fixtureRoot
 }
 
 # T21.2 PR b: a map zooms, pans and reopens at its view; a strip over 16384
@@ -1922,6 +1922,24 @@ function Run-MapReaderScenario([string] $fixtureRoot) {
     }
     finally {
         foreach ($gate in $gates) { $gate.Dispose() }
+    }
+    # T21.2 PR c: a glance at a map from the guide, by pointer, then by keyboard.
+    foreach ($mode in @('maps-popup', 'maps-keyboard')) {
+        Start-InstalledShell
+        $processId = $report.launchedProcessId
+        $gates = @(
+            foreach ($name in @('ProgressDiagnostics', 'MapDiagnostics')) {
+                [System.Threading.EventWaitHandle]::new(
+                    $false, [System.Threading.EventResetMode]::ManualReset,
+                    "Local\$eventPrefix.$name.$processId")
+            })
+        try {
+            $report[$mode] = Run-ShellSmoke $mode -ResultName $mode -AppDataRoot $dataRoot -AppCacheRoot $cacheRoot
+            Close-InstalledShell
+        }
+        finally {
+            foreach ($gate in $gates) { $gate.Dispose() }
+        }
     }
     $timings = Join-Path $cacheRoot 'diagnostics\map-cache.json'
     if (Test-Path -LiteralPath $timings) {
@@ -3389,6 +3407,11 @@ try {
     if (Enter-ScenarioGroup 'backup') { Run-BackupScenarios }
     if (Enter-ScenarioGroup 'workflow') { Run-WorkflowScenarios }
     if (Enter-ScenarioGroup 'navigation') { Run-NavigationScenarios }
+    # T21.2: the map reader and the Maps pane, in their own group so they can
+    # be run alone; the navigation shard runs both groups.
+    if (Enter-ScenarioGroup 'maps') {
+        Run-MapReaderScenario (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
+    }
     if (Enter-ScenarioGroup 'rc') { Run-RcScenarios }
 
     $report.success = $true

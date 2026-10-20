@@ -21,6 +21,7 @@ public sealed partial class ShellWindow
         AddShortcut(VirtualKey.C, ShortcutCommand.ShowContents, ToggleContentsFromKeyboard,
             VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift);
         AddShortcut(VirtualKey.D, ShortcutCommand.AddBookmark, AddBookmarkFromKeyboard);
+        AddShortcut(VirtualKey.M, ShortcutCommand.ShowMaps, ToggleMapsFromKeyboard, VirtualKeyModifiers.Menu);
         AddShortcut(VirtualKey.B, ShortcutCommand.ShowBookmarks, ToggleBookmarksFromKeyboard,
             VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift);
         // The inner text box marks Esc handled, so this runs on the way down.

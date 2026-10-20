@@ -30,6 +30,7 @@ public sealed class KeyboardShortcutsTests
                 (ShortcutContext.Reader, "Ctrl+Shift+C", ShortcutCommand.ShowContents, "Show contents"),
                 (ShortcutContext.Reader, "Ctrl+D", ShortcutCommand.AddBookmark, "Add bookmark"),
                 (ShortcutContext.Reader, "Ctrl+Shift+B", ShortcutCommand.ShowBookmarks, "Show bookmarks"),
+                (ShortcutContext.Reader, "Alt+M", ShortcutCommand.ShowMaps, "Show the game's maps"),
                 (ShortcutContext.Dialog, "Esc", ShortcutCommand.CloseDialog, "Close the dialog"),
             ],
             KeyboardShortcuts.All.Select(s => (s.Context, s.Keys, s.Command, s.Description)));

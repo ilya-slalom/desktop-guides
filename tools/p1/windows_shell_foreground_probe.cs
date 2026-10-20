@@ -90,13 +90,14 @@ public static class DesktopGuidesForegroundProbe
         for (int step = 1; step <= 10; step++)
         {
             System.Threading.Thread.Sleep(20);
-            MoveTo(fromX + (toX - fromX) * step / 10, fromY + (toY - fromY) * step / 10);
+            Hover(fromX + (toX - fromX) * step / 10, fromY + (toY - fromY) * step / 10);
         }
         System.Threading.Thread.Sleep(50);
         mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
     }
 
-    private static void MoveTo(int x, int y)
+    // T21.2 PR c: a pointer move the app sees, as a person's hover.
+    public static void Hover(int x, int y)
     {
         // SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN.
         int left = GetSystemMetrics(76), top = GetSystemMetrics(77);

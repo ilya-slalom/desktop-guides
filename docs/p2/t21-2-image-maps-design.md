@@ -2,7 +2,9 @@
 
 Status: approved in conversation, 19 October 2026. PR a (import maps and
 the Maps section) merged (#136); see the [PR a verification record](#pr-a-verification-record).
-PR b (the reader) in review; see the [PR b verification record](#pr-b-verification-record).
+PR b (the reader) merged (#137); see the [PR b verification record](#pr-b-verification-record).
+PR c (the Maps pop-up) in review; see the [PR c verification record](#pr-c-verification-record).
+With PR c, image maps are supported.
 
 ## Intent
 
@@ -480,3 +482,66 @@ See the [PR b plan](t21-2-image-maps-reader-plan.md).
   - an open during a build reads the overview from `.building`;
   - the build's peak memory is about 150 MiB, not 64;
   - the smoke has no final `else`.
+
+## PR c verification record
+
+See the [PR c plan](t21-2-image-maps-popup-plan.md).
+
+- **Core,** each test failing first and then passing on the host:
+  - `KeyboardShortcutsTests` and `ShortcutRoutingTests`: Alt+M, "Show the
+    game's maps", in the Reader only;
+  - `MapsMenuTests`: the game's maps by title with their kind and size,
+    a game with one map, no maps, and focus starting on the open map;
+  - `MapPreviewTests`:
+    - previews at most 2048 pixels;
+    - the pane filling the space from the toolbar to the window's edges,
+      within its cap, and staying inside a small window;
+    - a strip fitting by width, and a small map never enlarged;
+  - `ShellNavigatorTests`: Back from a map opened from a guide is the game
+    page.
+
+  The full suite passes, 1513/1513.
+- **Infrastructure:** unchanged; the full suite passes, 917/917.
+- **Production:** it builds with 0 warnings, with warnings as errors, and
+  the reader toolbar smoke builds with the Maps pane.
+- **Installed:** the new `maps` scenario group passes on both lanes (runs
+  39270308557, portable, and 39270314376, MSIX). It is dispatchable alone,
+  and the navigation shard runs it after `navigation`.
+  - `maps-reader` passes as in PR b.
+  - `maps-popup`:
+    - from a paged TXT guide, hovering two maps swaps the preview;
+    - moving onto the map, across it and away keeps the pane and its map;
+    - Esc closes it without moving the guide or saving a place;
+    - the pane read again shows its map on a click, and Open map opens it;
+    - Back is the game page, and the guide reopens on the same line.
+  - `maps-keyboard`:
+    - Alt+M lands on the first map, Down moves and the map follows;
+    - Esc returns to the guide, and Enter opens the focused map;
+    - in the map reader, Alt+M starts on the open map and closes again.
+
+  Screenshot: [maps-popup](evidence/ci/t21-2/maps-popup.png).
+- **Offline:** a map reads only its managed copy, and neither the reader
+  nor the pane loads anything remote. The installed runs read only the
+  copies the seed published.
+- **Found by the installed runs:**
+  - the pane, sized from the Maps button at the bar's right end, left the
+    map no room; it now opens under the toolbar and fills the space to the
+    window's edges;
+  - Alt+M focused before the list arrived, and a reopened pane focused its
+    old rows;
+  - closing the pane refocused the TXT list, which can scroll it. The
+    flyout returns focus itself.
+
+  The test's own faults were also fixed: a guide fixture of one repeated
+  line, paging sent to a row, and a focus call on the line list.
+- **Found by the final review:** Open map ran outside the navigation
+  queue, and an unlocked PDF never showed Maps. Both are fixed.
+- **Deferred:**
+  - reader keys still act on the guide behind an open pane;
+  - a slow list read can fill a pane that already closed;
+  - a preview load isn't cancelled when its map leaves the list;
+  - kept previews last the window's life;
+  - the 300 ms "click means close" rule follows every close;
+  - a preview can race a build's commit;
+  - the reload on each opening is pinned only indirectly;
+  - two stale comments.

@@ -1,0 +1,73 @@
+<UserControl
+    x:Class="DesktopGuides.Production.MapsPane"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:maps="using:DesktopGuides.Core.Maps">
+    <!-- T21.2 PR c: the game's maps and the one pointed at, side by side in
+         one flyout, so moving the pointer between them never closes it. It
+         uses only the typography styles and tokens, so the toolbar still
+         compiles without the Toolkit. -->
+    <Grid ColumnSpacing="{StaticResource DesktopGuidesSpacing16}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <ListView x:Name="MapsList"
+                  SelectionMode="Single"
+                  IsItemClickEnabled="True"
+                  ItemClick="MapClicked"
+                  PreviewKeyDown="MapsListPreviewKeyDown"
+                  ContainerContentChanging="MapRowChanging"
+                  AutomationProperties.AutomationId="MapsList"
+                  AutomationProperties.Name="Maps">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="maps:MapsMenuItem">
+                    <StackPanel Padding="0,6" Spacing="2">
+                        <TextBlock Text="{x:Bind Title}"
+                                   Style="{StaticResource DesktopGuidesBodyStyle}"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{x:Bind Facts}"
+                                   Style="{StaticResource DesktopGuidesMetadataStyle}" />
+                    </StackPanel>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+        <Grid Grid.Column="1" RowSpacing="{StaticResource DesktopGuidesSpacing8}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock x:Name="PreviewTitle"
+                       Style="{StaticResource DesktopGuidesSectionTitleStyle}"
+                       TextTrimming="CharacterEllipsis"
+                       AutomationProperties.AutomationId="MapsPreviewTitle" />
+            <TextBlock x:Name="PreviewFacts"
+                       Grid.Row="1"
+                       Style="{StaticResource DesktopGuidesMetadataStyle}" />
+            <Grid x:Name="PreviewArea" Grid.Row="2" SizeChanged="PreviewAreaSizeChanged">
+                <Image x:Name="PreviewImage"
+                       Stretch="Fill"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       AutomationProperties.AutomationId="MapsPreviewImage" />
+                <TextBlock x:Name="PreviewMessage"
+                           Text="Point to a map to see it."
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                           AutomationProperties.AutomationId="MapsPreviewMessage"
+                           AutomationProperties.LiveSetting="Polite" />
+            </Grid>
+            <Button x:Name="OpenMap"
+                    Grid.Row="3"
+                    Content="Open map"
+                    IsEnabled="False"
+                    HorizontalAlignment="Right"
+                    Click="OpenMapClicked"
+                    AutomationProperties.AutomationId="OpenMapFromMaps" />
+        </Grid>
+    </Grid>
+</UserControl>

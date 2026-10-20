@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark', 'maps-reader',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark', 'maps-reader', 'maps-popup', 'maps-keyboard',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -6733,6 +6733,7 @@ try {
             ShortcutCloseDialog = 'Close the dialog, Esc'
             ShortcutAddBookmark = 'Add bookmark, Ctrl+D'
             ShortcutShowBookmarks = 'Show bookmarks, Ctrl+Shift+B'
+            ShortcutShowMaps = 'Show the game''s maps, Alt+M'
         }
         foreach ($id in $expected.Keys) {
             [void](Show-SettingsCard $id)
@@ -7915,6 +7916,253 @@ try {
         # Stopping the build waits for at most one band, so removal is prompt.
         if ($removeClock.ElapsedMilliseconds -gt 5000) { throw "Removing a map mid-build took $($removeClock.ElapsedMilliseconds) ms." }
         $report.phases += 'maps-reader-remove-building'
+    }
+    elseif ($Mode -in @('maps-popup', 'maps-keyboard')) {
+        # T21.2 PR c: a glance at a map from a text guide, by pointer and by
+        # keyboard. Each check reads app-owned state: names, focus, the
+        # guide's top line and the saves count.
+        $rowCondition = [System.Windows.Automation.PropertyCondition]::new(
+            [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+            [System.Windows.Automation.ControlType]::ListItem)
+        function Get-TopLineRow {
+            $lines = Find-ById 'ReaderTextLines'
+            if (-not $lines) { return $null }
+            $top = $lines.Current.BoundingRectangle.Top
+            foreach ($row in @($lines.FindAll($scope, $rowCondition) | Where-Object { -not $_.Current.IsOffscreen } |
+                    Sort-Object { $_.Current.BoundingRectangle.Top })) {
+                $bounds = $row.Current.BoundingRectangle
+                if ($bounds.Top + $bounds.Height / 2 -ge $top) { return $row }
+            }
+            return $null
+        }
+        function Get-TopLineName {
+            $row = Get-TopLineRow
+            if ($row) { return $row.Current.Name } else { return '' }
+        }
+        # The rows take focus; their list doesn't.
+        function Focus-Guide {
+            $row = Get-TopLineRow
+            if (-not $row) { throw 'The guide showed no rows to focus.' }
+            $row.SetFocus()
+        }
+        function Wait-TopLineName([string] $expected, [string] $step) {
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                $name = Get-TopLineName
+                if ($name -eq $expected) { return }
+                Start-Sleep -Milliseconds 200
+            } while ((Get-Date) -lt $deadline)
+            throw "After $step the guide's top line was '$name'; expected '$expected'."
+        }
+        function Read-SaveCount {
+            $path = Join-Path $AppCacheRoot "diagnostics\progress-$ProcessId.json"
+            if (-not (Test-Path -LiteralPath $path)) { return 0 }
+            return [int] (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json).saves
+        }
+        # The pane reads its list as it opens, so its rows can follow the list.
+        function Get-MapRow([string] $title) {
+            $list = Wait-VisibleById 'MapsList'
+            $condition = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::NameProperty, $title)
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                $row = $list.FindFirst($scope, $condition)
+                if ($row) { return $row }
+                Start-Sleep -Milliseconds 200
+            } while ((Get-Date) -lt $deadline)
+            throw "The Maps pane had no '$title'."
+        }
+        function Hover-At([int] $x, [int] $y) {
+            [DesktopGuidesForegroundProbe]::Hover($x, $y)
+            Start-Sleep -Milliseconds 300
+        }
+        function Hover-Element($element) {
+            $bounds = $element.Current.BoundingRectangle
+            Hover-At ([int](($bounds.Left + $bounds.Right) / 2)) ([int](($bounds.Top + $bounds.Bottom) / 2))
+        }
+        function Wait-Preview([string] $title) {
+            $deadline = (Get-Date).AddSeconds(30)
+            do {
+                $image = Find-ById 'MapsPreviewImage'
+                if ($image -and -not $image.Current.IsOffscreen -and $image.Current.Name -eq $title) { return $image }
+                Start-Sleep -Milliseconds 200
+            } while ((Get-Date) -lt $deadline)
+            throw "The Maps pane never showed '$title'."
+        }
+        function Assert-PaneShows([string] $title, [string] $step) {
+            $list = Find-ById 'MapsList'
+            if (-not $list -or $list.Current.IsOffscreen) { throw "After $step the Maps pane closed." }
+            $image = Find-ById 'MapsPreviewImage'
+            if (-not $image -or $image.Current.Name -ne $title) { throw "After $step the pane showed '$($image.Current.Name)'." }
+        }
+        function Get-FocusedName {
+            $focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+            if ($focused) { return $focused.Current.Name } else { return '' }
+        }
+        function Test-FocusWithin([string] $id) {
+            $node = [System.Windows.Automation.AutomationElement]::FocusedElement
+            for ($depth = 0; $node -and $depth -lt 12; $depth++) {
+                if ($node.Current.AutomationId -eq $id) { return $true }
+                $node = [System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($node)
+            }
+            return $false
+        }
+        function Wait-FocusedRow([string] $title, [string] $step) {
+            $deadline = (Get-Date).AddSeconds(10)
+            do {
+                if ((Get-FocusedName) -eq $title -and (Test-FocusWithin 'MapsList')) { return }
+                Start-Sleep -Milliseconds 200
+            } while ((Get-Date) -lt $deadline)
+            throw "After $step focus was on '$(Get-FocusedName)', not the '$title' row."
+        }
+        function Send-Keys([string] $keys) {
+            [System.Windows.Forms.SendKeys]::SendWait($keys)
+            Start-Sleep -Milliseconds 300
+        }
+        function Open-Walkthrough {
+            Select-Element 'Walkthrough'
+            [void](Wait-Name 'ReaderHeading' 'Walkthrough')
+            $deadline = (Get-Date).AddSeconds(30)
+            while (-not (Get-TopLineName) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
+            [void](Wait-VisibleById 'ShowMaps')
+        }
+
+        Select-Element 'Map Reader Game'
+        [void](Wait-Name 'GameHeading' 'Map Reader Game')
+        [void](Wait-Status 'Game ready.')
+        Open-Walkthrough
+
+        if ($Mode -eq 'maps-popup') {
+            # 1. A place in the guide, saved.
+            # Where the guide's top line is at each step, to place any move.
+            $timeline = [System.Collections.Generic.List[string]]::new()
+            function Mark([string] $step) { $timeline.Add("${step}: $(Get-TopLineName)") }
+            $firstLine = Get-TopLineName
+            Mark 'opened'
+            # The reader's own paging, as the TXT modes page; focusing a row
+            # would let the list scroll it into view when focus comes back.
+            Invoke-Element (Find-ByName 'Next page')
+            Start-Sleep -Milliseconds 400
+            Mark 'next page 1'
+            Invoke-Element (Find-ByName 'Next page')
+            Start-Sleep -Milliseconds 400
+            Mark 'next page 2'
+            $deadline = (Get-Date).AddSeconds(10)
+            while ((Get-TopLineName) -eq $firstLine -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
+            $place = Get-TopLineName
+            if ($place -eq $firstLine) { throw 'Page Down left the guide on its first line.' }
+            Start-Sleep -Milliseconds 1500
+            $saves = Read-SaveCount
+            Mark 'settled'
+            $report.mapsPopupPlace = $place
+            $report.mapsPopupTimeline = $timeline
+
+            # 2. The pane, by pointer: nothing shown until a map is pointed at.
+            Click-Element (Wait-VisibleById 'ShowMaps')
+            [void](Get-MapRow 'castle floor 1')
+            $report.mapsPopupBounds = [ordered]@{
+                window = $root.Current.BoundingRectangle.ToString()
+                list = (Find-ById 'MapsList').Current.BoundingRectangle.ToString()
+                message = (Find-ById 'MapsPreviewMessage').Current.BoundingRectangle.ToString()
+                messageOffscreen = (Find-ById 'MapsPreviewMessage').Current.IsOffscreen
+                showMaps = (Find-ById 'ShowMaps').Current.BoundingRectangle.ToString()
+            }
+            $report.mapsPopupOpenScreenshot = Save-WindowScreenshot 'maps-popup-open'
+            $names = @((Wait-VisibleById 'MapsList').FindAll($scope, $rowCondition) | ForEach-Object { $_.Current.Name })
+            if (($names -join '|') -ne 'big map|castle floor 1') { throw "The Maps pane listed '$($names -join ', ')'." }
+            [void](Wait-Name 'MapsPreviewMessage' 'Point to a map to see it.')
+            Mark 'pane open'
+
+            # 3-4. Hovering a name shows its map; another swaps it.
+            Hover-Element (Get-MapRow 'castle floor 1')
+            [void](Wait-Preview 'castle floor 1')
+            Mark 'castle shown'
+            Hover-Element (Get-MapRow 'big map')
+            $image = Wait-Preview 'big map'
+            Mark 'big map shown'
+            $report.phases += 'maps-popup-hover'
+
+            # 5. Onto the map, across it, and away: nothing closes.
+            $bounds = $image.Current.BoundingRectangle
+            Hover-At ([int](($bounds.Left + $bounds.Right) / 2)) ([int](($bounds.Top + $bounds.Bottom) / 2))
+            Assert-PaneShows 'big map' 'moving onto the map'
+            Hover-At ([int]($bounds.Right - 2)) ([int](($bounds.Top + $bounds.Bottom) / 2))
+            Assert-PaneShows 'big map' 'moving across the map'
+            $window = $root.Current.BoundingRectangle
+            # The pane opens at the Maps button, so the window's left margin is outside it.
+            $pane = (Find-ById 'MapsList').Current.BoundingRectangle
+            if ($pane.Left -le $window.Left + 40) { throw "The Maps pane reached the window's left edge ($($pane.Left))." }
+            Hover-At ([int]($window.Left + 20)) ([int](($window.Top + $window.Bottom) / 2))
+            Assert-PaneShows 'big map' 'moving away from the pane'
+            Mark 'pointer away'
+            $report.mapsPopupScreenshot = Save-WindowScreenshot 'maps-popup'
+            $report.phases += 'maps-popup-stays'
+
+            # 6. Esc closes; the glance saved nothing and moved nothing.
+            Send-Keys '{ESC}'
+            Wait-HiddenById 'MapsList'
+            Mark 'closed'
+            Wait-TopLineName $place "closing the pane (timeline: $($timeline -join '; '))"
+            if ((Read-SaveCount) -ne $saves) { throw "Glancing at maps saved the guide's place ($saves to $(Read-SaveCount))." }
+            $report.phases += 'maps-popup-esc'
+
+            # 7. The pane again (its list read again); a click shows, Open map opens.
+            Click-Element (Wait-VisibleById 'ShowMaps')
+            Click-Element (Get-MapRow 'castle floor 1')
+            [void](Wait-Preview 'castle floor 1')
+            Invoke-Element (Wait-EnabledById 'OpenMapFromMaps')
+            $view = Wait-VisibleById 'MapImageView'
+            if ($view.Current.Name -ne 'castle floor 1') { throw "Open map opened '$($view.Current.Name)'." }
+            [void](Wait-VisibleById 'ShowMaps')
+            $report.phases += 'maps-popup-open'
+
+            # 8-9. Back is the game page, and the guide kept its place.
+            Go-Back
+            [void](Wait-Name 'GameHeading' 'Map Reader Game')
+            Open-Walkthrough
+            Wait-TopLineName $place 'reopening the guide'
+            Go-Back
+            [void](Wait-Name 'GameHeading' 'Map Reader Game')
+            $report.phases += 'maps-popup-back'
+        }
+        else {
+            # 1-2. Alt+M lands on the first row; Down moves, and the map follows.
+            Focus-Guide
+            Send-Keys '%m'
+            Wait-FocusedRow 'big map' 'Alt+M'
+            [void](Wait-Preview 'big map')
+            Send-Keys '{DOWN}'
+            Wait-FocusedRow 'castle floor 1' 'Down'
+            [void](Wait-Preview 'castle floor 1')
+            $report.phases += 'maps-keyboard-move'
+
+            # 3. Esc closes, back to the guide.
+            Send-Keys '{ESC}'
+            Wait-HiddenById 'MapsList'
+            $deadline = (Get-Date).AddSeconds(5)
+            while (-not (Test-FocusWithin 'ReaderTextLines') -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
+            if (-not (Test-FocusWithin 'ReaderTextLines')) { throw "After Esc focus was on '$(Get-FocusedName)', not the guide." }
+            $report.phases += 'maps-keyboard-esc'
+
+            # 4. Alt+M, Down, Enter opens the map.
+            Send-Keys '%m'
+            Wait-FocusedRow 'big map' 'Alt+M again'
+            Send-Keys '{DOWN}'
+            Wait-FocusedRow 'castle floor 1' 'Down again'
+            Send-Keys '{ENTER}'
+            $view = Wait-VisibleById 'MapImageView'
+            if ($view.Current.Name -ne 'castle floor 1') { throw "Enter opened '$($view.Current.Name)'." }
+            $report.phases += 'maps-keyboard-open'
+
+            # 5. In the map reader, Alt+M starts on the open map, and closes again.
+            Send-Keys '%m'
+            Wait-FocusedRow 'castle floor 1' 'Alt+M in the map'
+            Send-Keys '%m'
+            Wait-HiddenById 'MapsList'
+            Go-Back
+            [void](Wait-Name 'GameHeading' 'Map Reader Game')
+            $report.phases += 'maps-keyboard-map'
+        }
     }
     elseif ($Mode -like 'remove-*') {
         if (-not $ExpectedGuideTitle) {
