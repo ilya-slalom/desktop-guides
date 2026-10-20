@@ -2,6 +2,7 @@ using DesktopGuides.Core.Reading;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Input;
 using VirtualKey = Windows.System.VirtualKey;
 
@@ -100,24 +101,37 @@ public sealed partial class ContentsPane : UserControl
         if (node is not null) Tree.SelectedNode = node;
     }
 
-    // After layout, so the selected item's container exists.
-    public void FocusContent() =>
-        DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+    // After layout, so the selected item's container exists (#138: retried
+    // until the tree has made it, then the search link or Close).
+    public void FocusContent()
+    {
+        if (Tab == ReaderPaneTab.Bookmarks)
         {
-            if (Tab == ReaderPaneTab.Bookmarks)
-            {
-                BookmarksView.FocusContent();
-                return;
-            }
-            if (Tree.Visibility == Visibility.Visible &&
+            BookmarksView.FocusContent();
+            return;
+        }
+        _ = FocusRetry.RunAsync(DispatcherQueue,
+            () => Tree.Visibility == Visibility.Visible &&
                 Tree.SelectedNode is TreeViewNode node && Tree.ContainerFromNode(node) is Control item &&
-                item.Focus(FocusState.Programmatic))
+                item.Focus(FocusState.Programmatic),
+            () =>
             {
-                return;
-            }
-            if (SearchLink.Visibility == Visibility.Visible && SearchLink.Focus(FocusState.Programmatic)) return;
-            CloseButton.Focus(FocusState.Programmatic);
-        });
+                if (SearchLink.Visibility == Visibility.Visible && SearchLink.Focus(FocusState.Programmatic)) return;
+                CloseButton.Focus(FocusState.Programmatic);
+            });
+    }
+
+    // Whether the keyboard is somewhere in the pane.
+    public bool HasFocusWithin()
+    {
+        if (XamlRoot is null) return false;
+        for (DependencyObject? node = FocusManager.GetFocusedElement(XamlRoot) as DependencyObject;
+             node is not null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (ReferenceEquals(node, this)) return true;
+        }
+        return false;
+    }
 
     public void Clear()
     {

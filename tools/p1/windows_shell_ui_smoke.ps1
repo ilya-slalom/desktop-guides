@@ -4165,7 +4165,16 @@ try {
             # a disabled Import; the dialog offers no UTF-8 choice to pick.
             function Import-WorkflowGuide($guide) {
                 Click-Element (Wait-EnabledById 'ImportGuideButton')
-                Choose-OpenPath (Join-Path $WorkflowRoot $guide.file)
+                try {
+                    Choose-OpenPath (Join-Path $WorkflowRoot $guide.file)
+                }
+                catch {
+                    # #138: Windows' Open dialog sometimes never comes; ask once more.
+                    if ("$_" -notlike '*The system Open dialog did not appear*') { throw }
+                    $report.workflowPickerRetries = 1 + [int]$report.workflowPickerRetries
+                    Click-Element (Wait-EnabledById 'ImportGuideButton')
+                    Choose-OpenPath (Join-Path $WorkflowRoot $guide.file)
+                }
                 [void](Wait-VisibleById 'ImportGuideDialog')
                 [void](Wait-Name 'ImportFormat' $guide.format)
                 $deadline = (Get-Date).AddSeconds(30)

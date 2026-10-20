@@ -67,7 +67,12 @@ public sealed partial class ShellWindow
         // The guide was left, or another opened, while this one built.
         if (token.IsCancellationRequested || !ReferenceEquals(session, readerSession)) return;
         outline = built;
-        if (ReaderContentsHost.Visibility == Visibility.Visible) await ShowOutlineAsync(focus: false);
+        // #138: a pane opened while this built left the keyboard on its Close
+        // button or search link; the tree takes it once there is one.
+        if (ReaderContentsHost.Visibility == Visibility.Visible)
+        {
+            await ShowOutlineAsync(focus: ReaderContents.HasFocusWithin());
+        }
     }
 
     // The command for the tab already showing closes the pane.

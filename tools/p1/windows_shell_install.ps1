@@ -2566,13 +2566,13 @@ function Run-MaterialScenarios {
                 throw "The $themeName Acrylic window shows the Solid fill; " +
                     'an app layer covers the backdrop.'
             }
+            # #138: the dialog's backdrop is Windows' rendering, which falls back
+            # to a plain fill when the window isn't active, so it is recorded,
+            # not asserted. The window check above catches an app layer.
             $solidDialog = $report.materials["$themeName-Solid"].dialogStrip
             $acrylicDialog = $report.materials["$themeName-Acrylic"].dialogStrip
             $report.materials["$themeName-dialogDifference"] =
                 Get-AcrylicSurfaceDifference $acrylicDialog $solidDialog
-            if (-not (Test-AcrylicSurfaceVisible $acrylicDialog $solidDialog)) {
-                throw "The $themeName Acrylic dialog matched the Solid dialog."
-            }
         }
 
         Set-AppThemePreference $true
