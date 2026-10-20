@@ -68,19 +68,20 @@ public sealed class GuideImportPublisher
     /// </summary>
     public Task<Guid> PublishAsync(
         ImportManifest manifest, Guid gameId, string title, bool allowDuplicate,
-        IProgress<ImportProgress>? progress, CancellationToken token)
+        IProgress<ImportProgress>? progress, CancellationToken token, GuideSource? source = null)
     {
         ArgumentNullException.ThrowIfNull(manifest);
         string validTitle = GuideTitle.Create(title);
+        source?.Validate();
         return repository.RunImportAsync(
             (journal, gateToken) => PublishLockedAsync(
-                journal, manifest, gameId, validTitle, allowDuplicate, progress, gateToken),
+                journal, manifest, gameId, validTitle, allowDuplicate, progress, source, gateToken),
             token);
     }
 
     private async Task<Guid> PublishLockedAsync(
         IImportJournal journal, ImportManifest manifest, Guid gameId, string title, bool allowDuplicate,
-        IProgress<ImportProgress>? progress, CancellationToken token)
+        IProgress<ImportProgress>? progress, GuideSource? source, CancellationToken token)
     {
         CheckSource(manifest.Source);
         if (!allowDuplicate)
@@ -128,7 +129,8 @@ public sealed class GuideImportPublisher
                     plan.Html?.Manifest.Assets.Select(ToGuideAsset).ToArray() ?? [],
                     plan.Html?.Manifest.Pages.Select(ToGuidePage).ToArray(),
                     (manifest as MapImportManifest)?.PixelWidth,
-                    (manifest as MapImportManifest)?.PixelHeight),
+                    (manifest as MapImportManifest)?.PixelHeight,
+                    source),
                 () => checkpoint(ImportCheckpoint.InCommit));
         }
         catch (Exception error)

@@ -18,6 +18,11 @@ public interface ILibraryRepository : IReadingLocationStore, IGuideCompletionSto
         Guid gameId, CancellationToken token = default);
     // Newest activity first, then title, then ID. Reads only SQLite.
     Task<IReadOnlySet<string>> ListMapHashesAsync(CancellationToken token = default);
+    // S22: where saved guides came from, and a game's Steam app ID.
+    Task<GuideSource?> GetGuideSourceAsync(Guid guideId, CancellationToken token = default);
+    Task<IReadOnlyDictionary<Guid, GuideSource>> ListGuideSourcesAsync(Guid gameId, CancellationToken token = default);
+    Task<string?> GetSteamAppIdAsync(Guid gameId, CancellationToken token = default);
+    Task SetSteamAppIdAsync(Guid gameId, string? appId, CancellationToken token = default);
     Task<IReadOnlyList<LibraryGameSummary>> ListGameSummariesAsync(
         CancellationToken token = default);
     Task<IReadOnlyList<GuideSummary>> ListGuideSummariesAsync(

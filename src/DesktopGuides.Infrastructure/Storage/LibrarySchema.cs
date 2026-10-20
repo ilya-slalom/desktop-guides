@@ -2,7 +2,7 @@ namespace DesktopGuides.Infrastructure.Storage;
 
 internal static class LibrarySchema
 {
-    public const int CurrentVersion = 8;
+    public const int CurrentVersion = 9;
 
     public const string Version1 = """
         CREATE TABLE Games (
@@ -190,6 +190,42 @@ internal static class LibrarySchema
         PRAGMA user_version = 8;
         """;
 
+    // S22: where a saved guide or map came from, a game's Steam app ID, and
+    // FileOperations accepting ReplaceGuide (saving a guide again).
+    public const string Version9 = """
+        CREATE TABLE GuideSources (
+            GuideId TEXT PRIMARY KEY REFERENCES Guides(Id) ON DELETE CASCADE,
+            Site TEXT NOT NULL CHECK (Site IN ('GameFaqs', 'Neoseeker', 'Steam', 'VgMaps')),
+            ItemId TEXT NOT NULL CHECK (length(ItemId) BETWEEN 1 AND 200),
+            Url TEXT NOT NULL CHECK (length(Url) BETWEEN 1 AND 2048),
+            Author TEXT CHECK (Author IS NULL OR length(Author) BETWEEN 1 AND 200),
+            Notice TEXT CHECK (Notice IS NULL OR length(Notice) <= 16384),
+            SourceTitle TEXT CHECK (SourceTitle IS NULL OR length(SourceTitle) BETWEEN 1 AND 512),
+            SavedUtcMs INTEGER NOT NULL CHECK (SavedUtcMs >= 0),
+            SourceUpdatedUtcMs INTEGER CHECK (SourceUpdatedUtcMs IS NULL OR SourceUpdatedUtcMs >= 0),
+            CapturedPages INTEGER CHECK (CapturedPages IS NULL OR CapturedPages >= 1),
+            TotalPages INTEGER CHECK (TotalPages IS NULL OR TotalPages >= 2),
+            CHECK ((CapturedPages IS NULL) = (TotalPages IS NULL)),
+            CHECK (CapturedPages IS NULL OR CapturedPages < TotalPages)
+        );
+        CREATE INDEX IX_GuideSources_Item ON GuideSources(Site, ItemId);
+        CREATE TABLE GameSteamApps (
+            GameId TEXT PRIMARY KEY REFERENCES Games(Id) ON DELETE CASCADE,
+            AppId TEXT NOT NULL CHECK (length(AppId) BETWEEN 1 AND 12 AND AppId NOT GLOB '*[^0-9]*')
+        );
+        CREATE TABLE FileOperations9 (
+            Id TEXT PRIMARY KEY CHECK (length(Id) = 32),
+            Kind TEXT NOT NULL CHECK (Kind IN ('Import', 'DeleteGuide', 'DeleteGame', 'ReplaceGuide')),
+            Phase TEXT NOT NULL CHECK (Phase IN ('Prepared', 'Committed')),
+            ManifestJson TEXT NOT NULL,
+            CreatedUtcMs INTEGER NOT NULL CHECK (CreatedUtcMs >= 0)
+        );
+        INSERT INTO FileOperations9 SELECT Id, Kind, Phase, ManifestJson, CreatedUtcMs FROM FileOperations;
+        DROP TABLE FileOperations;
+        ALTER TABLE FileOperations9 RENAME TO FileOperations;
+        PRAGMA user_version = 9;
+        """;
+
     public static readonly (int Version, string Sql)[] Migrations =
     [
         (1, Version1),
@@ -199,6 +235,7 @@ internal static class LibrarySchema
         (5, Version5),
         (6, Version6),
         (7, Version7),
-        (8, Version8)
+        (8, Version8),
+        (9, Version9)
     ];
 }

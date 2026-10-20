@@ -140,6 +140,27 @@ internal sealed class RestoreFixture : IAsyncDisposable
         LibrarySchema.Version4 +
         " INSERT INTO GuideAssets SELECT * FROM GuideAssetsOld; DROP TABLE GuideAssetsOld;";
 
+    // S22: schema 9 added GuideSources and GameSteamApps and rebuilt
+    // FileOperations for ReplaceGuide; this undoes all three, with
+    // FileOperations as Version1 created it.
+    public static string SourcesBeforeVersionNine()
+    {
+        string first = LibrarySchema.Version1;
+        int start = first.IndexOf("CREATE TABLE FileOperations", StringComparison.Ordinal);
+        int end = first.IndexOf(");", start, StringComparison.Ordinal) + 2;
+        return $"""
+            PRAGMA foreign_keys = OFF;
+            DROP TABLE GuideSources;
+            DROP TABLE GameSteamApps;
+            PRAGMA legacy_alter_table = ON;
+            ALTER TABLE FileOperations RENAME TO FileOperationsAfter;
+            {first[start..end]}
+            INSERT INTO FileOperations SELECT * FROM FileOperationsAfter;
+            DROP TABLE FileOperationsAfter;
+            PRAGMA legacy_alter_table = OFF;
+            """;
+    }
+
     // T21.2: schema 8 rebuilt Guides for maps; this is the table before it.
     public static string GuidesBeforeVersionEight()
     {

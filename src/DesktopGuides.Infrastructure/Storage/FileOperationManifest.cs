@@ -8,7 +8,8 @@ internal enum FileOperationKind
 {
     Import,
     DeleteGuide,
-    DeleteGame
+    DeleteGame,
+    ReplaceGuide
 }
 
 internal enum FileOperationPhase
