@@ -30,11 +30,21 @@ internal sealed class PublisherHarness : IAsyncDisposable
         return harness;
     }
 
+    /// <summary>Opens a fresh repository on the same files, as the next app start does.</summary>
+    public async Task RestartAsync()
+    {
+        await Repository.DisposeAsync();
+        Repository = new SqliteLibraryRepository(Paths);
+        await Repository.InitializeAsync();
+    }
+
     /// <summary>A publisher whose next import uses fresh, known IDs.</summary>
     public GuideImportPublisher Publisher(
         Action<ImportCheckpoint>? checkpoint = null,
         Func<string, Stream>? createStagedFile = null,
-        Action<IImportJournal, Guid>? rollBack = null)
+        Action<IImportJournal, Guid>? rollBack = null,
+        Action<ReplaceCheckpoint>? replaceCheckpoint = null,
+        Action<IImportJournal, Guid>? replaceRollBack = null)
     {
         OperationId = Guid.NewGuid();
         GuideId = Guid.NewGuid();
@@ -44,7 +54,9 @@ internal sealed class PublisherHarness : IAsyncDisposable
             () => ids.Count > 0 ? ids.Dequeue() : Guid.NewGuid(),
             createStagedFile ?? (path => new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true)),
             checkpoint ?? (_ => { }),
-            rollBack ?? ((journal, operationId) => journal.RollBack(operationId)));
+            rollBack ?? ((journal, operationId) => journal.RollBack(operationId)),
+            replaceCheckpoint ?? (_ => { }),
+            replaceRollBack ?? ((journal, operationId) => journal.RollBackReplace(operationId)));
     }
 
     public async Task<ImportManifest> InspectAsync(string path, int? codePage = null, string? password = null)
@@ -74,6 +86,23 @@ internal sealed class PublisherHarness : IAsyncDisposable
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = $"SELECT COUNT(*) FROM {table}";
         return (long)command.ExecuteScalar()!;
+    }
+
+    /// <summary>Every row the query returns, each as its columns joined by '|', one per line.</summary>
+    public string Rows(string sql)
+    {
+        using SqliteConnection connection = new($"Data Source={Paths.DatabasePath};Pooling=False");
+        connection.Open();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = sql;
+        using SqliteDataReader reader = command.ExecuteReader();
+        List<string> rows = [];
+        while (reader.Read())
+        {
+            rows.Add(string.Join("|", Enumerable.Range(0, reader.FieldCount).Select(index =>
+                reader.IsDBNull(index) ? "null" : Convert.ToString(reader.GetValue(index), System.Globalization.CultureInfo.InvariantCulture))));
+        }
+        return string.Join("\n", rows);
     }
 
     public void Execute(string sql, Guid id)

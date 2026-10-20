@@ -39,7 +39,7 @@ internal sealed class RemovalLibrary : IAsyncDisposable
     public async Task<Guid> AddGameAsync(string title) =>
         (await Repository.AddGameAsync(title, null, null)).Id;
 
-    public async Task<Guid> AddGuideAsync(Guid gameId, string title)
+    public async Task<Guid> AddGuideAsync(Guid gameId, string title, GuideSource? source = null)
     {
         Guid operation = Guid.NewGuid();
         Guid id = Guid.NewGuid();
@@ -48,7 +48,7 @@ internal sealed class RemovalLibrary : IAsyncDisposable
             journal.Prepare(operation, id);
             journal.Publish(
                 new NewImportedGuide(operation, id, gameId, title, GuideFormat.Txt, "guide.txt",
-                    new string('a', 64), 20, null, null),
+                    new string('a', 64), 20, null, null, Source: source),
                 () => { });
             return Task.FromResult(true);
         }, CancellationToken.None);

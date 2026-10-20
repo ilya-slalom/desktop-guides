@@ -1845,10 +1845,56 @@ public sealed class SqliteLibraryRepositoryTests
         await using SqliteLibraryRepository repository = new(directory.Paths);
         await repository.InitializeAsync();
 
-        Assert.Equal(8L, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.Equal(LibrarySchema.CurrentVersion, (int)ReadUserVersion(directory.Paths.DatabasePath));
         Assert.Equal(before, Census(directory.Paths.DatabasePath));
         Assert.Equal("", ScalarText(directory.Paths.DatabasePath,
             "SELECT IFNULL(group_concat(IFNULL(PixelWidth, '') || IFNULL(PixelHeight, ''), ''), '') FROM Guides"));
+    }
+
+    [Fact]
+    public async Task UpgradesPopulatedVersionEightKeepingEveryRow()
+    {
+        using TestLibrary directory = new();
+        CreatePopulatedVersionEight(directory, Guid.NewGuid(), Guid.NewGuid());
+        string before = Census(directory.Paths.DatabasePath);
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+
+        Assert.Equal(9L, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.Equal(before, Census(directory.Paths.DatabasePath));
+        Assert.Equal("0", ScalarText(directory.Paths.DatabasePath, "SELECT COUNT(*) FROM GuideSources"));
+        Assert.Equal("0", ScalarText(directory.Paths.DatabasePath, "SELECT COUNT(*) FROM GameSteamApps"));
+    }
+
+    [Fact]
+    public async Task FailedVersionNineMigrationStaysAtVersionEight()
+    {
+        using TestLibrary directory = new();
+        CreatePopulatedVersionEight(directory, Guid.NewGuid(), Guid.NewGuid());
+        string before = Census(directory.Paths.DatabasePath);
+
+        await using (SqliteLibraryRepository failing = new(directory.Paths, null, version =>
+        {
+            if (version == 9) throw new IOException("Injected after FileOperations was rebuilt.");
+        }))
+        {
+            LibraryOpenException error = await Assert.ThrowsAsync<LibraryOpenException>(() => failing.InitializeAsync());
+            Assert.Equal(LibraryOpenIssue.MigrationFailed, error.Issue);
+        }
+
+        Assert.Equal(8L, ReadUserVersion(directory.Paths.DatabasePath));
+        Assert.Equal(before, Census(directory.Paths.DatabasePath));
+    }
+
+    private static void CreatePopulatedVersionEight(TestLibrary directory, Guid gameId, Guid guideId)
+    {
+        CreatePopulatedVersionSeven(directory, gameId, guideId);
+        using SqliteConnection connection = new($"Data Source={directory.Paths.DatabasePath};Pooling=False");
+        connection.Open();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "PRAGMA foreign_keys=OFF; " + LibrarySchema.Version8;
+        command.ExecuteNonQuery();
     }
 
     [Fact]

@@ -12,6 +12,9 @@ namespace DesktopGuides.Infrastructure.Import;
 
 internal enum ImportCheckpoint { Prepared, Copied, Verified, MovedToContent, Renamed, InCommit, Published }
 
+// S22: the steps of saving a guide again, in order.
+internal enum ReplaceCheckpoint { Prepared, Copied, Verified, OldMovedAside, NewMovedIn, InCommit, Committed, Finished }
+
 /// <summary>
 /// Copies a previewed guide into managed storage and publishes it. The whole
 /// import holds the library write gate; any failure before the commit rolls
@@ -27,6 +30,8 @@ public sealed class GuideImportPublisher
     private const string NoSpaceMessage = "There isn't enough free space to import this guide.";
     private const string SaveFailedMessage =
         "The guide couldn't be saved to your library. Nothing was changed.";
+    private const string PendingMessage =
+        "An earlier change to this guide is still being finished. Restart Desktop Guides, then save it again.";
     private const int BufferBytes = 81920;
 
     private readonly SqliteLibraryRepository repository;
@@ -36,20 +41,25 @@ public sealed class GuideImportPublisher
     private readonly Func<string, Stream> createStagedFile;
     private readonly Action<ImportCheckpoint> checkpoint;
     private readonly Action<IImportJournal, Guid> rollBack;
+    private readonly Action<ReplaceCheckpoint> replaceCheckpoint;
+    private readonly Action<IImportJournal, Guid> replaceRollBack;
 
     public GuideImportPublisher(
         SqliteLibraryRepository repository, ILibraryPaths paths, GuideImportLimits? limits = null)
         : this(repository, paths, limits, Guid.NewGuid,
             path => new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, BufferBytes, useAsync: true),
             _ => { },
-            (journal, operationId) => journal.RollBack(operationId))
+            (journal, operationId) => journal.RollBack(operationId),
+            _ => { },
+            (journal, operationId) => journal.RollBackReplace(operationId))
     {
     }
 
     internal GuideImportPublisher(
         SqliteLibraryRepository repository, ILibraryPaths paths, GuideImportLimits? limits,
         Func<Guid> newId, Func<string, Stream> createStagedFile,
-        Action<ImportCheckpoint> checkpoint, Action<IImportJournal, Guid> rollBack)
+        Action<ImportCheckpoint> checkpoint, Action<IImportJournal, Guid> rollBack,
+        Action<ReplaceCheckpoint> replaceCheckpoint, Action<IImportJournal, Guid> replaceRollBack)
     {
         this.repository = repository ?? throw new ArgumentNullException(nameof(repository));
         this.paths = paths ?? throw new ArgumentNullException(nameof(paths));
@@ -58,6 +68,8 @@ public sealed class GuideImportPublisher
         this.createStagedFile = createStagedFile;
         this.checkpoint = checkpoint;
         this.rollBack = rollBack;
+        this.replaceCheckpoint = replaceCheckpoint;
+        this.replaceRollBack = replaceRollBack;
     }
 
     /// <summary>
@@ -68,19 +80,20 @@ public sealed class GuideImportPublisher
     /// </summary>
     public Task<Guid> PublishAsync(
         ImportManifest manifest, Guid gameId, string title, bool allowDuplicate,
-        IProgress<ImportProgress>? progress, CancellationToken token)
+        IProgress<ImportProgress>? progress, CancellationToken token, GuideSource? source = null)
     {
         ArgumentNullException.ThrowIfNull(manifest);
         string validTitle = GuideTitle.Create(title);
+        source?.Validate();
         return repository.RunImportAsync(
             (journal, gateToken) => PublishLockedAsync(
-                journal, manifest, gameId, validTitle, allowDuplicate, progress, gateToken),
+                journal, manifest, gameId, validTitle, allowDuplicate, progress, source, gateToken),
             token);
     }
 
     private async Task<Guid> PublishLockedAsync(
         IImportJournal journal, ImportManifest manifest, Guid gameId, string title, bool allowDuplicate,
-        IProgress<ImportProgress>? progress, CancellationToken token)
+        IProgress<ImportProgress>? progress, GuideSource? source, CancellationToken token)
     {
         CheckSource(manifest.Source);
         if (!allowDuplicate)
@@ -128,7 +141,8 @@ public sealed class GuideImportPublisher
                     plan.Html?.Manifest.Assets.Select(ToGuideAsset).ToArray() ?? [],
                     plan.Html?.Manifest.Pages.Select(ToGuidePage).ToArray(),
                     (manifest as MapImportManifest)?.PixelWidth,
-                    (manifest as MapImportManifest)?.PixelHeight),
+                    (manifest as MapImportManifest)?.PixelHeight,
+                    source),
                 () => checkpoint(ImportCheckpoint.InCommit));
         }
         catch (Exception error)
@@ -150,6 +164,138 @@ public sealed class GuideImportPublisher
         // After the commit: a fault here must never reach the rollback above.
         checkpoint(ImportCheckpoint.Published);
         return guideId;
+    }
+
+    /// <summary>
+    /// S22: saves a guide again. The guide keeps its ID, title, place,
+    /// bookmarks and completion; its files, content columns, assets, pages
+    /// and source change. An unchanged copy is <see cref="GuideReplaceOutcome.UpToDate"/>
+    /// and changes nothing. A copy in another format throws
+    /// <see cref="ImportIssue.FormatChanged"/>, unless the change is between
+    /// TXT and HTML and <paramref name="allowFormatChange"/> is set; then
+    /// the place, bookmarks and reader settings are dropped.
+    /// </summary>
+    public Task<GuideReplaceOutcome> ReplaceAsync(
+        ImportManifest manifest, Guid guideId, GuideSource source, bool allowFormatChange,
+        IProgress<ImportProgress>? progress, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(manifest);
+        ArgumentNullException.ThrowIfNull(source);
+        source.Validate();
+        return repository.RunImportAsync(
+            (journal, gateToken) => ReplaceLockedAsync(
+                journal, manifest, guideId, source, allowFormatChange, progress, gateToken),
+            token);
+    }
+
+    private async Task<GuideReplaceOutcome> ReplaceLockedAsync(
+        IImportJournal journal, ImportManifest manifest, Guid guideId, GuideSource source,
+        bool allowFormatChange, IProgress<ImportProgress>? progress, CancellationToken token)
+    {
+        Guide guide = journal.GetGuide(guideId)
+            ?? throw new GuideImportException(ImportIssue.Missing, "The guide is no longer in your library.");
+        bool clearPlace = false;
+        if (guide.Format != manifest.Format)
+        {
+            bool textAndHtml = guide.Format is GuideFormat.Txt or GuideFormat.Html &&
+                               manifest.Format is GuideFormat.Txt or GuideFormat.Html;
+            if (!textAndHtml || !allowFormatChange)
+            {
+                throw new GuideImportException(ImportIssue.FormatChanged,
+                    $"The saved copy is a {ImportPresentation.FormatLabel(guide.Format)} guide and the new one is " +
+                    $"{ImportPresentation.FormatLabel(manifest.Format)}. Replacing it loses your place and bookmarks.");
+            }
+            clearPlace = true;
+        }
+        if (string.Equals(manifest.Fingerprint, guide.ContentSha256, StringComparison.Ordinal))
+        {
+            return GuideReplaceOutcome.UpToDate;
+        }
+        // A second operation claiming the guide would stop the library opening;
+        // the next start finishes the first.
+        if (journal.IsPending(guideId))
+        {
+            throw new GuideImportException(ImportIssue.SaveFailed, PendingMessage);
+        }
+        CheckSource(manifest.Source);
+        ImportPlan plan = await PlanAsync(manifest, token);
+        token.ThrowIfCancellationRequested();
+        Guid operationId = newId();
+        try
+        {
+            journal.PrepareReplace(operationId, guideId);
+        }
+        catch (SqliteException)
+        {
+            throw new GuideImportException(ImportIssue.SaveFailed, SaveFailedMessage);
+        }
+        try
+        {
+            Pass(ReplaceCheckpoint.Prepared, token);
+            string staged = paths.GetStagedGuideRoot(operationId, guideId);
+            string fingerprint = await CopyAsync(plan, manifest.Source, guideId, staged, progress, token);
+            if (!string.Equals(fingerprint, manifest.Fingerprint, StringComparison.Ordinal))
+            {
+                throw Changed();
+            }
+            Pass(ReplaceCheckpoint.Copied, token);
+            CheckSource(manifest.Source);
+            await VerifyAsync(manifest, plan, staged, token);
+            Pass(ReplaceCheckpoint.Verified, token);
+            // Past this point cancellation no longer applies.
+            progress?.Report(new ImportProgress(1, true));
+            string content = paths.GetGuideRoot(guideId);
+            string trash = paths.GetTrashedGuideRoot(operationId, guideId);
+            Directory.CreateDirectory(Path.GetDirectoryName(trash)!);
+            Directory.Move(content, trash);
+            replaceCheckpoint(ReplaceCheckpoint.OldMovedAside);
+            Directory.Move(staged, content);
+            replaceCheckpoint(ReplaceCheckpoint.NewMovedIn);
+            journal.PublishReplacement(
+                new ReplacedGuide(
+                    operationId, guideId, manifest.Format, plan.PrimaryRelativePath, fingerprint,
+                    plan.TotalBytes, manifest.Source.FileName, (manifest as TxtImportManifest)?.CodePage,
+                    source, clearPlace,
+                    plan.Html?.Manifest.Assets.Select(ToGuideAsset).ToArray() ?? [],
+                    plan.Html?.Manifest.Pages.Select(ToGuidePage).ToArray(),
+                    (manifest as MapImportManifest)?.PixelWidth,
+                    (manifest as MapImportManifest)?.PixelHeight),
+                () => replaceCheckpoint(ReplaceCheckpoint.InCommit));
+        }
+        catch (Exception error)
+        {
+            try
+            {
+                replaceRollBack(journal, operationId);
+            }
+            catch (Exception)
+            {
+                // The Prepared row stays, and the startup reconciler finishes the rollback.
+            }
+            if (error is OperationCanceledException or GuideImportException)
+            {
+                throw;
+            }
+            throw new GuideImportException(ImportIssue.SaveFailed, SaveFailedMessage);
+        }
+        // After the commit: a fault here leaves the Committed row for startup to finish.
+        try
+        {
+            replaceCheckpoint(ReplaceCheckpoint.Committed);
+            journal.FinishReplace(operationId);
+            replaceCheckpoint(ReplaceCheckpoint.Finished);
+        }
+        catch (Exception)
+        {
+            // The replacement happened; the next start deletes the old copy.
+        }
+        return GuideReplaceOutcome.Replaced;
+    }
+
+    private void Pass(ReplaceCheckpoint point, CancellationToken token)
+    {
+        replaceCheckpoint(point);
+        token.ThrowIfCancellationRequested();
     }
 
     private void Pass(ImportCheckpoint point, CancellationToken token)

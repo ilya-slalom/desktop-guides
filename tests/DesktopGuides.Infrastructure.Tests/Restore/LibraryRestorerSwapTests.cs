@@ -34,7 +34,7 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
     public async Task AVersionFiveBackupRestoresAndMigrates()
     {
         string backup = fixture.RewriteDatabase(
-            RestoreFixture.GuidesBeforeVersionEight() + RestoreFixture.GuideAssetsBeforeVersionSeven() + RestoreFixture.ReaderPreferencesBeforeVersionSix() + " PRAGMA user_version = 5;",
+            RestoreFixture.SourcesBeforeVersionNine() + RestoreFixture.GuidesBeforeVersionEight() + RestoreFixture.GuideAssetsBeforeVersionSeven() + RestoreFixture.ReaderPreferencesBeforeVersionSix() + " PRAGMA user_version = 5;",
             manifest => manifest with { SchemaVersion = 5 });
         LibraryRestoreStage stage = await fixture.StageAsync(backup);
 
@@ -52,7 +52,7 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
     public async Task AVersionFourBackupRestoresAndMigrates()
     {
         string backup = fixture.RewriteDatabase(
-            RestoreFixture.GuidesBeforeVersionEight() + RestoreFixture.GuideAssetsBeforeVersionSeven() + RestoreFixture.ReaderPreferencesBeforeVersionSix() + " DROP TABLE Bookmarks; PRAGMA user_version = 4;",
+            RestoreFixture.SourcesBeforeVersionNine() + RestoreFixture.GuidesBeforeVersionEight() + RestoreFixture.GuideAssetsBeforeVersionSeven() + RestoreFixture.ReaderPreferencesBeforeVersionSix() + " DROP TABLE Bookmarks; PRAGMA user_version = 4;",
             manifest => manifest with { SchemaVersion = 4 });
         LibraryRestoreStage stage = await fixture.StageAsync(backup);
 
@@ -308,12 +308,32 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
         Assert.Equal(bytes, File.ReadAllBytes(withMap.Target.Paths.GetPlannedGuideFile(map, "map.png")));
     }
 
+    // Review Focus 3: a backup from before schema 9 restores and migrates,
+    // with no sources and no Steam IDs.
+    [Fact]
+    public async Task AVersionEightBackupRestores()
+    {
+        string backup = fixture.RewriteDatabase(
+            RestoreFixture.SourcesBeforeVersionNine() + " PRAGMA user_version = 8;",
+            manifest => manifest with { SchemaVersion = 8 });
+        LibraryRestoreStage stage = await fixture.StageAsync(backup);
+
+        await fixture.Restorer().ReplaceAsync(stage, CancellationToken.None);
+        await fixture.Target.RestartAsync();
+
+        Assert.Equal("9", fixture.Target.Scalar("PRAGMA user_version"));
+        Assert.Equal("1", fixture.Target.Scalar(
+            $"SELECT COUNT(*) FROM Guides WHERE Id = '{fixture.Source.HtmlGuide:N}'"));
+        Assert.Equal("0", fixture.Target.Scalar("SELECT COUNT(*) FROM GuideSources"));
+        Assert.Equal("0", fixture.Target.Scalar("SELECT COUNT(*) FROM GameSteamApps"));
+    }
+
     // A backup from before schema 8 restores, and migration keeps its guides.
     [Fact]
     public async Task AVersionSevenBackupRestores()
     {
         string backup = fixture.RewriteDatabase(
-            RestoreFixture.GuidesBeforeVersionEight() + " PRAGMA user_version = 7;",
+            RestoreFixture.SourcesBeforeVersionNine() + RestoreFixture.GuidesBeforeVersionEight() + " PRAGMA user_version = 7;",
             manifest => manifest with { SchemaVersion = 7 });
         LibraryRestoreStage stage = await fixture.StageAsync(backup);
 
@@ -330,7 +350,7 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
     public async Task AVersionSixBackupRestoresWithOnePagePerHtmlGuide()
     {
         string backup = fixture.RewriteDatabase(
-            RestoreFixture.GuidesBeforeVersionEight() + RestoreFixture.GuideAssetsBeforeVersionSeven() + " PRAGMA user_version = 6;",
+            RestoreFixture.SourcesBeforeVersionNine() + RestoreFixture.GuidesBeforeVersionEight() + RestoreFixture.GuideAssetsBeforeVersionSeven() + " PRAGMA user_version = 6;",
             manifest => manifest with { SchemaVersion = 6 });
         LibraryRestoreStage stage = await fixture.StageAsync(backup);
 

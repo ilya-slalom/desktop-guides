@@ -1,6 +1,8 @@
 # P3 technical design: guides from supported online sources
 
 Status: approved in conversation, 20 October 2026.
+PR 2 (source fields and saving a guide again) in review (#146); see the
+[PR 2 verification record](#pr-2-verification-record).
 It covers S22 (T22.1, T22.2, TR22.1, TR22.2), the only story in P3.
 
 Related documents:
@@ -386,3 +388,26 @@ PRs in order, each with its own plan:
 | T22.2 | sections 5.1–5.7 |
 | TR22.1 | sections 5.5 and 5.8; failure tests in 5.9 |
 | TR22.2 | sections 5.1 and 5.2; the offline-read E2E in 5.9 |
+
+## PR 2 verification record
+
+[#146](https://github.com/ilya-slalom/desktop-guides/pull/146), following
+[the PR 2 plan](p3/s22-source-fields-plan.md), checked on 20 October 2026:
+
+- **Commits:**
+  - `4fd38a2`: the Core source record;
+  - `2479bd3`: schema 9 and source rows;
+  - `05c1cf7`: saving again in place;
+  - `9fd123d`: failure safety and startup recovery;
+  - `347422e`: IGDB's Steam app ID;
+  - `a4fe8c9`: the review fix, which refuses a replacement while another operation claims the guide.
+- **Suites on pcsx2-win:** Core.Tests 1522/1522, Infrastructure.Tests 949/949. The Release x64 build adds no new warnings.
+- **The plan's Review Focus tests:**
+  1. `AnInterruptedReplacementRollsBackOnTheNextStart`, over six checkpoints, with `ACrashAfterTheCommitKeepsTheNewCopy` for the two after the commit;
+  2. `APlaceOnARemovedPageDoesNotFailTheOpen`;
+  3. `AVersionEightBackupRestores`;
+  4. `RemovingAGuideOrGameRemovesItsSourceRows`;
+  5. `TheSameItemInAnotherGameIsNotReplaced`.
+- **Review:** a fresh whole-branch review found one Important issue. A second replacement while a first one's clean-up was still pending would leave two operations claiming the guide, and startup would then refuse the library. It's fixed and pinned by `ALeftoverOperationOnTheGuideRefusesASecondReplacement`. Six Minor findings are deferred, mostly test strength.
+- **CI:** run [39399887408](https://github.com/ilya-slalom/desktop-guides/actions/runs/39399887408) passed every job, including all installed groups.
+- **For PR 3:** an HTML place survives a re-save only if its page keeps the same document path, so captured pages need stable paths across saves.

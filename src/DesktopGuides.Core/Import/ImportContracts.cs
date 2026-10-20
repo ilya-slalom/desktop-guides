@@ -57,8 +57,11 @@ public enum ImportIssue
 {
     Missing, Unsupported, Empty, TooLarge, Unreadable, Encrypted,
     UnsupportedEncoding, Changed, NotEnoughSpace, SaveFailed, Duplicate,
-    PasswordIncorrect,
+    PasswordIncorrect, FormatChanged,
 }
+
+/// <summary>S22: saving a guide again either found it unchanged or replaced it.</summary>
+public enum GuideReplaceOutcome { UpToDate, Replaced }
 
 /// <summary>Copy progress from 0 to 1; Publishing is set once cancellation no longer applies.</summary>
 public readonly record struct ImportProgress(double Fraction, bool Publishing);

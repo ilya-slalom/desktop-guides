@@ -35,6 +35,7 @@ public sealed class ProviderGameImporter(
                 new ProviderGameLink(ProviderGameLink.Igdb, record.ExternalId, clock.GetUtcNow()),
                 record.Snapshot with { ArtworkSource = source },
                 stored?.RelativePath), token);
+            await StoreSteamAppIdAsync(game.Id, record.Hints.SteamAppId);
             return new ProviderAddResult(game, AlreadyInLibrary: false, ArtworkMissing: stored is null);
         }
         catch (DuplicateProviderLinkException duplicate)
@@ -79,7 +80,23 @@ public sealed class ProviderGameImporter(
             throw;
         }
         if (added is not null && current.ArtworkRelativePath is { } previous) store.Delete(previous);
+        await StoreSteamAppIdAsync(gameId, record.Hints.SteamAppId);
         return new ProviderRefreshResult(updated, ArtworkMissing: path is null);
+    }
+
+    // S22: Steam guide search needs it. A missing ID keeps any stored one, and
+    // a failure to store it doesn't undo the add or refresh: the game page
+    // asks for the game's Steam URL instead.
+    private async Task StoreSteamAppIdAsync(Guid gameId, string? steamAppId)
+    {
+        if (steamAppId is null) return;
+        try
+        {
+            await repository.SetSteamAppIdAsync(gameId, steamAppId, CancellationToken.None);
+        }
+        catch (Exception error) when (error is not OutOfMemoryException)
+        {
+        }
     }
 
     private async Task<(StoredArtwork? Stored, string? Source)> StoreArtworkAsync(
