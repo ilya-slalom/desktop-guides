@@ -20,30 +20,36 @@ using Microsoft.Data.Sqlite;
 if (args.Length is 4 or 5 &&
     args[0] is "hold-write-lock" or "hold-read-lock")
 {
+    if (!OperatingSystem.IsWindows())
+    {
+        Console.Error.WriteLine("Database locks are held on Windows only.");
+        return 2;
+    }
     ManagedPathResolver lockPaths = new(args[1]);
+    bool writeLock = args[0] == "hold-write-lock";
     using SqliteConnection lockConnection = new(new SqliteConnectionStringBuilder
     {
         DataSource = lockPaths.DatabasePath,
         Mode = SqliteOpenMode.ReadWrite,
         Pooling = false
     }.ToString());
-    lockConnection.Open();
     using SqliteCommand lockCommand = lockConnection.CreateCommand();
-    bool writeLock = args[0] == "hold-write-lock";
+    // #94: the app holds a WAL connection while open, so EXCLUSIVE locking
+    // mode can't be had. Holding SQLite's PENDING byte instead stops every
+    // new connection taking its SHARED lock: the app's reads and writes
+    // wait in SQLITE_BUSY, as they did behind the exclusive lock.
+    const long PendingByte = 0x40000000;
+    using FileStream? readBlock = writeLock ? null : new FileStream(
+        lockPaths.DatabasePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete);
     if (writeLock)
     {
+        lockConnection.Open();
         lockCommand.CommandText = "BEGIN IMMEDIATE";
         lockCommand.ExecuteNonQuery();
     }
     else
     {
-        lockCommand.CommandText = "PRAGMA locking_mode=EXCLUSIVE";
-        if (lockCommand.ExecuteScalar() is not string mode || mode != "exclusive")
-        {
-            throw new InvalidOperationException("Could not enable exclusive read lock.");
-        }
-        lockCommand.CommandText = "SELECT COUNT(*) FROM Games";
-        _ = lockCommand.ExecuteScalar();
+        readBlock!.Lock(PendingByte, 1);
     }
     try
     {
@@ -67,6 +73,10 @@ if (args.Length is 4 or 5 &&
         {
             lockCommand.CommandText = "ROLLBACK";
             lockCommand.ExecuteNonQuery();
+        }
+        else
+        {
+            readBlock!.Unlock(PendingByte, 1);
         }
     }
     return 0;

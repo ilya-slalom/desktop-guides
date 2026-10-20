@@ -42,14 +42,23 @@ internal sealed class RestoreFixture : IAsyncDisposable
         return new RestoreFixture(source, await RemovalLibrary.CreateAsync(), result.Path);
     }
 
+    // #94: the app closes its repository before it swaps a library in, and
+    // an open one now holds the database; so does the target's here.
     public LibraryRestorer Restorer(
-        Action<RestoreCheckpoint>? checkpoint = null, Func<string, long>? freeBytes = null) =>
+        Action<RestoreCheckpoint>? checkpoint = null, Func<string, long>? freeBytes = null)
+    {
+        Target.Repository.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        return Stager(checkpoint, freeBytes);
+    }
+
+    // Staging only reads the live library, which the app keeps open meanwhile.
+    private LibraryRestorer Stager(Action<RestoreCheckpoint>? checkpoint, Func<string, long>? freeBytes) =>
         new(Target.Paths, checkpoint ?? (_ => { }), freeBytes);
 
     public Task<LibraryRestoreStage> StageAsync(
         string? backup = null, Action<RestoreCheckpoint>? checkpoint = null,
         Func<string, long>? freeBytes = null, CancellationToken token = default) =>
-        Restorer(checkpoint, freeBytes).StageAsync(backup ?? Backup, null, token);
+        Stager(checkpoint, freeBytes).StageAsync(backup ?? Backup, null, token);
 
     /// <summary>Every live entry except staging; a missing library reads as one entry.</summary>
     public IReadOnlyDictionary<string, string> LiveEntries()
@@ -70,7 +79,13 @@ internal sealed class RestoreFixture : IAsyncDisposable
         Directory.Delete(Target.Paths.LibraryRoot, recursive: true);
     }
 
-    public Task<Guid> AddPriorGameAsync() => Target.AddGameAsync("Prior Game");
+    /// <summary>Adds a game, then closes the target as the app does before a restore.</summary>
+    public async Task<Guid> AddPriorGameAsync()
+    {
+        Guid id = await Target.AddGameAsync("Prior Game");
+        await Target.Repository.DisposeAsync();
+        return id;
+    }
 
     public string MarkerPath => Path.Combine(Target.Paths.DataRoot, "restore.marker");
 

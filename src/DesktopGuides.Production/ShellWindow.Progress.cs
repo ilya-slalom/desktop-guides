@@ -22,6 +22,7 @@ public sealed partial class ShellWindow
     // overwrite where the failed write was stuck.
     private int diagnosedFailures;
     private ProgressFailureContext? failureContext;
+    private (ProgressCounts Counts, ProgressFailure? LastFailure)? writtenCounts;
 
     private void StartProgress(IReadingLocationStore store)
     {
@@ -46,16 +47,26 @@ public sealed partial class ShellWindow
         string path = Path.Combine(folder, $"progress-{Environment.ProcessId}.json");
         lock (progressCountsFile)
         {
+            writtenCounts = (counts, lastFailure);
             if (counts.Failures != diagnosedFailures)
             {
                 diagnosedFailures = counts.Failures;
-                RepositoryWriteTiming? write = repository?.LastWriteTiming;
+                Func<RepositoryWriteTiming>? failed = repository?.LastWrite;
+                RepositoryWriteTiming? write = failed?.Invoke();
                 failureContext = new ProgressFailureContext(
                     write?.GateWaitMs,
                     write?.QueueWaitMs,
                     write?.WorkMs,
+                    write?.ValidateMs,
+                    write?.OpenMs,
+                    write?.PragmaMs,
+                    null,
                     ThreadPool.ThreadCount,
                     ThreadPool.PendingWorkItemCount);
+                if (failed is not null && write?.WorkMs < 0)
+                {
+                    _ = RecordWhenFailedWriteFinishesAsync(failed, failureContext);
+                }
             }
             try
             {
@@ -81,6 +92,27 @@ public sealed partial class ShellWindow
             {
             }
         }
+    }
+
+    // #94: a timed-out write runs on; how long it took tells a lock wait
+    // (up to SQLite's 30 s timeout) from a brief stall. -1: still running at 40 s.
+    private async Task RecordWhenFailedWriteFinishesAsync(
+        Func<RepositoryWriteTiming> failed, ProgressFailureContext context)
+    {
+        long finished = -1;
+        for (int poll = 0; poll < 160 && finished < 0; poll++)
+        {
+            await Task.Delay(250).ConfigureAwait(false);
+            finished = failed().WorkMs;
+        }
+        (ProgressCounts Counts, ProgressFailure? LastFailure) latest;
+        lock (progressCountsFile)
+        {
+            if (!ReferenceEquals(failureContext, context) || writtenCounts is null) return;
+            failureContext = context with { FinishedWorkMs = finished };
+            latest = writtenCounts.Value;
+        }
+        WriteProgressCountsForTest(latest.Counts, latest.LastFailure);
     }
 
     // Saves an unsaved place while the session is still alive. Never throws.
