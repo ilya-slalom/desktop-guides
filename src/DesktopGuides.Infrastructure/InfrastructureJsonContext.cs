@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using DesktopGuides.Core.Providers;
+using DesktopGuides.Infrastructure.Online;
 using DesktopGuides.Infrastructure.Providers;
 using DesktopGuides.Infrastructure.Storage;
 
@@ -14,4 +15,5 @@ namespace DesktopGuides.Infrastructure;
 [JsonSerializable(typeof(JsonObject))]
 [JsonSerializable(typeof(FixtureProviderHandler.FixtureManifest))]
 [JsonSerializable(typeof(List<FixtureProviderHandler.UnmatchedRequest>))]
+[JsonSerializable(typeof(CaptureFile))]
 internal sealed partial class InfrastructureJsonContext : JsonSerializerContext;
