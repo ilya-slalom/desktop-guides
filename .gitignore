@@ -10,3 +10,4 @@ docs/p0/traces/
 *.user
 *.pfx
 __pycache__/
+.superpowers/
