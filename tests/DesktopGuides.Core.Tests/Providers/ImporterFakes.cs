@@ -57,8 +57,14 @@ internal sealed class FakeRepository : ILibraryRepository
     public Task<IReadOnlySet<string>> ListMapHashesAsync(CancellationToken token = default) => throw new NotSupportedException();
     public Task<GuideSource?> GetGuideSourceAsync(Guid guideId, CancellationToken token = default) => throw new NotSupportedException();
     public Task<IReadOnlyDictionary<Guid, GuideSource>> ListGuideSourcesAsync(Guid gameId, CancellationToken token = default) => throw new NotSupportedException();
-    public Task<string?> GetSteamAppIdAsync(Guid gameId, CancellationToken token = default) => throw new NotSupportedException();
-    public Task SetSteamAppIdAsync(Guid gameId, string? appId, CancellationToken token = default) => throw new NotSupportedException();
+    public Dictionary<Guid, string> SteamAppIds { get; } = [];
+    public Task<string?> GetSteamAppIdAsync(Guid gameId, CancellationToken token = default) =>
+        Task.FromResult(SteamAppIds.TryGetValue(gameId, out string? id) ? id : null);
+    public Task SetSteamAppIdAsync(Guid gameId, string? appId, CancellationToken token = default)
+    {
+        if (appId is null) SteamAppIds.Remove(gameId); else SteamAppIds[gameId] = appId;
+        return Task.CompletedTask;
+    }
     public Task<IReadOnlyList<LibraryGameSummary>> ListGameSummariesAsync(CancellationToken token = default) => throw new NotSupportedException();
     public Task<IReadOnlyList<GuideSummary>> ListGuideSummariesAsync(Guid gameId, CancellationToken token = default) => throw new NotSupportedException();
     public Task<Guide?> GetGuideAsync(Guid guideId, CancellationToken token = default) => throw new NotSupportedException();

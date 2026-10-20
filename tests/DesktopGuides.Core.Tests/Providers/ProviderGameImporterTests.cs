@@ -16,14 +16,49 @@ public sealed class ProviderGameImporterTests
         public override DateTimeOffset GetUtcNow() => Now;
     }
 
-    private static ProviderGameRecord Record(params string[] platforms) => new("70", "Half-Life",
+    private static ProviderGameRecord Record(params string[] platforms) => WithSteamId("70", platforms);
+
+    private static ProviderGameRecord WithSteamId(string? steamAppId, params string[] platforms) => new("70", "Half-Life",
         new GameMetadataSnapshot(GameMetadataSnapshot.CurrentSchemaVersion, "Summary", new DateOnly(1998, 11, 19),
             ["Shooter"], ["Valve"], ["Sierra"], platforms, "https://www.igdb.com/games/half-life", GameTypeTag.MainGame),
-        new ArtworkHints("Half-Life", "70", "co1"));
+        new ArtworkHints("Half-Life", steamAppId, "co1"));
+
+    // S22: Steam guide search needs the game's Steam app ID.
+    [Fact]
+    public async Task AddingAGameStoresItsSteamAppId()
+    {
+        Harness h = new();
+        ProviderAddResult result = await h.Create().AddAsync("70", default);
+        Assert.Equal("70", await h.Repository.GetSteamAppIdAsync(result.Game.Id));
+    }
+
+    [Fact]
+    public async Task ARefreshWithoutASteamIdKeepsTheStoredOne()
+    {
+        Harness h = new();
+        Game game = (await h.Create().AddAsync("70", default)).Game;
+        Harness later = new() { Repository = h.Repository, Provider = new(WithSteamId(null, "PC (Windows)")) };
+
+        await later.Create().RefreshAsync(game.Id, default);
+
+        Assert.Equal("70", await h.Repository.GetSteamAppIdAsync(game.Id));
+    }
+
+    [Fact]
+    public async Task ARefreshReplacesAChangedSteamId()
+    {
+        Harness h = new();
+        Game game = (await h.Create().AddAsync("70", default)).Game;
+        Harness later = new() { Repository = h.Repository, Provider = new(WithSteamId("1091500", "PC (Windows)")) };
+
+        await later.Create().RefreshAsync(game.Id, default);
+
+        Assert.Equal("1091500", await h.Repository.GetSteamAppIdAsync(game.Id));
+    }
 
     private sealed class Harness
     {
-        public FakeRepository Repository { get; } = new();
+        public FakeRepository Repository { get; init; } = new();
         public FakeStore Store { get; } = new();
         public FakeProvider Provider { get; init; } = new(Record("PC (Windows)"));
         public Dictionary<Uri, byte[]> Images { get; } = new() { [Grid.Url] = [1, 2, 3], [Cover.Url] = [4, 5, 6] };
