@@ -21,6 +21,9 @@ internal interface IImportJournal
     // S22: saving a guide again.
     Guide? GetGuide(Guid guideId);
 
+    /// <summary>True while a file operation still claims the guide.</summary>
+    bool IsPending(Guid guideId);
+
     /// <summary>Commits a Prepared ReplaceGuide row owning the stage, the content and the trash.</summary>
     void PrepareReplace(Guid operationId, Guid guideId);
 

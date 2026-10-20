@@ -324,4 +324,24 @@ public sealed class GuideReplaceTests : IAsyncLifetime
         Assert.Equal(ImportIssue.NotEnoughSpace, error.Issue);
         SnapshotAssert.Unchanged(before, LibrarySnapshot.Capture(harness.Paths));
     }
+
+    // Final review: a second operation claiming the guide would stop the
+    // library opening, so a replacement waits for the first to be finished.
+    [Fact]
+    public async Task ALeftoverOperationOnTheGuideRefusesASecondReplacement()
+    {
+        Guid id = await SaveTextAsync("Chapter 1\nOld.\n");
+        ImportManifest first = await TextManifest("Chapter 1\nFirst.\n");
+        Assert.Equal(GuideReplaceOutcome.Replaced, await ReplaceAsync(id, first, publisher: harness.Publisher(
+            replaceCheckpoint: FaultFixture.FaultAt(ReplaceCheckpoint.Committed))));
+        Assert.Equal(1, harness.Count("FileOperations"));
+
+        GuideImportException refused = await Assert.ThrowsAsync<GuideImportException>(() =>
+            ReplaceAsync(id, harness.InspectAsync(WriteText("second.txt", "Chapter 1\nSecond.\n"), 437).Result));
+        Assert.Equal(ImportIssue.SaveFailed, refused.Issue);
+
+        await harness.RestartAsync();
+        Assert.Equal(first.Fingerprint, (await harness.Repository.GetGuideAsync(id))!.ContentSha256);
+        AssertNoOperationLeft();
+    }
 }

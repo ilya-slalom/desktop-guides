@@ -1407,6 +1407,12 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             return SqliteLibraryRepository.GetGuide(connection, guideId);
         }
 
+        public bool IsPending(Guid guideId)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            return FileOperationReconciler.ClaimsGuide(connection, guideId);
+        }
+
         public void PrepareReplace(Guid operationId, Guid guideId)
         {
             using SqliteConnection connection = owner.OpenConnection();

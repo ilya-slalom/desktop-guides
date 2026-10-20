@@ -30,6 +30,8 @@ public sealed class GuideImportPublisher
     private const string NoSpaceMessage = "There isn't enough free space to import this guide.";
     private const string SaveFailedMessage =
         "The guide couldn't be saved to your library. Nothing was changed.";
+    private const string PendingMessage =
+        "An earlier change to this guide is still being finished. Restart Desktop Guides, then save it again.";
     private const int BufferBytes = 81920;
 
     private readonly SqliteLibraryRepository repository;
@@ -208,6 +210,12 @@ public sealed class GuideImportPublisher
         if (string.Equals(manifest.Fingerprint, guide.ContentSha256, StringComparison.Ordinal))
         {
             return GuideReplaceOutcome.UpToDate;
+        }
+        // A second operation claiming the guide would stop the library opening;
+        // the next start finishes the first.
+        if (journal.IsPending(guideId))
+        {
+            throw new GuideImportException(ImportIssue.SaveFailed, PendingMessage);
         }
         CheckSource(manifest.Source);
         ImportPlan plan = await PlanAsync(manifest, token);
