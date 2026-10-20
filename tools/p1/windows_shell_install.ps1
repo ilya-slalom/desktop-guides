@@ -3583,8 +3583,15 @@ finally {
         # can still be writing to it.
         if ($portableDataOwned -and $tasksDrained -and
             $shellProcessesAfterStop.Count -eq 0) {
-            Remove-Item -LiteralPath $portableDataRoot -Recurse -Force `
-                -ErrorAction SilentlyContinue
+            # S22: WebView2 child processes can outlive a killed app for a
+            # few seconds and hold the online profile under the cache.
+            $removeDeadline = (Get-Date).AddSeconds(15)
+            do {
+                Remove-Item -LiteralPath $portableDataRoot -Recurse -Force `
+                    -ErrorAction SilentlyContinue
+                if (-not (Test-Path -LiteralPath $portableDataRoot)) { break }
+                Start-Sleep -Milliseconds 500
+            } while ((Get-Date) -lt $removeDeadline)
         }
         $report.portableDataStillPresent = $portableDataOwned -and
             (Test-Path -LiteralPath $portableDataRoot)
