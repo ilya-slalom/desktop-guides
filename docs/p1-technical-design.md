@@ -405,7 +405,7 @@ The recorded UI tasks were reviewed as one set:
 | T19.1–T19.2 | Keep bookmark list/navigation native and use `Segmented` for Original/Reflow. |
 | T21.2 | Select a Toolkit media control only after a chosen format proves a need; no generic media package is preselected. |
 | T22.2 | Evaluate `RichSuggestBox` for a provider that supports safe incremental suggestions; otherwise reuse T04.4 explicit search. |
-| T23.2, T24.1–T24.2 | Keep conflict, window, controller, and annotation UI unassigned until those interaction models are designed. |
+| T23.2, T24.1–T24.2 | Keep conflict, window, controller, and annotation UI unassigned until those interaction models are designed. Both stories are unscheduled since 20 October 2026. |
 
 `NavigationView` does not manage a back stack automatically. A shell
 navigation coordinator owns `Library`, `Game(gameId)`, `Reader(guideId)`, and

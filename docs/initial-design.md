@@ -64,10 +64,11 @@ matching every feature.
    [format survey](p2/format-survey.md), 17 October 2026). Add PDF text
    search only with a PDF engine that exposes text; the proposed MVP
    renderer exposes page images.
-3. **Collection and platform features:** supported online guide sources,
-   lawful offline capture, controller shortcuts, multi-window reading,
-   annotations, and optional device sync. Each online source
-   needs a separate terms, attribution, and failure-handling review.
+3. **Collection and platform features:** supported online guide sources
+   and lawful offline capture, in P3 (S22). Each online source needs a
+   separate terms, attribution, and failure-handling review. Controller
+   shortcuts, multi-window reading, annotations, and optional device sync
+   (S23, S24) are unscheduled after the final milestone (20 October 2026).
 
 ## 3. Key user flows and UI
 
