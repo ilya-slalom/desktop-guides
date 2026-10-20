@@ -53,18 +53,23 @@ public sealed partial class ShellWindow
             return;
         }
         crashesRecorded = true;
-        Application.Current.UnhandledException += (_, args) =>
+        void Record(string where, object? error)
         {
             try
             {
                 string folder = Path.Combine(root, "diagnostics");
                 Directory.CreateDirectory(folder);
-                File.WriteAllText(Path.Combine(folder, $"unhandled-{Environment.ProcessId}.txt"), args.Exception.ToString());
+                File.AppendAllText(Path.Combine(folder, $"unhandled-{Environment.ProcessId}.txt"),
+                    $"{DateTimeOffset.UtcNow:O} {where}{Environment.NewLine}{error}{Environment.NewLine}");
             }
             catch (Exception)
             {
             }
-        };
+        }
+        // XAML sees UI-thread exceptions; the others end the process through the AppDomain.
+        Application.Current.UnhandledException += (_, args) => Record("xaml", args.Exception);
+        AppDomain.CurrentDomain.UnhandledException += (_, args) => Record("appdomain", args.ExceptionObject);
+        TaskScheduler.UnobservedTaskException += (_, args) => Record("unobserved", args.Exception);
 #endif
     }
 
