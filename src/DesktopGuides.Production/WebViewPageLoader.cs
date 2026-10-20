@@ -86,8 +86,16 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
         }
     }
 
-    // The status of the navigation, or 0 when it timed out.
+    // The status of the navigation, or 0 when it timed out twice.
     private async Task<int> NavigateAsync(Uri url, CancellationToken token)
+    {
+        int status = await NavigateOnceAsync(url, token);
+        if (status != 0) return status;
+        Log($"{url} retrying after a timeout");
+        return await NavigateOnceAsync(url, token);
+    }
+
+    private async Task<int> NavigateOnceAsync(Uri url, CancellationToken token)
     {
         TaskCompletionSource<int> done = new(TaskCreationOptions.RunContinuationsAsynchronously);
         long started = Environment.TickCount64;

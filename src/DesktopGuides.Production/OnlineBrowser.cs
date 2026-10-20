@@ -80,8 +80,10 @@ internal sealed class OnlineBrowser : IAsyncDisposable
     {
         CoreWebView2Controller controller = await environment.CreateCoreWebView2ControllerAsync(
             CoreWebView2ControllerWindowReference.CreateFromWindowHandle((ulong)window));
-        controller.IsVisible = false;
-        controller.Bounds = new Windows.Foundation.Rect(0, 0, 1280, 2000);
+        // Visible to Chromium but outside the window, which clips it: a
+        // hidden renderer can be throttled until its navigation stalls.
+        controller.Bounds = new Windows.Foundation.Rect(-4000, 0, 1280, 2000);
+        controller.IsVisible = true;
         WebViewPageLoader loader = new(controller, loadLog);
         Configure(controller.CoreWebView2, visible: false, loader);
 #if !PUBLIC_LANE
