@@ -206,7 +206,7 @@ public sealed partial class ShellWindow
     }
 
     // After each page loads: is it a guide this app can save?
-    private async Task UpdateOnlineSaveAsync()
+    private async Task UpdateOnlineSaveAsync(bool keepStatus = false)
     {
         if (onlineBrowser?.CurrentUrl is not Uri url) return;
         if (!ReferenceEquals(FocusManager.GetFocusedElement(OnlineAddress.XamlRoot), OnlineAddress))
@@ -223,7 +223,10 @@ public sealed partial class ShellWindow
         }
         onlineReading = reading;
         OnlineSave.IsEnabled = reading is not null;
-        OnlineStatus.Text = reading is null ? "This page isn't a guide Desktop Guides can save." : "";
+        if (!keepStatus)
+        {
+            OnlineStatus.Text = reading is null ? "This page isn't a guide Desktop Guides can save." : "";
+        }
     }
 
     private bool FocusOnlineAddress() => OnlineAddress.Focus(FocusState.Keyboard);
@@ -317,7 +320,11 @@ public sealed partial class ShellWindow
             onlineCapture.Dispose();
             onlineCapture = null;
             OnlineProgressRow.Visibility = Visibility.Collapsed;
-            OnlineSave.IsEnabled = onlineReading is not null;
+            // A page that loaded during the capture wasn't read; read what's showing now,
+            // so Save never offers the guide just saved for another page.
+            onlineReading = null;
+            OnlineSave.IsEnabled = false;
+            if (onlineBrowser is not null) _ = UpdateOnlineSaveAsync(keepStatus: true);
         }
     }
 

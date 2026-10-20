@@ -1923,11 +1923,11 @@ function Invoke-OnlineMode([string] $mode, [string] $fixtures) {
         foreach ($gate in $gates) { $gate.Dispose() }
         $crash = Join-Path (Get-HtmlCacheRoot) "diagnostics\unhandled-$processId.txt"
         if (Test-Path -LiteralPath $crash) {
-            Copy-Item -LiteralPath $crash -Destination (Join-Path $ResultDirectory "$mode-unhandled.txt") -Force
+            Copy-Item -LiteralPath $crash -Destination (Join-Path $ResultDirectory "$mode-unhandled.log") -Force
         }
         $loads = Join-Path (Get-HtmlCacheRoot) "diagnostics\online-loads-$processId.txt"
         if (Test-Path -LiteralPath $loads) {
-            Copy-Item -LiteralPath $loads -Destination (Join-Path $ResultDirectory "$mode-loads.txt") -Force
+            Copy-Item -LiteralPath $loads -Destination (Join-Path $ResultDirectory "$mode-loads.log") -Force
         }
     }
 }
