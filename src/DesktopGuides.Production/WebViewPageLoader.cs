@@ -94,16 +94,18 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
         // Only this navigation's completion counts: a cancelled earlier one
         // can complete late, after a Cancel and a quick Resume.
         ulong? ours = null;
-        void Starting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args) => ours ??= args.NavigationId;
-        void Completed(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
+        // Kept as variables: C#/WinRT detaches a handler only by the same delegate instance.
+        Windows.Foundation.TypedEventHandler<CoreWebView2, CoreWebView2NavigationStartingEventArgs> starting =
+            (_, args) => ours ??= args.NavigationId;
+        Windows.Foundation.TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs> completed = (_, args) =>
         {
             Log($"{url} completed id={args.NavigationId} ours={ours} http={args.HttpStatusCode} success={args.IsSuccess} " +
                 $"error={args.WebErrorStatus} after={Environment.TickCount64 - started}ms");
             if (ours != args.NavigationId) return;
             done.TrySetResult(args.HttpStatusCode is > 0 ? args.HttpStatusCode : args.IsSuccess ? 200 : 0);
-        }
-        Core.NavigationStarting += Starting;
-        Core.NavigationCompleted += Completed;
+        };
+        Core.NavigationStarting += starting;
+        Core.NavigationCompleted += completed;
         try
         {
             Core.Navigate(url.AbsoluteUri);
@@ -119,11 +121,17 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
                 Core.Stop();
                 return 0;
             }
+            catch (OperationCanceledException)
+            {
+                // A cancelled capture leaves no navigation running behind it.
+                Core.Stop();
+                throw;
+            }
         }
         finally
         {
-            Core.NavigationStarting -= Starting;
-            Core.NavigationCompleted -= Completed;
+            Core.NavigationStarting -= starting;
+            Core.NavigationCompleted -= completed;
         }
     }
 

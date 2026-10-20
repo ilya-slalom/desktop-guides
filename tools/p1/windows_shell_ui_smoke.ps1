@@ -8030,11 +8030,13 @@ try {
             Go-Online $textFaq
             Wait-Save $true 'the text FAQ'
             Save-Online
+            Wait-Until { Find-VisibleName "This guide's notice limits copies" } 'the notice dialog'
             Invoke-Named 'Cancel'
             Wait-Until { -not (Find-VisibleName "This guide's notice limits copies") } 'the notice dialog to close'
             Start-Sleep -Seconds 2
             if ((Get-OnlineStatus) -like 'Saved*') { throw 'Cancelling the notice saved the guide.' }
             Save-Online
+            Wait-Until { Find-VisibleName "This guide's notice limits copies" } 'the notice dialog again'
             Invoke-Named 'Save for personal reading'
             Wait-OnlineStatus "Saved Example Quest Walkthrough to $game." 60
             # Review Focus 4 and 5: both read in the readers, which never reach the network.

@@ -215,17 +215,30 @@ public sealed partial class ShellWindow
         }
         if (OnlineSources.Find(url) is { } source) SelectOnlineSource(source);
         if (onlineCapture is not null) return;
-        GuidePageReading? reading = null;
-        if (OnlineSources.Find(url) is { } site && OnlineAdapters.TryGetValue(site.Site, out IGuideSourceAdapter? adapter))
-        {
-            string html = await onlineBrowser.GetHtmlAsync();
-            reading = adapter.Read(url, html);
-        }
+        GuidePageReading? reading = await ReadCurrentPageAsync();
         onlineReading = reading;
         OnlineSave.IsEnabled = reading is not null;
         if (!keepStatus)
         {
             OnlineStatus.Text = reading is null ? "This page isn't a guide Desktop Guides can save." : "";
+        }
+    }
+
+    private async Task<GuidePageReading?> ReadCurrentPageAsync()
+    {
+        if (onlineBrowser?.CurrentUrl is not Uri url || OnlineSources.Find(url) is not { } site ||
+            !OnlineAdapters.TryGetValue(site.Site, out IGuideSourceAdapter? adapter))
+        {
+            return null;
+        }
+        try
+        {
+            return adapter.Read(url, await onlineBrowser.GetHtmlAsync());
+        }
+        catch (Exception)
+        {
+            // A page that is mid-navigation or gone reads as not a guide.
+            return null;
         }
     }
 
@@ -241,7 +254,17 @@ public sealed partial class ShellWindow
     private async void OnlineSaveClicked(object sender, RoutedEventArgs args)
     {
         // One dialog at a time: a second click while one is open or closing does nothing.
-        if (onlineReading is not { } reading || onlineCapture is not null || DialogOpen()) return;
+        if (onlineCapture is not null || DialogOpen()) return;
+        // The page showing now, never one read earlier: a page that loaded
+        // as a capture ended may not have been read yet.
+        GuidePageReading? reading = await ReadCurrentPageAsync();
+        onlineReading = reading;
+        if (reading is null)
+        {
+            OnlineSave.IsEnabled = false;
+            OnlineStatus.Text = "This page isn't a guide Desktop Guides can save.";
+            return;
+        }
         if (NoticeRules.Classify(reading.Notice) == NoticeKind.Restrictive && !await ConfirmNoticeAsync(reading.Notice!))
         {
             return;
