@@ -21,7 +21,8 @@ accessibility record (T16.3) is part of the final milestone.
   story or technical enabler, `T` is an implementation task, and `TR` is a
   testable technical requirement. IDs are stable when stories are reordered.
 - **P0** is a reader and platform spike. **P1** is the first usable release.
-  **P2** adds reader depth, backup, and formats. **P3** adds connected features.
+  **P2** adds reader depth, backup, and formats. **P3** adds guides saved
+  from supported online sources (S22).
 - A story is ready for implementation when its dependencies and any spike
   decisions are resolved. It is done when its acceptance checks pass, its
   technical requirements have evidence, and relevant changes are reviewed.
@@ -671,7 +672,7 @@ locator, offline check, and failure behavior before it is marked supported.
   ones it links import with it. The app doesn't substitute styles of its
   own for missing ones.
 
-## P3 — connected and optional features
+## P3 — guides from supported online sources
 
 ### S22 — Discover and save guides from supported sources
 
@@ -692,42 +693,11 @@ readable offline.
 - **TR22.2** Online browsing and previously imported offline reading remain
   separate capabilities.
 
-### S23 — Sync library and progress across devices
-
-**Story:** As a reader, I want optional sync without losing locally stored
-guides or reading positions. **Depends on:** S20.
-
-**Acceptance:** Sync can be disabled; offline edits remain available locally;
-conflicting positions and guide revisions have a documented, testable
-resolution rule.
-
-- **T23.1** Choose transport and identity model; document privacy and storage
-  costs before implementation.
-- **T23.2** Define content IDs, change tracking, conflict UI/rules, and
-  backup-based recovery tests.
-- **TR23.1** Sync is opt-in and cannot silently replace a newer local guide
-  or completion state with stale remote data.
-
-### S24 — Expand desktop reading workflows
-
-**Story:** As a reader, I want optional controller navigation, second-window
-reading, and map annotations when they improve play alongside a game.
-**Depends on:** S11, S12, S21.
-
-**Acceptance:** Each feature preserves independent guide positions, remains
-keyboard-accessible, and can be disabled without affecting the base reader.
-
-- **T24.1** Prototype controller mapping and multiple-window state ownership.
-- **T24.2** Prototype annotations as separate overlays stored apart from
-  imported originals.
-- **TR24.1** Two windows cannot overwrite one another's saved position without
-  an explicit last-active-window rule.
-- **TR24.2** Annotations never modify imported guide files.
-
 ## Final milestone — accessibility audit and Store submission
 
 Decided 12 October 2026: the accessibility audit and the Microsoft Store
-submission run once, after the last currently planned phase (P3), so they
+submission run once, after the last currently planned phase (P3, which
+holds only S22 since 20 October 2026), so they
 apply to every feature without repeat passes. An app that is still gaining
 major features is also unlikely to pass Store review. P1 keeps T16.1's
 keyboard work; its release claims R9 only to that extent.
@@ -789,7 +759,45 @@ T16.1 and T10.1–T10.3 verified.
 
 ## After the final milestone
 
-Candidates with no phase, added when needed:
+Candidates with no phase, added when needed.
+
+S23 and S24 moved out of P3 on 20 October 2026 (the user's choice): P3
+holds only S22. They keep their IDs, stories and requirements below, and
+each would need its own design before it's scheduled.
+
+### S23 — Sync library and progress across devices
+
+**Story:** As a reader, I want optional sync without losing locally stored
+guides or reading positions. **Depends on:** S20.
+
+**Acceptance:** Sync can be disabled; offline edits remain available locally;
+conflicting positions and guide revisions have a documented, testable
+resolution rule.
+
+- **T23.1** Choose transport and identity model; document privacy and storage
+  costs before implementation.
+- **T23.2** Define content IDs, change tracking, conflict UI/rules, and
+  backup-based recovery tests.
+- **TR23.1** Sync is opt-in and cannot silently replace a newer local guide
+  or completion state with stale remote data.
+
+### S24 — Expand desktop reading workflows
+
+**Story:** As a reader, I want optional controller navigation, second-window
+reading, and map annotations when they improve play alongside a game.
+**Depends on:** S11, S12, S21.
+
+**Acceptance:** Each feature preserves independent guide positions, remains
+keyboard-accessible, and can be disabled without affecting the base reader.
+
+- **T24.1** Prototype controller mapping and multiple-window state ownership.
+- **T24.2** Prototype annotations as separate overlays stored apart from
+  imported originals.
+- **TR24.1** Two windows cannot overwrite one another's saved position without
+  an explicit last-active-window rule.
+- **TR24.2** Annotations never modify imported guide files.
+
+Other candidates:
 
 - **More guide formats,** from the [format survey](p2/format-survey.md):
   MHTML (a page saved as one file), CBZ, EPUB and Markdown, in the
