@@ -8027,17 +8027,19 @@ try {
             Wait-Save $true 'the text FAQ'
             Save-Online
             Invoke-Named 'Cancel'
+            Wait-Until { -not (Find-VisibleName "This guide's notice limits copies") } 'the notice dialog to close'
             Start-Sleep -Seconds 2
             if ((Get-OnlineStatus) -like 'Saved*') { throw 'Cancelling the notice saved the guide.' }
             Save-Online
             Invoke-Named 'Save for personal reading'
             Wait-OnlineStatus "Saved Example Quest Walkthrough to $game." 60
             # Review Focus 4 and 5: both read in the readers, which never reach the network.
-            Press-Back
+            # The title bar's Back: Alt+Left inside the web page is the page's own back.
+            Go-Back
             [void](Wait-Name 'GameHeading' $game)
             Open-GuideFromGame $sagaTitle
             [void](Wait-Status 'Guide ready.')
-            Press-Back
+            Go-Back
             [void](Wait-Name 'GameHeading' $game)
             Open-GuideFromGame 'Example Quest Walkthrough'
             [void](Wait-Status 'Guide ready.')
@@ -8069,7 +8071,7 @@ try {
             Wait-Save $true 'the guide'
             Save-Online
             Wait-OnlineStatus "Saving page 2 of 3$([char]0x2026)" 60
-            Press-Back
+            Go-Back
             [void](Wait-Name 'GameHeading' $game)
             Invoke-Element (Wait-EnabledById 'FindOnlineButton')
             [void](Wait-Name 'OnlineHeading' "Find online: $game")

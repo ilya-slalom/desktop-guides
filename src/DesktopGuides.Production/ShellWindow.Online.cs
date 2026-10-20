@@ -209,7 +209,8 @@ public sealed partial class ShellWindow
 
     private async void OnlineSaveClicked(object sender, RoutedEventArgs args)
     {
-        if (onlineReading is not { } reading || onlineCapture is not null) return;
+        // One dialog at a time: a second click while one is open or closing does nothing.
+        if (onlineReading is not { } reading || onlineCapture is not null || DialogOpen()) return;
         if (NoticeRules.Classify(reading.Notice) == NoticeKind.Restrictive && !await ConfirmNoticeAsync(reading.Notice!))
         {
             return;
@@ -237,7 +238,15 @@ public sealed partial class ShellWindow
             DefaultButton = ContentDialogButton.Close,
         };
         DialogSurface.Apply(dialog, EffectiveMaterial, DialogTheme);
-        return await dialog.ShowAsync() == ContentDialogResult.Primary;
+        try
+        {
+            return await dialog.ShowAsync() == ContentDialogResult.Primary;
+        }
+        catch (Exception error) when (error is System.Runtime.InteropServices.COMException or InvalidOperationException)
+        {
+            // Another dialog is still closing; nothing is saved.
+            return false;
+        }
     }
 
     private async Task RunCaptureAsync(CaptureDraft draft)
