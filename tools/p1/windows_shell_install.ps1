@@ -31,6 +31,8 @@ param(
     # T18.1: in-guide search.
     [switch] $NavigationOnly,
     [switch] $MapsOnly,
+    # S22: Find online against fixture pages; no live site is loaded.
+    [switch] $OnlineOnly,
 
     # Or name several groups, as CI shards do. They still run in the order
     # listed below. Don't combine with an *Only switch.
@@ -95,6 +97,7 @@ $scenarioGroups = [ordered]@{
     'workflow' = $WorkflowOnly.IsPresent
     'navigation' = $NavigationOnly.IsPresent
     'maps' = $MapsOnly.IsPresent
+    'online' = $OnlineOnly.IsPresent
     'rc' = $RcOnly.IsPresent
 }
 $selectedGroups = @($scenarioGroups.Keys | Where-Object { $scenarioGroups[$_] })
@@ -1901,6 +1904,82 @@ function Run-NavigationScenarios {
 # T21.2 PR b: a map zooms, pans and reopens at its view; a strip over 16384
 # pixels wide displays; neither counts as reading; removing a map removes
 # its cache.
+# S22: Find online. Both in-app browsers answer from the fixture manifest
+# while the OnlineFixtures gate is open, so nothing reaches a live site.
+function Invoke-OnlineMode([string] $mode, [string] $fixtures) {
+    Start-InstalledShell
+    $processId = $report.launchedProcessId
+    $gates = @(
+        foreach ($name in @('OnlineFixtures', 'ExternalLaunch')) {
+            [System.Threading.EventWaitHandle]::new(
+                $false, [System.Threading.EventResetMode]::ManualReset,
+                "Local\$eventPrefix.$name.$processId")
+        })
+    try {
+        $report[$mode] = Run-ShellSmoke $mode -ResultName $mode -AppDataRoot $dataRoot -AppCacheRoot (Get-HtmlCacheRoot)
+        Close-InstalledShell
+    }
+    finally {
+        foreach ($gate in $gates) { $gate.Dispose() }
+    }
+}
+
+function Set-OnlineRoute([string] $manifest, [string] $url, [string] $file, [int] $status = 200) {
+    $json = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
+    $route = @($json.routes | Where-Object { $_.url -eq $url })[0]
+    if (-not $route) { throw "The online manifest has no route for $url." }
+    $route.file = $file
+    $route.status = $status
+    [System.IO.File]::WriteAllText($manifest, ($json | ConvertTo-Json -Depth 5))
+}
+
+function Run-OnlineScenarios([string] $fixtureRoot) {
+    $fixtures = Join-Path $dataRoot 'test\online'
+    Remove-Item -LiteralPath $fixtures -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Force $fixtures | Out-Null
+    Copy-Item -Path (Join-Path $fixtureRoot '*') -Destination $fixtures -Recurse -Force
+    $manifest = Join-Path $fixtures 'manifest.json'
+    $saga = 'https://gamefaqs.gamespot.com/ps5/100002-example-saga/faqs/78736/'
+    Invoke-ShellSeed @('seed-online', $dataRoot) | Out-Null
+    $cacheRoot = Get-HtmlCacheRoot
+
+    Invoke-OnlineMode 'online-browse' $fixtures
+    Invoke-OnlineMode 'online-save' $fixtures
+    $state = Invoke-ShellSeed @('describe-online', $dataRoot, $cacheRoot) | ConvertFrom-Json
+    $report.onlineSaved = $state
+    $html = @($state.Guides | Where-Object { $_.Format -eq 'Html' })
+    $text = @($state.Guides | Where-Object { $_.Format -eq 'Txt' })
+    if ($html.Count -ne 1 -or $html[0].Pages -ne 3 -or $html[0].Images -lt 1) {
+        throw "Expected one saved HTML guide with 3 pages and its image; got $($state | ConvertTo-Json -Depth 4 -Compress)."
+    }
+    if ($text.Count -ne 1 -or $text[0].Site -ne 'GameFaqs') { throw 'Expected one saved text FAQ.' }
+    if ($null -ne $html[0].CapturedPages) { throw 'The complete save was recorded as partial.' }
+
+    # Saving again after page 2 changed replaces the guide in place.
+    Set-OnlineRoute $manifest ($saga + 'cairn') 'online/html-slug-cairn-v2.html'
+    Invoke-OnlineMode 'online-resave' $fixtures
+    $after = Invoke-ShellSeed @('describe-online', $dataRoot, $cacheRoot) | ConvertFrom-Json
+    $resaved = @($after.Guides | Where-Object { $_.Format -eq 'Html' })
+    if ($resaved.Count -ne 1 -or $resaved[0].Id -ne $html[0].Id -or $resaved[0].ContentSha256 -eq $html[0].ContentSha256) {
+        throw 'Saving again did not replace the guide in place.'
+    }
+
+    # Review Focus 1: a challenge on page 2 pauses there; the smoke restores it and resumes.
+    Get-ChildItem -LiteralPath $dataRoot -Force | Where-Object { $_.Name -ne 'test' } | Remove-Item -Recurse -Force
+    Invoke-ShellSeed @('seed-online', $dataRoot) | Out-Null
+    Set-OnlineRoute $manifest ($saga + 'cairn') 'online/challenge.html'
+    Invoke-OnlineMode 'online-pause' $fixtures
+    # Review Focus 2: leaving mid-save keeps the draft, which the next visit resumes.
+    Get-ChildItem -LiteralPath $dataRoot -Force | Where-Object { $_.Name -ne 'test' } | Remove-Item -Recurse -Force
+    Invoke-ShellSeed @('seed-online', $dataRoot) | Out-Null
+    Set-OnlineRoute $manifest ($saga + 'cairn') 'gamefaqs/html-slug-cairn.html'
+    Invoke-OnlineMode 'online-resume' $fixtures
+    $resumed = Invoke-ShellSeed @('describe-online', $dataRoot, $cacheRoot) | ConvertFrom-Json
+    if (@($resumed.Guides).Count -ne 1 -or $resumed.Drafts -ne 0) {
+        throw "After resuming, expected one guide and no drafts; got $($resumed | ConvertTo-Json -Depth 4 -Compress)."
+    }
+}
+
 function Run-MapReaderScenario([string] $fixtureRoot) {
     if (-not (Test-Path -LiteralPath (Join-Path $fixtureRoot 'p0\generated\maps\big-map.png'))) {
         throw 'big-map.png is missing; run tools/p0/make_fixtures.py first.'
@@ -3411,6 +3490,9 @@ try {
     # be run alone; the navigation shard runs both groups.
     if (Enter-ScenarioGroup 'maps') {
         Run-MapReaderScenario (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures')).Path
+    }
+    if (Enter-ScenarioGroup 'online') {
+        Run-OnlineScenarios (Resolve-Path (Join-Path $PSScriptRoot '..\..\tests\fixtures\p3')).Path
     }
     if (Enter-ScenarioGroup 'rc') { Run-RcScenarios }
 

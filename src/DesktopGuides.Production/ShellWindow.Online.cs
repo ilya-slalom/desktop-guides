@@ -30,6 +30,7 @@ public sealed partial class ShellWindow
     private WebViewPageLoader? onlineLoader;
     private CaptureStore? captureStore;
     private CancellationTokenSource? onlineCapture;
+    private Task? onlineCaptureRun;
     private CaptureDraft? onlineDraft;
     private GuidePageReading? onlineReading;
     private Guid onlineGameId;
@@ -114,7 +115,19 @@ public sealed partial class ShellWindow
 
     private async Task CloseOnlineAsync()
     {
+        // The capture stops before its browser goes; its pages stay in the draft.
         onlineCapture?.Cancel();
+        if (onlineCaptureRun is { } run)
+        {
+            try
+            {
+                await run;
+            }
+            catch (Exception)
+            {
+                // Reported by the capture itself.
+            }
+        }
         onlineLoader?.Dispose();
         onlineLoader = null;
         if (onlineBrowser is not null)
@@ -203,8 +216,10 @@ public sealed partial class ShellWindow
         }
         CaptureDraft draft = Captures.Find(onlineGameId, reading.Match.Site, reading.Match.ItemId)
             ?? Captures.Begin(onlineGameId, reading);
-        await RunCaptureAsync(draft);
+        await StartCaptureAsync(draft);
     }
+
+    private Task StartCaptureAsync(CaptureDraft draft) => onlineCaptureRun = RunCaptureAsync(draft);
 
     private async Task<bool> ConfirmNoticeAsync(string notice)
     {
@@ -252,6 +267,13 @@ public sealed partial class ShellWindow
         catch (OperationCanceledException)
         {
             OnlineStatus.Text = "Saving stopped. The pages saved so far are kept.";
+        }
+        catch (Exception) when (!token.IsCancellationRequested)
+        {
+            OnlineStatus.Text = "";
+            ShowOnlineInfo(InfoBarSeverity.Error, "Couldn't save the guide",
+                "A page couldn't be loaded. The pages saved so far are kept.",
+                showPage: null, canSave: draft.Captured.Count > 0);
         }
         finally
         {
@@ -311,7 +333,7 @@ public sealed partial class ShellWindow
 
     private async void OnlineResumeClicked(object sender, RoutedEventArgs args)
     {
-        if (onlineDraft is { } draft && onlineCapture is null) await RunCaptureAsync(draft);
+        if (onlineDraft is { } draft && onlineCapture is null) await StartCaptureAsync(draft);
     }
 
     private async void OnlineSavePartialClicked(object sender, RoutedEventArgs args)

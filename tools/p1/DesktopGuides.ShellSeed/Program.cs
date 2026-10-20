@@ -180,6 +180,42 @@ if (args.Length == 2 && args[0] == "describe-providers")
     return 0;
 }
 
+// S22: what Find online saved, and the drafts it left.
+if (args.Length == 3 && args[0] == "describe-online")
+{
+    await using SqliteLibraryRepository onlineRepository = new(new ManagedPathResolver(args[1]));
+    await onlineRepository.InitializeAsync();
+    List<object> saved = [];
+    foreach (Game onlineGame in await onlineRepository.ListGamesAsync())
+    {
+        IReadOnlyDictionary<Guid, GuideSource> sources = await onlineRepository.ListGuideSourcesAsync(onlineGame.Id);
+        foreach (Guide onlineGuide in await onlineRepository.ListGuidesAsync(onlineGame.Id))
+        {
+            GuideSource? source = sources.TryGetValue(onlineGuide.Id, out GuideSource? found) ? found : null;
+            saved.Add(new
+            {
+                onlineGuide.Id,
+                onlineGuide.Title,
+                Format = onlineGuide.Format.ToString(),
+                onlineGuide.ContentSha256,
+                Pages = (await onlineRepository.GetGuidePagesAsync(onlineGuide.Id)).Count,
+                Images = (await onlineRepository.GetGuideAssetsAsync(onlineGuide.Id)).Count(asset => asset.Kind == GuideAssetKind.Image),
+                Site = source?.Site.ToString(),
+                source?.ItemId,
+                source?.CapturedPages,
+                source?.TotalPages,
+            });
+        }
+    }
+    string captures = Path.Combine(args[2], "online-captures");
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        Guides = saved,
+        Drafts = Directory.Exists(captures) ? Directory.EnumerateDirectories(captures).Count() : 0,
+    }));
+    return 0;
+}
+
 if (args.Length == 2 && args[0] == "describe-import")
 {
     ManagedPathResolver importPaths = new(args[1]);
@@ -1307,7 +1343,7 @@ if (args.Length == 2 && args[0] == "describe-library")
 if (args.Length != 2 ||
     args[0] is not ("seed" or "stale" or "seed-long" or "seed-second" or
         "seed-design" or "seed-catalog" or "seed-facts" or "seed-search" or "seed-import" or
-        "seed-actions" or "seed-navigation"))
+        "seed-actions" or "seed-navigation" or "seed-online"))
 {
     Console.Error.WriteLine(
         "Usage: DesktopGuides.ShellSeed seed|stale|seed-long|seed-second|seed-design|seed-catalog|seed-facts|seed-search|seed-import|seed-actions|seed-navigation " +
@@ -1687,6 +1723,17 @@ if (args[0] == "seed-actions")
         GuidedGameId = guidedGameId.ToString("N"),
         GuidedGuideIds = new[] { guidedWalkthroughId.ToString("N"), guidedMapId.ToString("N") },
     }));
+    return 0;
+}
+
+if (args[0] == "seed-online")
+{
+    if ((await repository.ListGamesAsync()).Count != 0)
+    {
+        throw new InvalidOperationException("The online seed needs an empty library.");
+    }
+    Game onlineGame = await repository.AddGameAsync("Online Test Game", "PC", null);
+    Console.WriteLine($"Seeded online game {onlineGame.Id:N}.");
     return 0;
 }
 

@@ -50,4 +50,24 @@ public sealed class OnlineFixtureRoutesTests : IDisposable
             """);
         Assert.Throws<InvalidDataException>(() => OnlineFixtureRoutes.Load(Path.Combine(root, "manifest.json")));
     }
+
+    // The installed online group's manifest loads, and every route's file exists.
+    [Fact]
+    public void TheInstalledGroupsManifestIsValid()
+    {
+        string manifest = Path.GetFullPath(Path.Combine(
+            DesktopGuides.Infrastructure.Tests.Import.P0Fixtures.Root, "..", "p3", "manifest.json"));
+        OnlineFixtureRoutes routes = OnlineFixtureRoutes.Load(manifest);
+        foreach (string url in new[]
+        {
+            "https://gamefaqs.gamespot.com/search?game=Online%20Test%20Game",
+            "https://gamefaqs.gamespot.com/ps5/100002-example-saga/faqs/78736/cairn",
+            "https://gamefaqs.gamespot.com/a/faqs/36/78736-54.png",
+        })
+        {
+            Assert.True(routes.TryAnswer(new Uri(url), out int status, out _, out string? file), url);
+            Assert.Equal(200, status);
+            Assert.True(File.Exists(file), file);
+        }
+    }
 }
