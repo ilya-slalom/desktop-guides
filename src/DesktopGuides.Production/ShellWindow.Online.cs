@@ -401,7 +401,14 @@ public sealed partial class ShellWindow
     private void OnlineDiscardClicked(object sender, RoutedEventArgs args)
     {
         if (onlineCapture is not null) return;
-        onlineDraft?.Discard();
+        try
+        {
+            onlineDraft?.Discard();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // A draft folder in use is swept at a later start.
+        }
         onlineDraft = null;
         OnlineInfo.IsOpen = false;
         OnlineInfo.Visibility = Visibility.Collapsed;
@@ -424,10 +431,15 @@ public sealed partial class ShellWindow
                 ? await saver.SaveAsNewAsync(draft, null, CancellationToken.None)
                 : await saver.SaveAsync(draft, allowFormatChange, null, CancellationToken.None);
         }
-        catch (GuideImportException error)
+        catch (Exception error)
         {
+            // An async void handler leads here, so nothing may escape. The
+            // library is unchanged, and the draft is kept for another try.
             OnlineStatus.Text = "";
-            ShowOnlineInfo(InfoBarSeverity.Error, "Couldn't save the guide", error.Message, showPage: null, canSave: true);
+            string message = error is GuideImportException import
+                ? import.Message
+                : "The guide couldn't be saved to your library. Nothing was changed.";
+            ShowOnlineInfo(InfoBarSeverity.Error, "Couldn't save the guide", message, showPage: null, canSave: true);
             return;
         }
         switch (result)
@@ -504,16 +516,26 @@ public sealed partial class ShellWindow
         DialogSurface.Apply(dialog, EffectiveMaterial, DialogTheme);
         if (await dialog.ShowAsync() != ContentDialogResult.Primary || cacheRoot is null) return;
         await CloseOnlineAsync();
-        try
+        // The browser's processes exit a moment after it closes, holding the profile until then.
+        string folder = Path.Combine(cacheRoot, "Online");
+        for (int attempt = 1; ; attempt++)
         {
-            string folder = Path.Combine(cacheRoot, "Online");
-            if (Directory.Exists(folder)) await Task.Run(() => Directory.Delete(folder, recursive: true));
-            AnnounceStatus("Online data cleared.");
-            ShowTransientStatus("Online data cleared.");
-        }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-        {
-            ShowErrorStatus("Couldn't clear online data. Close Desktop Guides, then try again.");
+            try
+            {
+                if (Directory.Exists(folder)) await Task.Run(() => Directory.Delete(folder, recursive: true));
+                AnnounceStatus("Online data cleared.");
+                ShowTransientStatus("Online data cleared.");
+                return;
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                if (attempt == 20)
+                {
+                    ShowErrorStatus("Couldn't clear online data. Close Desktop Guides, then try again.");
+                    return;
+                }
+                await Task.Delay(500);
+            }
         }
     }
 }

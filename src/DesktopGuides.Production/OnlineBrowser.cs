@@ -82,15 +82,15 @@ internal sealed class OnlineBrowser : IAsyncDisposable
             CoreWebView2ControllerWindowReference.CreateFromWindowHandle((ulong)window));
         controller.IsVisible = false;
         controller.Bounds = new Windows.Foundation.Rect(0, 0, 1280, 2000);
-        Configure(controller.CoreWebView2, visible: false);
         WebViewPageLoader loader = new(controller, loadLog);
+        Configure(controller.CoreWebView2, visible: false, loader);
 #if !PUBLIC_LANE
         FixtureServed += loader.RecordServed;
 #endif
         return loader;
     }
 
-    internal void Configure(CoreWebView2 core, bool visible)
+    internal void Configure(CoreWebView2 core, bool visible, WebViewPageLoader? loader = null)
     {
         core.Settings.IsWebMessageEnabled = false;
         core.Settings.AreHostObjectsAllowed = false;
@@ -98,8 +98,8 @@ internal sealed class OnlineBrowser : IAsyncDisposable
 #if PUBLIC_LANE
         core.Settings.AreDevToolsEnabled = false;
 #endif
-        core.NavigationStarting += OnNavigationStarting;
-        core.NewWindowRequested += OnNewWindowRequested;
+        core.NavigationStarting += (_, args) => OnNavigationStarting(args, visible, loader);
+        core.NewWindowRequested += (_, args) => OnNewWindowRequested(args, visible);
         core.PermissionRequested += (_, args) => args.State = CoreWebView2PermissionState.Deny;
         core.DownloadStarting += (_, args) => args.Cancel = true;
         core.LaunchingExternalUriScheme += (_, args) => args.Cancel = true;
@@ -112,31 +112,39 @@ internal sealed class OnlineBrowser : IAsyncDisposable
 #endif
     }
 
-    private void OnNavigationStarting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args)
+    // Off the sources, a page never loads here. In the visible browser a
+    // link the user followed opens in the system browser; a navigation a
+    // script started (an ad redirect, say) is only stopped. The hidden
+    // browser launches nothing, and leaves the sources only for the image
+    // it was asked to load.
+    private void OnNavigationStarting(CoreWebView2NavigationStartingEventArgs args, bool visible, WebViewPageLoader? loader)
     {
-        if (!Uri.TryCreate(args.Uri, UriKind.Absolute, out Uri? url) || url.Scheme == "about")
+        if (!Uri.TryCreate(args.Uri, UriKind.Absolute, out Uri? url) || url.Scheme == "about" ||
+            OnlineSources.Find(url) is not null)
         {
             return;
         }
-        if (OnlineSources.Find(url) is null)
+        if (!visible && loader?.ImageTarget is { } image && image == url)
         {
-            args.Cancel = true;
-            if (url.Scheme == Uri.UriSchemeHttps || url.Scheme == Uri.UriSchemeHttp)
-            {
-                ExternalLinkRequested?.Invoke(this, url);
-            }
+            return;
         }
-    }
-
-    private void OnNewWindowRequested(CoreWebView2 sender, CoreWebView2NewWindowRequestedEventArgs args)
-    {
-        args.Handled = true;
-        if (Uri.TryCreate(args.Uri, UriKind.Absolute, out Uri? url) &&
-            (url.Scheme == Uri.UriSchemeHttps || url.Scheme == Uri.UriSchemeHttp))
+        args.Cancel = true;
+        if (visible && args.IsUserInitiated && IsWeb(url))
         {
             ExternalLinkRequested?.Invoke(this, url);
         }
     }
+
+    private void OnNewWindowRequested(CoreWebView2NewWindowRequestedEventArgs args, bool visible)
+    {
+        args.Handled = true;
+        if (visible && args.IsUserInitiated && Uri.TryCreate(args.Uri, UriKind.Absolute, out Uri? url) && IsWeb(url))
+        {
+            ExternalLinkRequested?.Invoke(this, url);
+        }
+    }
+
+    private static bool IsWeb(Uri url) => url.Scheme == Uri.UriSchemeHttps || url.Scheme == Uri.UriSchemeHttp;
 
 #if !PUBLIC_LANE
     // Test runs: every request is answered from the fixture manifest.

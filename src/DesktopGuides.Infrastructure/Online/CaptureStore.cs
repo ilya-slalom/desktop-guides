@@ -54,8 +54,15 @@ public sealed class CaptureStore(string root, TimeProvider clock)
         {
             if (file is null || file.TouchedUtc < cutoff)
             {
-                Directory.Delete(folder, recursive: true);
-                removed++;
+                // A draft in use or locked by a scanner waits for the next start.
+                try
+                {
+                    Directory.Delete(folder, recursive: true);
+                    removed++;
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                {
+                }
             }
         }
         return removed;

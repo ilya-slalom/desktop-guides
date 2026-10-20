@@ -8007,11 +8007,14 @@ try {
             Wait-Save $true 'a text FAQ'
             Go-Online 'https://www.example.com/'
             Wait-OnlineStatus 'Desktop Guides can save guides from GameFAQs and Neoseeker. Open other sites in your browser.'
-            # Review Focus 3: a page that leaves the source (here by script)
-            # opens in the system browser, never in the in-app browser.
+            # Review Focus 3: a page that leaves the source by script never
+            # loads in the in-app browser, and nothing opens without a click.
             Go-Online 'https://gamefaqs.gamespot.com/out'
+            Start-Sleep -Seconds 3
             $launches = Join-Path $AppCacheRoot 'diagnostics\external-launches.json'
-            Wait-Until { (Test-Path -LiteralPath $launches) -and ((Get-Content -LiteralPath $launches -Raw) -like '*https://www.example.com/sponsored*') } 'the sponsored link to open outside'
+            if ((Test-Path -LiteralPath $launches) -and ((Get-Content -LiteralPath $launches -Raw) -like '*example.com*')) {
+                throw 'A script navigation opened the system browser without a click.'
+            }
             $address = (Find-ById 'OnlineAddress').GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
             if ($address -like '*example.com*') { throw "The in-app browser left the site for '$address'." }
             $report.phases += 'online-browse'

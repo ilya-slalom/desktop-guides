@@ -135,4 +135,22 @@ public sealed class CaptureStoreTests : IDisposable
 
         Assert.Equal([newer.Id, older.Id], store.ListForGame(game).Select(draft => draft.Id));
     }
+
+    // Final review: startup sweeps drafts; a locked one must not stop the library opening.
+    [Fact]
+    public void SweepSkipsADraftItCantDelete()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        CaptureStore store = new(root, clock);
+        CaptureDraft locked = store.Begin(Guid.NewGuid(), Saga("cairn", "cairn"));
+        CaptureDraft stale = store.Begin(Guid.NewGuid(), Saga("cairn", "cairn"));
+        clock.Now = clock.Now.AddDays(8);
+        using FileStream held = new(Path.Combine(root, locked.Id.ToString("N"), "capture.json"),
+            FileMode.Open, FileAccess.Read, FileShare.None);
+
+        int removed = store.Sweep();
+
+        Assert.Equal(1, removed);
+        Assert.False(Directory.Exists(Path.Combine(root, stale.Id.ToString("N"))));
+    }
 }

@@ -15,6 +15,9 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
     private readonly SemaphoreSlim one = new(1, 1);
     private Dictionary<Uri, byte[]>? images;
 
+    /// <summary>The image being loaded on its own, which may sit on another host.</summary>
+    internal Uri? ImageTarget { get; private set; }
+
     // Installed tests only: one line per load, for diagnosing a stalled capture.
     private readonly string? loadLog;
 
@@ -71,11 +74,13 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
         try
         {
             images = [];
+            ImageTarget = url;
             int status = await NavigateAsync(url, token);
             return status == 200 && images.TryGetValue(url, out byte[]? bytes) ? bytes : null;
         }
         finally
         {
+            ImageTarget = null;
             images = null;
             one.Release();
         }
@@ -86,12 +91,18 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
     {
         TaskCompletionSource<int> done = new(TaskCreationOptions.RunContinuationsAsynchronously);
         long started = Environment.TickCount64;
+        // Only this navigation's completion counts: a cancelled earlier one
+        // can complete late, after a Cancel and a quick Resume.
+        ulong? ours = null;
+        void Starting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args) => ours ??= args.NavigationId;
         void Completed(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
         {
-            Log($"{url} completed id={args.NavigationId} http={args.HttpStatusCode} success={args.IsSuccess} " +
+            Log($"{url} completed id={args.NavigationId} ours={ours} http={args.HttpStatusCode} success={args.IsSuccess} " +
                 $"error={args.WebErrorStatus} after={Environment.TickCount64 - started}ms");
+            if (ours != args.NavigationId) return;
             done.TrySetResult(args.HttpStatusCode is > 0 ? args.HttpStatusCode : args.IsSuccess ? 200 : 0);
         }
+        Core.NavigationStarting += Starting;
         Core.NavigationCompleted += Completed;
         try
         {
@@ -111,6 +122,7 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
         }
         finally
         {
+            Core.NavigationStarting -= Starting;
             Core.NavigationCompleted -= Completed;
         }
     }
@@ -130,14 +142,17 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
     private async void OnResponseReceived(CoreWebView2 sender, CoreWebView2WebResourceResponseReceivedEventArgs args)
     {
         Dictionary<Uri, byte[]>? collecting = images;
-        if (collecting is null || args.Response.StatusCode != 200 ||
-            !Uri.TryCreate(args.Request.Uri, UriKind.Absolute, out Uri? url) ||
-            !(args.Response.Headers.GetHeader("Content-Type") ?? "").StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
+        if (collecting is null) return;
+        // An async void handler must never throw, so every check is inside the try.
         try
         {
+            if (args.Response.StatusCode != 200 ||
+                !Uri.TryCreate(args.Request.Uri, UriKind.Absolute, out Uri? url) ||
+                !args.Response.Headers.Contains("Content-Type") ||
+                !args.Response.Headers.GetHeader("Content-Type").StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
             using Windows.Storage.Streams.IRandomAccessStream? body = await args.Response.GetContentAsync();
             if (body is null) return;
             using Stream stream = body.AsStreamForRead();
@@ -147,8 +162,7 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
         }
         catch (Exception)
         {
-            // An async void handler must never throw: an image whose body
-            // isn't available is loaded directly later.
+            // An image whose body isn't available is loaded directly later.
         }
     }
 
