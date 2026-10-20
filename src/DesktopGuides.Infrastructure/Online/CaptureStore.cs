@@ -7,7 +7,7 @@ internal sealed record CapturedEntry(GuidePageReading Reading, Dictionary<string
 
 internal sealed record CaptureFile(
     int SchemaVersion, Guid Id, Guid GameId, SourceSite Site, string ItemId,
-    List<GuidePageLink> Pages, bool Truncated, List<CapturedEntry> Captured, DateTimeOffset TouchedUtc);
+    List<GuidePageLink> Pages, int TotalPages, List<CapturedEntry> Captured, DateTimeOffset TouchedUtc);
 
 /// <summary>
 /// S22: unfinished captures, kept outside the library under the cache root
@@ -23,9 +23,8 @@ public sealed class CaptureStore(string root, TimeProvider clock)
         List<GuidePageLink> pages = first.Pages.Count > 0
             ? first.Pages.ToList()
             : [new GuidePageLink(first.Match.PageKey, first.Url, null)];
-        bool truncated = pages.Count > MaxPages;
         CaptureFile file = new(1, Guid.NewGuid(), gameId, first.Match.Site, first.Match.ItemId,
-            pages.Take(MaxPages).ToList(), truncated, [], clock.GetUtcNow());
+            pages.Take(MaxPages).ToList(), pages.Count, [], clock.GetUtcNow());
         CaptureDraft draft = new(this, Path.Combine(root, file.Id.ToString("N")), file);
         Directory.CreateDirectory(draft.Folder);
         draft.Write();
@@ -101,6 +100,9 @@ public sealed class CaptureDraft
     public GuidePageMatch Item => new(file.Site, file.ItemId, "");
     public IReadOnlyList<GuidePageLink> Pages => file.Pages;
 
+    /// <summary>The guide's page count; more than <see cref="Pages"/> when it was cut at 200.</summary>
+    public int TotalPages => file.TotalPages;
+
     public IReadOnlyList<CapturedPage> Captured => file.Pages
         .Select(page => file.Captured.FirstOrDefault(entry => entry.Reading.Match.PageKey == page.PageKey))
         .OfType<CapturedEntry>()
@@ -112,7 +114,7 @@ public sealed class CaptureDraft
         file.Pages.Where(page => file.Captured.All(entry => entry.Reading.Match.PageKey != page.PageKey)).ToArray();
 
     /// <summary>Every page of the guide is captured; a guide cut at 200 pages never is.</summary>
-    public bool IsComplete => !file.Truncated && Remaining.Count == 0;
+    public bool IsComplete => file.TotalPages == file.Pages.Count && Remaining.Count == 0;
 
     /// <summary>Stores an image's bytes in the draft and returns the file's path.</summary>
     public string SaveImage(Uri url, ReadOnlySpan<byte> bytes)
