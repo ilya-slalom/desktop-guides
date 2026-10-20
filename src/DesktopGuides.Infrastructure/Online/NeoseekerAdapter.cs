@@ -76,6 +76,7 @@ public sealed partial class NeoseekerAdapter : IGuideSourceAdapter
             comment.RemoveFromParent();
         }
 
+        OnlineHtml.Absolutize(output, url);
         List<GuidePageLink> pages = [new GuidePageLink("index", new Uri($"https://{Host}/{game}/walkthrough"), null)];
         foreach (IElement link in document.QuerySelectorAll("#wiki-navigation a[href]"))
         {
@@ -97,7 +98,7 @@ public sealed partial class NeoseekerAdapter : IGuideSourceAdapter
         DateTimeOffset? edited = document.QuerySelectorAll("article#wiki-content time[datetime]")
             .Select(Time).Where(time => time is not null).Max();
         Uri[] images = output.QuerySelectorAll("img")
-            .Select(image => GameFaqsAdapter.ImageUrl(image, url)).OfType<Uri>().Distinct().ToArray();
+            .Select(image => OnlineHtml.ImageUrl(image, url)).OfType<Uri>().Distinct().ToArray();
         return new GuidePageReading(match, url, CapturedFormat.Html,
             gameName.Length > 0 ? gameName + " Walkthrough" : "Walkthrough",
             null, Notice, edited, pages, output.InnerHtml, images);

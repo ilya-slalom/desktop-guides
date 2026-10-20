@@ -71,25 +71,15 @@ public sealed partial class GameFaqsAdapter : IGuideSourceAdapter
         INode[] content = toc is null
             ? wrap.ChildNodes.ToArray()
             : wrap.ChildNodes.SkipWhile(node => node != toc).Skip(1).ToArray();
+        foreach (IElement element in content.OfType<IElement>()) OnlineHtml.Absolutize(element, baseUrl);
         StringBuilder body = new();
         foreach (INode node in content) body.Append(node.ToHtml());
         Uri[] images = content.OfType<IElement>()
             .SelectMany(element => element.Matches("img") ? [element] : element.QuerySelectorAll("img").ToArray())
-            .Select(image => ImageUrl(image, baseUrl)).OfType<Uri>().Distinct().ToArray();
+            .Select(image => OnlineHtml.ImageUrl(image, baseUrl)).OfType<Uri>().Distinct().ToArray();
         string pageText = string.Concat(content.Select(node => node.TextContent));
         return new GuidePageReading(match, url, CapturedFormat.Html, title, author,
             NoticeRules.Find(pageText), updated, pages, body.ToString(), images);
-    }
-
-    internal static Uri? ImageUrl(IElement image, Uri baseUrl)
-    {
-        string? source = image.GetAttribute("src");
-        if (source is null || source.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
-        {
-            source = image.GetAttribute("data-src");
-        }
-        return source is not null && Uri.TryCreate(baseUrl, source, out Uri? resolved) &&
-               (resolved.Scheme == Uri.UriSchemeHttps || resolved.Scheme == Uri.UriSchemeHttp) ? resolved : null;
     }
 
     private List<GuidePageLink> ReadPages(IElement? toc, Uri baseUrl)
