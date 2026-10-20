@@ -86,7 +86,9 @@ internal sealed record FileOperationManifest(IReadOnlyList<Guid> GuideIds)
             if (guideArray.ValueKind != JsonValueKind.Array ||
                 pathArray.ValueKind != JsonValueKind.Array ||
                 guideArray.GetArrayLength() is < 1 or > MaxGuideCount ||
-                pathArray.GetArrayLength() != guideArray.GetArrayLength() * 2)
+                // A replacement owns three paths per guide: stage, content and trash.
+                pathArray.GetArrayLength() != guideArray.GetArrayLength() *
+                    (kind == FileOperationKind.ReplaceGuide ? 3 : 2))
             {
                 throw new InvalidDataException("File-operation manifest has invalid path counts.");
             }
@@ -150,9 +152,16 @@ internal sealed record FileOperationManifest(IReadOnlyList<Guid> GuideIds)
         {
             throw new InvalidDataException("File-operation ID is invalid.");
         }
-        return guideNames.SelectMany(guide => kind == FileOperationKind.Import
-                ? new[] { $".staging/{operationId:N}/{guide}", $"content/{guide}" }
-                : new[] { $"content/{guide}", $".trash/{operationId:N}/{guide}" })
+        return guideNames.SelectMany(guide => kind switch
+                {
+                    FileOperationKind.Import => new[] { $".staging/{operationId:N}/{guide}", $"content/{guide}" },
+                    // S22: the new copy's stage, the live copy, and the old copy aside.
+                    FileOperationKind.ReplaceGuide => new[]
+                    {
+                        $".staging/{operationId:N}/{guide}", $"content/{guide}", $".trash/{operationId:N}/{guide}"
+                    },
+                    _ => new[] { $"content/{guide}", $".trash/{operationId:N}/{guide}" }
+                })
             .OrderBy(path => path, StringComparer.Ordinal).ToArray();
     }
 }

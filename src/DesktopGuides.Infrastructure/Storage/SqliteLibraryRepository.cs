@@ -1375,45 +1375,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             insert.Parameters.AddWithValue("$height", (object?)guide.PixelHeight ?? DBNull.Value);
             insert.Parameters.AddWithValue("$now", owner.clock.GetUtcNow().ToUnixTimeMilliseconds());
             insert.ExecuteNonQuery();
-            foreach (GuideAsset asset in guide.Assets ?? [])
-            {
-                using SqliteCommand row = connection.CreateCommand();
-                row.Transaction = transaction;
-                row.CommandText = """
-                    INSERT INTO GuideAssets (GuideId, RequestPath, RelativePath, Kind, ByteCount, Sha256)
-                    VALUES ($id, $request, $relative, $kind, $bytes, $sha)
-                    """;
-                row.Parameters.AddWithValue("$id", id);
-                row.Parameters.AddWithValue("$request", asset.RequestPath);
-                row.Parameters.AddWithValue("$relative", asset.RelativePath);
-                row.Parameters.AddWithValue("$kind", asset.Kind.ToString());
-                row.Parameters.AddWithValue("$bytes", asset.ByteCount);
-                row.Parameters.AddWithValue("$sha", asset.Sha256);
-                row.ExecuteNonQuery();
-            }
-            // T21.2: every HTML guide has its pages; without a list, the entry
-            // is the only page.
-            IReadOnlyList<GuidePage> pages = guide.Pages ?? (guide.Format == GuideFormat.Html
-                ? (guide.Assets ?? [])
-                    .Where(asset => asset.Kind == GuideAssetKind.EntryHtml)
-                    .Select(asset => new GuidePage(0, asset.RequestPath, null, null))
-                    .ToArray()
-                : []);
-            foreach (GuidePage page in pages)
-            {
-                using SqliteCommand row = connection.CreateCommand();
-                row.Transaction = transaction;
-                row.CommandText = """
-                    INSERT INTO GuidePages (GuideId, PageOrder, RequestPath, OriginalUrl, Title)
-                    VALUES ($id, $order, $request, $url, $title)
-                    """;
-                row.Parameters.AddWithValue("$id", id);
-                row.Parameters.AddWithValue("$order", page.Order);
-                row.Parameters.AddWithValue("$request", page.RequestPath);
-                row.Parameters.AddWithValue("$url", (object?)page.OriginalUrl ?? DBNull.Value);
-                row.Parameters.AddWithValue("$title", (object?)page.Title ?? DBNull.Value);
-                row.ExecuteNonQuery();
-            }
+            WriteAssetsAndPages(connection, transaction, guide.Id, guide.Format, guide.Assets, guide.Pages);
             if (guide.Source is GuideSource source)
             {
                 WriteGuideSource(connection, transaction, guide.Id, source);
@@ -1437,6 +1399,107 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         {
             using SqliteConnection connection = owner.OpenConnection();
             new FileOperationReconciler(owner.paths).RollBackImport(connection, operationId);
+        }
+
+        public Guide? GetGuide(Guid guideId)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            return SqliteLibraryRepository.GetGuide(connection, guideId);
+        }
+
+        public void PrepareReplace(Guid operationId, Guid guideId)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO FileOperations (Id, Kind, Phase, ManifestJson, CreatedUtcMs)
+                VALUES ($id, 'ReplaceGuide', 'Prepared', $manifest, $now)
+                """;
+            command.Parameters.AddWithValue("$id", operationId.ToString("N"));
+            command.Parameters.AddWithValue("$manifest",
+                FileOperationManifest.Create(FileOperationKind.ReplaceGuide, operationId, [guideId]));
+            command.Parameters.AddWithValue("$now", owner.clock.GetUtcNow().ToUnixTimeMilliseconds());
+            command.ExecuteNonQuery();
+        }
+
+        public void PublishReplacement(ReplacedGuide guide, Action beforeCommit)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            string id = guide.Id.ToString("N");
+            if (Scalar(connection, transaction, $"SELECT COUNT(*) FROM Guides WHERE Id = '{id}'") is not 1L)
+            {
+                throw new InvalidOperationException("Cannot replace a missing guide.");
+            }
+            using (SqliteCommand update = connection.CreateCommand())
+            {
+                update.Transaction = transaction;
+                update.CommandText = """
+                    UPDATE Guides SET Format = $format, PrimaryRelativePath = $primary,
+                        ContentSha256 = $sha, ContentBytes = $bytes, SourceLabel = $label,
+                        TextCodePage = $codePage, PixelWidth = $width, PixelHeight = $height,
+                        UpdatedUtcMs = $now
+                    WHERE Id = $id;
+                    DELETE FROM GuidePages WHERE GuideId = $id;
+                    DELETE FROM GuideAssets WHERE GuideId = $id;
+                    """;
+                update.Parameters.AddWithValue("$id", id);
+                update.Parameters.AddWithValue("$format", guide.Format.ToString());
+                update.Parameters.AddWithValue("$primary", guide.PrimaryRelativePath);
+                update.Parameters.AddWithValue("$sha", guide.ContentSha256);
+                update.Parameters.AddWithValue("$bytes", guide.ContentBytes);
+                update.Parameters.AddWithValue("$label", (object?)guide.SourceLabel ?? DBNull.Value);
+                update.Parameters.AddWithValue("$codePage", (object?)guide.TextCodePage ?? DBNull.Value);
+                update.Parameters.AddWithValue("$width", (object?)guide.PixelWidth ?? DBNull.Value);
+                update.Parameters.AddWithValue("$height", (object?)guide.PixelHeight ?? DBNull.Value);
+                update.Parameters.AddWithValue("$now", owner.clock.GetUtcNow().ToUnixTimeMilliseconds());
+                update.ExecuteNonQuery();
+            }
+            WriteAssetsAndPages(connection, transaction, guide.Id, guide.Format, guide.Assets, guide.Pages);
+            WriteGuideSource(connection, transaction, guide.Id, guide.Source);
+            using (SqliteCommand finish = connection.CreateCommand())
+            {
+                finish.Transaction = transaction;
+                finish.CommandText = (guide.ClearPlace
+                    ? """
+                      UPDATE ReadingStates SET LocatorJson = NULL, EstimatedFraction = NULL WHERE GuideId = $id;
+                      DELETE FROM Bookmarks WHERE GuideId = $id;
+                      UPDATE ReaderPreferences SET TextScale = NULL, TextView = NULL WHERE GuideId = $id;
+                      """
+                    : "") + """
+                    UPDATE FileOperations SET Phase = 'Committed'
+                    WHERE Id = $operation AND Kind = 'ReplaceGuide' AND Phase = 'Prepared';
+                    """;
+                finish.Parameters.AddWithValue("$id", id);
+                finish.Parameters.AddWithValue("$operation", guide.OperationId.ToString("N"));
+                finish.ExecuteNonQuery();
+            }
+            if (Scalar(connection, transaction, "SELECT changes()") is not 1L)
+            {
+                throw new InvalidOperationException("The replacement is not in the file-operation journal.");
+            }
+            beforeCommit();
+            transaction.Commit();
+        }
+
+        public void RollBackReplace(Guid operationId)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            new FileOperationReconciler(owner.paths).RollBackReplace(connection, operationId);
+        }
+
+        public void FinishReplace(Guid operationId)
+        {
+            using SqliteConnection connection = owner.OpenConnection();
+            new FileOperationReconciler(owner.paths).FinishReplace(connection, operationId);
+        }
+
+        private static object? Scalar(SqliteConnection connection, SqliteTransaction transaction, string sql)
+        {
+            using SqliteCommand command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = sql;
+            return command.ExecuteScalar();
         }
     }
 
@@ -1746,6 +1809,53 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
             command.ExecuteNonQuery();
             transaction.Commit();
         }, token);
+    }
+
+    // A guide's asset and page rows, inside the caller's transaction.
+    private static void WriteAssetsAndPages(
+        SqliteConnection connection, SqliteTransaction transaction, Guid guideId, GuideFormat format,
+        IReadOnlyList<GuideAsset>? assets, IReadOnlyList<GuidePage>? pages)
+    {
+        string id = guideId.ToString("N");
+        foreach (GuideAsset asset in assets ?? [])
+        {
+            using SqliteCommand row = connection.CreateCommand();
+            row.Transaction = transaction;
+            row.CommandText = """
+                INSERT INTO GuideAssets (GuideId, RequestPath, RelativePath, Kind, ByteCount, Sha256)
+                VALUES ($id, $request, $relative, $kind, $bytes, $sha)
+                """;
+            row.Parameters.AddWithValue("$id", id);
+            row.Parameters.AddWithValue("$request", asset.RequestPath);
+            row.Parameters.AddWithValue("$relative", asset.RelativePath);
+            row.Parameters.AddWithValue("$kind", asset.Kind.ToString());
+            row.Parameters.AddWithValue("$bytes", asset.ByteCount);
+            row.Parameters.AddWithValue("$sha", asset.Sha256);
+            row.ExecuteNonQuery();
+        }
+        // T21.2: every HTML guide has its pages; without a list, the entry
+        // is the only page.
+        IReadOnlyList<GuidePage> pageList = pages ?? (format == GuideFormat.Html
+            ? (assets ?? [])
+                .Where(asset => asset.Kind == GuideAssetKind.EntryHtml)
+                .Select(asset => new GuidePage(0, asset.RequestPath, null, null))
+                .ToArray()
+            : []);
+        foreach (GuidePage page in pageList)
+        {
+            using SqliteCommand row = connection.CreateCommand();
+            row.Transaction = transaction;
+            row.CommandText = """
+                INSERT INTO GuidePages (GuideId, PageOrder, RequestPath, OriginalUrl, Title)
+                VALUES ($id, $order, $request, $url, $title)
+                """;
+            row.Parameters.AddWithValue("$id", id);
+            row.Parameters.AddWithValue("$order", page.Order);
+            row.Parameters.AddWithValue("$request", page.RequestPath);
+            row.Parameters.AddWithValue("$url", (object?)page.OriginalUrl ?? DBNull.Value);
+            row.Parameters.AddWithValue("$title", (object?)page.Title ?? DBNull.Value);
+            row.ExecuteNonQuery();
+        }
     }
 
     // Inserts or replaces a guide's source row, inside the caller's transaction.

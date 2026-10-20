@@ -266,6 +266,58 @@ internal sealed class FileOperationReconciler(ILibraryPaths paths)
         RemoveJournalRow(connection, row.Id);
     }
 
+    /// <summary>
+    /// S22: undoes a replacement that hasn't committed. While the old copy
+    /// is in the trash, content/&lt;guide&gt; is the new copy or nothing, so it
+    /// is deleted and the old copy moves back; the stage is deleted.
+    /// </summary>
+    public void RollBackReplace(SqliteConnection connection, Guid operationId) =>
+        UndoReplacement(connection, ReadReplacement(connection, operationId, FileOperationPhase.Prepared));
+
+    /// <summary>S22: deletes a committed replacement's old copy and stage, then its row.</summary>
+    public void FinishReplace(SqliteConnection connection, Guid operationId) =>
+        FinishReplacement(connection, ReadReplacement(connection, operationId, FileOperationPhase.Committed));
+
+    private void UndoReplacement(SqliteConnection connection, JournalRow row)
+    {
+        (Guid guideId, string staged, string trash) = ReplacementPaths(connection, row);
+        string content = paths.GetGuideRoot(guideId);
+        if (OwnedGuideTree.Capture(trash).Exists)
+        {
+            OwnedGuideTree.Capture(content).Delete();
+            Directory.Move(trash, content);
+        }
+        OwnedGuideTree.Capture(staged).Delete();
+        RemoveIfEmpty(Path.GetDirectoryName(staged));
+        RemoveIfEmpty(Path.GetDirectoryName(trash));
+        RemoveJournalRow(connection, row.Id);
+    }
+
+    private void FinishReplacement(SqliteConnection connection, JournalRow row)
+    {
+        (_, string staged, string trash) = ReplacementPaths(connection, row);
+        OwnedGuideTree.Capture(trash).Delete();
+        OwnedGuideTree.Capture(staged).Delete();
+        RemoveIfEmpty(Path.GetDirectoryName(staged));
+        RemoveIfEmpty(Path.GetDirectoryName(trash));
+        RemoveJournalRow(connection, row.Id);
+    }
+
+    // A replacement's guide row exists in both phases.
+    private (Guid GuideId, string Staged, string Trash) ReplacementPaths(SqliteConnection connection, JournalRow row)
+    {
+        Guid guideId = row.Manifest.GuideIds.Single();
+        if (!ReadGuideIds(connection).Contains(guideId))
+        {
+            throw new InvalidDataException("File-operation phase conflicts with committed guide metadata.");
+        }
+        string staged = paths.GetStagedGuideRoot(row.Id, guideId);
+        string trash = paths.GetTrashedGuideRoot(row.Id, guideId);
+        RequireDirectoryOrMissing(Path.GetDirectoryName(staged)!);
+        RequireDirectoryOrMissing(Path.GetDirectoryName(trash)!);
+        return (guideId, staged, trash);
+    }
+
     public static bool ClaimsGuide(SqliteConnection connection, Guid guideId) =>
         ReadJournalRows(connection).Any(row => row.Manifest.GuideIds.Contains(guideId));
 
@@ -274,9 +326,21 @@ internal sealed class FileOperationReconciler(ILibraryPaths paths)
     {
         JournalRow row = ReadJournalRows(connection).SingleOrDefault(candidate => candidate.Id == operationId)
             ?? throw new InvalidDataException("The deletion is not in the file-operation journal.");
-        if (row.Kind == FileOperationKind.Import || row.Phase != phase)
+        if (row.Kind is not (FileOperationKind.DeleteGuide or FileOperationKind.DeleteGame) || row.Phase != phase)
         {
             throw new InvalidDataException("The file operation is not a deletion in the expected phase.");
+        }
+        return row;
+    }
+
+    private static JournalRow ReadReplacement(
+        SqliteConnection connection, Guid operationId, FileOperationPhase phase)
+    {
+        JournalRow row = ReadJournalRows(connection).SingleOrDefault(candidate => candidate.Id == operationId)
+            ?? throw new InvalidDataException("The replacement is not in the file-operation journal.");
+        if (row.Kind != FileOperationKind.ReplaceGuide || row.Phase != phase)
+        {
+            throw new InvalidDataException("The file operation is not a replacement in the expected phase.");
         }
         return row;
     }

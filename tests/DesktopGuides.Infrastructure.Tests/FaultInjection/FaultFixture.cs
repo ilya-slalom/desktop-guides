@@ -71,7 +71,9 @@ internal sealed class FaultFixture : IAsyncDisposable
             () => ids.Count > 0 ? ids.Dequeue() : Guid.NewGuid(),
             createStagedFile ?? (path => new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true)),
             checkpoint ?? (_ => { }),
-            rollBack ?? ((journal, operation) => journal.RollBack(operation)));
+            rollBack ?? ((journal, operation) => journal.RollBack(operation)),
+            _ => { },
+            (journal, operation) => journal.RollBackReplace(operation));
     }
 
     public Task<Guid> ImportAsync(

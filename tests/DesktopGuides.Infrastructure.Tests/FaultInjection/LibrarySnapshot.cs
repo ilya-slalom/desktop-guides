@@ -21,6 +21,8 @@ internal sealed class LibrarySnapshot
         ("ReaderPreferences", ["GuideId"]),
         ("Settings", ["Key"]),
         ("FileOperations", ["Id"]),
+        ("GuideSources", ["GuideId"]),
+        ("GameSteamApps", ["GameId"]),
     ];
 
     private LibrarySnapshot(IReadOnlyDictionary<string, string> entries) => Entries = entries;
