@@ -25,8 +25,17 @@ public sealed class OnlineGuideSaver(
     SqliteLibraryRepository repository, GuideImportPublisher publisher, GuideImportValidator validator,
     string workRoot, TimeProvider clock)
 {
-    public async Task<OnlineSaveResult> SaveAsync(
-        CaptureDraft draft, bool allowFormatChange, IProgress<ImportProgress>? progress, CancellationToken token)
+    public Task<OnlineSaveResult> SaveAsync(
+        CaptureDraft draft, bool allowFormatChange, IProgress<ImportProgress>? progress, CancellationToken token) =>
+        SaveCoreAsync(draft, allowFormatChange, asNew: false, progress, token);
+
+    /// <summary>Saves the capture as another guide, leaving the one saved before ("Keep both").</summary>
+    public Task<OnlineSaveResult> SaveAsNewAsync(
+        CaptureDraft draft, IProgress<ImportProgress>? progress, CancellationToken token) =>
+        SaveCoreAsync(draft, allowFormatChange: false, asNew: true, progress, token);
+
+    private async Task<OnlineSaveResult> SaveCoreAsync(
+        CaptureDraft draft, bool allowFormatChange, bool asNew, IProgress<ImportProgress>? progress, CancellationToken token)
     {
         IReadOnlyList<CapturedPage> captured = draft.Captured;
         if (captured.Count == 0) throw new InvalidOperationException("Nothing has been captured.");
@@ -49,7 +58,8 @@ public sealed class OnlineGuideSaver(
                 draft.IsComplete ? null : captured.Count, draft.IsComplete ? null : draft.TotalPages);
 
             OnlineSaveResult result;
-            if (await repository.FindSourcedGuideAsync(draft.GameId, draft.Item.Site, draft.Item.ItemId, token) is { } saved)
+            if (!asNew &&
+                await repository.FindSourcedGuideAsync(draft.GameId, draft.Item.Site, draft.Item.ItemId, token) is { } saved)
             {
                 try
                 {

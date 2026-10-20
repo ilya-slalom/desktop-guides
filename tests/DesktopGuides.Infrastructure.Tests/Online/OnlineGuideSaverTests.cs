@@ -132,4 +132,23 @@ public sealed class OnlineGuideSaverTests : IAsyncLifetime
         Assert.NotNull(store.Find(harness.Game.Id, SourceSite.GameFaqs, "78736"));
         Assert.Empty(Directory.EnumerateFileSystemEntries(work));
     }
+
+    // PR 3b: "Keep both" after a format change saves the capture as a second guide.
+    [Fact]
+    public async Task KeepingBothSavesASecondGuide()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        GuidePageReading text = new GameFaqsAdapter().Read(new Uri(SagaUrl + "introduction"),
+            P3Fixtures.Read("gamefaqs/text-faq.html"))!;
+        Guid first = Assert.IsType<OnlineSaveResult.Added>(await SaveAsync(Draft(text))).GuideId;
+        CaptureDraft html = AllThree();
+
+        OnlineSaveResult.Added second = Assert.IsType<OnlineSaveResult.Added>(
+            await Saver().SaveAsNewAsync(html, null, CancellationToken.None));
+
+        Assert.NotEqual(first, second.GuideId);
+        Assert.Equal(GuideFormat.Txt, (await harness.Repository.GetGuideAsync(first))!.Format);
+        Assert.Equal(GuideFormat.Html, (await harness.Repository.GetGuideAsync(second.GuideId))!.Format);
+        Assert.Null(store.Find(harness.Game.Id, SourceSite.GameFaqs, "78736"));
+    }
 }
