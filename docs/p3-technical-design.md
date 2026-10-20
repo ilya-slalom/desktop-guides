@@ -1,8 +1,11 @@
 # P3 technical design: guides from supported online sources
 
 Status: approved in conversation, 20 October 2026.
-PR 2 (source fields and saving a guide again) in review (#146); see the
-[PR 2 verification record](#pr-2-verification-record).
+PR 1 (this design and the source review) merged (#145). PR 2 (source
+fields and saving a guide again) merged (#146); see the
+[PR 2 verification record](#pr-2-verification-record). PR 3a (the
+capture core) in review (#147); see the
+[PR 3a verification record](#pr-3a-verification-record).
 It covers S22 (T22.1, T22.2, TR22.1, TR22.2), the only story in P3.
 
 Related documents:
@@ -364,8 +367,14 @@ PRs in order, each with its own plan:
 1. **T22.1:** the [source review](p3/source-review.md) and this design.
 2. **Source fields and re-save** (Infrastructure): the migration, backup
    and restore, replacement with place kept, failure safety.
-3. **Find online and the in-app browser**, with GameFAQs and Neoseeker
-   capture, the fixture server and the `online` E2E group.
+3. **Find online and the in-app browser, with GameFAQs and Neoseeker
+   capture**, split on 20 October 2026 into two PRs:
+   - **3a, the capture core** ([plan](p3/s22-capture-core-plan.md)),
+     Infrastructure only: the two adapters, notice rules, the offline
+     copy, unfinished captures, and saving;
+   - **3b, Find online:** the screen, the in-app and hidden capture
+     browsers, pause and resume, the build switches, the fixture server
+     and the `online` E2E group.
 4. **Steam:** credentials, search, pasted URLs.
 5. **VGMaps:** the index, search, map saving into image maps.
 6. **Records:** results, live checks, the tested matrix, release notes.
@@ -411,3 +420,36 @@ PRs in order, each with its own plan:
 - **Review:** a fresh whole-branch review found one Important issue. A second replacement while a first one's clean-up was still pending would leave two operations claiming the guide, and startup would then refuse the library. It's fixed and pinned by `ALeftoverOperationOnTheGuideRefusesASecondReplacement`. Six Minor findings are deferred, mostly test strength.
 - **CI:** run [39399887408](https://github.com/ilya-slalom/desktop-guides/actions/runs/39399887408) passed every job, including all installed groups.
 - **For PR 3:** an HTML place survives a re-save only if its page keeps the same document path, so captured pages need stable paths across saves.
+
+## PR 3a verification record
+
+[#147](https://github.com/ilya-slalom/desktop-guides/pull/147), following
+[the PR 3a plan](p3/s22-capture-core-plan.md), checked on 20 October 2026:
+
+- **Commits:**
+  - `bf45196`: the GameFAQs adapter;
+  - `48706c6`: the Neoseeker adapter;
+  - `46316fa`: notice rules;
+  - `6f3cab8`: the offline copy;
+  - `eb10daa`: unfinished captures;
+  - `a2e21eb`: saving;
+  - `49a63f7`: the review fixes.
+- **Suites on pcsx2-win:** Infrastructure.Tests 1009/1009, Core.Tests 1522/1522. The Release x64 build adds no new warnings.
+- **The plan's Review Focus tests:**
+  1. `ATextFaqJoinsItsChunksExactly`;
+  2. `LazyImagesUseTheirDataSource` and `ALazyImageIsSavedLocally`;
+  3. `TheFirstPagedPageHasOneKey`;
+  4. `OnlyTheWalkthroughsOwnPagesAreListed`;
+  5. `ASecondSaveKeepsThePagePathsAndThePlace`.
+- **Review:** a fresh whole-branch review checked the adapters against Wayback captures of real pages and found four defects. The fixtures now copy the real structure, and each fix is pinned by a test that failed first:
+  - **Text FAQ chunks:** each chunk after the first starts with a newline that HTML parsing drops, so lines ran together.
+  - **GameFAQs titles:** the JSON-LD headline carries HTML entities, and its author is a plain string.
+  - **Neoseeker red links:** links to pages that don't exist (class `new`, `?edit`) counted as pages.
+  - **Neoseeker hub titles:** a hub without the game's name above its heading was titled "Walkthrough".
+
+  Seven Minor findings are deferred. Among them are rare page-key collisions, and remote references (video posters, SVG links) that the reader's CSP already blocks.
+- **CI:** run [39412407167](https://github.com/ilya-slalom/desktop-guides/actions/runs/39412407167) passed after one re-run. Its `portable, pdf` job had hit the launch-timeout flake recorded on #138.
+- **For PR 3b:**
+  - pages come from the live DOM through WebView2, where the same `<pre>` newline rule applies;
+  - a capture should start from a page whose navigation lists the whole walkthrough, since a hub may list fewer pages than a chapter page;
+  - the live checks on pcsx2-win confirm or correct the archived structure.
