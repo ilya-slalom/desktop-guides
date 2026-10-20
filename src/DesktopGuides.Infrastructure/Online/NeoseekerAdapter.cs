@@ -80,9 +80,10 @@ public sealed partial class NeoseekerAdapter : IGuideSourceAdapter
         List<GuidePageLink> pages = [new GuidePageLink("index", new Uri($"https://{Host}/{game}/walkthrough"), null)];
         foreach (IElement link in document.QuerySelectorAll("#wiki-navigation a[href]"))
         {
-            // An accordion toggle (href="#toc-1") names this page, not a page of the guide.
+            // An accordion toggle (href="#toc-1") names this page, and a red
+            // link (class "new", "?edit") a page that doesn't exist.
             string href = link.GetAttribute("href") ?? "";
-            if (href.StartsWith('#') ||
+            if (href.StartsWith('#') || href.Contains('?') || link.ClassList.Contains("new") ||
                 !Uri.TryCreate(url, href, out Uri? target) ||
                 !target.AbsolutePath.StartsWith($"/{game}/walkthrough/", StringComparison.Ordinal) ||
                 Match(new Uri(target.GetLeftPart(UriPartial.Path))) is not { } found ||
@@ -94,14 +95,28 @@ public sealed partial class NeoseekerAdapter : IGuideSourceAdapter
                 link.TextContent.Trim() is { Length: > 0 } name ? name : null));
         }
 
-        string gameName = document.QuerySelector("#page-title strong")?.TextContent.Trim() ?? "";
+        string title = WalkthroughTitle(document);
         DateTimeOffset? edited = document.QuerySelectorAll("article#wiki-content time[datetime]")
             .Select(Time).Where(time => time is not null).Max();
         Uri[] images = output.QuerySelectorAll("img")
             .Select(image => OnlineHtml.ImageUrl(image, url)).OfType<Uri>().Distinct().ToArray();
         return new GuidePageReading(match, url, CapturedFormat.Html,
-            gameName.Length > 0 ? gameName + " Walkthrough" : "Walkthrough",
+            title,
             null, Notice, edited, pages, output.InnerHtml, images);
+    }
+
+    // A page names its game above its heading; the hub's heading is
+    // "{Game} Walkthrough and Guide".
+    private static string WalkthroughTitle(IDocument document)
+    {
+        if (document.QuerySelector("#page-title strong")?.TextContent.Trim() is { Length: > 0 } game)
+        {
+            return game + " Walkthrough";
+        }
+        string heading = document.QuerySelector("#page-title h1")?.TextContent.Trim() ?? "";
+        if (heading.EndsWith(" and Guide", StringComparison.OrdinalIgnoreCase)) heading = heading[..^" and Guide".Length].TrimEnd();
+        return heading.Length == 0 ? "Walkthrough"
+            : heading.Contains("walkthrough", StringComparison.OrdinalIgnoreCase) ? heading : heading + " Walkthrough";
     }
 
     private static DateTimeOffset? Time(IElement? element) =>

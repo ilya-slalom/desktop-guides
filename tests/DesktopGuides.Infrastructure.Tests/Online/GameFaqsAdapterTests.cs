@@ -35,7 +35,8 @@ public sealed class GameFaqsAdapterTests
     {
         GuidePageReading page = Read("text-faq.html", Host + "/ps/100001-example-quest/faqs/13639");
         Assert.Equal(CapturedFormat.Text, page.Format);
-        Assert.Contains("The sword is in the chapel. Take it", page.Content);
+        Assert.Contains("The sword is in the\nchapel. Take it", page.Content);
+        Assert.Contains("open the crypt.\n\n\n3. COPYRIGHT", page.Content);
         Assert.Contains("guard \"Old Tom\"", page.Content);
         Assert.StartsWith("EXAMPLE QUEST WALKTHROUGH\nVersion 1.2", page.Content);
         Assert.Empty(page.Pages);
@@ -61,7 +62,7 @@ public sealed class GameFaqsAdapterTests
         Assert.Equal(new Uri(Host + "/ps5/100002-example-saga/faqs/78736/fishing"), page.Pages[2].Url);
         Assert.Equal("Fishing", page.Pages[2].Title);
         Assert.Equal("cairn", page.Match.PageKey);
-        Assert.Equal("Example Saga Walkthrough", page.Title);
+        Assert.Equal("Example's Saga Walkthrough", page.Title);
         Assert.Equal("Guide Writer", page.Author);
     }
 

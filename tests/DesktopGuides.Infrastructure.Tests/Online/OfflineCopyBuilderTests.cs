@@ -127,7 +127,7 @@ public sealed class OfflineCopyBuilderTests : IAsyncLifetime
         OfflineCopyBuilder.Build(ThreeSagaPages(), folder, Saved);
         string entry = Text("guide.html");
         Assert.Contains("<header class=\"dg-source\">", entry);
-        Assert.Contains("<h1>Example Saga Walkthrough</h1>", entry);
+        Assert.Contains("<h1>Example's Saga Walkthrough</h1>", entry);
         Assert.Contains("By Guide Writer", entry);
         Assert.Contains("Saved from GameFAQs on 20 October 2026", entry);
         Assert.Contains($"href=\"{SagaUrl}introduction\"", entry);

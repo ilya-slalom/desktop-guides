@@ -81,6 +81,8 @@ public sealed class NeoseekerAdapterTests
     {
         GuidePageReading page = Read("wiki-hub.html", "/example-quest/walkthrough");
         Assert.Equal("Example Quest Walkthrough", page.Title);
+        Assert.Equal("Example Quest Walkthrough",
+            Read("wiki-episode-3.html", "/example-quest/walkthrough/Episode_3").Title);
         Assert.Equal(DateTimeOffset.Parse("2024-03-19T14:52:48Z"), page.SourceUpdated);
         Assert.Null(page.Author);
         Assert.Equal("© Neo Era Media Inc.", page.Notice);

@@ -57,9 +57,9 @@ public sealed class OnlineGuideSaverTests : IAsyncLifetime
         Assert.Equal(3, (await harness.Repository.GetGuidePagesAsync(added.GuideId)).Count);
         GuideSource source = (await harness.Repository.GetGuideSourceAsync(added.GuideId))!;
         Assert.Equal((SourceSite.GameFaqs, "78736", SagaUrl + "introduction"), (source.Site, source.ItemId, source.Url));
-        Assert.Equal(("Guide Writer", "Example Saga Walkthrough"), (source.Author, source.SourceTitle));
+        Assert.Equal(("Guide Writer", "Example's Saga Walkthrough"), (source.Author, source.SourceTitle));
         Assert.False(source.IsPartial);
-        Assert.Equal("Example Saga Walkthrough", (await harness.Repository.GetGuideAsync(added.GuideId))!.Title);
+        Assert.Equal("Example's Saga Walkthrough", (await harness.Repository.GetGuideAsync(added.GuideId))!.Title);
         Assert.Null(store.Find(harness.Game.Id, SourceSite.GameFaqs, "78736"));
         Assert.Empty(Directory.EnumerateFileSystemEntries(work));
     }

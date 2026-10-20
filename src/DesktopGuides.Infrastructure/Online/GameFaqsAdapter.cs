@@ -52,8 +52,9 @@ public sealed partial class GameFaqsAdapter : IGuideSourceAdapter
         IHtmlCollection<IElement> chunks = document.QuerySelectorAll("#faqtext > pre[id^='faqspan-']");
         if (chunks.Length > 0)
         {
-            // Chunks split mid-line, so they join with nothing between.
-            string text = string.Concat(chunks.Select(chunk => chunk.TextContent));
+            // Each chunk after the first starts with a newline that HTML
+            // parsing drops (as it does after any <pre>), so the join puts it back.
+            string text = string.Join("\n", chunks.Select(chunk => chunk.TextContent));
             return new GuidePageReading(match, url, CapturedFormat.Text, title, author,
                 NoticeRules.Find(text), updated, [], text, []);
         }
@@ -112,8 +113,10 @@ public sealed partial class GameFaqsAdapter : IGuideSourceAdapter
                     continue;
                 }
                 string? headline = Text(root, "headline");
-                string? author = root.TryGetProperty("author", out JsonElement person) && person.ValueKind == JsonValueKind.Object
-                    ? Text(person, "name") : null;
+                // The author is a name, or a Person with one.
+                string? author = !root.TryGetProperty("author", out JsonElement person) ? null
+                    : person.ValueKind == JsonValueKind.Object ? Text(person, "name")
+                    : person.ValueKind == JsonValueKind.String ? Clean(person.GetString()) : null;
                 DateTimeOffset? updated = Date(root, "dateModified") ?? Date(root, "datePublished");
                 return (headline, author, updated);
             }
@@ -125,8 +128,12 @@ public sealed partial class GameFaqsAdapter : IGuideSourceAdapter
     }
 
     private static string? Text(JsonElement element, string name) =>
-        element.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.String &&
-        value.GetString()!.Trim() is { Length: > 0 } text ? text : null;
+        element.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.String
+            ? Clean(value.GetString()) : null;
+
+    // GameFAQs' JSON-LD carries HTML entities ("Assassin&#039;s Creed").
+    private static string? Clean(string? text) =>
+        System.Net.WebUtility.HtmlDecode(text ?? "").Trim() is { Length: > 0 } clean ? clean : null;
 
     private static DateTimeOffset? Date(JsonElement element, string name) =>
         Text(element, name) is { } text &&
