@@ -1925,6 +1925,10 @@ function Invoke-OnlineMode([string] $mode, [string] $fixtures) {
         if (Test-Path -LiteralPath $crash) {
             Copy-Item -LiteralPath $crash -Destination (Join-Path $ResultDirectory "$mode-unhandled.txt") -Force
         }
+        $loads = Join-Path (Get-HtmlCacheRoot) "diagnostics\online-loads-$processId.txt"
+        if (Test-Path -LiteralPath $loads) {
+            Copy-Item -LiteralPath $loads -Destination (Join-Path $ResultDirectory "$mode-loads.txt") -Force
+        }
     }
 }
 

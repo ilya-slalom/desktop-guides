@@ -15,8 +15,12 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
     private readonly SemaphoreSlim one = new(1, 1);
     private Dictionary<Uri, byte[]>? images;
 
-    internal WebViewPageLoader(CoreWebView2Controller controller)
+    // Installed tests only: one line per load, for diagnosing a stalled capture.
+    private readonly string? loadLog;
+
+    internal WebViewPageLoader(CoreWebView2Controller controller, string? loadLog = null)
     {
+        this.loadLog = loadLog;
         this.controller = controller;
         controller.CoreWebView2.WebResourceResponseReceived += OnResponseReceived;
     }
@@ -81,8 +85,13 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
     private async Task<int> NavigateAsync(Uri url, CancellationToken token)
     {
         TaskCompletionSource<int> done = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        void Completed(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args) =>
+        long started = Environment.TickCount64;
+        void Completed(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
+        {
+            Log($"{url} completed id={args.NavigationId} http={args.HttpStatusCode} success={args.IsSuccess} " +
+                $"error={args.WebErrorStatus} after={Environment.TickCount64 - started}ms");
             done.TrySetResult(args.HttpStatusCode is > 0 ? args.HttpStatusCode : args.IsSuccess ? 200 : 0);
+        }
         Core.NavigationCompleted += Completed;
         try
         {
@@ -95,6 +104,7 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
             }
             catch (OperationCanceledException) when (!token.IsCancellationRequested)
             {
+                Log($"{url} timed out after {Environment.TickCount64 - started}ms; source={Core.Source}");
                 Core.Stop();
                 return 0;
             }
@@ -102,6 +112,18 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
         finally
         {
             Core.NavigationCompleted -= Completed;
+        }
+    }
+
+    private void Log(string line)
+    {
+        if (loadLog is null) return;
+        try
+        {
+            File.AppendAllText(loadLog, $"{DateTimeOffset.UtcNow:O} {line}{Environment.NewLine}");
+        }
+        catch (Exception)
+        {
         }
     }
 

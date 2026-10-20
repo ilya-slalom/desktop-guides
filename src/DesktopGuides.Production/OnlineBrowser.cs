@@ -39,6 +39,8 @@ internal sealed class OnlineBrowser : IAsyncDisposable
 
     public static string ProfileFolder(string cacheRoot) => Path.Combine(cacheRoot, "Online", "Profile");
 
+    private string? loadLog;
+
     public static async Task<OnlineBrowser> CreateAsync(string cacheRoot, nint window, OnlineFixtureRoutes? fixtures)
     {
         string profile = ProfileFolder(cacheRoot);
@@ -49,6 +51,13 @@ internal sealed class OnlineBrowser : IAsyncDisposable
         WebView2 view = new();
         await view.EnsureCoreWebView2Async(environment);
         OnlineBrowser browser = new(environment, view, window, fixtures);
+#if !PUBLIC_LANE
+        if (fixtures is not null)
+        {
+            browser.loadLog = Path.Combine(cacheRoot, "diagnostics", $"online-loads-{Environment.ProcessId}.txt");
+            Directory.CreateDirectory(Path.GetDirectoryName(browser.loadLog)!);
+        }
+#endif
         browser.Configure(view.CoreWebView2, visible: true);
         view.CoreWebView2.NavigationCompleted += (_, _) => browser.PageLoaded?.Invoke(browser, EventArgs.Empty);
         return browser;
@@ -74,7 +83,7 @@ internal sealed class OnlineBrowser : IAsyncDisposable
         controller.IsVisible = false;
         controller.Bounds = new Windows.Foundation.Rect(0, 0, 1280, 2000);
         Configure(controller.CoreWebView2, visible: false);
-        WebViewPageLoader loader = new(controller);
+        WebViewPageLoader loader = new(controller, loadLog);
 #if !PUBLIC_LANE
         FixtureServed += loader.RecordServed;
 #endif
