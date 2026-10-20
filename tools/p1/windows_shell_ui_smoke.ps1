@@ -8044,7 +8044,7 @@ try {
             [void](Wait-Name 'GameHeading' $game)
             Open-GuideFromGame 'Example Quest Walkthrough'
             [void](Wait-Status 'Guide ready.')
-            [void](Wait-FirstTextRow)
+            [void](Wait-VisibleById 'ReaderTextLines')
             $report.phases += 'online-save'
         }
         elseif ($Mode -eq 'online-resave') {

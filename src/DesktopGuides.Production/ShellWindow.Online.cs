@@ -333,8 +333,16 @@ public sealed partial class ShellWindow
     private void ShowPaused(CaptureOutcome.Paused paused)
     {
         string site = OnlineSources.Available.FirstOrDefault(source => source.Site == paused.Draft.Item.Site)?.Name ?? "The site";
+        // What the site answered: a refusal's status, or no answer at all.
+        string answer = paused.Status switch
+        {
+            0 => " (no answer)",
+            200 => "",
+            int status => $" (HTTP {status})",
+        };
+        OnlineStatus.Text = "";
         ShowOnlineInfo(InfoBarSeverity.Warning, "Saving paused",
-            $"{site} didn't return page {paused.Number} of {paused.Total}. It may be asking you to confirm you're a person.",
+            $"{site} didn't return page {paused.Number} of {paused.Total}{answer}. It may be asking you to confirm you're a person.",
             showPage: paused.Page.Url, canSave: paused.Draft.Captured.Count > 0);
     }
 
