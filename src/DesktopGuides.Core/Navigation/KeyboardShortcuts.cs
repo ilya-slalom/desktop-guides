@@ -1,12 +1,13 @@
 namespace DesktopGuides.Core.Navigation;
 
-public enum ShortcutContext { Everywhere, Library, LibrarySearch, Game, Reader, Dialog }
+public enum ShortcutContext { Everywhere, Library, LibrarySearch, Game, Reader, Dialog, Online }
 
 public enum ShortcutCommand
 {
     Back, FocusLibrarySearch, ClearLibrarySearch, ImportGuide, PreviousPage, NextPage,
     PageStart, PageEnd, PreviousGuidePage, NextGuidePage, GoToPage, ZoomIn, ZoomOut, ZoomReset, FindInGuide, FindNext, FindPrevious,
-    ShowContents, AddBookmark, ShowBookmarks, ShowMaps, CloseDialog
+    ShowContents, AddBookmark, ShowBookmarks, ShowMaps, CloseDialog,
+    FocusAddress, SaveOnline
 }
 
 public sealed record KeyboardShortcut(
@@ -25,6 +26,8 @@ public static class KeyboardShortcuts
         new(ShortcutContext.Library, "Ctrl+F", ShortcutCommand.FocusLibrarySearch, "Search the library"),
         new(ShortcutContext.LibrarySearch, "Esc", ShortcutCommand.ClearLibrarySearch, "Clear the search"),
         new(ShortcutContext.Game, "Ctrl+O", ShortcutCommand.ImportGuide, "Import a guide"),
+        new(ShortcutContext.Online, "Ctrl+L", ShortcutCommand.FocusAddress, "Go to the address box (Find online)"),
+        new(ShortcutContext.Online, "Ctrl+S", ShortcutCommand.SaveOnline, "Save the guide to the library (Find online)"),
         new(ShortcutContext.Reader, "Page Up", ShortcutCommand.PreviousPage, "Previous page (TXT, PDF)"),
         new(ShortcutContext.Reader, "Page Down", ShortcutCommand.NextPage, "Next page (TXT, PDF)"),
         new(ShortcutContext.Reader, "Ctrl+Home", ShortcutCommand.PageStart, "Go to start (TXT, PDF)"),

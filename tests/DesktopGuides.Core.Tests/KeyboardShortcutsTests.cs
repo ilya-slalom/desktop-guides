@@ -14,6 +14,8 @@ public sealed class KeyboardShortcutsTests
                 (ShortcutContext.Library, "Ctrl+F", ShortcutCommand.FocusLibrarySearch, "Search the library"),
                 (ShortcutContext.LibrarySearch, "Esc", ShortcutCommand.ClearLibrarySearch, "Clear the search"),
                 (ShortcutContext.Game, "Ctrl+O", ShortcutCommand.ImportGuide, "Import a guide"),
+                (ShortcutContext.Online, "Ctrl+L", ShortcutCommand.FocusAddress, "Go to the address box (Find online)"),
+                (ShortcutContext.Online, "Ctrl+S", ShortcutCommand.SaveOnline, "Save the guide to the library (Find online)"),
                 (ShortcutContext.Reader, "Page Up", ShortcutCommand.PreviousPage, "Previous page (TXT, PDF)"),
                 (ShortcutContext.Reader, "Page Down", ShortcutCommand.NextPage, "Next page (TXT, PDF)"),
                 (ShortcutContext.Reader, "Ctrl+Home", ShortcutCommand.PageStart, "Go to start (TXT, PDF)"),

@@ -34,6 +34,7 @@ public static class ShortcutRouting
             ShortcutContext.LibrarySearch => route is LibraryRoute && textInputFocused,
             ShortcutContext.Game => route is GameRoute,
             ShortcutContext.Reader => route is ReaderRoute,
+            ShortcutContext.Online => route is OnlineRoute,
             _ => false
         };
         return inContext ? ShortcutDecision.Run : ShortcutDecision.Ignore;

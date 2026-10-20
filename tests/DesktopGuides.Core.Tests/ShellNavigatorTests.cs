@@ -279,4 +279,19 @@ public sealed class ShellNavigatorTests
         Assert.True(navigator.GoBack());
         Assert.Equal(new GameRoute(game), navigator.Current);
     }
+
+    // S22: Find online opens from a game, and Back returns to it.
+    [Fact]
+    public void OpeningOnlineFromAGameReturnsToItOnBack()
+    {
+        ShellNavigator navigator = new();
+        Guid gameId = Guid.NewGuid();
+        navigator.OpenGame(gameId);
+
+        navigator.OpenOnline(gameId);
+
+        Assert.Equal(new OnlineRoute(gameId), navigator.Current);
+        Assert.True(navigator.GoBack());
+        Assert.Equal(new GameRoute(gameId), navigator.Current);
+    }
 }

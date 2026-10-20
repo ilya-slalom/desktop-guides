@@ -1,4 +1,10 @@
 <Project>
+  <!-- S22: the online sources a build includes. `-p:IncludeGameFaqs=false`
+       leaves one out; its pasted URLs are then refused like any other site. -->
+  <PropertyGroup>
+    <IncludeGameFaqs Condition="'$(IncludeGameFaqs)' == ''">true</IncludeGameFaqs>
+    <IncludeNeoseeker Condition="'$(IncludeNeoseeker)' == ''">true</IncludeNeoseeker>
+  </PropertyGroup>
   <!-- `-p:Portable=true` builds the unpackaged, self-contained app. Its outputs
        live outside the project folders so neither build globs the other's files. -->
   <PropertyGroup Condition="'$(Portable)' == 'true'">

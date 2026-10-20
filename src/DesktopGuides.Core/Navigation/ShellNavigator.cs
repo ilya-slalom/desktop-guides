@@ -10,6 +10,9 @@ public sealed record ReaderRoute(Guid GuideId, Guid GameId) : ShellRoute;
 
 public sealed record SettingsRoute : ShellRoute;
 
+// S22: Find online for one game.
+public sealed record OnlineRoute(Guid GameId) : ShellRoute;
+
 public sealed class ShellNavigator
 {
     // Each entry keeps an optional anchor: the focused game on the Library,
@@ -55,6 +58,16 @@ public sealed class ShellNavigator
         }
         CurrentAnchor = guideId;
         Navigate(reader);
+    }
+
+    public void OpenOnline(Guid gameId)
+    {
+        RequireId(gameId);
+        if (Current is not GameRoute game || game.GameId != gameId)
+        {
+            Navigate(new GameRoute(gameId));
+        }
+        Navigate(new OnlineRoute(gameId));
     }
 
     public void SetAnchor(Guid? anchorId)

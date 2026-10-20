@@ -1,0 +1,7 @@
+<Project>
+  <!-- S22: appended after each project's own DefineConstants, so none replaces them. -->
+  <PropertyGroup>
+    <DefineConstants Condition="'$(IncludeGameFaqs)' == 'true'">$(DefineConstants);SOURCE_GAMEFAQS</DefineConstants>
+    <DefineConstants Condition="'$(IncludeNeoseeker)' == 'true'">$(DefineConstants);SOURCE_NEOSEEKER</DefineConstants>
+  </PropertyGroup>
+</Project>
