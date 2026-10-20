@@ -57,12 +57,12 @@ public sealed class ManagedPathResolver : ILibraryPaths
         }
     }
 
-    private static void RejectDatabaseFileLinks(string path)
+    private static void RejectDatabaseFileLinks(string path, bool sidecar = false)
     {
         RejectFilesystemLinks(path);
         if (OperatingSystem.IsWindows() && File.Exists(path))
         {
-            WindowsFileLinks.RejectMultipleHardLinks(path);
+            WindowsFileLinks.RejectMultipleHardLinks(path, beingDeletedPasses: sidecar);
         }
     }
 
@@ -70,14 +70,15 @@ public sealed class ManagedPathResolver : ILibraryPaths
     // that delete is pending Windows denies access to the file. A sidecar
     // this process can't read is one SQLite here can't open either, so it
     // can't be followed: it passes. A sharing violation is tried again
-    // briefly, and a sidecar that vanished meanwhile passes too.
+    // briefly, and a sidecar that vanished meanwhile, or is being deleted
+    // under the check (#138), passes too.
     private static void ValidateSidecar(string path)
     {
         for (int attempt = 1; ; attempt++)
         {
             try
             {
-                RejectDatabaseFileLinks(path);
+                RejectDatabaseFileLinks(path, sidecar: true);
                 return;
             }
             catch (UnauthorizedAccessException)

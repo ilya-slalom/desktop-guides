@@ -2,7 +2,6 @@ using DesktopGuides.Core.Reading;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Input;
 using VirtualKey = Windows.System.VirtualKey;
 
@@ -111,9 +110,12 @@ public sealed partial class ContentsPane : UserControl
             return;
         }
         _ = FocusRetry.RunAsync(DispatcherQueue,
-            () => Tree.Visibility == Visibility.Visible &&
-                Tree.SelectedNode is TreeViewNode node && Tree.ContainerFromNode(node) is Control item &&
-                item.Focus(FocusState.Programmatic),
+            () =>
+            {
+                if (Tree.Visibility != Visibility.Visible || Tree.SelectedNode is not TreeViewNode node) return false;
+                Tree.UpdateLayout();
+                return Tree.ContainerFromNode(node) is Control item && item.Focus(FocusState.Programmatic);
+            },
             () =>
             {
                 if (SearchLink.Visibility == Visibility.Visible && SearchLink.Focus(FocusState.Programmatic)) return;
@@ -121,16 +123,13 @@ public sealed partial class ContentsPane : UserControl
             });
     }
 
-    // Whether the keyboard is somewhere in the pane.
-    public bool HasFocusWithin()
+    // Whether the keyboard is on the Contents tab's fallback (Close or the
+    // search link), where it waits for an outline still being built.
+    public bool FocusIsOnFallback()
     {
-        if (XamlRoot is null) return false;
-        for (DependencyObject? node = FocusManager.GetFocusedElement(XamlRoot) as DependencyObject;
-             node is not null; node = VisualTreeHelper.GetParent(node))
-        {
-            if (ReferenceEquals(node, this)) return true;
-        }
-        return false;
+        if (Tab != ReaderPaneTab.Contents || XamlRoot is null) return false;
+        object? focused = FocusManager.GetFocusedElement(XamlRoot);
+        return ReferenceEquals(focused, CloseButton) || ReferenceEquals(focused, SearchLink);
     }
 
     public void Clear()

@@ -895,7 +895,7 @@ public sealed class SqliteLibraryRepositoryTests
         }
 
         InvalidDataException error = Assert.Throws<InvalidDataException>(() => directory.Paths.ValidateDatabasePath());
-        Assert.Equal("Managed database file has 2 hard links.", error.Message);
+        Assert.Equal("Managed database file library.sqlite has 2 hard links.", error.Message);
     }
 
     [Fact]

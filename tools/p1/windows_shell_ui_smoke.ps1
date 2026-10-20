@@ -4169,10 +4169,13 @@ try {
                     Choose-OpenPath (Join-Path $WorkflowRoot $guide.file)
                 }
                 catch {
-                    # #138: Windows' Open dialog sometimes never comes; ask once more.
-                    if ("$_" -notlike '*The system Open dialog did not appear*') { throw }
+                    # #138: Windows' Open dialog sometimes never comes; ask once more,
+                    # if the app is ready to ask, or keep the first error.
+                    $first = $_
+                    if ("$first" -notlike '*The system Open dialog did not appear*') { throw }
                     $report.workflowPickerRetries = 1 + [int]$report.workflowPickerRetries
-                    Click-Element (Wait-EnabledById 'ImportGuideButton')
+                    try { $button = Wait-EnabledById 'ImportGuideButton' } catch { throw $first }
+                    Click-Element $button
                     Choose-OpenPath (Join-Path $WorkflowRoot $guide.file)
                 }
                 [void](Wait-VisibleById 'ImportGuideDialog')
@@ -6420,6 +6423,9 @@ try {
         Invoke-Element (Wait-EnabledById 'EditGameButton')
         [void](Wait-VisibleById 'GameTitleInput')
         Assert-ShellForeground
+        # #138: as the library screenshot does, let the dialog's backdrop
+        # settle; its open animation and Acrylic arrive after the input.
+        Start-Sleep -Milliseconds 400
         $report.dialogScreenshot = Save-WindowScreenshot "material-$selected-edit-game"
         # The dialog's own peer spans the smoke layer, so anchor on the primary
         # button inside the dialog panel's command area.
