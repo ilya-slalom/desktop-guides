@@ -119,6 +119,8 @@ public sealed class LibraryRestorerSwapTests : IAsyncLifetime
     {
         if (!OperatingSystem.IsWindows()) return;
         LibraryRestoreStage stage = await fixture.StageAsync();
+        // The handle below is another process; the app's own is closed (#94).
+        await fixture.Target.Repository.DisposeAsync();
         IReadOnlyDictionary<string, string> before = fixture.LiveEntries();
 
         LibraryRestoreException error;

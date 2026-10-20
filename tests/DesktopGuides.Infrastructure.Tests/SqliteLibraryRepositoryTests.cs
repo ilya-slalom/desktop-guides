@@ -796,9 +796,14 @@ public sealed class SqliteLibraryRepositoryTests
     public async Task RejectsLinkedSharedMemoryFileBeforeModifyingItsTarget()
     {
         using TestLibrary directory = new();
+        // #94: an open library holds -shm, so the link is planted between
+        // sessions, as an attacker would have to.
+        await using (SqliteLibraryRepository first = new(directory.Paths))
+        {
+            await first.InitializeAsync();
+            await first.AddGameAsync("Keep", null, null);
+        }
         await using SqliteLibraryRepository repository = new(directory.Paths);
-        await repository.InitializeAsync();
-        await repository.AddGameAsync("Keep", null, null);
 
         string sharedMemory = directory.Paths.DatabasePath + "-shm";
         if (File.Exists(sharedMemory))
@@ -896,6 +901,28 @@ public sealed class SqliteLibraryRepositoryTests
 
         InvalidDataException error = Assert.Throws<InvalidDataException>(() => directory.Paths.ValidateDatabasePath());
         Assert.Equal("Managed database file library.sqlite has 2 hard links.", error.Message);
+    }
+
+    // #94: while the library is open, one connection keeps the WAL, so an
+    // operation's connection closing is never the last one. The last close
+    // checkpoints and deletes the WAL under a lock that stalls a write
+    // arriving then (Microsoft.Data.Sqlite retries in 150 ms sleeps).
+    [Fact]
+    public async Task TheWalStaysWhileTheLibraryIsOpenAndGoesWhenItCloses()
+    {
+        using TestLibrary directory = new();
+        string wal = directory.Paths.DatabasePath + "-wal";
+        await using (SqliteLibraryRepository repository = new(directory.Paths))
+        {
+            await repository.InitializeAsync();
+            await repository.AddGameAsync("Kept", null, null);
+            Assert.True(File.Exists(wal), "the WAL was deleted while the library was open");
+        }
+        Assert.False(File.Exists(wal), "the WAL outlived the library");
+
+        await using SqliteLibraryRepository reopened = new(directory.Paths);
+        await reopened.InitializeAsync();
+        Assert.Equal("Kept", Assert.Single(await reopened.ListGamesAsync()).Title);
     }
 
     [Fact]

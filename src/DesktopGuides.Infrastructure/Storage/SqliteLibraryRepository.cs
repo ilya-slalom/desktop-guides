@@ -31,6 +31,11 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
     private readonly TimeProvider clock;
     private readonly Action<int>? migrationCheckpoint;
     private readonly SemaphoreSlim writeGate = new(1, 1);
+    // #94: one connection held while the library is open, joined to the WAL,
+    // so no operation's close is the last one. The last close checkpoints
+    // and deletes the WAL under a lock, and a write arriving then retries in
+    // 150 ms sleeps; enough of those passed the 2 s save budget.
+    private SqliteConnection? walAnchor;
     private WriteMarks? lastWrite;
 
     public SqliteLibraryRepository(ILibraryPaths paths, TimeProvider? clock = null)
@@ -49,7 +54,12 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
     public StartupReconciliationReport? LastStartupReconciliation { get; private set; }
 
     public Task InitializeAsync(CancellationToken token = default) =>
-        WriteAsync(Initialize, token);
+        WriteAsync(() =>
+        {
+            CloseWalAnchor();
+            Initialize();
+            OpenWalAnchor();
+        }, token);
 
     public Task<Game> AddGameAsync(
         string title, string? platform, string? notes, CancellationToken token = default)
@@ -930,8 +940,34 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
 
     public ValueTask DisposeAsync()
     {
+        // The last connection to close checkpoints the WAL into the database.
+        CloseWalAnchor();
         writeGate.Dispose();
         return ValueTask.CompletedTask;
+    }
+
+    private void OpenWalAnchor()
+    {
+        SqliteConnection anchor = OpenConnection();
+        try
+        {
+            // A statement joins the WAL; an idle open connection doesn't.
+            using SqliteCommand join = anchor.CreateCommand();
+            join.CommandText = "SELECT COUNT(*) FROM sqlite_master";
+            join.ExecuteScalar();
+        }
+        catch
+        {
+            anchor.Dispose();
+            throw;
+        }
+        walAnchor = anchor;
+    }
+
+    private void CloseWalAnchor()
+    {
+        walAnchor?.Dispose();
+        walAnchor = null;
     }
 
     private void Initialize()
