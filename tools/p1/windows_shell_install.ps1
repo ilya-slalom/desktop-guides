@@ -1910,7 +1910,7 @@ function Invoke-OnlineMode([string] $mode, [string] $fixtures) {
     Start-InstalledShell
     $processId = $report.launchedProcessId
     $gates = @(
-        foreach ($name in @('OnlineFixtures', 'ExternalLaunch')) {
+        foreach ($name in @('OnlineFixtures', 'ExternalLaunch', 'CrashDiagnostics')) {
             [System.Threading.EventWaitHandle]::new(
                 $false, [System.Threading.EventResetMode]::ManualReset,
                 "Local\$eventPrefix.$name.$processId")
@@ -1921,6 +1921,10 @@ function Invoke-OnlineMode([string] $mode, [string] $fixtures) {
     }
     finally {
         foreach ($gate in $gates) { $gate.Dispose() }
+        $crash = Join-Path (Get-HtmlCacheRoot) "diagnostics\unhandled-$processId.txt"
+        if (Test-Path -LiteralPath $crash) {
+            Copy-Item -LiteralPath $crash -Destination (Join-Path $ResultDirectory "$mode-unhandled.txt") -Force
+        }
     }
 }
 

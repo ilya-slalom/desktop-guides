@@ -40,6 +40,34 @@ public sealed partial class ShellWindow
     private CaptureStore Captures => captureStore ??=
         new CaptureStore(Path.Combine(cacheRoot!, "online-captures"), TimeProvider.System);
 
+    // Installed tests only: an unhandled exception's details, which the
+    // Application log doesn't keep, for the harness to collect.
+    private bool crashesRecorded;
+
+    private void RecordCrashesForTest()
+    {
+#if !PUBLIC_LANE
+        if (crashesRecorded || cacheRoot is not string root ||
+            !TestGate.IsOpen(AppLane.Current.LocalEvent("CrashDiagnostics", Environment.ProcessId)))
+        {
+            return;
+        }
+        crashesRecorded = true;
+        Application.Current.UnhandledException += (_, args) =>
+        {
+            try
+            {
+                string folder = Path.Combine(root, "diagnostics");
+                Directory.CreateDirectory(folder);
+                File.WriteAllText(Path.Combine(folder, $"unhandled-{Environment.ProcessId}.txt"), args.Exception.ToString());
+            }
+            catch (Exception)
+            {
+            }
+        };
+#endif
+    }
+
     private void InitializeOnline()
     {
         // Find online is available whenever the game page can import.

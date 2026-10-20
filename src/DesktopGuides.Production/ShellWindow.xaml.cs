@@ -438,6 +438,7 @@ public sealed partial class ShellWindow : Window
                 AppDataRoot.HasPackageIdentity(),
                 () => ApplicationData.Current.LocalCacheFolder.Path,
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+            RecordCrashesForTest();
             mapCache?.CancelAll();
             mapStore = new MapTileStore(cacheRoot);
             mapCache = new MapCacheQueue(mapStore, cacheRoot);

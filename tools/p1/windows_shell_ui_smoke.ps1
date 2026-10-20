@@ -7957,6 +7957,7 @@ try {
                 catch [System.Windows.Automation.ElementNotAvailableException] { }
                 Start-Sleep -Milliseconds 250
             } while ((Get-Date) -lt $deadline)
+            try { $report.onlineTimeoutScreenshot = Save-WindowScreenshot 'online-timeout' } catch { }
             throw "Timed out waiting for $what."
         }
         function Open-FindOnline {

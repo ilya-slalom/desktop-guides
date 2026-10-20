@@ -123,9 +123,10 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
             await stream.CopyToAsync(copy);
             lock (collecting) collecting[url] = copy.ToArray();
         }
-        catch (Exception error) when (error is IOException or System.Runtime.InteropServices.COMException)
+        catch (Exception)
         {
-            // An image whose body isn't available is loaded directly later.
+            // An async void handler must never throw: an image whose body
+            // isn't available is loaded directly later.
         }
     }
 
