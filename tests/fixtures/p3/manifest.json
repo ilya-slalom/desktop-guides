@@ -47,6 +47,13 @@
       "status": 200,
       "file": "online/neoseeker-home.html",
       "contentType": "text/html"
+    },
+    {
+      "url": "https://gamefaqs.gamespot.com/out",
+      "status": 200,
+      "file": "online/out.html",
+      "contentType": "text/html",
+      "location": null
     }
   ]
 }

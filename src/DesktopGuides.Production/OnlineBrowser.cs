@@ -134,11 +134,13 @@ internal sealed class OnlineBrowser : IAsyncDisposable
     internal void AnswerFromFixtures(CoreWebView2 core, CoreWebView2WebResourceRequestedEventArgs args)
     {
         if (!Uri.TryCreate(args.Request.Uri, UriKind.Absolute, out Uri? url) || url.Scheme == "data") return;
-        fixtures!.TryAnswer(url, out int status, out string contentType, out string? file);
+        fixtures!.TryAnswer(url, out int status, out string contentType, out string? file, out string? location);
+        // In memory, so no fixture file stays open in the browser.
         IRandomAccessStream? body = file is not null && File.Exists(file)
-            ? File.OpenRead(file).AsRandomAccessStream() : null;
+            ? new MemoryStream(File.ReadAllBytes(file)).AsRandomAccessStream() : null;
+        string headers = $"Content-Type: {contentType}" + (location is null ? "" : $"\r\nLocation: {location}");
         args.Response = environment.CreateWebResourceResponse(
-            body, status, status == 200 ? "OK" : "Fixture", $"Content-Type: {contentType}");
+            body, status, status == 200 ? "OK" : "Fixture", headers);
         FixtureServed?.Invoke(url, file);
     }
 

@@ -51,6 +51,17 @@ public sealed class OnlineFixtureRoutesTests : IDisposable
         Assert.Throws<InvalidDataException>(() => OnlineFixtureRoutes.Load(Path.Combine(root, "manifest.json")));
     }
 
+    [Fact]
+    public void ARedirectRouteGivesItsLocation()
+    {
+        File.WriteAllText(Path.Combine(root, "manifest.json"), """
+            { "routes": [ { "url": "https://gamefaqs.gamespot.com/out", "status": 302, "file": null, "contentType": "text/html", "location": "https://www.example.com/x" } ] }
+            """);
+        OnlineFixtureRoutes routes = OnlineFixtureRoutes.Load(Path.Combine(root, "manifest.json"));
+        Assert.True(routes.TryAnswer(new Uri("https://gamefaqs.gamespot.com/out"), out int status, out _, out string? file, out string? location));
+        Assert.Equal((302, null, "https://www.example.com/x"), (status, file, location));
+    }
+
     // The installed online group's manifest loads, and every route's file exists.
     [Fact]
     public void TheInstalledGroupsManifestIsValid()

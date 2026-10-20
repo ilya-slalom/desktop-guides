@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace DesktopGuides.Infrastructure.Online;
 
-internal sealed record OnlineFixtureRoute(string Url, int Status, string? File, string ContentType);
+internal sealed record OnlineFixtureRoute(string Url, int Status, string? File, string ContentType, string? Location = null);
 
 internal sealed record OnlineFixtureManifest(List<OnlineFixtureRoute> Routes);
 
@@ -32,7 +32,11 @@ public sealed class OnlineFixtureRoutes
         return loaded;
     }
 
-    public bool TryAnswer(Uri url, out int status, out string contentType, out string? filePath)
+    public bool TryAnswer(Uri url, out int status, out string contentType, out string? filePath) =>
+        TryAnswer(url, out status, out contentType, out filePath, out _);
+
+    /// <summary>As above, with a redirect's target, for a route that answers 3xx.</summary>
+    public bool TryAnswer(Uri url, out int status, out string contentType, out string? filePath, out string? location)
     {
         lock (gate)
         {
@@ -42,12 +46,14 @@ public sealed class OnlineFixtureRoutes
                 status = route.Status;
                 contentType = route.ContentType;
                 filePath = route.File is null ? null : Resolve(route.File);
+                location = route.Location;
                 return true;
             }
         }
         status = 599;
         contentType = "text/plain";
         filePath = null;
+        location = null;
         return false;
     }
 
