@@ -8025,7 +8025,7 @@ try {
             Save-Online
             Wait-Until { -not (Find-ById 'OnlineProgress').Current.IsOffscreen } 'the save progress'
             $report.onlineSavingScreenshot = Save-WindowScreenshot 'online-saving'
-            Wait-OnlineStatus "Saved $sagaTitle to $game." 150
+            Wait-OnlineStatus "Saved $sagaTitle to $game." 90
             # A restrictive notice asks first; Cancel saves nothing.
             Go-Online $textFaq
             Wait-Save $true 'the text FAQ'
@@ -8038,7 +8038,7 @@ try {
             Save-Online
             Wait-Until { Find-VisibleName "This guide's notice limits copies" } 'the notice dialog again'
             Invoke-Named 'Save for personal reading'
-            Wait-OnlineStatus "Saved Example Quest Walkthrough to $game." 120
+            Wait-OnlineStatus "Saved Example Quest Walkthrough to $game." 60
             # Review Focus 4 and 5: both read in the readers, which never reach the network.
             # The title bar's Back: Alt+Left inside the web page is the page's own back.
             Go-Back
@@ -8056,7 +8056,7 @@ try {
             Go-Online ($saga + 'introduction')
             Wait-Save $true 'the guide'
             Save-Online
-            Wait-OnlineStatus "Replaced $sagaTitle. Your place is kept." 150
+            Wait-OnlineStatus "Replaced $sagaTitle. Your place is kept." 90
             $report.phases += 'online-resave'
         }
         elseif ($Mode -eq 'online-pause') {
@@ -8069,7 +8069,7 @@ try {
             # The site lets the reader through.
             Set-ManifestFile ($saga + 'cairn') 'gamefaqs/html-slug-cairn.html'
             Invoke-Named 'Resume'
-            Wait-OnlineStatus "Saved $sagaTitle to $game." 150
+            Wait-OnlineStatus "Saved $sagaTitle to $game." 90
             $report.phases += 'online-pause'
         }
         elseif ($Mode -eq 'online-resume') {
@@ -8083,7 +8083,7 @@ try {
             [void](Wait-Name 'OnlineHeading' "Find online: $game")
             Wait-OnlineInfo 'An unfinished save of'
             Invoke-Named 'Resume'
-            Wait-OnlineStatus "Saved $sagaTitle to $game." 150
+            Wait-OnlineStatus "Saved $sagaTitle to $game." 90
             $report.phases += 'online-resume'
         }
     }

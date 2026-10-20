@@ -16,13 +16,11 @@ internal sealed class OnlineBrowser : IAsyncDisposable
 {
     private readonly CoreWebView2Environment environment;
     private readonly OnlineFixtureRoutes? fixtures;
-    private readonly nint window;
     private bool disposed;
 
-    private OnlineBrowser(CoreWebView2Environment environment, WebView2 view, nint window, OnlineFixtureRoutes? fixtures)
+    private OnlineBrowser(CoreWebView2Environment environment, WebView2 view, OnlineFixtureRoutes? fixtures)
     {
         this.environment = environment;
-        this.window = window;
         this.fixtures = fixtures;
         View = view;
     }
@@ -41,7 +39,7 @@ internal sealed class OnlineBrowser : IAsyncDisposable
 
     private string? loadLog;
 
-    public static async Task<OnlineBrowser> CreateAsync(string cacheRoot, nint window, OnlineFixtureRoutes? fixtures)
+    public static async Task<OnlineBrowser> CreateAsync(string cacheRoot, OnlineFixtureRoutes? fixtures)
     {
         string profile = ProfileFolder(cacheRoot);
         Directory.CreateDirectory(profile);
@@ -50,7 +48,7 @@ internal sealed class OnlineBrowser : IAsyncDisposable
             null, profile, new CoreWebView2EnvironmentOptions());
         WebView2 view = new();
         await view.EnsureCoreWebView2Async(environment);
-        OnlineBrowser browser = new(environment, view, window, fixtures);
+        OnlineBrowser browser = new(environment, view, fixtures);
 #if !PUBLIC_LANE
         if (fixtures is not null)
         {
@@ -58,7 +56,7 @@ internal sealed class OnlineBrowser : IAsyncDisposable
             Directory.CreateDirectory(Path.GetDirectoryName(browser.loadLog)!);
         }
 #endif
-        browser.Configure(view.CoreWebView2, visible: true);
+        browser.Configure(view.CoreWebView2);
         view.CoreWebView2.NavigationCompleted += (_, _) => browser.PageLoaded?.Invoke(browser, EventArgs.Empty);
         return browser;
     }
@@ -75,33 +73,42 @@ internal sealed class OnlineBrowser : IAsyncDisposable
         return System.Text.Json.JsonSerializer.Deserialize(json, ProductionJsonContext.Default.String) ?? "";
     }
 
-    /// <summary>A hidden browser on the same session, for capturing pages.</summary>
-    public async Task<WebViewPageLoader> CreateLoaderAsync()
+    // The capture running in this browser, if any: its image loads may leave the sources.
+    private WebViewPageLoader? capture;
+
+    /// <summary>
+    /// A loader that steps this browser through a guide's pages. While it
+    /// is in use, the caller keeps the reader from browsing.
+    /// </summary>
+    public WebViewPageLoader CreateLoader()
     {
-        CoreWebView2Controller controller = await environment.CreateCoreWebView2ControllerAsync(
-            CoreWebView2ControllerWindowReference.CreateFromWindowHandle((ulong)window));
-        // Visible to Chromium but outside the window, which clips it: a
-        // hidden renderer can be throttled until its navigation stalls.
-        controller.Bounds = new Windows.Foundation.Rect(-4000, 0, 1280, 2000);
-        controller.IsVisible = true;
-        WebViewPageLoader loader = new(controller, loadLog);
-        Configure(controller.CoreWebView2, visible: false, loader);
+        ObjectDisposedException.ThrowIf(disposed, this);
+        WebViewPageLoader loader = new(View.CoreWebView2, loadLog);
+        capture = loader;
 #if !PUBLIC_LANE
         FixtureServed += loader.RecordServed;
 #endif
         return loader;
     }
 
-    internal void Configure(CoreWebView2 core, bool visible, WebViewPageLoader? loader = null)
+    public void EndCapture(WebViewPageLoader loader)
+    {
+#if !PUBLIC_LANE
+        FixtureServed -= loader.RecordServed;
+#endif
+        if (ReferenceEquals(capture, loader)) capture = null;
+        loader.Dispose();
+    }
+
+    internal void Configure(CoreWebView2 core)
     {
         core.Settings.IsWebMessageEnabled = false;
         core.Settings.AreHostObjectsAllowed = false;
-        core.Settings.IsStatusBarEnabled = visible;
 #if PUBLIC_LANE
         core.Settings.AreDevToolsEnabled = false;
 #endif
-        core.NavigationStarting += (_, args) => OnNavigationStarting(args, visible, loader);
-        core.NewWindowRequested += (_, args) => OnNewWindowRequested(args, visible);
+        core.NavigationStarting += (_, args) => OnNavigationStarting(args);
+        core.NewWindowRequested += (_, args) => OnNewWindowRequested(args);
         core.PermissionRequested += (_, args) => args.State = CoreWebView2PermissionState.Deny;
         core.DownloadStarting += (_, args) => args.Cancel = true;
         core.LaunchingExternalUriScheme += (_, args) => args.Cancel = true;
@@ -114,33 +121,32 @@ internal sealed class OnlineBrowser : IAsyncDisposable
 #endif
     }
 
-    // Off the sources, a page never loads here. In the visible browser a
-    // link the user followed opens in the system browser; a navigation a
-    // script started (an ad redirect, say) is only stopped. The hidden
-    // browser launches nothing, and leaves the sources only for the image
-    // it was asked to load.
-    private void OnNavigationStarting(CoreWebView2NavigationStartingEventArgs args, bool visible, WebViewPageLoader? loader)
+    // Off the sources, a page never loads here: a link the user followed
+    // opens in the system browser, and a navigation a script started (an
+    // ad redirect, say) is only stopped. During a capture nothing launches,
+    // and the browser leaves the sources only for the image it was asked to load.
+    private void OnNavigationStarting(CoreWebView2NavigationStartingEventArgs args)
     {
         if (!Uri.TryCreate(args.Uri, UriKind.Absolute, out Uri? url) || url.Scheme == "about" ||
             OnlineSources.Find(url) is not null)
         {
             return;
         }
-        if (!visible && loader?.ImageTarget is { } image && image == url)
+        if (capture?.ImageTarget is { } image && image == url)
         {
             return;
         }
         args.Cancel = true;
-        if (visible && args.IsUserInitiated && IsWeb(url))
+        if (capture is null && args.IsUserInitiated && IsWeb(url))
         {
             ExternalLinkRequested?.Invoke(this, url);
         }
     }
 
-    private void OnNewWindowRequested(CoreWebView2NewWindowRequestedEventArgs args, bool visible)
+    private void OnNewWindowRequested(CoreWebView2NewWindowRequestedEventArgs args)
     {
         args.Handled = true;
-        if (visible && args.IsUserInitiated && Uri.TryCreate(args.Uri, UriKind.Absolute, out Uri? url) && IsWeb(url))
+        if (capture is null && args.IsUserInitiated && Uri.TryCreate(args.Uri, UriKind.Absolute, out Uri? url) && IsWeb(url))
         {
             ExternalLinkRequested?.Invoke(this, url);
         }

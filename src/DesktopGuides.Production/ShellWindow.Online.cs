@@ -10,7 +10,6 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Windows.System;
-using WinRT.Interop;
 
 namespace DesktopGuides.Production;
 
@@ -27,7 +26,6 @@ public sealed partial class ShellWindow
         };
 
     private OnlineBrowser? onlineBrowser;
-    private WebViewPageLoader? onlineLoader;
     private CaptureStore? captureStore;
     private CancellationTokenSource? onlineCapture;
     private Task? onlineCaptureRun;
@@ -36,6 +34,9 @@ public sealed partial class ShellWindow
     private Guid onlineGameId;
     private string onlineGameTitle = "";
     private bool onlineSourceSuppressed;
+    // The next page load keeps the status line: the browser returning to the
+    // reader's page after a save mustn't hide the save's outcome.
+    private bool onlineKeepStatus;
 
     private CaptureStore Captures => captureStore ??=
         new CaptureStore(Path.Combine(cacheRoot!, "online-captures"), TimeProvider.System);
@@ -111,15 +112,19 @@ public sealed partial class ShellWindow
         {
             try
             {
-                onlineBrowser = await OnlineBrowser.CreateAsync(
-                    cacheRoot!, WindowNative.GetWindowHandle(this), OnlineFixtures());
+                onlineBrowser = await OnlineBrowser.CreateAsync(cacheRoot!, OnlineFixtures());
             }
             catch (Exception)
             {
                 OnlineStatus.Text = "The in-app browser couldn't start. Repair the WebView2 Runtime, then try again.";
                 return;
             }
-            onlineBrowser.PageLoaded += (_, _) => _ = UpdateOnlineSaveAsync();
+            onlineBrowser.PageLoaded += (_, _) =>
+            {
+                bool keep = onlineKeepStatus;
+                onlineKeepStatus = false;
+                _ = UpdateOnlineSaveAsync(keep);
+            };
             onlineBrowser.ExternalLinkRequested += (_, url) => _ = ExternalLinkLaunchers.Create(cacheRoot!).LaunchAsync(url);
             OnlineBrowserHost.Child = onlineBrowser.View;
         }
@@ -161,8 +166,6 @@ public sealed partial class ShellWindow
                 // Reported by the capture itself.
             }
         }
-        onlineLoader?.Dispose();
-        onlineLoader = null;
         if (onlineBrowser is not null)
         {
             OnlineBrowserHost.Child = null;
@@ -319,14 +322,21 @@ public sealed partial class ShellWindow
         OnlineSave.IsEnabled = false;
         OnlineProgressRow.Visibility = Visibility.Visible;
         ShowCaptureProgress(draft.Captured.Count, draft.Pages.Count);
+        // The capture steps this browser through the guide; the reader
+        // watches, and browses again when it ends.
+        OnlineBrowser browser = onlineBrowser;
+        Uri? returnTo = browser.CurrentUrl;
+        SetOnlineBrowsing(false);
+        WebViewPageLoader loader = browser.CreateLoader();
         try
         {
-            onlineLoader ??= await onlineBrowser.CreateLoaderAsync();
-            GuideCapture capture = new(OnlineAdapters[draft.Item.Site], onlineLoader, TimeProvider.System);
+            GuideCapture capture = new(OnlineAdapters[draft.Item.Site], loader, TimeProvider.System);
             CaptureOutcome outcome = await capture.RunAsync(
                 draft, new Progress<(int Done, int Total)>(step => ShowCaptureProgress(step.Done, step.Total)), token);
             if (outcome is CaptureOutcome.Paused paused)
             {
+                // The refused page is showing; the reader may need it to confirm they're a person.
+                returnTo = null;
                 ShowPaused(paused);
                 return;
             }
@@ -345,15 +355,36 @@ public sealed partial class ShellWindow
         }
         finally
         {
+            browser.EndCapture(loader);
+            SetOnlineBrowsing(true);
             onlineCapture.Dispose();
             onlineCapture = null;
             OnlineProgressRow.Visibility = Visibility.Collapsed;
-            // A page that loaded during the capture wasn't read; read what's showing now,
-            // so Save never offers the guide just saved for another page.
+            // Pages loaded during the capture weren't read; the page the
+            // browser returns to is, when it loads.
             onlineReading = null;
             OnlineSave.IsEnabled = false;
-            if (onlineBrowser is not null) _ = UpdateOnlineSaveAsync(keepStatus: true);
+            if (ReferenceEquals(onlineBrowser, browser))
+            {
+                if (returnTo is not null)
+                {
+                    onlineKeepStatus = true;
+                    browser.Navigate(returnTo);
+                }
+                else
+                {
+                    _ = UpdateOnlineSaveAsync(keepStatus: true);
+                }
+            }
         }
+    }
+
+    private void SetOnlineBrowsing(bool enabled)
+    {
+        OnlineSource.IsEnabled = enabled;
+        OnlineAddress.IsEnabled = enabled;
+        OnlineGo.IsEnabled = enabled;
+        OnlineBrowserHost.IsHitTestVisible = enabled;
     }
 
     private void ShowCaptureProgress(int done, int total)

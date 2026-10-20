@@ -4,14 +4,15 @@ using Microsoft.Web.WebView2.Core;
 namespace DesktopGuides.Production;
 
 /// <summary>
-/// S22: loads capture pages in a hidden browser on the in-app browser's
-/// session, one at a time. Images come from the page load's own responses;
-/// the page is scrolled to start lazy images. A load gives up after 30 s.
+/// S22: loads capture pages in the in-app browser itself, one at a time, as
+/// a person stepping through the guide would. Images come from the page
+/// load's own responses; the page is scrolled to start lazy images. A load
+/// that doesn't finish in 30 s is tried once more.
 /// </summary>
 internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
-    private readonly CoreWebView2Controller controller;
+    private readonly CoreWebView2 core;
     private readonly SemaphoreSlim one = new(1, 1);
     private Dictionary<Uri, byte[]>? images;
 
@@ -21,11 +22,12 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
     // Installed tests only: one line per load, for diagnosing a stalled capture.
     private readonly string? loadLog;
 
-    internal WebViewPageLoader(CoreWebView2Controller controller, string? loadLog = null)
+    // The browser stays the view's; the loader only borrows it for a capture.
+    internal WebViewPageLoader(CoreWebView2 core, string? loadLog = null)
     {
         this.loadLog = loadLog;
-        this.controller = controller;
-        controller.CoreWebView2.WebResourceResponseReceived += OnResponseReceived;
+        this.core = core;
+        core.WebResourceResponseReceived += OnResponseReceived;
     }
 
     // Test runs: an image the fixtures served, which WebView2 may not report
@@ -42,7 +44,7 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
         lock (collecting) collecting[url] = bytes;
     }
 
-    private CoreWebView2 Core => controller.CoreWebView2;
+    private CoreWebView2 Core => core;
 
     public async Task<PageLoad> LoadPageAsync(Uri url, CancellationToken token)
     {
@@ -184,8 +186,7 @@ internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
 
     public void Dispose()
     {
-        controller.CoreWebView2.WebResourceResponseReceived -= OnResponseReceived;
-        controller.Close();
+        core.WebResourceResponseReceived -= OnResponseReceived;
         one.Dispose();
     }
 }
