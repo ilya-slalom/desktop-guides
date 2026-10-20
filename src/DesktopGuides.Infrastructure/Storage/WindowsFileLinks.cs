@@ -31,9 +31,16 @@ internal static class WindowsFileLinks
             throw new IOException("Managed database file link count could not be checked.",
                 new Win32Exception(Marshal.GetLastPInvokeError()));
         }
+        // #138: the count and a pending delete are named, so a failure says
+        // which it was.
+        if (info.DeletePending != 0)
+        {
+            throw new InvalidDataException(
+                $"Managed database file is being deleted ({info.NumberOfLinks} hard links).");
+        }
         if (info.NumberOfLinks != 1)
         {
-            throw new InvalidDataException("Managed database file has multiple hard links.");
+            throw new InvalidDataException($"Managed database file has {info.NumberOfLinks} hard links.");
         }
     }
 

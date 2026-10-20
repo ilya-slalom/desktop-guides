@@ -867,6 +867,37 @@ public sealed class SqliteLibraryRepositoryTests
         Assert.Equal(1L, (long)version.ExecuteScalar()!);
     }
 
+    // #138: the refusal names the link count, so a CI failure tells a second
+    // link from a file that is being deleted.
+    [Fact]
+    public void AHardLinkedDatabaseNamesItsLinkCount()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using TestLibrary directory = new();
+        directory.Paths.EnsureCreated();
+        string outside = Path.Combine(directory.Root, "outside.sqlite");
+        File.WriteAllBytes(outside, [1]);
+        ProcessStartInfo start = new(
+            "cmd.exe", $"/c mklink /H \"{directory.Paths.DatabasePath}\" \"{outside}\"")
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true
+        };
+        using (Process process = Process.Start(start)!)
+        {
+            process.WaitForExit();
+            Assert.True(process.ExitCode == 0, process.StandardError.ReadToEnd());
+        }
+
+        InvalidDataException error = Assert.Throws<InvalidDataException>(() => directory.Paths.ValidateDatabasePath());
+        Assert.Equal("Managed database file has 2 hard links.", error.Message);
+    }
+
     [Fact]
     public async Task RejectsAlteredVersionOneConstraintsBeforeBackup()
     {
