@@ -8,7 +8,7 @@ namespace DesktopGuides.Production;
 /// session, one at a time. Images come from the page load's own responses;
 /// the page is scrolled to start lazy images. A load gives up after 30 s.
 /// </summary>
-internal sealed class WebViewPageLoader : IPageLoader, IDisposable
+internal sealed partial class WebViewPageLoader : IPageLoader, IDisposable
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
     private readonly CoreWebView2Controller controller;
