@@ -100,24 +100,37 @@ public sealed partial class ContentsPane : UserControl
         if (node is not null) Tree.SelectedNode = node;
     }
 
-    // After layout, so the selected item's container exists.
-    public void FocusContent() =>
-        DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+    // After layout, so the selected item's container exists (#138: retried
+    // until the tree has made it, then the search link or Close).
+    public void FocusContent()
+    {
+        if (Tab == ReaderPaneTab.Bookmarks)
         {
-            if (Tab == ReaderPaneTab.Bookmarks)
+            BookmarksView.FocusContent();
+            return;
+        }
+        _ = FocusRetry.RunAsync(DispatcherQueue,
+            () =>
             {
-                BookmarksView.FocusContent();
-                return;
-            }
-            if (Tree.Visibility == Visibility.Visible &&
-                Tree.SelectedNode is TreeViewNode node && Tree.ContainerFromNode(node) is Control item &&
-                item.Focus(FocusState.Programmatic))
+                if (Tree.Visibility != Visibility.Visible || Tree.SelectedNode is not TreeViewNode node) return false;
+                Tree.UpdateLayout();
+                return Tree.ContainerFromNode(node) is Control item && item.Focus(FocusState.Programmatic);
+            },
+            () =>
             {
-                return;
-            }
-            if (SearchLink.Visibility == Visibility.Visible && SearchLink.Focus(FocusState.Programmatic)) return;
-            CloseButton.Focus(FocusState.Programmatic);
-        });
+                if (SearchLink.Visibility == Visibility.Visible && SearchLink.Focus(FocusState.Programmatic)) return;
+                CloseButton.Focus(FocusState.Programmatic);
+            });
+    }
+
+    // Whether the keyboard is on the Contents tab's fallback (Close or the
+    // search link), where it waits for an outline still being built.
+    public bool FocusIsOnFallback()
+    {
+        if (Tab != ReaderPaneTab.Contents || XamlRoot is null) return false;
+        object? focused = FocusManager.GetFocusedElement(XamlRoot);
+        return ReferenceEquals(focused, CloseButton) || ReferenceEquals(focused, SearchLink);
+    }
 
     public void Clear()
     {

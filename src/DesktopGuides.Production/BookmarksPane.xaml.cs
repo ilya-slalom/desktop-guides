@@ -79,17 +79,9 @@ public sealed partial class BookmarksPane : UserControl
 
     // After layout, so the selected item's container exists. Completes once
     // focus is set, so a status announced after it finds the list ready.
-    public Task FocusContentAsync()
-    {
-        TaskCompletionSource done = new();
-        bool queued = DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
-        {
-            if (!FocusSelected()) AddButton.Focus(FocusState.Programmatic);
-            done.TrySetResult();
-        });
-        if (!queued) done.TrySetResult();
-        return done.Task;
-    }
+    // #138: retried until the list has made the row, then Add bookmark.
+    public Task FocusContentAsync() =>
+        FocusRetry.RunAsync(DispatcherQueue, FocusSelected, () => AddButton.Focus(FocusState.Programmatic));
 
     // A list just shown has no item containers until layout runs, as with
     // the guide list: lay out, bring the row into view, lay out again.
