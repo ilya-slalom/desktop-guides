@@ -22,15 +22,32 @@ internal sealed class FileOperationReconciler(ILibraryPaths paths)
         HashSet<Guid> committedGuides = ReadGuideIds(connection);
         IReadOnlyList<JournalRow> rows = ReadJournalRows(connection);
         List<OperationPlan> plans = Preflight(rows, committedGuides);
+        // S22: a replacement's guide row exists in both phases; checked before anything moves.
+        JournalRow[] replacements = rows.Where(row => row.Kind == FileOperationKind.ReplaceGuide).ToArray();
+        foreach (JournalRow row in replacements)
+        {
+            ReplacementPaths(connection, row);
+        }
 
         foreach (OperationPlan plan in plans)
         {
             Resolve(plan);
             RemoveJournalRow(connection, plan.Row.Id);
         }
+        foreach (JournalRow row in replacements)
+        {
+            if (row.Phase == FileOperationPhase.Prepared)
+            {
+                UndoReplacement(connection, row);
+            }
+            else
+            {
+                FinishReplacement(connection, row);
+            }
+        }
 
         return new StartupReconciliationReport(
-            plans.Count, CountReviewOrphans(committedGuides));
+            plans.Count + replacements.Length, CountReviewOrphans(committedGuides));
     }
 
     private List<OperationPlan> Preflight(
@@ -47,6 +64,10 @@ internal sealed class FileOperationReconciler(ILibraryPaths paths)
                 if (!claimedGuides.Add(guideId))
                 {
                     throw new InvalidDataException("File operations claim the same guide.");
+                }
+                if (row.Kind == FileOperationKind.ReplaceGuide)
+                {
+                    continue;
                 }
                 bool hasGuide = committedGuides.Contains(guideId);
                 bool shouldHaveGuide =
@@ -88,7 +109,10 @@ internal sealed class FileOperationReconciler(ILibraryPaths paths)
                 }
                 guides.Add(new GuidePlan(contentPath, content, sidePath, side));
             }
-            plans.Add(new OperationPlan(row, guides, operationRoot!));
+            if (row.Kind != FileOperationKind.ReplaceGuide)
+            {
+                plans.Add(new OperationPlan(row, guides, operationRoot!));
+            }
         }
         return plans;
     }

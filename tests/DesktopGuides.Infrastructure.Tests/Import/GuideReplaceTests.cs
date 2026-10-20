@@ -242,4 +242,86 @@ public sealed class GuideReplaceTests : IAsyncLifetime
 
         SnapshotAssert.Unchanged(before, LibrarySnapshot.Capture(harness.Paths));
     }
+
+    private void AssertNoOperationLeft()
+    {
+        Assert.Equal(0, harness.Count("FileOperations"));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(harness.Paths.StagingRoot));
+        Assert.False(Directory.Exists(harness.Paths.TrashRoot) &&
+                     Directory.EnumerateFileSystemEntries(harness.Paths.TrashRoot).Any());
+    }
+
+    // Review Focus 1: a crash before the commit, with no rollback in the
+    // process, is undone by the next start.
+    [Theory]
+    [InlineData("Prepared")]
+    [InlineData("Copied")]
+    [InlineData("Verified")]
+    [InlineData("OldMovedAside")]
+    [InlineData("NewMovedIn")]
+    [InlineData("InCommit")]
+    public async Task AnInterruptedReplacementRollsBackOnTheNextStart(string checkpoint)
+    {
+        ReplaceCheckpoint point = Enum.Parse<ReplaceCheckpoint>(checkpoint);
+        Guid id = await SaveTextAsync("Chapter 1\nOld.\n");
+        ImportManifest manifest = await TextManifest("Chapter 1\nNew.\n");
+        LibrarySnapshot before = LibrarySnapshot.Capture(harness.Paths);
+
+        await Assert.ThrowsAnyAsync<Exception>(() => ReplaceAsync(id, manifest, publisher: harness.Publisher(
+            replaceCheckpoint: FaultFixture.FaultAt(point), replaceRollBack: FaultFixture.SkipImportRollBack)));
+        await harness.RestartAsync();
+
+        SnapshotAssert.Unchanged(before, LibrarySnapshot.Capture(harness.Paths));
+        AssertNoOperationLeft();
+    }
+
+    // A crash after the commit keeps the new copy; the next start removes the old one.
+    [Theory]
+    [InlineData("Committed")]
+    [InlineData("Finished")]
+    public async Task ACrashAfterTheCommitKeepsTheNewCopy(string checkpoint)
+    {
+        ReplaceCheckpoint point = Enum.Parse<ReplaceCheckpoint>(checkpoint);
+        Guid id = await SaveTextAsync("Chapter 1\nOld.\n");
+        string state = harness.Rows($"SELECT * FROM ReadingStates WHERE GuideId = '{id:N}'");
+        ImportManifest manifest = await TextManifest("Chapter 1\nNew.\n");
+
+        Assert.Equal(GuideReplaceOutcome.Replaced, await ReplaceAsync(id, manifest, publisher: harness.Publisher(
+            replaceCheckpoint: FaultFixture.FaultAt(point))));
+        await harness.RestartAsync();
+
+        Guide replaced = (await harness.Repository.GetGuideAsync(id))!;
+        Assert.Equal(manifest.Fingerprint, replaced.ContentSha256);
+        Assert.Equal("Chapter 1\nNew.\n", File.ReadAllText(harness.Paths.GetPlannedGuideFile(id, replaced.PrimaryRelativePath)));
+        Assert.Equal(state, harness.Rows($"SELECT * FROM ReadingStates WHERE GuideId = '{id:N}'"));
+        AssertNoOperationLeft();
+    }
+
+    [Fact]
+    public async Task AFailedReplacementRollsBackAtOnce()
+    {
+        Guid id = await SaveTextAsync("Chapter 1\nOld.\n");
+        ImportManifest manifest = await TextManifest("Chapter 1\nNew.\n");
+        LibrarySnapshot before = LibrarySnapshot.Capture(harness.Paths);
+
+        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(() => ReplaceAsync(id, manifest,
+            publisher: harness.Publisher(replaceCheckpoint: FaultFixture.FaultAt(ReplaceCheckpoint.NewMovedIn))));
+
+        Assert.Equal(ImportIssue.SaveFailed, error.Issue);
+        SnapshotAssert.Unchanged(before, LibrarySnapshot.Capture(harness.Paths));
+    }
+
+    [Fact]
+    public async Task AFullDiskDuringTheCopyChangesNothing()
+    {
+        Guid id = await SaveTextAsync("Chapter 1\nOld.\n");
+        ImportManifest manifest = await TextManifest("Chapter 1\nNew.\n");
+        LibrarySnapshot before = LibrarySnapshot.Capture(harness.Paths);
+
+        GuideImportException error = await Assert.ThrowsAsync<GuideImportException>(() => ReplaceAsync(id, manifest,
+            publisher: harness.Publisher(createStagedFile: _ => new DiskFullStream())));
+
+        Assert.Equal(ImportIssue.NotEnoughSpace, error.Issue);
+        SnapshotAssert.Unchanged(before, LibrarySnapshot.Capture(harness.Paths));
+    }
 }

@@ -125,6 +125,26 @@ public sealed class FileOperationReconciliationTests
         Assert.Equal(1, OperationCount(directory.Paths.DatabasePath));
     }
 
+    // S22: a replacement's guide row exists in both phases.
+    [Fact]
+    public async Task APreparedReplacementWithoutItsGuideIsRefused()
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        Guid operationId = Guid.NewGuid();
+        Guid guideId = Guid.NewGuid();
+        string trash = TrashedRoot(directory.Paths, operationId, guideId);
+        WriteMarker(trash);
+        InsertOperation(directory.Paths.DatabasePath, operationId, "ReplaceGuide", "Prepared",
+            FileOperationManifest.Create(FileOperationKind.ReplaceGuide, operationId, [guideId]));
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => repository.InitializeAsync());
+
+        Assert.True(Directory.Exists(trash));
+        Assert.Equal(1, OperationCount(directory.Paths.DatabasePath));
+    }
+
     [Fact]
     public async Task ConflictingPreparedDeletionLeavesContentAndTrashForReview()
     {

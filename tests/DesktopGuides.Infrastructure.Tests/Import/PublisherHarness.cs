@@ -30,6 +30,14 @@ internal sealed class PublisherHarness : IAsyncDisposable
         return harness;
     }
 
+    /// <summary>Opens a fresh repository on the same files, as the next app start does.</summary>
+    public async Task RestartAsync()
+    {
+        await Repository.DisposeAsync();
+        Repository = new SqliteLibraryRepository(Paths);
+        await Repository.InitializeAsync();
+    }
+
     /// <summary>A publisher whose next import uses fresh, known IDs.</summary>
     public GuideImportPublisher Publisher(
         Action<ImportCheckpoint>? checkpoint = null,
