@@ -80,6 +80,7 @@ public sealed class KeyboardShortcutsTests
     [InlineData(ShortcutContext.LibrarySearch, "Library search")]
     [InlineData(ShortcutContext.Game, "Game page")]
     [InlineData(ShortcutContext.Reader, "Reader")]
+    [InlineData(ShortcutContext.Online, "Find online")]
     [InlineData(ShortcutContext.Dialog, "Dialogs")]
     public void EachContextHasAHeading(ShortcutContext context, string heading)
     {

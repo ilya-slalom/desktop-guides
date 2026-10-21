@@ -6747,6 +6747,8 @@ try {
             ShortcutFocusLibrarySearch = 'Search the library, Ctrl+F'
             ShortcutClearLibrarySearch = 'Clear the search, Esc'
             ShortcutImportGuide = 'Import a guide, Ctrl+O'
+            ShortcutFocusAddress = 'Go to the address box (Find online), Ctrl+L'
+            ShortcutSaveOnline = 'Save the guide to the library (Find online), Ctrl+S'
             ShortcutPreviousPage = 'Previous page (TXT, PDF), Page Up'
             ShortcutNextPage = 'Next page (TXT, PDF), Page Down'
             ShortcutPageStart = 'Go to start (TXT, PDF), Ctrl+Home'

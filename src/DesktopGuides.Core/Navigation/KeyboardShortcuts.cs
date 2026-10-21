@@ -57,6 +57,7 @@ public static class KeyboardShortcuts
         ShortcutContext.LibrarySearch => "Library search",
         ShortcutContext.Game => "Game page",
         ShortcutContext.Reader => "Reader",
+        ShortcutContext.Online => "Find online",
         _ => "Dialogs"
     };
 

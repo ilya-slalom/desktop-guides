@@ -924,19 +924,6 @@
                                    Text="Library"
                                    Style="{StaticResource DesktopGuidesSettingsSectionStyle}"
                                    AutomationProperties.AutomationId="SettingsLibraryHeading" />
-                        <!-- S22: the in-app browser's cookies and sign-ins. -->
-                        <toolkit:SettingsCard
-                            x:Name="OnlineDataSettingsCard"
-                            Header="Online data"
-                            Description="Find online keeps cookies and sign-ins for the sites you browse. Clearing signs you out of every site."
-                            HorizontalAlignment="Stretch"
-                            AutomationProperties.AutomationId="OnlineDataSettingsCard"
-                            AutomationProperties.Name="Online data. Find online keeps cookies and sign-ins for the sites you browse. Clearing signs you out of every site.">
-                            <Button x:Name="ClearOnlineDataButton"
-                                    Content="Clear online data"
-                                    Click="ClearOnlineDataClicked"
-                                    AutomationProperties.AutomationId="ClearOnlineDataButton" />
-                        </toolkit:SettingsCard>
                         <toolkit:SettingsCard
                             x:Name="ExportSettingsCard"
                             Header="Back up library"
@@ -1038,6 +1025,23 @@
                             x:Name="KeyboardShortcutsExpander"
                             HorizontalAlignment="Stretch"
                             AutomationProperties.AutomationId="KeyboardShortcutsExpander" />
+                        <!-- S22: last, so nothing above it moves. -->
+                        <TextBlock x:Name="SettingsOnlineHeading"
+                                   Text="Find online"
+                                   Style="{StaticResource DesktopGuidesSettingsSectionStyle}"
+                                   AutomationProperties.AutomationId="SettingsOnlineHeading" />
+                        <toolkit:SettingsCard
+                            x:Name="OnlineDataSettingsCard"
+                            Header="Online data"
+                            Description="Find online keeps cookies and sign-ins for the sites you browse. Clearing signs you out of every site."
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="OnlineDataSettingsCard"
+                            AutomationProperties.Name="Online data. Find online keeps cookies and sign-ins for the sites you browse. Clearing signs you out of every site.">
+                            <Button x:Name="ClearOnlineDataButton"
+                                    Content="Clear online data"
+                                    Click="ClearOnlineDataClicked"
+                                    AutomationProperties.AutomationId="ClearOnlineDataButton" />
+                        </toolkit:SettingsCard>
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
