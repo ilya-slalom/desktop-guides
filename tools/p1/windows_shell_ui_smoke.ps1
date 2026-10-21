@@ -1122,10 +1122,12 @@ try {
     # window, so a card can start below the fold; scroll it into view.
     function Show-SettingsCard([string] $id) {
         $deadline = (Get-Date).AddSeconds(15)
+        $tries = 0
         do {
             $element = Find-ById $id
             if ($element -and -not $element.Current.IsOffscreen) { return $element }
             if ($element) {
+                if (++$tries -gt 3) { return Scroll-SettingsUntilVisible $id }
                 $item = $null
                 if ($element.TryGetCurrentPattern(
                         [System.Windows.Automation.ScrollItemPattern]::Pattern, [ref]$item)) {
@@ -1140,7 +1142,9 @@ try {
             }
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
-        throw "Expected visible '$id'."
+        # S22: ScrollIntoView can leave a shortcut row off screen now that
+        # Settings continues below the list; step through the page instead.
+        return Scroll-SettingsUntilVisible $id
     }
 
     # Show-SettingsCard only scrolls down; this brings Settings back to the top.
@@ -7965,6 +7969,8 @@ try {
             Wait-Until { [System.Windows.Automation.AutomationElement]::FocusedElement.Current.AutomationId -eq 'OnlineAddress' } 'focus in the address box'
         }
         function Go-Online([string] $url) {
+            # After a save the address box is enabled again a moment after the done message.
+            [void](Wait-EnabledById 'OnlineAddress')
             Set-Text 'OnlineAddress' $url
             Invoke-Element (Wait-VisibleById 'OnlineGo')
         }
