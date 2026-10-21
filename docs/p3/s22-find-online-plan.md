@@ -19,7 +19,7 @@ saved as it is, or discarded.
   - `OnlineFixtureRoutes`, the fixture manifest for test runs.
 - **Production:**
   - `OnlineBrowser`, the visible WebView2 in a persistent profile;
-  - `WebViewPageLoader`, a hidden WebView2 on the same environment that implements `IPageLoader`;
+  - `WebViewPageLoader`, which implements `IPageLoader` by stepping the visible browser itself through the guide's pages. It was first a hidden second WebView2; see the deviation note below;
   - `ShellWindow.Online.cs`, the screen and the save flow.
 
 **Tech Stack:** .NET 10, WinUI 3, WebView2 1.0.4191.47 (pinned), xUnit,
@@ -27,6 +27,12 @@ PowerShell UI Automation.
 
 **Spec:** [the P3 technical design](../p3-technical-design.md), sections
 5.1–5.3, 5.7–5.9, built on PR 3a's [capture core](s22-capture-core-plan.md).
+
+**Deviation, 21 October 2026, by the user's choice:** capture runs in the
+visible browser, with no hidden second WebView2. In the installed runs the
+hidden controller's navigations stalled now and then, and the app crashed,
+and four targeted fixes didn't end it. The "hidden browser" wording below
+describes the plan as written; the design's section 5.3 has the change.
 
 **Visual direction** (ui-ux-pro-max, plan stage):
 - the app's existing Fluent styles; no new styles;

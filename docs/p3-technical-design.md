@@ -174,18 +174,22 @@ A source adapter, one per source, behind a common interface, knows how to:
 
 **GameFAQs and Neoseeker** are captured through the in-app browser's own
 session:
-- The page being viewed is captured from its live DOM.
-- Each further page of the guide is loaded in a hidden WebView2 on the
-  same profile. Each is a normal page load, so ads, scripts and challenges
-  behave as they would for the user.
-- Images in the guide's content are taken from that page load's own
+- Save steps the in-app browser itself through the guide's pages, one at
+  a time, as a person clicking Next would. Each is a normal page load, so
+  ads, scripts and challenges behave as they would for the user.
+  - While it runs, browsing is disabled and the progress shows above the
+    browser; Cancel stays.
+  - Afterwards the browser returns to the page the reader was on. After a
+    pause it stays on the refused page.
+  - Changed on 21 October 2026, by the user's choice: PR 3b first used a
+    hidden second WebView2. In CI its navigations stalled now and then,
+    and the app crashed, and four targeted fixes didn't end it.
+- Images in the guide's content are taken from each page load's own
   responses, through WebView2's resource events, not fetched separately.
-  So that every page, the first included, is captured the same way, the
-  page being viewed is loaded again in the hidden WebView2 (design call).
-  The hidden view scrolls through the page to trigger lazy-loaded images.
-  An image still missing is loaded by navigating the hidden view to it, as
-  a browser would. If that fails too, the copy shows a placeholder, and
-  the save reports how many images are missing.
+  The page is scrolled to trigger lazy-loaded images. An image still
+  missing is loaded by navigating to it, as a browser would. If that fails
+  too, the copy shows a placeholder, and the save reports how many images
+  are missing.
 - Pages load one at a time, at most one every 2 seconds, with at most 200
   pages per guide.
 - If a page shows a challenge, an error, or a 403 or 429 response, capture
@@ -372,8 +376,8 @@ PRs in order, each with its own plan:
    - **3a, the capture core** ([plan](p3/s22-capture-core-plan.md)),
      Infrastructure only: the two adapters, notice rules, the offline
      copy, unfinished captures, and saving;
-   - **3b, Find online:** the screen, the in-app and hidden capture
-     browsers, pause and resume, the build switches, the fixture server
+   - **3b, Find online** ([plan](p3/s22-find-online-plan.md)): the screen,
+     the in-app browser and capture through it, pause and resume, the build switches, the fixture server
      and the `online` E2E group.
 4. **Steam:** credentials, search, pasted URLs.
 5. **VGMaps:** the index, search, map saving into image maps.
