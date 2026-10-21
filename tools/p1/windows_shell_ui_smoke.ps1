@@ -3705,9 +3705,10 @@ try {
                     }
                 }
                 Wait-CompletionShown $false 'A guide never completed'
-                # The choice's row follows the header actions in tab order.
-                (Wait-VisibleById 'ImportGuideButton').SetFocus()
-                Wait-FocusedId 'ImportGuideButton'
+                # The choice's row follows the header actions in tab order;
+                # Find online (S22) is the last of them.
+                (Wait-VisibleById 'FindOnlineButton').SetFocus()
+                Wait-FocusedId 'FindOnlineButton'
                 Send-Keys '{TAB}'
                 Wait-FocusedId 'CompletionInProgress'
                 Send-Keys '{RIGHT}'

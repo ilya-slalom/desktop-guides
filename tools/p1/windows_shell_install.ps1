@@ -1941,6 +1941,24 @@ function Set-OnlineRoute([string] $manifest, [string] $url, [string] $file, [int
     [System.IO.File]::WriteAllText($manifest, ($json | ConvertTo-Json -Depth 5))
 }
 
+# A fresh library between online modes. The fixtures and the cache stay: in
+# the portable lane the cache is under the data folder, and a closed app's
+# WebView2 processes hold the online profile there for a few seconds. Only
+# the unfinished captures in it are cleared.
+function Reset-OnlineLibrary([string] $cacheRoot) {
+    $cacheName = Split-Path -Leaf $cacheRoot
+    Get-ChildItem -LiteralPath $dataRoot -Force |
+        Where-Object { $_.Name -ne 'test' -and $_.Name -ne $cacheName } |
+        Remove-Item -Recurse -Force
+    $captures = Join-Path $cacheRoot 'online-captures'
+    $deadline = (Get-Date).AddSeconds(15)
+    while ((Test-Path -LiteralPath $captures) -and (Get-Date) -lt $deadline) {
+        Remove-Item -LiteralPath $captures -Recurse -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $captures) { Start-Sleep -Milliseconds 500 }
+    }
+    if (Test-Path -LiteralPath $captures) { throw "Couldn't clear $captures between online modes." }
+}
+
 function Run-OnlineScenarios([string] $fixtureRoot) {
     $fixtures = Join-Path $dataRoot 'test\online'
     Remove-Item -LiteralPath $fixtures -Recurse -Force -ErrorAction SilentlyContinue
@@ -1973,12 +1991,12 @@ function Run-OnlineScenarios([string] $fixtureRoot) {
     }
 
     # Review Focus 1: a challenge on page 2 pauses there; the smoke restores it and resumes.
-    Get-ChildItem -LiteralPath $dataRoot -Force | Where-Object { $_.Name -ne 'test' } | Remove-Item -Recurse -Force
+    Reset-OnlineLibrary $cacheRoot
     Invoke-ShellSeed @('seed-online', $dataRoot) | Out-Null
     Set-OnlineRoute $manifest ($saga + 'cairn') 'online/challenge.html'
     Invoke-OnlineMode 'online-pause' $fixtures
     # Review Focus 2: leaving mid-save keeps the draft, which the next visit resumes.
-    Get-ChildItem -LiteralPath $dataRoot -Force | Where-Object { $_.Name -ne 'test' } | Remove-Item -Recurse -Force
+    Reset-OnlineLibrary $cacheRoot
     Invoke-ShellSeed @('seed-online', $dataRoot) | Out-Null
     Set-OnlineRoute $manifest ($saga + 'cairn') 'gamefaqs/html-slug-cairn.html'
     Invoke-OnlineMode 'online-resume' $fixtures
