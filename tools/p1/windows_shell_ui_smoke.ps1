@@ -1132,16 +1132,10 @@ try {
                     $item.ScrollIntoView()
                 }
                 else {
-                    $scrollable = [System.Windows.Automation.PropertyCondition]::new(
-                        [System.Windows.Automation.AutomationElement]::IsScrollPatternAvailableProperty, $true)
-                    foreach ($viewer in $root.FindAll($scope, $scrollable)) {
-                        $pattern = $viewer.GetCurrentPattern(
-                            [System.Windows.Automation.ScrollPattern]::Pattern)
-                        if ($pattern.Current.VerticallyScrollable) {
-                            $pattern.SetScrollPercent(
-                                [System.Windows.Automation.ScrollPattern]::NoScroll, 100)
-                        }
-                    }
+                    # S22: Settings no longer ends with the shortcut list, so
+                    # the bottom of the page may not show this card; step
+                    # through the page until it is on screen.
+                    return Scroll-SettingsUntilVisible $id
                 }
             }
             Start-Sleep -Milliseconds 200
