@@ -92,4 +92,21 @@ public sealed class NeoseekerAdapterTests
     [Fact]
     public void AChangedLayoutIsNotAGuide() =>
         Assert.Null(adapter.Read(new Uri(Host + "/example-quest/walkthrough"), "<html><body><p>New</p></body></html>"));
+
+    [Fact]
+    public void AnImageLinkedToItsFilePageStaysAnImage()
+    {
+        GuidePageReading page = adapter.Read(new Uri(Host + "/example-quest/walkthrough/Episode_3"), """
+            <html><body><article id="wiki-content"><div class="mw-parser-output">
+            <p><a class="image" href="/example-quest/File:Map.png"><img src="https://cdn.staticneo.com/ew/map.png"></a>
+            <a href="/example-quest/File%3AKey.png">Key</a> <a href="/example-quest/walkthrough/Episode_4">Next</a></p>
+            </div></article></body></html>
+            """)!;
+
+        Assert.Contains("<img src=\"https://cdn.staticneo.com/ew/map.png\">", page.Content);
+        Assert.DoesNotContain("File:", page.Content);
+        Assert.DoesNotContain("File%3A", page.Content);
+        Assert.Contains("Key <a href", page.Content);
+        Assert.Contains("href=\"https://www.neoseeker.com/example-quest/walkthrough/Episode_4\"", page.Content);
+    }
 }

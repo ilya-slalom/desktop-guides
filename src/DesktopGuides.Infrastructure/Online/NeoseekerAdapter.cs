@@ -77,6 +77,15 @@ public sealed partial class NeoseekerAdapter : IGuideSourceAdapter
         }
 
         OnlineHtml.Absolutize(output, url);
+        // An image links to its wiki file page; offline it's just the image.
+        foreach (IElement link in output.QuerySelectorAll("a[href]").ToArray())
+        {
+            if (Uri.TryCreate(url, link.GetAttribute("href"), out Uri? target) &&
+                Uri.UnescapeDataString(target.AbsolutePath).Contains("/File:", StringComparison.OrdinalIgnoreCase))
+            {
+                link.Replace([.. link.ChildNodes]);
+            }
+        }
         List<GuidePageLink> pages = [new GuidePageLink("index", new Uri($"https://{Host}/{game}/walkthrough"), null)];
         foreach (IElement link in document.QuerySelectorAll("#wiki-navigation a[href]"))
         {

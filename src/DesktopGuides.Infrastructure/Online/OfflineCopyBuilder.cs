@@ -55,6 +55,14 @@ public static class OfflineCopyBuilder
             keysByUrl.TryAdd(Key(reading.Url), reading.Match.PageKey);
             foreach (GuidePageLink link in reading.Pages) keysByUrl.TryAdd(Key(link.Url), link.PageKey);
         }
+        // A guide's links can spell a page's slug with other hyphens
+        // ("arts-plug-ins" for "arts-plugins"); a spelling two pages share is no match.
+        Dictionary<string, string?> keysBySpelling = new(StringComparer.Ordinal);
+        foreach ((string url, string key) in keysByUrl)
+        {
+            string spelling = Spelling(new Uri(url));
+            keysBySpelling[spelling] = keysBySpelling.TryGetValue(spelling, out string? other) && other != key ? null : key;
+        }
 
         Dictionary<Uri, string> savedImages = [];
         int missing = 0;
@@ -72,7 +80,7 @@ public static class OfflineCopyBuilder
                     element.RemoveAttribute(handler.Name);
                 }
             }
-            RewriteLinks(main, page.Reading.Url, keysByUrl, files);
+            RewriteLinks(main, page.Reading.Url, keysByUrl, keysBySpelling, files);
             missing += SaveImages(document, main, page, folder, savedImages);
 
             string title = page.Reading.Pages.FirstOrDefault(link => link.PageKey == page.Reading.Match.PageKey)?.Title
@@ -89,8 +97,16 @@ public static class OfflineCopyBuilder
 
     private static string Key(Uri url) => new Uri(url.GetLeftPart(UriPartial.Query)).AbsoluteUri;
 
+    private static string Spelling(Uri url)
+    {
+        string key = Key(url);
+        int segment = key.LastIndexOf('/') + 1;
+        return key[..segment] + key[segment..].Replace("-", "", StringComparison.Ordinal);
+    }
+
     private static void RewriteLinks(
-        IElement main, Uri pageUrl, Dictionary<string, string> keysByUrl, Dictionary<string, string> files)
+        IElement main, Uri pageUrl, Dictionary<string, string> keysByUrl,
+        Dictionary<string, string?> keysBySpelling, Dictionary<string, string> files)
     {
         foreach (IElement link in main.QuerySelectorAll("a[href]"))
         {
@@ -106,8 +122,10 @@ public static class OfflineCopyBuilder
                 link.RemoveAttribute("href");
                 continue;
             }
+            string? key = keysByUrl.TryGetValue(Key(target), out string? exact) ? exact
+                : keysBySpelling.TryGetValue(Spelling(target), out string? spelled) ? spelled : null;
             link.SetAttribute("href",
-                keysByUrl.TryGetValue(Key(target), out string? key) && files.TryGetValue(key, out string? file)
+                key is not null && files.TryGetValue(key, out string? file)
                     ? file + target.Fragment
                     : target.AbsoluteUri);
         }

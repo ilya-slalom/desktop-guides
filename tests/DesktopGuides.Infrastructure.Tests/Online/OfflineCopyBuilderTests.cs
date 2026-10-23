@@ -158,4 +158,34 @@ public sealed class OfflineCopyBuilderTests : IAsyncLifetime
     public void PagesFromTwoItemsAreRefused() =>
         Assert.Throws<ArgumentException>(() => OfflineCopyBuilder.Build(
             [Page(Saga("cairn", "cairn")), Page(Wiki("wiki-hub", ""))], folder, Saved));
+
+    private static GuidePageReading SagaPage(string slug, string content) =>
+        Saga("cairn", "cairn") with
+        {
+            Url = new Uri(SagaUrl + slug),
+            Match = Saga("cairn", "cairn").Match with { PageKey = slug },
+            Pages = [],
+            Content = content,
+        };
+
+    [Fact]
+    public void ALinkSpellingAPageWithOtherHyphensReachesIt()
+    {
+        OfflineCopyBuilder.Build(
+            [Page(SagaPage("arts", $"<a href=\"{SagaUrl}arts-plug-ins#fire\">Fire</a>")), Page(SagaPage("arts-plugins", "<p>Plug-ins</p>"))],
+            folder, Saved);
+        Assert.Contains("href=\"arts-plugins.html#fire\"", Text("guide.html"));
+    }
+
+    [Fact]
+    public void AnExactPageMatchWinsOverASpellingVariant()
+    {
+        OfflineCopyBuilder.Build(
+            [Page(SagaPage("first", $"<a href=\"{SagaUrl}a-b\">A-B</a> <a href=\"{SagaUrl}ab\">AB</a>")),
+             Page(SagaPage("ab", "<p>ab</p>")), Page(SagaPage("a-b", "<p>a-b</p>"))],
+            folder, Saved);
+        string html = Text("guide.html");
+        Assert.Contains("href=\"a-b.html\"", html);
+        Assert.Contains("href=\"ab.html\"", html);
+    }
 }
