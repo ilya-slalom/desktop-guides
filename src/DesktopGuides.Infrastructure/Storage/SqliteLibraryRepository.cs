@@ -1250,9 +1250,11 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         List<SchemaObject> objects = [];
         while (reader.Read())
         {
+            // sqlite_schema keeps the CREATE text verbatim, and its line
+            // endings are those of the build that ran the migration.
             objects.Add(new SchemaObject(
-                reader.GetString(0), reader.GetString(1),
-                reader.GetString(2), reader.GetString(3)));
+                reader.GetString(0), reader.GetString(1), reader.GetString(2),
+                reader.GetString(3).ReplaceLineEndings("\n")));
         }
         return objects;
     }
