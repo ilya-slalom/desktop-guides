@@ -1,3 +1,4 @@
+using DesktopGuides.Core.Library;
 using System.Text;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Import;
@@ -187,5 +188,59 @@ public sealed class OfflineCopyBuilderTests : IAsyncLifetime
         string html = Text("guide.html");
         Assert.Contains("href=\"a-b.html\"", html);
         Assert.Contains("href=\"ab.html\"", html);
+    }
+
+    [Fact]
+    public void EveryHtmlPageLinksTheSitesStyleSheet()
+    {
+        OfflineCopyBuilder.Build(ThreeSagaPages(), folder, Saved);
+        Assert.Equal(OfflineCopyBuilder.StyleSheet(SourceSite.GameFaqs), Text("guide.css"));
+        foreach (string name in new[] { "guide.html", "cairn.html", "fishing.html" })
+        {
+            string html = Text(name);
+            Assert.Contains("<head><meta charset=\"utf-8\"><link rel=\"stylesheet\" href=\"guide.css\">", html);
+            Assert.Contains("<main class=\"dg-site-gamefaqs\">", html);
+        }
+    }
+
+    [Fact]
+    public void NeoseekerContentSitsInItsWikiWrapper()
+    {
+        OfflineCopyBuilder.Build([Page(Wiki("wiki-hub", ""))], folder, Saved);
+        Assert.Contains("<main class=\"dg-site-neoseeker\"><div class=\"mw-parser-output\">", Text("guide.html"));
+        Assert.Equal(OfflineCopyBuilder.StyleSheet(SourceSite.Neoseeker), Text("guide.css"));
+    }
+
+    [Theory]
+    [InlineData(SourceSite.GameFaqs)]
+    [InlineData(SourceSite.Neoseeker)]
+    public void AStyleSheetCanMakeNoRequest(SourceSite site)
+    {
+        string css = OfflineCopyBuilder.StyleSheet(site);
+        Assert.Contains(".dg-source", css);
+        foreach (string request in new[] { "url(", "@import", "@font-face" })
+        {
+            Assert.DoesNotContain(request, css, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public void TheSitesStyleSheetsDiffer() =>
+        Assert.NotEqual(OfflineCopyBuilder.StyleSheet(SourceSite.GameFaqs), OfflineCopyBuilder.StyleSheet(SourceSite.Neoseeker));
+
+    [Fact]
+    public void ASpoilerCanBeRevealedFromTheKeyboard()
+    {
+        OfflineCopyBuilder.Build([Page(SagaPage("cairn", "<p>Boss: <span class=\"fspoiler\">Gwyn</span></p>"))], folder, Saved);
+        Assert.Contains("<span class=\"fspoiler\" tabindex=\"0\">Gwyn</span>", Text("guide.html"));
+    }
+
+    [Fact]
+    public void ATextCopyHasNoStyleSheet()
+    {
+        GuidePageReading text = new GameFaqsAdapter().Read(
+            new Uri("https://gamefaqs.gamespot.com/ps5/100002-example-saga/faqs/78735"), P3Fixtures.Read("gamefaqs/text-faq.html"))!;
+        OfflineCopyBuilder.Build([Page(text)], folder, Saved);
+        Assert.False(File.Exists(Path.Combine(folder, "guide.css")));
     }
 }

@@ -1,0 +1,49 @@
+/* Neoseeker wiki walkthroughs and articles (MediaWiki markup). */
+:where(.dg-site-neoseeker) :where(.wikitable, .table-list) {
+  width: auto;
+}
+:where(.dg-site-neoseeker) :where(.table) {
+  width: 100%;
+}
+:where(.dg-site-neoseeker) :where(.mw-headline) {
+  font-weight: inherit;
+}
+/* Notes: the kind is in the alert's own text; the bar only echoes it. */
+:where(.dg-site-neoseeker) :where(.alert) {
+  margin: 0 0 1em;
+  padding: 8px 12px;
+  background: #F9F9F9;
+  border: 1px solid #E0E0E0;
+  border-left: 4px solid #8A8A8A;
+  border-radius: 4px;
+}
+:where(.dg-site-neoseeker) :where(.alert-primary, .alert-info) { border-left-color: #005FB8; }
+:where(.dg-site-neoseeker) :where(.alert-success) { border-left-color: #0F7B0F; }
+:where(.dg-site-neoseeker) :where(.alert-danger) { border-left-color: #C42B1C; }
+:where(.dg-site-neoseeker) :where(.alert-secondary, .alert-dark) { border-left-color: #8A8A8A; }
+:where(.dg-site-neoseeker) :where(.alert > :last-child) { margin-bottom: 0; }
+:where(.dg-site-neoseeker) :where(.center-div-container, .center) {
+  text-align: center;
+  margin: 8px 0;
+}
+:where(.dg-site-neoseeker) :where(.img-icon, .img-icon img) {
+  display: inline;
+  height: 1.5em;
+  width: auto;
+  vertical-align: middle;
+}
+:where(.dg-site-neoseeker) :where(.floatnone) {
+  display: block;
+  margin: 8px 0;
+}
+:where(.dg-site-neoseeker) :where(.pull-right) {
+  float: right;
+  margin: 0 0 8px 16px;
+}
+:where(.dg-site-neoseeker) :where(dt) {
+  font-weight: 600;
+  margin-top: 0.5em;
+}
+:where(.dg-site-neoseeker) :where(dd) {
+  margin: 0 0 0.5em 1.5em;
+}

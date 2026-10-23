@@ -65,6 +65,15 @@ public sealed class OnlineGuideSaverTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ASavedHtmlGuideCarriesItsStyleSheet()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        Guid id = Assert.IsType<OnlineSaveResult.Added>(await SaveAsync(AllThree())).GuideId;
+        Assert.Contains(await harness.Repository.GetGuideAssetsAsync(id),
+            asset => asset.RequestPath == "guide.css" && asset.Kind == GuideAssetKind.StyleSheet);
+    }
+
+    [Fact]
     public async Task ASecondSaveOfTheSameCopyIsUpToDate()
     {
         if (!OperatingSystem.IsWindows()) return;

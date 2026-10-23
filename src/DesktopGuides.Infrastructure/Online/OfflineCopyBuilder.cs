@@ -64,14 +64,25 @@ public static class OfflineCopyBuilder
             keysBySpelling[spelling] = keysBySpelling.TryGetValue(spelling, out string? other) && other != key ? null : key;
         }
 
+        File.WriteAllText(Path.Combine(folder, "guide.css"), StyleSheet(item.Site), new UTF8Encoding(false));
+
         Dictionary<Uri, string> savedImages = [];
         int missing = 0;
         foreach (CapturedPage page in pages.DistinctBy(page => page.Reading.Match.PageKey))
         {
             IDocument document = new HtmlParser().ParseDocument(
-                "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body><main></main></body></html>");
+                "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><link rel=\"stylesheet\" href=\"guide.css\"></head>" +
+                $"<body><main class=\"{SiteClass(item.Site)}\"></main></body></html>");
             IElement main = document.QuerySelector("main")!;
-            main.InnerHtml = page.Reading.Content;
+            // Neoseeker's content is a MediaWiki page's, and its rules name the wrapper.
+            IElement content = main;
+            if (item.Site == SourceSite.Neoseeker)
+            {
+                content = document.CreateElement("div");
+                content.ClassName = "mw-parser-output";
+                main.AppendChild(content);
+            }
+            content.InnerHtml = page.Reading.Content;
             foreach (IElement element in main.QuerySelectorAll(string.Join(",", Removed)).ToArray()) element.Remove();
             foreach (IElement element in main.QuerySelectorAll("*"))
             {
@@ -80,6 +91,7 @@ public static class OfflineCopyBuilder
                     element.RemoveAttribute(handler.Name);
                 }
             }
+            foreach (IElement spoiler in main.QuerySelectorAll(".fspoiler")) spoiler.SetAttribute("tabindex", "0");
             RewriteLinks(main, page.Reading.Url, keysByUrl, keysBySpelling, files);
             missing += SaveImages(document, main, page, folder, savedImages);
 
@@ -93,6 +105,29 @@ public static class OfflineCopyBuilder
             File.WriteAllText(Path.Combine(folder, files[page.Reading.Match.PageKey]), html, new UTF8Encoding(false));
         }
         return new OfflineCopy(Path.Combine(folder, "guide.html"), CapturedFormat.Html, missing);
+    }
+
+    /// <summary>The copy's stylesheet: the shared base, then the site's own rules if it has any.</summary>
+    internal static string StyleSheet(SourceSite site) => site switch
+    {
+        SourceSite.GameFaqs => Resource("base") + "\n" + Resource("gamefaqs"),
+        SourceSite.Neoseeker => Resource("base") + "\n" + Resource("neoseeker"),
+        _ => Resource("base"),
+    };
+
+    private static string SiteClass(SourceSite site) => site switch
+    {
+        SourceSite.GameFaqs => "dg-site-gamefaqs",
+        SourceSite.Neoseeker => "dg-site-neoseeker",
+        _ => "dg-site",
+    };
+
+    private static string Resource(string name)
+    {
+        using Stream stream = typeof(OfflineCopyBuilder).Assembly.GetManifestResourceStream($"DesktopGuides.Online.Styles.{name}.css")
+            ?? throw new InvalidOperationException($"The {name} stylesheet is missing from the build.");
+        using StreamReader reader = new(stream);
+        return reader.ReadToEnd();
     }
 
     private static string Key(Uri url) => new Uri(url.GetLeftPart(UriPartial.Query)).AbsoluteUri;

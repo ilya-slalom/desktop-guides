@@ -234,7 +234,13 @@ whole page:
   offline anyway. The copy is still ordinary static HTML;
 - links between captured pages are rewritten to point at each other.
   Other links stay as external links, which the reader already opens in
-  the system browser on request.
+  the system browser on request;
+- **styles** (changed on 23 October 2026, by the user's choice):
+  - The site's own CSS isn't captured. Each copy gets `guide.css`, a stylesheet Desktop Guides ships for that site's guide markup, linked from every page.
+  - The look is Fluent and app-native, the same for every site.
+  - The sheet names no address, other sheet or font, so it can make no request.
+  - Its selectors have no specificity, so the reader's dark and high-contrast themes still apply.
+  - Site CSS was set aside: it brings ad and layout rules and third-party font and CDN hosts, and it breaks quietly when a site changes.
 
 The result goes through the existing static HTML, TXT or image map
 validation and staging unchanged: no scripts, local assets only, the size
