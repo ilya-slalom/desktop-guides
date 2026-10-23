@@ -146,9 +146,15 @@ internal sealed class OnlineBrowser : IAsyncDisposable
     private void OnNewWindowRequested(CoreWebView2NewWindowRequestedEventArgs args)
     {
         args.Handled = true;
-        if (capture is null && args.IsUserInitiated && Uri.TryCreate(args.Uri, UriKind.Absolute, out Uri? url) && IsWeb(url))
+        Uri? url = Uri.TryCreate(args.Uri, UriKind.Absolute, out Uri? parsed) ? parsed : null;
+        switch (OnlineNavigation.ForNewWindow(url, capturing: capture is not null, args.IsUserInitiated))
         {
-            ExternalLinkRequested?.Invoke(this, url);
+            case NewWindowAction.OpenHere:
+                View.CoreWebView2.Navigate(url!.AbsoluteUri);
+                break;
+            case NewWindowAction.OpenExternally:
+                ExternalLinkRequested?.Invoke(this, url!);
+                break;
         }
     }
 
