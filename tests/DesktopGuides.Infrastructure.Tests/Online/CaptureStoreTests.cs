@@ -153,4 +153,57 @@ public sealed class CaptureStoreTests : IDisposable
         Assert.Equal(1, removed);
         Assert.False(Directory.Exists(Path.Combine(root, stale.Id.ToString("N"))));
     }
+
+    private static GuidePageLink Linked(string key) => new(key, new Uri($"{SagaUrl}{key}"), null, Linked: true);
+
+    [Fact]
+    public void FoundArticlesFollowTheGuidesPagesUpTo200()
+    {
+        GuidePageReading many = Saga("cairn", "cairn") with
+        {
+            Pages = Enumerable.Range(0, 199).Select(n => new GuidePageLink($"p{n}", new Uri($"{SagaUrl}p{n}"), null)).ToArray(),
+            Match = new GuidePageMatch(SourceSite.GameFaqs, "78736", "p0"),
+        };
+        CaptureDraft draft = new CaptureStore(root, clock).Begin(Guid.NewGuid(), many);
+
+        draft.Extend([Linked("a1"), Linked("a2"), Linked("p3"), Linked("a1")]);
+        draft.Extend([Linked("a2"), Linked("a3")]);
+
+        Assert.Equal(200, draft.Pages.Count);
+        Assert.Equal("a1", draft.Pages[^1].PageKey);
+        Assert.True(draft.Pages[^1].Linked);
+        Assert.Equal(202, draft.TotalPages);
+        Assert.False(draft.IsComplete);
+    }
+
+    [Fact]
+    public void ADroppedArticleIsNotFoundAgain()
+    {
+        CaptureDraft draft = new CaptureStore(root, clock).Begin(Guid.NewGuid(), Saga("cairn", "cairn"));
+        draft.Extend([Linked("a1")]);
+        draft.Drop("a1");
+        draft.Extend([Linked("a1")]);
+
+        Assert.Equal(["introduction", "cairn", "fishing"], draft.Pages.Select(page => page.PageKey));
+        Assert.Equal(3, draft.TotalPages);
+        CaptureDraft found = new CaptureStore(root, clock).Find(draft.GameId, SourceSite.GameFaqs, "78736")!;
+        found.Extend([Linked("a1")]);
+        Assert.Equal(3, found.Pages.Count);
+    }
+
+    [Fact]
+    public void ADraftSavedBeforeArticlesStillLoads()
+    {
+        CaptureDraft draft = new CaptureStore(root, clock).Begin(Guid.NewGuid(), Saga("cairn", "cairn"));
+        string file = Path.Combine(root, draft.Id.ToString("N"), "capture.json");
+        string json = File.ReadAllText(file);
+        json = System.Text.RegularExpressions.Regex.Replace(json, ",\\s*\"Linked\":\\s*false", "");
+        json = System.Text.RegularExpressions.Regex.Replace(json, ",\\s*\"(Cut|Dropped)\":\\s*(null|\\[\\])", "");
+        Assert.DoesNotContain("Linked", json);
+        File.WriteAllText(file, json);
+
+        CaptureDraft found = new CaptureStore(root, clock).Find(draft.GameId, SourceSite.GameFaqs, "78736")!;
+        Assert.Equal(3, found.Pages.Count);
+        Assert.All(found.Pages, page => Assert.False(page.Linked));
+    }
 }

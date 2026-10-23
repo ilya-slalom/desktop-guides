@@ -8,8 +8,8 @@ using DesktopGuides.Core.Library;
 
 namespace DesktopGuides.Infrastructure.Online;
 
-/// <summary>A captured page and the image files the caller saved for it, by address.</summary>
-public sealed record CapturedPage(GuidePageReading Reading, IReadOnlyDictionary<Uri, string> ImageFiles);
+/// <summary>A captured page, the image files the caller saved for it by address, and whether a guide page linked to it.</summary>
+public sealed record CapturedPage(GuidePageReading Reading, IReadOnlyDictionary<Uri, string> ImageFiles, bool Linked = false);
 
 public sealed record OfflineCopy(string EntryPath, CapturedFormat Format, int MissingImages);
 
@@ -196,19 +196,23 @@ public static class OfflineCopyBuilder
         return missing;
     }
 
-    // The guide's pages in order: the import finds a guide's pages by
-    // following links from its entry, and the site's own contents are dropped.
+    // The guide's pages in order, then the articles they link to: the import
+    // finds a guide's pages by following links from its entry, and the
+    // site's own contents are dropped.
     private static IElement Contents(IDocument document, IReadOnlyList<CapturedPage> pages, Dictionary<string, string> files)
     {
         IElement nav = document.CreateElement("nav");
         nav.ClassName = "dg-pages";
         StringBuilder items = new();
-        foreach (GuidePageReading reading in pages.Select(page => page.Reading).DistinctBy(reading => reading.Match.PageKey))
+        StringBuilder articles = new();
+        foreach (CapturedPage page in pages.DistinctBy(page => page.Reading.Match.PageKey))
         {
+            GuidePageReading reading = page.Reading;
             string name = reading.Pages.FirstOrDefault(link => link.PageKey == reading.Match.PageKey)?.Title ?? reading.Title;
-            items.Append($"<li><a href=\"{files[reading.Match.PageKey]}\">{WebUtility.HtmlEncode(name)}</a></li>");
+            (page.Linked ? articles : items).Append(
+                $"<li><a href=\"{files[reading.Match.PageKey]}\">{WebUtility.HtmlEncode(name)}</a></li>");
         }
-        nav.InnerHtml = $"<ol>{items}</ol>";
+        nav.InnerHtml = $"<ol>{items}</ol>" + (articles.Length > 0 ? $"<h2>Linked articles</h2><ul>{articles}</ul>" : "");
         return nav;
     }
 

@@ -196,13 +196,18 @@ session:
   pauses. The user can open that page in the visible browser to solve it,
   then **Resume**. They can also **Save what's captured** or **Discard**.
 - Only the guide's pages are captured: the adapter's page list for that
-  guide's identity. No other link is followed.
+  guide's identity, plus Neoseeker's linked articles below. No other link is followed.
 - **Neoseeker** has two kinds of guide, and both are supported (design
   call):
   - text FAQs, owned by their authors;
   - wiki walkthroughs, owned by Neo Era Media. A walkthrough's own pages
-    are the ones its contents navigation lists, and nothing else on the
-    wiki.
+    are the ones its contents navigation lists. Since 23 October 2026, by
+    the user's choice, the same game's wiki articles those pages link to
+    directly are saved too, and their own links are never followed. The
+    articles include side quests, activities and world intel.
+    - Articles are captured after the walkthrough's pages, under the same pacing, pause rules and 200-page cap. The cap trims articles first.
+    - A link that loads a Neoseeker page with no wiki article is dropped, and stays an online link.
+    - Files, special pages, talk pages and the game's other site sections are never followed.
 - **Restrictive notices:** the adapter flags notice wording that forbids
   electronic copies or distribution. Save then shows the notice and asks
   before going on. A notice it can't classify is kept, with no prompt.

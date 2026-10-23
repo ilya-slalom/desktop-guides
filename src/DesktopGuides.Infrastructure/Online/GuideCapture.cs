@@ -24,7 +24,8 @@ public abstract record CaptureOutcome
 
 /// <summary>
 /// S22: captures a draft's remaining pages one at a time, at least 2 s
-/// apart, through the user's browser session. A refused page (403, 429,
+/// apart, through the user's browser session, then the pages they link to
+/// that the adapter saves with the guide, one level deep. A refused page (403, 429,
 /// 503, a timeout, or a page the adapter can't read, such as a challenge)
 /// pauses the capture there; every page already captured stays in the draft.
 /// </summary>
@@ -40,14 +41,24 @@ public sealed class GuideCapture(
     public async Task<CaptureOutcome> RunAsync(
         CaptureDraft draft, IProgress<(int Done, int Total)>? progress, CancellationToken token)
     {
-        foreach (GuidePageLink page in draft.Remaining.ToArray())
+        // The guide's own pages come first; each adds the pages it links to,
+        // which are captured after them and add none.
+        while (draft.Remaining.FirstOrDefault() is { } page)
         {
             int number = IndexOf(draft, page) + 1;
             await PaceAsync(token);
             PageLoad load = await loader.LoadPageAsync(page.Url, token);
-            GuidePageReading? reading = load.Status is 403 or 429 or 503 or 0 || load.Html is null
-                ? null
-                : adapter.Read(page.Url, load.Html);
+            bool loaded = load.Status is not (403 or 429 or 503 or 0) && load.Html is not null;
+            GuidePageReading? reading = !loaded ? null
+                : page.Linked ? adapter.ReadLinked(page, load.Html!, draft.Item)
+                : adapter.Read(page.Url, load.Html!);
+            if (reading is null && page.Linked && loaded && adapter.IsSitePage(load.Html!))
+            {
+                // The site's own page, but no page of the guide: its links stay online.
+                draft.Drop(page.PageKey);
+                progress?.Report((draft.Captured.Count, draft.Pages.Count));
+                continue;
+            }
             if (reading is null || reading.Match.ItemId != draft.Item.ItemId || reading.Match.Site != draft.Item.Site)
             {
                 return new CaptureOutcome.Paused(draft, page, number, draft.Pages.Count, load.Status);
@@ -65,6 +76,7 @@ public sealed class GuideCapture(
                 if (bytes is not null) files[image] = draft.SaveImage(image, bytes);
             }
             draft.Add(reading, files);
+            if (!page.Linked) draft.Extend(reading.Linked);
             progress?.Report((draft.Captured.Count, draft.Pages.Count));
         }
         return new CaptureOutcome.Complete(draft);

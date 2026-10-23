@@ -243,4 +243,33 @@ public sealed class OfflineCopyBuilderTests : IAsyncLifetime
         OfflineCopyBuilder.Build([Page(text)], folder, Saved);
         Assert.False(File.Exists(Path.Combine(folder, "guide.css")));
     }
+
+    private static CapturedPage ArticlePage(string fixture, string path, string key) =>
+        new(new NeoseekerAdapter().ReadLinked(
+                new GuidePageLink(key, new Uri("https://www.neoseeker.com/example-quest/" + path), null, Linked: true),
+                P3Fixtures.Read($"neoseeker/{fixture}.html"),
+                new GuidePageMatch(DesktopGuides.Core.Library.SourceSite.Neoseeker, "example-quest/walkthrough", ""))!,
+            new Dictionary<Uri, string>(), Linked: true);
+
+    [Fact]
+    public void LinksToSavedArticlesOpenOffline()
+    {
+        OfflineCopyBuilder.Build(
+            [Page(Wiki("wiki-hub", "")), Page(Wiki("wiki-episode-3", "/Episode_3")),
+             ArticlePage("wiki-article-stuck-in-a-rut", "Quests/Stuck_in_a_Rut", "article-quests-stuck-in-a-rut"),
+             ArticlePage("wiki-article-gongaga", "World_Intel/Gongaga", "article-world-intel-gongaga")],
+            folder, Saved);
+
+        string episode = Text("episode-3.html");
+        Assert.Contains("href=\"article-quests-stuck-in-a-rut.html\"", episode);
+        Assert.Contains("href=\"article-quests-stuck-in-a-rut.html#Reward\"", episode);
+        Assert.Contains("href=\"article-world-intel-gongaga.html#Activation_Intel_2\"", episode);
+        Assert.Contains("href=\"https://www.neoseeker.com/example-quest/Quests/Deeper_Quest\"",
+            Text("article-quests-stuck-in-a-rut.html"));
+        string contents = episode[episode.IndexOf("dg-pages", StringComparison.Ordinal)..];
+        int heading = contents.IndexOf("<h2>Linked articles</h2>", StringComparison.Ordinal);
+        Assert.True(heading > contents.IndexOf("episode-3.html", StringComparison.Ordinal));
+        Assert.True(contents.IndexOf("article-world-intel-gongaga.html", StringComparison.Ordinal) > heading);
+        Assert.Contains(">Stuck in a Rut</a>", contents);
+    }
 }

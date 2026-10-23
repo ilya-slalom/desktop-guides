@@ -67,25 +67,9 @@ public sealed partial class NeoseekerAdapter : IGuideSourceAdapter
 
     private GuidePageReading? ReadWalkthrough(Uri url, GuidePageMatch match, IDocument document)
     {
-        IElement? output = document.QuerySelector("article#wiki-content .mw-parser-output");
+        IElement? output = Content(document, url);
         if (output is null) return null;
-        string game = match.ItemId[..^"/walkthrough".Length];
-        foreach (IElement removed in output.QuerySelectorAll(".section-ad, .noprint").ToArray()) removed.Remove();
-        foreach (INode comment in output.Descendants().Where(node => node.NodeType == NodeType.Comment).ToArray())
-        {
-            comment.RemoveFromParent();
-        }
-
-        OnlineHtml.Absolutize(output, url);
-        // An image links to its wiki file page; offline it's just the image.
-        foreach (IElement link in output.QuerySelectorAll("a[href]").ToArray())
-        {
-            if (Uri.TryCreate(url, link.GetAttribute("href"), out Uri? target) &&
-                Uri.UnescapeDataString(target.AbsolutePath).Contains("/File:", StringComparison.OrdinalIgnoreCase))
-            {
-                link.Replace([.. link.ChildNodes]);
-            }
-        }
+        string game = Game(match);
         List<GuidePageLink> pages = [new GuidePageLink("index", new Uri($"https://{Host}/{game}/walkthrough"), null)];
         foreach (IElement link in document.QuerySelectorAll("#wiki-navigation a[href]"))
         {
@@ -104,15 +88,106 @@ public sealed partial class NeoseekerAdapter : IGuideSourceAdapter
                 link.TextContent.Trim() is { Length: > 0 } name ? name : null));
         }
 
-        string title = WalkthroughTitle(document);
-        DateTimeOffset? edited = document.QuerySelectorAll("article#wiki-content time[datetime]")
-            .Select(Time).Where(time => time is not null).Max();
-        Uri[] images = output.QuerySelectorAll("img")
-            .Select(image => OnlineHtml.ImageUrl(image, url)).OfType<Uri>().Distinct().ToArray();
         return new GuidePageReading(match, url, CapturedFormat.Html,
-            title,
-            null, Notice, edited, pages, output.InnerHtml, images);
+            WalkthroughTitle(document),
+            null, Notice, Edited(document), pages, output.InnerHtml, Images(output, url))
+        {
+            Linked = Articles(output, game),
+        };
     }
+
+    /// <summary>A wiki article a walkthrough page links to, read as a page of that walkthrough.</summary>
+    public GuidePageReading? ReadLinked(GuidePageLink link, string html, GuidePageMatch item)
+    {
+        if (item.Site != SourceSite.Neoseeker || !item.ItemId.EndsWith("/walkthrough", StringComparison.Ordinal)) return null;
+        IDocument document = new HtmlParser().ParseDocument(html);
+        IElement? output = Content(document, link.Url);
+        if (output is null) return null;
+        string title = document.QuerySelector("#page-title h1")?.TextContent.Trim() is { Length: > 0 } heading
+            ? heading : link.Title ?? "Article";
+        return new GuidePageReading(item with { PageKey = link.PageKey }, link.Url, CapturedFormat.Html,
+            title, null, Notice, Edited(document), [], output.InnerHtml, Images(output, link.Url));
+    }
+
+    // Every Neoseeker page carries its title block and Neo Era's footer; a
+    // challenge or an error page from in front of the site doesn't.
+    public bool IsSitePage(string html)
+    {
+        IDocument document = new HtmlParser().ParseDocument(html);
+        return document.QuerySelector("#page-title") is not null &&
+               document.QuerySelector("footer")?.TextContent.Contains("Neo Era Media", StringComparison.Ordinal) == true;
+    }
+
+    // The wiki page's own content, cleaned: no ads, edit links or comments,
+    // its addresses absolute, and its images unlinked from their file pages.
+    private static IElement? Content(IDocument document, Uri url)
+    {
+        IElement? output = document.QuerySelector("article#wiki-content .mw-parser-output");
+        if (output is null) return null;
+        foreach (IElement removed in output.QuerySelectorAll(".section-ad, .noprint").ToArray()) removed.Remove();
+        foreach (INode comment in output.Descendants().Where(node => node.NodeType == NodeType.Comment).ToArray())
+        {
+            comment.RemoveFromParent();
+        }
+        OnlineHtml.Absolutize(output, url);
+        // An image links to its wiki file page; offline it's just the image.
+        foreach (IElement link in output.QuerySelectorAll("a[href]").ToArray())
+        {
+            if (Uri.TryCreate(url, link.GetAttribute("href"), out Uri? target) &&
+                Uri.UnescapeDataString(target.AbsolutePath).Contains("/File:", StringComparison.OrdinalIgnoreCase))
+            {
+                link.Replace([.. link.ChildNodes]);
+            }
+        }
+        return output;
+    }
+
+    // The same game's wiki articles the content links to, once each:
+    // not the walkthrough, a file, a special or talk page, the game's other
+    // site sections, a red link or a link with a query.
+    private static GuidePageLink[] Articles(IElement output, string game)
+    {
+        List<GuidePageLink> articles = [];
+        foreach (IElement link in output.QuerySelectorAll("a[href]"))
+        {
+            if (link.ClassList.Contains("new") ||
+                !Uri.TryCreate(link.GetAttribute("href"), UriKind.Absolute, out Uri? target) ||
+                target.Scheme != Uri.UriSchemeHttps || !target.Host.Equals(Host, StringComparison.OrdinalIgnoreCase) ||
+                target.Query.Length > 0 ||
+                !target.AbsolutePath.StartsWith($"/{game}/", StringComparison.Ordinal))
+            {
+                continue;
+            }
+            string path = target.AbsolutePath[(game.Length + 2)..].TrimEnd('/');
+            string first = Uri.UnescapeDataString(path.Split('/')[0]);
+            if (path.Length == 0 || NotArticles.Contains(first) ||
+                NotArticleNamespaces.Any(space => first.StartsWith(space, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+            string key = "article-" + PageKey(path);
+            if (articles.Any(article => article.PageKey == key)) continue;
+            articles.Add(new GuidePageLink(key, new Uri(target.GetLeftPart(UriPartial.Path)),
+                link.TextContent.Trim() is { Length: > 0 } name ? name : null, Linked: true));
+        }
+        return articles.ToArray();
+    }
+
+    private static readonly HashSet<string> NotArticles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "walkthrough", "faqs", "cheats", "screenshots", "videos", "news", "reviews", "forums", "previews", "downloads",
+    };
+
+    private static readonly string[] NotArticleNamespaces =
+        ["File:", "Special:", "Category:", "Template:", "User:", "User_talk:", "Talk:", "Help:", "MediaWiki:", "Module:"];
+
+    private static string Game(GuidePageMatch match) => match.ItemId[..^"/walkthrough".Length];
+
+    private static DateTimeOffset? Edited(IDocument document) =>
+        document.QuerySelectorAll("article#wiki-content time[datetime]").Select(Time).Where(time => time is not null).Max();
+
+    private static Uri[] Images(IElement output, Uri url) =>
+        output.QuerySelectorAll("img").Select(image => OnlineHtml.ImageUrl(image, url)).OfType<Uri>().Distinct().ToArray();
 
     // A page names its game above its heading; the hub's heading is
     // "{Game} Walkthrough and Guide".

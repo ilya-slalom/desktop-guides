@@ -160,4 +160,88 @@ public sealed class GuideCaptureTests : IDisposable
     {
         public void Report((int Done, int Total) value) => reports.Add(value);
     }
+
+    private const string Wiki = "https://www.neoseeker.com/example-quest/";
+
+    // Neoseeker pages by path; an article not listed loads the site's no-article page.
+    private sealed class WikiLoader(Clock clock) : IPageLoader
+    {
+        public Dictionary<string, Queue<int>> Statuses { get; } = [];
+        public List<(string Path, DateTimeOffset At)> Loads { get; } = [];
+
+        public Task<PageLoad> LoadPageAsync(Uri url, CancellationToken token)
+        {
+            string path = url.AbsolutePath[("/example-quest/".Length)..];
+            Loads.Add((path, clock.Now));
+            clock.Now += TimeSpan.FromMilliseconds(500);
+            int status = Statuses.TryGetValue(path, out Queue<int>? queue) && queue.Count > 0 ? queue.Dequeue() : 200;
+            string fixture = path switch
+            {
+                "walkthrough" => "wiki-hub",
+                "walkthrough/Episode_3" => "wiki-episode-3",
+                "walkthrough/A_Golden_Key" => "wiki-a-golden-key",
+                "Quests/Stuck_in_a_Rut" => "wiki-article-stuck-in-a-rut",
+                "World_Intel/Gongaga" => "wiki-article-gongaga",
+                _ => "wiki-no-article",
+            };
+            string? html = status == 200 ? P3Fixtures.Read($"neoseeker/{fixture}.html") : null;
+            return Task.FromResult(new PageLoad(status, html, new Dictionary<Uri, byte[]>()));
+        }
+
+        public Task<byte[]?> LoadImageAsync(Uri url, CancellationToken token) => Task.FromResult<byte[]?>([9]);
+    }
+
+    private CaptureDraft WikiDraft() => new CaptureStore(root, clock).Begin(Guid.NewGuid(),
+        new NeoseekerAdapter().Read(new Uri(Wiki + "walkthrough"), P3Fixtures.Read("neoseeker/wiki-hub.html"))!);
+
+    private GuideCapture WikiCapture(WikiLoader loader) => new(new NeoseekerAdapter(), loader, clock, clock.Delay);
+
+    [Fact]
+    public async Task AWalkthroughsLinkedArticlesAreCapturedAfterItsPages()
+    {
+        WikiLoader loader = new(clock);
+        CaptureDraft draft = WikiDraft();
+        int walkthroughPages = draft.Pages.Count;
+
+        Assert.IsType<CaptureOutcome.Complete>(await WikiCapture(loader).RunAsync(draft, null, CancellationToken.None));
+
+        Assert.True(draft.IsComplete);
+        string[] loads = loader.Loads.Select(load => load.Path).ToArray();
+        Assert.Equal(["Quests/Stuck_in_a_Rut", "World_Intel/Gongaga"], loads[walkthroughPages..]);
+        Assert.DoesNotContain("Quests/Deeper_Quest", loads);
+        Assert.All(loader.Loads.Zip(loader.Loads.Skip(1)), pair => Assert.True(pair.Second.At - pair.First.At >= GuideCapture.Pace));
+        Assert.Equal(
+            ["article-quests-stuck-in-a-rut", "article-world-intel-gongaga"],
+            draft.Captured.Skip(walkthroughPages).Select(page => page.Reading.Match.PageKey));
+    }
+
+    [Fact]
+    public async Task ALinkThatIsNoArticleIsDroppedAndTheCaptureGoesOn()
+    {
+        WikiLoader loader = new(clock);
+        CaptureDraft draft = WikiDraft();
+        draft.Extend([new GuidePageLink("article-faqs", new Uri(Wiki + "faqs"), null, Linked: true)]);
+
+        Assert.IsType<CaptureOutcome.Complete>(await WikiCapture(loader).RunAsync(draft, null, CancellationToken.None));
+
+        Assert.True(draft.IsComplete);
+        Assert.DoesNotContain(draft.Pages, page => page.PageKey == "article-faqs");
+    }
+
+    [Fact]
+    public async Task AnArticleThatIsAChallengePauses()
+    {
+        WikiLoader loader = new(clock);
+        CaptureDraft draft = WikiDraft();
+        loader.Statuses["Quests/Stuck_in_a_Rut"] = new Queue<int>([429]);
+
+        CaptureOutcome.Paused paused = Assert.IsType<CaptureOutcome.Paused>(
+            await WikiCapture(loader).RunAsync(draft, null, CancellationToken.None));
+        Assert.Equal("article-quests-stuck-in-a-rut", paused.Page.PageKey);
+        Assert.Equal(429, paused.Status);
+
+        Assert.IsType<CaptureOutcome.Complete>(await WikiCapture(loader).RunAsync(draft, null, CancellationToken.None));
+        Assert.True(draft.IsComplete);
+        Assert.Equal(1, loader.Loads.Count(load => load.Path == "World_Intel/Gongaga"));
+    }
 }
