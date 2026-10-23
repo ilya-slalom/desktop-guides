@@ -200,6 +200,7 @@ if (args.Length == 3 && args[0] == "describe-online")
                 onlineGuide.ContentSha256,
                 Pages = (await onlineRepository.GetGuidePagesAsync(onlineGuide.Id)).Count,
                 Images = (await onlineRepository.GetGuideAssetsAsync(onlineGuide.Id)).Count(asset => asset.Kind == GuideAssetKind.Image),
+                StyleSheets = (await onlineRepository.GetGuideAssetsAsync(onlineGuide.Id)).Count(asset => asset.Kind == GuideAssetKind.StyleSheet),
                 Site = source?.Site.ToString(),
                 source?.ItemId,
                 source?.CapturedPages,

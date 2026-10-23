@@ -8048,6 +8048,7 @@ try {
             [void](Wait-Name 'GameHeading' $game)
             Open-GuideFromGame $sagaTitle
             [void](Wait-Status 'Guide ready.')
+            $report.onlineStyledScreenshot = Save-WindowScreenshot 'online-styled'
             Go-Back
             [void](Wait-Name 'GameHeading' $game)
             Open-GuideFromGame 'Example Quest Walkthrough'

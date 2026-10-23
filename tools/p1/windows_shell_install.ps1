@@ -1979,6 +1979,8 @@ function Run-OnlineScenarios([string] $fixtureRoot) {
         throw "Expected one saved HTML guide with 3 pages and its image; got $($state | ConvertTo-Json -Depth 4 -Compress)."
     }
     if ($text.Count -ne 1 -or $text[0].Site -ne 'GameFaqs') { throw 'Expected one saved text FAQ.' }
+    # The copy's built-in stylesheet; how it looks is the live check's.
+    if ($html[0].StyleSheets -ne 1) { throw "Expected the saved HTML guide's stylesheet; got $($html[0].StyleSheets)." }
     if ($null -ne $html[0].CapturedPages) { throw 'The complete save was recorded as partial.' }
 
     # Saving again after page 2 changed replaces the guide in place.
