@@ -101,6 +101,13 @@ public sealed partial class NeoseekerAdapter : IGuideSourceAdapter
     {
         if (item.Site != SourceSite.Neoseeker || !item.ItemId.EndsWith("/walkthrough", StringComparison.Ordinal)) return null;
         IDocument document = new HtmlParser().ParseDocument(html);
+        // A link can land elsewhere (a redirect to another game, a category
+        // or the walkthrough itself); the canonical address says where.
+        if (document.QuerySelector("link[rel='canonical']")?.GetAttribute("href") is { } canonical &&
+            (!Uri.TryCreate(link.Url, canonical, out Uri? landed) || ArticlePath(landed, Game(item)) is null))
+        {
+            return null;
+        }
         IElement? output = Content(document, link.Url);
         if (output is null) return null;
         string title = document.QuerySelector("#page-title h1")?.TextContent.Trim() is { Length: > 0 } heading
@@ -152,16 +159,7 @@ public sealed partial class NeoseekerAdapter : IGuideSourceAdapter
         {
             if (link.ClassList.Contains("new") ||
                 !Uri.TryCreate(link.GetAttribute("href"), UriKind.Absolute, out Uri? target) ||
-                target.Scheme != Uri.UriSchemeHttps || !target.Host.Equals(Host, StringComparison.OrdinalIgnoreCase) ||
-                target.Query.Length > 0 ||
-                !target.AbsolutePath.StartsWith($"/{game}/", StringComparison.Ordinal))
-            {
-                continue;
-            }
-            string path = target.AbsolutePath[(game.Length + 2)..].TrimEnd('/');
-            string first = Uri.UnescapeDataString(path.Split('/')[0]);
-            if (path.Length == 0 || NotArticles.Contains(first) ||
-                NotArticleNamespaces.Any(space => first.StartsWith(space, StringComparison.OrdinalIgnoreCase)))
+                ArticlePath(target, game) is not { } path)
             {
                 continue;
             }
@@ -171,6 +169,21 @@ public sealed partial class NeoseekerAdapter : IGuideSourceAdapter
                 link.TextContent.Trim() is { Length: > 0 } name ? name : null, Linked: true));
         }
         return articles.ToArray();
+    }
+
+    // The article's path after the game, or null when the address is no article of that game.
+    private static string? ArticlePath(Uri target, string game)
+    {
+        if (target.Scheme != Uri.UriSchemeHttps || !target.Host.Equals(Host, StringComparison.OrdinalIgnoreCase) ||
+            target.Query.Length > 0 || !target.AbsolutePath.StartsWith($"/{game}/", StringComparison.Ordinal))
+        {
+            return null;
+        }
+        string path = target.AbsolutePath[(game.Length + 2)..].TrimEnd('/');
+        string first = Uri.UnescapeDataString(path.Split('/')[0]);
+        return path.Length == 0 || NotArticles.Contains(first) ||
+               NotArticleNamespaces.Any(space => first.StartsWith(space, StringComparison.OrdinalIgnoreCase))
+            ? null : path;
     }
 
     private static readonly HashSet<string> NotArticles = new(StringComparer.OrdinalIgnoreCase)

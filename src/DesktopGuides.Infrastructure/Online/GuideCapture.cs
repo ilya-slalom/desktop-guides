@@ -59,7 +59,9 @@ public sealed class GuideCapture(
                 progress?.Report((draft.Captured.Count, draft.Pages.Count));
                 continue;
             }
-            if (reading is null || reading.Match.ItemId != draft.Item.ItemId || reading.Match.Site != draft.Item.Site)
+            // A page read back as another page would never leave Remaining.
+            if (reading is null || reading.Match.ItemId != draft.Item.ItemId || reading.Match.Site != draft.Item.Site ||
+                reading.Match.PageKey != page.PageKey)
             {
                 return new CaptureOutcome.Paused(draft, page, number, draft.Pages.Count, load.Status);
             }

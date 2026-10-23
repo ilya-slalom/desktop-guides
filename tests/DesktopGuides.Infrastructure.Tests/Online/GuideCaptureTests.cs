@@ -244,4 +244,30 @@ public sealed class GuideCaptureTests : IDisposable
         Assert.True(draft.IsComplete);
         Assert.Equal(1, loader.Loads.Count(load => load.Path == "World_Intel/Gongaga"));
     }
+
+    // Final review: a page read back under another key would never leave Remaining.
+    private sealed class RekeyingAdapter(string slug) : IGuideSourceAdapter
+    {
+        private readonly GameFaqsAdapter inner = new();
+        public SourceSite Site => inner.Site;
+        public GuidePageMatch? Match(Uri url) => inner.Match(url);
+        public GuidePageReading? Read(Uri url, string html) => inner.Read(url, html) is { } reading && url.Segments[^1] == slug
+            ? reading with { Match = reading.Match with { PageKey = "introduction" } }
+            : inner.Read(url, html);
+    }
+
+    [Fact]
+    public async Task APageReadUnderAnotherKeyPauses()
+    {
+        // The test's loads run synchronously, so a loop is stopped by cancelling it.
+        using CancellationTokenSource stop = new();
+        Loader loader = new(clock);
+        loader.OnLoad = _ => { if (loader.Loads.Count > 20) stop.Cancel(); };
+        CaptureDraft draft = Draft();
+
+        CaptureOutcome.Paused paused = Assert.IsType<CaptureOutcome.Paused>(
+            await new GuideCapture(new RekeyingAdapter("fishing"), loader, clock, clock.Delay).RunAsync(draft, null, stop.Token));
+        Assert.Equal("fishing", paused.Page.PageKey);
+        Assert.Equal(3, loader.Loads.Count(load => load.Url.Segments[^1] is not "78736-54.png"));
+    }
 }

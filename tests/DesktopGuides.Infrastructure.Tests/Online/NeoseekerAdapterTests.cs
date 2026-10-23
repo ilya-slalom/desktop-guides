@@ -159,4 +159,26 @@ public sealed class NeoseekerAdapterTests
     [Fact]
     public void AChallengeIsNotASitePage() =>
         Assert.False(adapter.IsSitePage("<html><body><p>Checking your browser…</p></body></html>"));
+
+    // Final review: a link can land on another page; the canonical address says which.
+    [Theory]
+    [InlineData("/other-game/Quests/Stuck_in_a_Rut")]
+    [InlineData("/example-quest/Category:Quests")]
+    [InlineData("/example-quest/walkthrough/Episode_3")]
+    public void AnArticleLinkThatLandsElsewhereIsNoArticle(string canonical)
+    {
+        string html = P3Fixtures.Read("neoseeker/wiki-article-stuck-in-a-rut.html").Replace(
+            "https://www.neoseeker.com/example-quest/Quests/Stuck_in_a_Rut", Host + canonical, StringComparison.Ordinal);
+        Assert.Null(adapter.ReadLinked(Article("Quests/Stuck_in_a_Rut", "article-quests-stuck-in-a-rut"), html, WalkthroughItem));
+        Assert.True(adapter.IsSitePage(html));
+    }
+
+    [Fact]
+    public void AnArticleLinkRedirectedToAnotherArticleOfTheGameIsRead()
+    {
+        string html = P3Fixtures.Read("neoseeker/wiki-article-stuck-in-a-rut.html").Replace(
+            "/example-quest/Quests/Stuck_in_a_Rut\"", "/example-quest/Quests/Stuck_in_a_Rut_(Quest)\"", StringComparison.Ordinal);
+        Assert.Contains("Stuck_in_a_Rut_(Quest)", html);
+        Assert.NotNull(adapter.ReadLinked(Article("Quests/Stuck_in_a_Rut", "article-quests-stuck-in-a-rut"), html, WalkthroughItem));
+    }
 }
