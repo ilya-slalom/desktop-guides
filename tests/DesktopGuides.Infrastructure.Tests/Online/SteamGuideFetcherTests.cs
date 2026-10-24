@@ -118,6 +118,8 @@ public sealed class SteamGuideFetcherTests : IAsyncLifetime
         Assert.Equal((SourceSite.Steam, "4242", "https://steamcommunity.com/sharedfiles/filedetails/?id=4242", "Test Author"),
             (source.Site, source.ItemId, source.Url, source.Author));
         Assert.Contains(await harness.Repository.GetGuideAssetsAsync(id), asset => asset.Kind == GuideAssetKind.StyleSheet);
+        // Review: Steam's image addresses name no type, and an untyped image wasn't imported.
+        Assert.Equal(2, (await harness.Repository.GetGuideAssetsAsync(id)).Count(asset => asset.Kind == GuideAssetKind.Image));
 
         Assert.Equal(new OnlineSaveResult.UpToDate(id), await Saver().SaveAsync(
             await Fetcher().FetchAsync(harness.Game.Id, "4242", null, CancellationToken.None), false, null, CancellationToken.None));

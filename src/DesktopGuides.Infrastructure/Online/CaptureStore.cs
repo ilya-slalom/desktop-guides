@@ -173,7 +173,7 @@ public sealed class CaptureDraft
     {
         string named = Path.GetExtension(url.AbsolutePath).ToLowerInvariant();
         string extension = named is ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp" or ".svg" or ".avif" or ".bmp"
-            ? named : ".img";
+            ? named : Sniff(bytes);
         string relative = $"images/{Guid.NewGuid():N}{extension}";
         string path = Path.Combine(Folder, relative.Replace('/', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -181,6 +181,16 @@ public sealed class CaptureDraft
         Touch();
         return path;
     }
+
+    // S22 PR 4: an address with no type (Steam's /ugc/…/HASH/) is typed
+    // by its first bytes; the import takes only known image types.
+    private static string Sniff(ReadOnlySpan<byte> bytes) =>
+        bytes.StartsWith((byte[])[0x89, 0x50, 0x4E, 0x47]) ? ".png"
+        : bytes.StartsWith((byte[])[0xFF, 0xD8, 0xFF]) ? ".jpg"
+        : bytes.StartsWith("GIF8"u8) ? ".gif"
+        : bytes.Length >= 12 && bytes.StartsWith("RIFF"u8) && bytes[8..12].SequenceEqual("WEBP"u8) ? ".webp"
+        : bytes.StartsWith("BM"u8) ? ".bmp"
+        : ".img";
 
     /// <summary>Adds or replaces a captured page; its images must be files from <see cref="SaveImage"/>.</summary>
     public void Add(GuidePageReading page, IReadOnlyDictionary<Uri, string> imageFiles)

@@ -8154,7 +8154,8 @@ try {
         # Without a key, search says where to add one; a pasted guide still saves.
         elseif ($Mode -eq 'online-steam-nokey') {
             Open-Steam
-            $query = (Find-ById 'SteamQuery').GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+            # The element the wait found: a fresh lookup can miss it while the panel lays out.
+            $query = (Wait-VisibleById 'SteamQuery').GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
             if ($query -ne $game) { throw "The Steam search box held '$query', not the game's title." }
             Invoke-Element (Wait-VisibleById 'SteamSearch')
             Wait-Until { Test-Shown 'SteamKeyInfo' } 'the no-key bar'
