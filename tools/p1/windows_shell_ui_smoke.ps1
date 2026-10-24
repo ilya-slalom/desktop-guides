@@ -8194,6 +8194,8 @@ try {
             if ($rows.Count -ne 2 -or $rows[0].Current.Name -notlike "$steamTitle, By Test Author*") {
                 throw "The results read '$(($rows | ForEach-Object { $_.Current.Name }) -join ' | ')'."
             }
+            # Review: a page the hidden browser finished loading once set the site back to GameFAQs.
+            if ((Get-ComboSelection 'OnlineSource') -ne 'Steam') { throw "With Steam's results showing, the site read '$(Get-ComboSelection 'OnlineSource')'." }
             $report.steamResultsScreenshot = Save-WindowScreenshot 'online-steam-results'
             $rows[0].SetFocus()
             Start-Sleep -Milliseconds 200

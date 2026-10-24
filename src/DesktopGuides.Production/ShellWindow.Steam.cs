@@ -95,6 +95,7 @@ public sealed partial class ShellWindow
     private void ShowSteamSearch()
     {
         if (SteamQuery.Text.Length == 0) SteamQuery.Text = onlineGameTitle;
+        OnlineAddress.Text = "";
         OnlineSave.IsEnabled = false;
         OnlineStatus.Text = "";
         ShowSteam(selected: true, results: true);

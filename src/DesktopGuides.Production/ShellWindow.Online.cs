@@ -236,18 +236,19 @@ public sealed partial class ShellWindow
     private async Task UpdateOnlineSaveAsync(bool keepStatus = false)
     {
         if (onlineBrowser?.CurrentUrl is not Uri url) return;
+        // Steam's results are showing: the hidden browser's page is neither
+        // the site nor the address the reader is on.
+        if (SteamResults.Visibility == Visibility.Visible)
+        {
+            OnlineSave.IsEnabled = false;
+            return;
+        }
         if (!ReferenceEquals(FocusManager.GetFocusedElement(OnlineAddress.XamlRoot), OnlineAddress))
         {
             OnlineAddress.Text = url.AbsoluteUri;
         }
         if (OnlineSources.Find(url) is { } source) SelectOnlineSource(source);
         if (onlineCapture is not null) return;
-        // Steam's results are showing; the hidden browser's page isn't the reader's.
-        if (SteamResults.Visibility == Visibility.Visible)
-        {
-            OnlineSave.IsEnabled = false;
-            return;
-        }
         GuidePageReading? reading = await ReadCurrentPageAsync();
         onlineReading = reading;
         OnlineSave.IsEnabled = reading is not null;
