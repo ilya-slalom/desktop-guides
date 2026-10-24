@@ -35,4 +35,14 @@ public sealed class ProviderMessagesTests
     [InlineData(ProviderErrorKind.MalformedData, ProviderRecovery.AddManually)]
     public void RecoveryActionsMatchTheSpecTable(ProviderErrorKind kind, ProviderRecovery expected) =>
         Assert.Equal(expected, ProviderMessages.RecoveryFor(kind));
+
+    [Theory]
+    [InlineData(ProviderErrorKind.NotConfigured, "Steam search needs your Steam Web API key.")]
+    [InlineData(ProviderErrorKind.InvalidCredentials, "Steam didn't accept the key. Check it in Settings.")]
+    [InlineData(ProviderErrorKind.RateLimited, "Steam is limiting requests. Try again in a few minutes.")]
+    [InlineData(ProviderErrorKind.Timeout, "Steam took too long to respond.")]
+    [InlineData(ProviderErrorKind.MalformedData, "This Steam page couldn't be read as a guide.")]
+    [InlineData(ProviderErrorKind.Unavailable, "Can't reach Steam. Check your connection.")]
+    public void SteamFailuresSayWhatToDo(ProviderErrorKind kind, string message) =>
+        Assert.Equal(message, ProviderMessages.ForSteam(kind));
 }

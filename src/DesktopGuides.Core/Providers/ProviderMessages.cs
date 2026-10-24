@@ -29,6 +29,16 @@ public static class ProviderMessages
         _ => "Can't reach SteamGridDB. Check your connection.",
     };
 
+    public static string ForSteam(ProviderErrorKind kind) => kind switch
+    {
+        ProviderErrorKind.NotConfigured => "Steam search needs your Steam Web API key.",
+        ProviderErrorKind.InvalidCredentials => "Steam didn't accept the key. Check it in Settings.",
+        ProviderErrorKind.RateLimited => "Steam is limiting requests. Try again in a few minutes.",
+        ProviderErrorKind.Timeout => "Steam took too long to respond.",
+        ProviderErrorKind.MalformedData => "This Steam page couldn't be read as a guide.",
+        _ => "Can't reach Steam. Check your connection.",
+    };
+
     public static string NoResults(string query) => $"No games match \"{query}\".";
 
     public static ProviderRecovery RecoveryFor(ProviderErrorKind kind) => kind switch

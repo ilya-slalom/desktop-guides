@@ -43,7 +43,7 @@ public static class CatalogPresentation
 
     public static IReadOnlyList<CatalogFact> GuideFacts(
         GuideSummary summary, TimeProvider clock, CultureInfo culture,
-        GuideFileStatus fileStatus = GuideFileStatus.Ok)
+        GuideFileStatus fileStatus = GuideFileStatus.Ok, GuideSource? source = null)
     {
         string format = ImportPresentation.FormatLabel(summary.Guide.Format);
         List<CatalogFact> facts = [];
@@ -62,6 +62,18 @@ public static class CatalogPresentation
             return facts;
         }
         facts.Add(new(format, format));
+        // S22: design 5.4, where a saved guide came from and who wrote it.
+        if (source is not null)
+        {
+            string site = SiteName(source.Site);
+            facts.Add(source.Author is { } author
+                ? new($"{site} · {author}", $"Saved from {site}, by {author}")
+                : new(site, $"Saved from {site}"));
+            if (source is { CapturedPages: int captured, TotalPages: int total })
+            {
+                facts.Add(new($"Pages 1–{captured} of {total}", $"Pages 1 to {captured} of {total} saved"));
+            }
+        }
         facts.Add(ReadingStateFact(summary.State));
         if (summary.State?.LastOpenedUtc is DateTimeOffset opened)
         {
@@ -69,6 +81,14 @@ public static class CatalogPresentation
         }
         return facts;
     }
+
+    public static string SiteName(SourceSite site) => site switch
+    {
+        SourceSite.GameFaqs => "GameFAQs",
+        SourceSite.Neoseeker => "Neoseeker",
+        SourceSite.Steam => "Steam Community",
+        _ => "VGMaps",
+    };
 
     public static string AccessibleText(IReadOnlyList<CatalogFact> facts) =>
         string.Join(", ", facts.Select(fact => fact.AccessibleLabel));
