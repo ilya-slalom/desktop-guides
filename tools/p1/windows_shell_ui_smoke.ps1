@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'reflow-centered', 'contents-remember-open', 'contents-remember-reopen', 'contents-remember-closed', 'contents-auto', 'contents-auto-narrow', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark', 'maps-reader', 'maps-popup', 'maps-keyboard', 'online-browse', 'online-save', 'online-resave', 'online-pause', 'online-resume', 'online-steam-limit', 'online-steam-nokey', 'online-steam-search',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'reflow-centered', 'contents-remember-open', 'contents-remember-reopen', 'contents-remember-closed', 'contents-auto', 'contents-auto-narrow', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark', 'maps-reader', 'maps-popup', 'maps-keyboard', 'online-browse', 'online-save', 'online-resave', 'online-pause', 'online-resume', 'online-steam-limit', 'online-steam-nokey', 'online-steam-search', 'online-vgmaps',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -8245,6 +8245,54 @@ try {
             $kept = (Wait-VisibleById 'SteamQuery').GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
             if ($kept -ne 'zzz') { throw "After a search with no results the box held '$kept'." }
             $report.phases += 'online-steam-search'
+        }
+        # S22 PR 5: VGMaps. Search the atlas, open a game, save two maps, save them again.
+        elseif ($Mode -eq 'online-vgmaps') {
+            Select-ComboItem 'OnlineSource' 'VGMaps'
+            $query = (Wait-VisibleById 'VgMapsQuery').GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+            if ($query -ne $game) { throw "The VGMaps search box held '$query', not the game's title." }
+            Invoke-Element (Wait-VisibleById 'VgMapsSearch')
+            $item = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::ListItem)
+            $script:vgGames = @()
+            Wait-Until {
+                $list = Find-ById 'VgMapsGames'
+                $script:vgGames = if ($list) { @($list.FindAll([System.Windows.Automation.TreeScope]::Descendants, $item)) } else { @() }
+                $script:vgGames.Count -ge 2
+            } 'the atlas results'
+            $names = @($script:vgGames | ForEach-Object { $_.Current.Name })
+            if (($names -join '|') -ne 'Online Test Game (PSX)|Online Test Game (NES)') { throw "The atlas listed '$($names -join ' | ')'." }
+            $report.vgmapsGamesScreenshot = Save-WindowScreenshot 'online-vgmaps-games'
+            $script:vgGames[0].SetFocus()
+            Start-Sleep -Milliseconds 200
+            [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+            $box = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::CheckBox)
+            $script:vgMaps = @()
+            Wait-Until {
+                $list = Find-ById 'VgMapsMaps'
+                $script:vgMaps = if ($list) { @($list.FindAll([System.Windows.Automation.TreeScope]::Descendants, $box)) } else { @() }
+                $script:vgMaps.Count -ge 7
+            } "the game's 7 maps"
+            $byArea = @{}
+            foreach ($map in $script:vgMaps) { $byArea[($map.Current.Name -split ':', 2)[0]] = $map }
+            foreach ($area in @('World', 'Town', 'Cave', 'Field', 'Intro', 'Huge World', 'Sea')) {
+                if (-not $byArea.ContainsKey($area)) { throw "No map row for $area; rows: $(($script:vgMaps | ForEach-Object { $_.Current.Name }) -join ' | ')." }
+            }
+            if ($byArea['Intro'].Current.IsEnabled -or $byArea['Intro'].Current.Name -notlike '*Not saveable (SWF)*') { throw "The SWF row read '$($byArea['Intro'].Current.Name)'." }
+            if ($byArea['Huge World'].Current.IsEnabled -or $byArea['Huge World'].Current.Name -notlike '*Too large to save*') { throw "The oversized row read '$($byArea['Huge World'].Current.Name)'." }
+            if ($byArea['World'].Current.Name -ne 'World: 3400 × 1480 · 4.82 MB · PNG · by Test Ripper') { throw "The World row read '$($byArea['World'].Current.Name)'." }
+            foreach ($area in @('World', 'Cave')) {
+                $byArea[$area].GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
+            }
+            $report.vgmapsMapsScreenshot = Save-WindowScreenshot 'online-vgmaps-maps'
+            Invoke-Element (Wait-EnabledById 'VgMapsSaveSelected')
+            Wait-OnlineStatus "Saved 2 maps to $game." 60
+            Invoke-Element (Wait-EnabledById 'VgMapsSaveSelected')
+            Wait-OnlineStatus '2 maps are up to date.' 60
+            $report.phases += 'online-vgmaps'
         }
         elseif ($Mode -eq 'online-browse') {
             $source = Get-ComboSelection 'OnlineSource'
