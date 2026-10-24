@@ -1,6 +1,6 @@
-=======================================================
+===============================================================================
  REFLOW GUIDE
-=======================================================
+===============================================================================
 
 This guide is an authored fixture for the reflow view. Its paragraphs
 are hard-wrapped near seventy columns, the way many plain text guides

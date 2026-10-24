@@ -4422,9 +4422,11 @@ try {
                 if (-not $tree) { return @() }
                 return @($tree.FindAll([System.Windows.Automation.TreeScope]::Descendants, $treeItem))
             }
+            # The pane on any tab or state: its outline, "Finding sections…",
+            # "No sections found" or Bookmarks.
             function Test-ContentsShown {
-                $tree = Find-ById 'ReaderContentsTree'
-                return [bool]($tree -and -not $tree.Current.IsOffscreen)
+                $pane = Find-ById 'ReaderContentsPane'
+                return [bool]($pane -and -not $pane.Current.IsOffscreen)
             }
             function Wait-ContentsSelected([string] $name) {
                 $deadline = (Get-Date).AddSeconds(10)
@@ -5609,6 +5611,15 @@ try {
                 if ($reflowed.Width -gt $reflowed.ListWidth - 100 -or [Math]::Abs($reflowed.LeftGap - $reflowed.RightGap) -gt 12) {
                     throw "The reflowed column isn't capped and centered: $($reflowed | ConvertTo-Json -Compress)."
                 }
+                # Review: the column fits 80 columns of preserved text, as GameFAQs
+                # guides are wrapped; the fixture's 79-column rules don't scroll.
+                $wide = @(foreach ($item in @((Find-ById 'ReaderReflowBlocks').FindAll($scope, $listItem) | Where-Object { -not $_.Current.IsOffscreen })) {
+                    $child = $item.FindFirst([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)
+                    $pattern = $null
+                    if ($child -and $child.TryGetCurrentPattern([System.Windows.Automation.ScrollPattern]::Pattern, [ref]$pattern) -and
+                        $pattern.Current.HorizontallyScrollable) { $item.Current.Name }
+                })
+                if ($wide.Count -gt 0) { throw "Preserved blocks scroll sideways at 1024 px: $(($wide | ForEach-Object { $_.Substring(0, [Math]::Min(40, $_.Length)) }) -join ' | ')." }
                 $report.centeredReflowScreenshot = Save-WindowScreenshot 'reflow-centered-reflow'
                 Select-TextView 'Original'
                 Wait-TextViewChosen 'Original'
