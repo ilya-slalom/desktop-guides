@@ -16,7 +16,9 @@ public sealed class ProviderHttp : IDisposable
     {
         "id.twitch.tv", "api.igdb.com", "images.igdb.com", "www.steamgriddb.com", "cdn2.steamgriddb.com",
         // S22 PR 4: Steam's Web API, its guide pages and their images.
-        "api.steampowered.com", "steamcommunity.com", "images.steamusercontent.com"
+        "api.steampowered.com", "steamcommunity.com", "images.steamusercontent.com",
+        // S22 PR 5: The Video Game Atlas.
+        "vgmaps.com"
     };
 
     private readonly HttpClient client;
