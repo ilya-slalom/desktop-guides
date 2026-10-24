@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
+using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
 
 namespace DesktopGuides.Production;
@@ -174,8 +175,32 @@ public sealed partial class TextReflowView : UserControl
         }
     }
 
-    // About 80 characters of prose: 40em of the reading font at its scale.
-    private double ReflowMeasure => 40 * baseFontSize * textScale;
+    // About 80 characters of prose, 40em of the reading font, and never
+    // narrower than 80 columns of preserved text: GameFAQs guides are wrapped
+    // at 79, and their maps and rules would scroll sideways otherwise.
+    private double ReflowMeasure
+    {
+        get
+        {
+            double size = baseFontSize * textScale;
+            if (size != monoProbeSize)
+            {
+                TextBlock probe = new()
+                {
+                    FontFamily = (FontFamily)Application.Current.Resources["DesktopGuidesReaderMonoFontFamily"],
+                    FontSize = size,
+                    Text = new string('M', 80),
+                };
+                probe.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                monoProbeSize = size;
+                monoColumns = Math.Ceiling(probe.DesiredSize.Width);
+            }
+            return Math.Max(40 * size, monoColumns);
+        }
+    }
+
+    private double monoProbeSize = -1;
+    private double monoColumns;
 
     private void BlockContainerChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
     {
