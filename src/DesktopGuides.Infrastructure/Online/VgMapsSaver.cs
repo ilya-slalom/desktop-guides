@@ -76,17 +76,24 @@ public sealed class VgMapsSaver(
 
     private async Task<OnlineSaveResult> SaveOneAsync(Guid gameId, VgMapsGamePage page, VgMapsMap map, CancellationToken token)
     {
-        byte[] bytes = await client.GetMapAsync(map.Url, token);
-        string extension = ".png";
-        if (map.Saveable == VgMapsSaveable.Convert) bytes = await converter.ToPngAsync(bytes, token);
-        else if (map.Format is "JPG" or "JPEG") extension = ".jpg";
-
         string work = Path.Combine(workRoot, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
         try
         {
-            string file = Path.Combine(work, "map" + extension);
-            await File.WriteAllBytesAsync(file, bytes, token);
+            // Streamed to the work folder: a map can be hundreds of megabytes.
+            string downloaded = Path.Combine(work, "map.download");
+            await client.DownloadMapAsync(map.Url, downloaded, token);
+            string file;
+            if (map.Saveable == VgMapsSaveable.Convert)
+            {
+                file = Path.Combine(work, "map.png");
+                await File.WriteAllBytesAsync(file, await converter.ToPngAsync(await File.ReadAllBytesAsync(downloaded, token), token), token);
+            }
+            else
+            {
+                file = Path.Combine(work, map.Format is "JPG" or "JPEG" ? "map.jpg" : "map.png");
+                File.Move(downloaded, file);
+            }
             ImportManifest manifest = await validator.InspectAsync(file, token) switch
             {
                 // A map past the limits throws here, with the import's own message.

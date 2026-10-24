@@ -49,4 +49,26 @@ public sealed class VgMapsSystemPageTests
     [Fact]
     public void AGameWithoutATableHasNoPage() =>
         Assert.Null(Read(new VgMapsGame("Missing Game", "Missing Game (PSX)", "PSX/index.htm", "MissingGame")));
+
+    // Review: a thousands separator is part of the number.
+    [Fact]
+    public void SizesWithSeparatorsRead()
+    {
+        string html = VgMapsClient.Decode(P3Bytes.Read("vgmaps/system.htm"))
+            .Replace("3400 x 1480", "13,400 x 1,480", StringComparison.Ordinal)
+            .Replace("544 kB", "1,544 kB", StringComparison.Ordinal);
+        VgMapsGamePage page = VgMapsSystemPage.Read(html, Page, Game)!;
+        Assert.Equal((13400, 1480), (page.Maps[0].Width, page.Maps[0].Height));
+        Assert.Equal(1544L * 1024, page.Maps[1].Bytes);
+    }
+
+    // Review: a map with no name in its row is still a map, named by its place.
+    [Fact]
+    public void AMapWithoutANameIsNamedByItsPlace()
+    {
+        string html = VgMapsClient.Decode(P3Bytes.Read("vgmaps/system.htm"))
+            .Replace(">Town</a>", "><img src=\"x.png\"></a>", StringComparison.Ordinal)
+            .Replace("<p align=\"center\">Town</TD>", "<p align=\"center\"></TD>", StringComparison.Ordinal);
+        Assert.Equal("Map 2", VgMapsSystemPage.Read(html, Page, Game)!.Maps[1].Area);
+    }
 }

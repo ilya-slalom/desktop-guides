@@ -72,6 +72,12 @@ public sealed partial class ShellWindow
     private VgMapsIndex? vgMapsIndex;
     private VgMapsGamePage? vgMapsPage;
     private readonly Dictionary<string, string> vgMapsSystemPages = new(StringComparer.Ordinal);
+    // Bumped when the reader leaves VGMaps or Find online: a load still
+    // running then mustn't show its results in another view, or another game's.
+    private int vgMapsGeneration;
+
+    private bool VgMapsCurrent(int generation) =>
+        generation == vgMapsGeneration && VgMapsSelected && OnlinePanel.Visibility == Visibility.Visible;
 
     private bool VgMapsSelected =>
         OnlineSource.SelectedIndex >= 0 && OnlineSources.Available[OnlineSource.SelectedIndex].Site == Core.Library.SourceSite.VgMaps;
@@ -86,6 +92,8 @@ public sealed partial class ShellWindow
         VgMapsPanel.Visibility = selected ? Visibility.Visible : Visibility.Collapsed;
         if (!selected)
         {
+            vgMapsGeneration++;
+            vgMapsPage = null;
             VgMapsGames.Visibility = VgMapsMaps.Visibility = VgMapsGameRow.Visibility = Visibility.Collapsed;
             return;
         }
@@ -121,23 +129,33 @@ public sealed partial class ShellWindow
         if (onlineCapture is not null) return;
         vgMapsPage = null;
         ShowVgMaps(selected: true);
+        int generation = ++vgMapsGeneration;
         try
         {
             if (refresh || !VgMapsAtlas.IsFresh) OnlineStatus.Text = "Loading the atlas's index…";
-            await VgMapsAtlas.LoadAsync(async token => VgMapsIndex.Parse(await VgMapsApi().GetIndexAsync(token)), refresh, CancellationToken.None);
+            // Fetched, decoded and parsed off the UI thread: the index is about 2 MB.
+            VgMapsClient api = VgMapsApi();
+            await VgMapsAtlas.LoadAsync(token => Task.Run(async () => VgMapsIndex.Parse(await api.GetIndexAsync(token)), token),
+                refresh, CancellationToken.None);
+            if (!VgMapsCurrent(generation)) return;
             List<VgMapsGameItem> games = VgMapsAtlas.Search(VgMapsQuery.Text).Select(game => new VgMapsGameItem(game)).ToList();
             VgMapsGames.ItemsSource = games;
             OnlineStatus.Text = games.Count == 0 ? "No games in the atlas match."
                 : games.Count == 1 ? "1 game in the atlas." : $"{games.Count} games in the atlas.";
         }
-        catch (ProviderException error)
+        catch (ProviderException error) when (VgMapsCurrent(generation))
         {
             OnlineStatus.Text = $"{ProviderMessages.ForVgMaps(error.Kind)} The atlas's index couldn't be loaded.";
         }
-        catch (Exception)
+        catch (Exception) when (VgMapsCurrent(generation))
         {
             // Handlers that await this are async void: nothing may escape.
             OnlineStatus.Text = "The atlas's index couldn't be loaded. Try again.";
+        }
+        catch (Exception)
+        {
+            // The reader moved on.
+            return;
         }
         AnnounceStatus(OnlineStatus.Text);
     }
@@ -145,16 +163,19 @@ public sealed partial class ShellWindow
     private async void VgMapsGameChosen(object sender, ItemClickEventArgs args)
     {
         if (args.ClickedItem is not VgMapsGameItem item || onlineCapture is not null) return;
+        int generation = ++vgMapsGeneration;
         try
         {
             OnlineStatus.Text = $"Loading {item.Label}…";
             if (!vgMapsSystemPages.TryGetValue(item.Game.SystemPath, out string? html))
             {
-                html = await VgMapsApi().GetSystemPageAsync(item.Game.SystemPath, CancellationToken.None);
+                VgMapsClient api = VgMapsApi();
+                html = await Task.Run(() => api.GetSystemPageAsync(item.Game.SystemPath, CancellationToken.None));
                 vgMapsSystemPages[item.Game.SystemPath] = html;
             }
             VgMapsGamePage? page = await Task.Run(() =>
                 VgMapsSystemPage.Read(html, VgMapsClient.SystemPage(item.Game.SystemPath), item.Game));
+            if (!VgMapsCurrent(generation)) return;
             if (page is null || page.Maps.Count == 0)
             {
                 OnlineStatus.Text = $"{item.Label}'s maps couldn't be found on its page.";
@@ -168,13 +189,17 @@ public sealed partial class ShellWindow
             OnlineStatus.Text = $"{page.Maps.Count} maps, {saveable} of them saveable.";
             VgMapsMaps.Focus(FocusState.Programmatic);
         }
-        catch (ProviderException error)
+        catch (ProviderException error) when (VgMapsCurrent(generation))
         {
             OnlineStatus.Text = $"{ProviderMessages.ForVgMaps(error.Kind)} {item.Label}'s page couldn't be loaded.";
         }
-        catch (Exception)
+        catch (Exception) when (VgMapsCurrent(generation))
         {
             OnlineStatus.Text = $"{item.Label}'s page couldn't be loaded. Try again.";
+        }
+        catch (Exception)
+        {
+            return;
         }
         AnnounceStatus(OnlineStatus.Text);
     }
@@ -187,10 +212,11 @@ public sealed partial class ShellWindow
         VgMapsGames.Focus(FocusState.Programmatic);
     }
 
+    // Closing Find online waits for a save, as for a capture.
     private void VgMapsSaveSelectedClicked(object sender, RoutedEventArgs args) =>
-        _ = SaveVgMapsAsync(item => item.IsChecked);
+        onlineCaptureRun = SaveVgMapsAsync(item => item.IsChecked);
 
-    private void VgMapsSaveAllClicked(object sender, RoutedEventArgs args) => _ = SaveVgMapsAsync(_ => true);
+    private void VgMapsSaveAllClicked(object sender, RoutedEventArgs args) => onlineCaptureRun = SaveVgMapsAsync(_ => true);
 
     private async Task SaveVgMapsAsync(Func<VgMapsMapItem, bool> chosen)
     {
@@ -204,6 +230,7 @@ public sealed partial class ShellWindow
         if (maps.Length == 0)
         {
             OnlineStatus.Text = "Choose the maps to save.";
+            AnnounceStatus(OnlineStatus.Text);
             return;
         }
         onlineCapture = new CancellationTokenSource();
@@ -280,6 +307,7 @@ public sealed partial class ShellWindow
 
     private void CloseVgMaps()
     {
+        vgMapsGeneration++;
         vgMapsPage = null;
         vgMapsClient = null;
         vgMapsSystemPages.Clear();

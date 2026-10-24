@@ -120,4 +120,19 @@ public sealed class VgMapsSaverTests : IAsyncLifetime
         await Assert.ThrowsAsync<ArgumentException>(() => SaveAsync("Huge World"));
         Assert.Empty(stub.Requests);
     }
+
+    // Review: a real file past the limit, under a smaller listing, is too large, not unreadable.
+    [Fact]
+    public async Task AMapLargerThanListedIsTooLarge()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        stub.Routes["vgmaps.com/Atlas/PSX/OnlineTestGame-World.png"] = _ => (HttpStatusCode.OK, new byte[1024]);
+        VgMapsGamePage page = GamePage();
+        VgMapsSaver saver = new(new VgMapsClient(new ProviderHttp(stub), clock.Delay, maxMapBytes: 512), harness.Repository,
+            harness.Publisher(), harness.Validator, new FakeConverter(() => { }), Path.Combine(harness.Sources.Root, "vgmaps-work"), clock);
+        VgMapsSaveException error = await Assert.ThrowsAsync<VgMapsSaveException>(() =>
+            saver.SaveAsync(harness.Game.Id, page, [page.Maps[0]], null, CancellationToken.None));
+        Assert.Equal(DesktopGuides.Core.Import.ImportIssue.TooLarge,
+            Assert.IsType<DesktopGuides.Core.Import.GuideImportException>(error.InnerException).Issue);
+    }
 }

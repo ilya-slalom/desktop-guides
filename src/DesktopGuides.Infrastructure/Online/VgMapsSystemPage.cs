@@ -44,7 +44,10 @@ public static partial class VgMapsSystemPage
             {
                 continue;
             }
-            string area = Cell(cells, 1) is { Length: > 0 } named ? named : Space().Replace(link.TextContent, " ").Trim();
+            // A row naming no area (an image link) is named by its place.
+            string area = Cell(cells, 1) is { Length: > 0 } named ? named
+                : Space().Replace(link.TextContent, " ").Trim() is { Length: > 0 } linked ? linked
+                : $"Map {maps.Count + 1}";
             (int? width, int? height) = Dimensions(Cell(cells, 2));
             long? bytes = FileSize(Cell(cells, 3));
             string format = (Cell(cells, 4) ?? "").ToUpperInvariant();
@@ -70,14 +73,15 @@ public static partial class VgMapsSystemPage
         index < cells.Length ? Space().Replace(cells[index].TextContent, " ").Trim() : null;
 
     private static (int?, int?) Dimensions(string? text) =>
-        text is not null && DimensionText().Match(text) is { Success: true } size &&
+        text is not null && DimensionText().Match(text.Replace(",", "", StringComparison.Ordinal)) is { Success: true } size &&
         int.TryParse(size.Groups["w"].Value, CultureInfo.InvariantCulture, out int width) &&
         int.TryParse(size.Groups["h"].Value, CultureInfo.InvariantCulture, out int height)
             ? (width, height) : (null, null);
 
     private static long? FileSize(string? text)
     {
-        if (text is null || SizeText().Match(text) is not { Success: true } size ||
+        // "1,234 kB": the comma separates thousands.
+        if (text is null || SizeText().Match(text.Replace(",", "", StringComparison.Ordinal)) is not { Success: true } size ||
             !double.TryParse(size.Groups["n"].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double number))
         {
             return null;

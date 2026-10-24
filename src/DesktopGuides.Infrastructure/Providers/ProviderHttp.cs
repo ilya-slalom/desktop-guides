@@ -65,6 +65,103 @@ public sealed class ProviderHttp : IDisposable
         }
     }
 
+    /// <summary>
+    /// S22 PR 5: streams a large file (a map) to <paramref name="path"/>. The
+    /// request timeout covers the headers and each wait for more of the body,
+    /// not the whole download, so a big file on a slow line still arrives.
+    /// Returns the status; only a 200 writes the file, and a failure deletes it.
+    /// </summary>
+    public async Task<HttpStatusCode> DownloadAsync(
+        Uri uri, string path, Action<HttpRequestMessage> configure, long maxBytes, CancellationToken token)
+    {
+        RequireAllowed(uri);
+        await gate.WaitAsync(token);
+        try
+        {
+            Uri current = uri;
+            for (int hop = 0; hop <= MaxRedirects; hop++)
+            {
+                using CancellationTokenSource timer = CancellationTokenSource.CreateLinkedTokenSource(token);
+                timer.CancelAfter(requestTimeout);
+                try
+                {
+                    using HttpRequestMessage request = new(HttpMethod.Get, current);
+                    configure(request);
+                    using HttpResponseMessage response = await client.SendAsync(
+                        request, HttpCompletionOption.ResponseHeadersRead, timer.Token);
+                    if ((int)response.StatusCode is >= 300 and < 400 && response.Headers.Location is { } location)
+                    {
+                        Uri next = location.IsAbsoluteUri ? location : new Uri(current, location);
+                        if (next.Scheme != Uri.UriSchemeHttps || !string.Equals(next.Host, uri.Host, StringComparison.OrdinalIgnoreCase))
+                        {
+                            throw Unavailable(uri, "redirected to another host");
+                        }
+                        current = next;
+                        continue;
+                    }
+                    if (response.StatusCode == HttpStatusCode.TooManyRequests)
+                    {
+                        throw new ProviderException(ProviderErrorKind.RateLimited, $"{uri.Host} is busy.");
+                    }
+                    if (response.StatusCode != HttpStatusCode.OK) return response.StatusCode;
+                    if (response.Content.Headers.ContentLength > maxBytes) throw TooLarge(uri);
+                    await CopyLimitedAsync(response.Content, path, maxBytes, uri, timer, token);
+                    return HttpStatusCode.OK;
+                }
+                catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                {
+                    TryDelete(path);
+                    throw new ProviderException(ProviderErrorKind.Timeout, $"{uri.Host} took too long to respond.");
+                }
+                catch (Exception error) when (error is HttpRequestException or IOException)
+                {
+                    TryDelete(path);
+                    throw Unavailable(uri, "could not be reached");
+                }
+                catch
+                {
+                    TryDelete(path);
+                    throw;
+                }
+            }
+            throw Unavailable(uri, "redirected too many times");
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    // Each read restarts the silence timer.
+    private async Task CopyLimitedAsync(
+        HttpContent content, string path, long maxBytes, Uri uri, CancellationTokenSource timer, CancellationToken token)
+    {
+        await using Stream source = await content.ReadAsStreamAsync(timer.Token);
+        await using FileStream target = new(path, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true);
+        byte[] chunk = new byte[81920];
+        long written = 0;
+        while (true)
+        {
+            timer.CancelAfter(requestTimeout);
+            int read = await source.ReadAsync(chunk, timer.Token);
+            if (read == 0) return;
+            written += read;
+            if (written > maxBytes) throw TooLarge(uri);
+            await target.WriteAsync(chunk.AsMemory(0, read), token);
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
     public async Task<byte[]> GetImageAsync(Uri uri, CancellationToken token)
     {
         ProviderResponse response = await SendAsync(HttpMethod.Get, uri, _ => { }, MaxImageBytes, token);

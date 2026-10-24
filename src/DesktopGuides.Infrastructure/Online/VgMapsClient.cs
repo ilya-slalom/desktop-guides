@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using DesktopGuides.Core.Import;
 using DesktopGuides.Core.Maps;
 using DesktopGuides.Core.Providers;
 using DesktopGuides.Infrastructure.Providers;
@@ -10,7 +11,8 @@ namespace DesktopGuides.Infrastructure.Online;
 /// S22 PR 5: The Video Game Atlas's pages and maps, fetched by the app one
 /// at a time and at least a second apart. Its pages are windows-1252.
 /// </summary>
-public sealed class VgMapsClient(ProviderHttp http, Func<TimeSpan, CancellationToken, Task>? delay = null)
+public sealed class VgMapsClient(
+    ProviderHttp http, Func<TimeSpan, CancellationToken, Task>? delay = null, long maxMapBytes = MapImageLimits.MaxBytes)
 {
     public const int MaxPageBytes = 16 * 1024 * 1024;
     public static readonly Uri Atlas = new("https://vgmaps.com/Atlas/");
@@ -26,7 +28,29 @@ public sealed class VgMapsClient(ProviderHttp http, Func<TimeSpan, CancellationT
     public async Task<string> GetSystemPageAsync(string systemPath, CancellationToken token) =>
         Decode(await GetAsync(SystemPage(systemPath), MaxPageBytes, token));
 
-    public Task<byte[]> GetMapAsync(Uri map, CancellationToken token) => GetAsync(map, (int)MapImageLimits.MaxBytes, token);
+    /// <summary>
+    /// Streams a map to <paramref name="path"/>. One past the limits is
+    /// refused as the import refuses it, too large, not unreadable.
+    /// </summary>
+    public async Task DownloadMapAsync(Uri map, string path, CancellationToken token)
+    {
+        if (started) await delay(Pace, token);
+        started = true;
+        HttpStatusCode status;
+        try
+        {
+            status = await http.DownloadAsync(map, path, SteamClient.Identify, maxMapBytes, token);
+        }
+        catch (ProviderException error) when (error.Kind == ProviderErrorKind.MalformedData)
+        {
+            throw new GuideImportException(ImportIssue.TooLarge,
+                $"This map is larger than the {maxMapBytes / (1024 * 1024):N0} MB Desktop Guides saves.");
+        }
+        if (status != HttpStatusCode.OK)
+        {
+            throw new ProviderException(ProviderErrorKind.Unavailable, $"VGMaps answered {(int)status} for the map.");
+        }
+    }
 
     public static Uri SystemPage(string systemPath) => new(Atlas, systemPath);
 
