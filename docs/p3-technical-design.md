@@ -520,5 +520,8 @@ with its live-check fixes in [#149](https://github.com/ilya-slalom/desktop-guide
   - `GetPublishedFileDetails` answers guides as missing without a key. It's now asked with the key, and is optional. The source review and section 5.6 were corrected.
 
   Two Minor findings are deferred: a duplicate draft after a failed library save, and installed coverage of the Valve line, which is unit-tested.
-- **Live check:** to come, by the user, with a real key and real guides.
+- **Live check (the user, on pcsx2-win, 24 October 2026):**
+  - A game with one clear Steam match (Final Fantasy VII Rebirth) searched, saved and read as expected.
+  - Games IGDB gave no single Steam app asked for a store URL, so the user asked to pick from Steam's matches instead. That's the game picker of [#152](https://github.com/ilya-slalom/desktop-guides/pull/152) ([plan](p3/s22-steam-game-picker-plan.md)).
+  - With the picker's build, the user found Steam guide search and import "now works as expected".
 
