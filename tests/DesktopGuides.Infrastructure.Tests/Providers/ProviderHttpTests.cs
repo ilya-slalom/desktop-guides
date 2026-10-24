@@ -180,9 +180,10 @@ public sealed class ProviderHttpTests
         string file = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         try
         {
-            ProviderHttp http = Create(Streaming(new TrickleStream(10, TimeSpan.FromMilliseconds(60))), TimeSpan.FromMilliseconds(250));
+            // About 2 s in all against a 1 s timeout, each gap far inside it: a busy runner still passes.
+            ProviderHttp http = Create(Streaming(new TrickleStream(40, TimeSpan.FromMilliseconds(50))), TimeSpan.FromSeconds(1));
             Assert.Equal(HttpStatusCode.OK, await http.DownloadAsync(Map, file, _ => { }, 1024, CancellationToken.None));
-            Assert.Equal(10, new FileInfo(file).Length);
+            Assert.Equal(40, new FileInfo(file).Length);
         }
         finally
         {
@@ -194,8 +195,8 @@ public sealed class ProviderHttpTests
     public async Task ADownloadThatGoesSilentTimesOutAndLeavesNoFile()
     {
         string file = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        ProviderHttp http = Create(Streaming(new TrickleStream(10, TimeSpan.FromMilliseconds(10), TimeSpan.FromSeconds(2))),
-            TimeSpan.FromMilliseconds(250));
+        ProviderHttp http = Create(Streaming(new TrickleStream(10, TimeSpan.FromMilliseconds(10), TimeSpan.FromSeconds(5))),
+            TimeSpan.FromSeconds(1));
         Assert.Equal(ProviderErrorKind.Timeout, (await Assert.ThrowsAsync<ProviderException>(
             () => http.DownloadAsync(Map, file, _ => { }, 1024, CancellationToken.None))).Kind);
         Assert.False(File.Exists(file));
