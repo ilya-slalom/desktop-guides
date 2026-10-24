@@ -39,6 +39,14 @@ public static class ProviderMessages
         _ => "Can't reach Steam. Check your connection.",
     };
 
+    public static string ForVgMaps(ProviderErrorKind kind) => kind switch
+    {
+        ProviderErrorKind.RateLimited => "VGMaps is limiting requests. Try again in a few minutes.",
+        ProviderErrorKind.Timeout => "VGMaps took too long to respond.",
+        ProviderErrorKind.MalformedData => "VGMaps sent something the app couldn't read.",
+        _ => "Can't reach VGMaps. Check your connection.",
+    };
+
     public static string NoResults(string query) => $"No games match \"{query}\".";
 
     public static ProviderRecovery RecoveryFor(ProviderErrorKind kind) => kind switch

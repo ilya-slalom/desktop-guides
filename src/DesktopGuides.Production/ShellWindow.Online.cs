@@ -133,10 +133,16 @@ public sealed partial class ShellWindow
         }
         SelectOnlineSource(OnlineSources.Available[0]);
         OnlineSource.IsEnabled = OnlineAddress.IsEnabled = OnlineGo.IsEnabled = true;
-        // A build whose first site is Steam starts at its search.
+        // A build whose first site is Steam or VGMaps starts at its search.
+        ShowVgMaps(selected: false);
         if (SteamSelected)
         {
             ShowSteamSearch();
+        }
+        else if (VgMapsSelected)
+        {
+            ShowSteam(selected: false, results: false);
+            ShowVgMapsSearch();
         }
         else
         {
@@ -187,6 +193,7 @@ public sealed partial class ShellWindow
         }
         onlineReading = null;
         CloseSteam();
+        CloseVgMaps();
         OnlinePanel.Visibility = Visibility.Collapsed;
     }
 
@@ -200,13 +207,19 @@ public sealed partial class ShellWindow
     private void OnlineSourceChanged(object sender, SelectionChangedEventArgs args)
     {
         if (onlineSourceSuppressed || onlineBrowser is null || OnlineSource.SelectedIndex < 0) return;
-        // S22 PR 4: Steam starts at its search, not a page.
+        // S22 PR 4: Steam starts at its search, not a page; PR 5: so does VGMaps.
+        ShowVgMaps(selected: false);
         if (SteamSelected)
         {
             ShowSteamSearch();
             return;
         }
         ShowSteam(selected: false, results: false);
+        if (VgMapsSelected)
+        {
+            ShowVgMapsSearch();
+            return;
+        }
         onlineBrowser.Navigate(OnlineSources.StartUrl(OnlineSources.Available[OnlineSource.SelectedIndex], onlineGameTitle));
     }
 
@@ -231,12 +244,18 @@ public sealed partial class ShellWindow
             return;
         }
         SelectOnlineSource(source);
+        ShowVgMaps(selected: false);
         if (source.Site == SourceSite.Steam)
         {
             OpenSteamGuide(url);
             return;
         }
         ShowSteam(selected: false, results: false);
+        if (source.Site == SourceSite.VgMaps)
+        {
+            ShowVgMapsSearch();
+            return;
+        }
         onlineBrowser.Navigate(url);
     }
 
@@ -246,7 +265,7 @@ public sealed partial class ShellWindow
         if (onlineBrowser?.CurrentUrl is not Uri url) return;
         // Steam's results are showing: the hidden browser's page is neither
         // the site nor the address the reader is on.
-        if (SteamResults.Visibility == Visibility.Visible)
+        if (SteamResults.Visibility == Visibility.Visible || VgMapsPanel.Visibility == Visibility.Visible)
         {
             OnlineSave.IsEnabled = false;
             return;
@@ -428,6 +447,10 @@ public sealed partial class ShellWindow
         SteamQuery.IsEnabled = enabled;
         SteamSearch.IsEnabled = enabled;
         SteamResults.IsEnabled = enabled;
+        VgMapsQuery.IsEnabled = enabled;
+        VgMapsSearch.IsEnabled = enabled;
+        VgMapsGames.IsEnabled = enabled;
+        VgMapsMaps.IsEnabled = enabled;
         OnlineBrowserHost.IsHitTestVisible = enabled;
     }
 

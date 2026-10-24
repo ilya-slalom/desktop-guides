@@ -8283,7 +8283,10 @@ try {
             }
             if ($byArea['Intro'].Current.IsEnabled -or $byArea['Intro'].Current.Name -notlike '*Not saveable (SWF)*') { throw "The SWF row read '$($byArea['Intro'].Current.Name)'." }
             if ($byArea['Huge World'].Current.IsEnabled -or $byArea['Huge World'].Current.Name -notlike '*Too large to save*') { throw "The oversized row read '$($byArea['Huge World'].Current.Name)'." }
-            if ($byArea['World'].Current.Name -ne 'World: 3400 × 1480 · 4.82 MB · PNG · by Test Ripper') { throw "The World row read '$($byArea['World'].Current.Name)'." }
+            # The script is read without a byte-order mark, so the times sign and the middle dot come from their codes.
+            $times = [char]0x00D7; $dot = [char]0x00B7
+            $worldName = "World: 3400 $times 1480 $dot 4.82 MB $dot PNG $dot by Test Ripper"
+            if ($byArea['World'].Current.Name -ne $worldName) { throw "The World row read '$($byArea['World'].Current.Name)'." }
             foreach ($area in @('World', 'Cave')) {
                 $byArea[$area].GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
             }

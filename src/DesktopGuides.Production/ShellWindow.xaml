@@ -968,6 +968,86 @@
                             BorderThickness="1"
                             AutomationProperties.Name="Web page"
                             AutomationProperties.AutomationId="OnlineBrowser" />
+                    <!-- S22 PR 5: VGMaps is searched above; a game's maps are chosen below. -->
+                    <StackPanel x:Name="VgMapsPanel"
+                                Visibility="Collapsed"
+                                Spacing="{StaticResource DesktopGuidesSpacing8}"
+                                AutomationProperties.AutomationId="VgMapsPanel">
+                        <Grid ColumnSpacing="{StaticResource DesktopGuidesSpacing8}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="VgMapsQuery"
+                                     Header="Search the atlas"
+                                     VerticalAlignment="Bottom"
+                                     KeyDown="VgMapsQueryKeyDown"
+                                     AutomationProperties.AutomationId="VgMapsQuery" />
+                            <Button x:Name="VgMapsSearch"
+                                    Grid.Column="1"
+                                    Content="Search"
+                                    VerticalAlignment="Bottom"
+                                    Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                                    Click="VgMapsSearchClicked"
+                                    AutomationProperties.AutomationId="VgMapsSearch" />
+                            <HyperlinkButton x:Name="VgMapsRefresh"
+                                             Grid.Column="2"
+                                             Content="Refresh index"
+                                             VerticalAlignment="Bottom"
+                                             Click="VgMapsRefreshClicked"
+                                             AutomationProperties.AutomationId="VgMapsRefresh" />
+                        </Grid>
+                        <Grid x:Name="VgMapsGameRow" Visibility="Collapsed" ColumnSpacing="{StaticResource DesktopGuidesSpacing8}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="VgMapsGameHeading"
+                                       VerticalAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                                       AutomationProperties.AutomationId="VgMapsGameHeading" />
+                            <HyperlinkButton Grid.Column="1" Content="Back to results" Click="VgMapsBackClicked"
+                                             AutomationProperties.AutomationId="VgMapsBack" />
+                            <Button x:Name="VgMapsSaveSelected" Grid.Column="2" Content="Save selected"
+                                    Style="{StaticResource AccentButtonStyle}" Click="VgMapsSaveSelectedClicked"
+                                    AutomationProperties.AutomationId="VgMapsSaveSelected" />
+                            <Button x:Name="VgMapsSaveAll" Grid.Column="3" Content="Save all saveable"
+                                    Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}" Click="VgMapsSaveAllClicked"
+                                    AutomationProperties.AutomationId="VgMapsSaveAll" />
+                        </Grid>
+                    </StackPanel>
+                    <ListView x:Name="VgMapsGames"
+                              Grid.Row="1"
+                              Visibility="Collapsed"
+                              SelectionMode="Single"
+                              IsItemClickEnabled="True"
+                              ItemClick="VgMapsGameChosen"
+                              AutomationProperties.Name="Games in the atlas"
+                              AutomationProperties.AutomationId="VgMapsGames">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="local:VgMapsGameItem">
+                                <TextBlock Text="{x:Bind Label}" Padding="0,6" />
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <ListView x:Name="VgMapsMaps"
+                              Grid.Row="1"
+                              Visibility="Collapsed"
+                              SelectionMode="None"
+                              AutomationProperties.Name="The game's maps"
+                              AutomationProperties.AutomationId="VgMapsMaps">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="local:VgMapsMapItem">
+                                <CheckBox Content="{x:Bind Name}"
+                                          IsChecked="{x:Bind IsChecked, Mode=TwoWay}"
+                                          IsEnabled="{x:Bind IsSaveable}" />
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
                     <ListView x:Name="SteamResults"
                               Grid.Row="1"
                                   Visibility="Collapsed"
