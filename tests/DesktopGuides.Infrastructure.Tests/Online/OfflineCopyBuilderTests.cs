@@ -128,7 +128,9 @@ public sealed class OfflineCopyBuilderTests : IAsyncLifetime
         OfflineCopyBuilder.Build(ThreeSagaPages(), folder, Saved);
         string entry = Text("guide.html");
         Assert.Contains("<header class=\"dg-source\">", entry);
-        Assert.Contains("<h1>Example's Saga Walkthrough</h1>", entry);
+        // The reader shows the guide's title; as a heading it would be every page's first contents entry.
+        Assert.Contains("<p class=\"dg-title\">Example's Saga Walkthrough</p>", entry);
+        Assert.DoesNotContain("<h1", entry);
         Assert.Contains("By Guide Writer", entry);
         Assert.Contains("Saved from GameFAQs on 20 October 2026", entry);
         Assert.Contains($"href=\"{SagaUrl}introduction\"", entry);
@@ -267,9 +269,26 @@ public sealed class OfflineCopyBuilderTests : IAsyncLifetime
         Assert.Contains("href=\"https://www.neoseeker.com/example-quest/Quests/Deeper_Quest\"",
             Text("article-quests-stuck-in-a-rut.html"));
         string contents = episode[episode.IndexOf("dg-pages", StringComparison.Ordinal)..];
-        int heading = contents.IndexOf("<h2>Linked articles</h2>", StringComparison.Ordinal);
+        int heading = contents.IndexOf("<p class=\"dg-pages-heading\">Linked articles</p>", StringComparison.Ordinal);
         Assert.True(heading > contents.IndexOf("episode-3.html", StringComparison.Ordinal));
         Assert.True(contents.IndexOf("article-world-intel-gongaga.html", StringComparison.Ordinal) > heading);
         Assert.Contains(">Stuck in a Rut</a>", contents);
+    }
+
+    // The reader's Contents pane lists the pages; the copy's own list stays for the import only.
+    [Fact]
+    public async Task ThePagesListIsHiddenAndStillLeadsTheImportToEveryPage()
+    {
+        OfflineCopy copy = OfflineCopyBuilder.Build(ThreeSagaPages(), folder, Saved);
+        foreach (string name in new[] { "guide.html", "cairn.html", "fishing.html" })
+        {
+            string html = Text(name);
+            Assert.Contains("<nav class=\"dg-pages\" hidden=\"\">", html);
+            Assert.DoesNotContain("<h2", html[html.IndexOf("dg-pages", StringComparison.Ordinal)..html.IndexOf("</nav>", StringComparison.Ordinal)]);
+        }
+        if (!OperatingSystem.IsWindows()) return;
+        Guid id = await harness.PublishAsync(harness.Publisher(), await harness.InspectAsync(copy.EntryPath));
+        Assert.Equal(["guide.html", "cairn.html", "fishing.html"],
+            (await harness.Repository.GetGuidePagesAsync(id)).Select(page => page.RequestPath));
     }
 }
