@@ -7,7 +7,7 @@ public sealed record OnlineSource(SourceSite Site, string Name, IReadOnlyList<st
 
 /// <summary>
 /// S22: the sources this build includes. Each is a build switch
-/// (IncludeGameFaqs, IncludeNeoseeker), so a build can leave one out.
+/// (IncludeGameFaqs, IncludeNeoseeker, IncludeSteam), so a build can leave one out.
 /// </summary>
 public static class OnlineSources
 {
@@ -21,6 +21,9 @@ public static class OnlineSources
 #endif
 #if SOURCE_NEOSEEKER
         sources.Add(new(SourceSite.Neoseeker, "Neoseeker", ["www.neoseeker.com"], new Uri("https://www.neoseeker.com/")));
+#endif
+#if SOURCE_STEAM
+        sources.Add(new(SourceSite.Steam, "Steam", ["steamcommunity.com"], new Uri("https://steamcommunity.com/")));
 #endif
         return sources.ToArray();
     }

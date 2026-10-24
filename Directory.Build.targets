@@ -3,5 +3,6 @@
   <PropertyGroup>
     <DefineConstants Condition="'$(IncludeGameFaqs)' == 'true'">$(DefineConstants);SOURCE_GAMEFAQS</DefineConstants>
     <DefineConstants Condition="'$(IncludeNeoseeker)' == 'true'">$(DefineConstants);SOURCE_NEOSEEKER</DefineConstants>
+    <DefineConstants Condition="'$(IncludeSteam)' == 'true'">$(DefineConstants);SOURCE_STEAM</DefineConstants>
   </PropertyGroup>
 </Project>
