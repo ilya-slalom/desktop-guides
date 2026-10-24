@@ -109,6 +109,8 @@ public sealed partial class ShellWindow
         OnlineStatus.Text = "";
         OnlineInfo.IsOpen = false;
         OnlineInfo.Visibility = Visibility.Collapsed;
+        // A site picked while the browser starts would be undone when it's ready.
+        OnlineSource.IsEnabled = OnlineAddress.IsEnabled = OnlineGo.IsEnabled = false;
         if (onlineBrowser is null)
         {
             try
@@ -131,6 +133,7 @@ public sealed partial class ShellWindow
         }
         SelectOnlineSource(OnlineSources.Available[0]);
         ShowSteam(selected: false, results: false);
+        OnlineSource.IsEnabled = OnlineAddress.IsEnabled = OnlineGo.IsEnabled = true;
         onlineBrowser.Navigate(OnlineSources.StartUrl(OnlineSources.Available[0], onlineGameTitle));
         if (Captures.ListForGame(gameId).FirstOrDefault() is { } waiting)
         {

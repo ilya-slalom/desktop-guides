@@ -8177,6 +8177,8 @@ try {
             [void](Wait-Name 'ProviderSettingsStatus' 'Provider credentials saved.')
             Go-Back
             [void](Wait-Name 'OnlineHeading' "Find online: $game")
+            # Find online opens again, its browser too; the site picker waits for it.
+            Wait-Until { [System.Windows.Automation.AutomationElement]::FocusedElement.Current.AutomationId -eq 'OnlineAddress' } 'focus in the address box'
             Open-Steam
             Invoke-Element (Wait-VisibleById 'SteamSearch')
             Wait-Until { Test-Shown 'SteamAppInfo' } "the prompt for the game's Steam page"
