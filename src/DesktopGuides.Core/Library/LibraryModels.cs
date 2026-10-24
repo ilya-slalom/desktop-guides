@@ -70,7 +70,8 @@ public sealed record AppSettings(
     Guid? LastActiveGuideId,
     WindowMaterial WindowMaterial = WindowMaterial.Mica,
     bool ExportReminderShown = false,
-    bool ColorfulIcons = false);
+    bool ColorfulIcons = false,
+    bool? ContentsPaneOpen = null);
 
 // MissingGuides compares by value, so reports stay comparable in tests.
 public sealed record StartupReconciliationReport(

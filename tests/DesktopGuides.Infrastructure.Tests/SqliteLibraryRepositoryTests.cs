@@ -1065,6 +1065,48 @@ public sealed class SqliteLibraryRepositoryTests
             await reopened.GetSettingsAsync());
     }
 
+    [Fact]
+    public async Task RemembersTheContentsPaneAcrossReopen()
+    {
+        using TestLibrary directory = new();
+        await using (SqliteLibraryRepository repository = new(directory.Paths))
+        {
+            await repository.InitializeAsync();
+            Assert.Null((await repository.GetSettingsAsync()).ContentsPaneOpen);
+            await repository.UpdateSettingsAsync(s => s with { ContentsPaneOpen = true });
+        }
+        await using (SqliteLibraryRepository reopened = new(directory.Paths))
+        {
+            await reopened.InitializeAsync();
+            Assert.True((await reopened.GetSettingsAsync()).ContentsPaneOpen);
+            await reopened.UpdateSettingsAsync(s => s with { ContentsPaneOpen = false });
+        }
+        await using SqliteLibraryRepository again = new(directory.Paths);
+        await again.InitializeAsync();
+        Assert.False((await again.GetSettingsAsync()).ContentsPaneOpen);
+        await again.UpdateSettingsAsync(s => s with { ContentsPaneOpen = null });
+        Assert.Null((await again.GetSettingsAsync()).ContentsPaneOpen);
+    }
+
+    [Theory]
+    [InlineData("True")]
+    [InlineData("1")]
+    [InlineData("")]
+    public async Task ReadsAnUnknownStoredPaneStateAsUnchosen(string value)
+    {
+        using TestLibrary directory = new();
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        using (SqliteCommand command = connection.CreateCommand())
+        {
+            command.CommandText = "INSERT INTO Settings (Key, Value) VALUES ('ContentsPaneOpen', $value)";
+            command.Parameters.AddWithValue("$value", value);
+            command.ExecuteNonQuery();
+        }
+        Assert.Null((await repository.GetSettingsAsync()).ContentsPaneOpen);
+    }
+
     [Theory]
     [InlineData("Glass")]
     [InlineData("acrylic")]
