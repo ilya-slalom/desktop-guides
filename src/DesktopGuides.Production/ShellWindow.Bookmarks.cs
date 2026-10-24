@@ -87,7 +87,7 @@ public sealed partial class ShellWindow
     {
         if (bookmarkGuide is null || readerSession is not IOutlineReader) return;
         paneTab = ReaderPaneTab.Bookmarks;
-        contentsOpen = true;
+        ChoosePane(open: true);
         ReaderContents.ShowTab(ReaderPaneTab.Bookmarks);
         ShowContentsHost();
         await RefreshBookmarksAsync(select, focus: true);
@@ -205,7 +205,7 @@ public sealed partial class ShellWindow
         if (!ReferenceEquals(session, readerSession)) return;
         if (outcome.Kind == RestoreKind.Approximate) ShowReaderNotice(BookmarkList.Shifted);
         else if (outcome.Kind == RestoreKind.Unavailable) ShowWarningStatus(BookmarkList.NotFound);
-        if (ContentsNarrow) CloseContents(focusGuide: false);
+        if (ContentsNarrow) CloseContents(focusGuide: false, chosen: false);
         FocusReaderContent();
     }
 
