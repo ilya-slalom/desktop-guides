@@ -8230,6 +8230,8 @@ try {
             Invoke-Element (Wait-VisibleById 'SteamSearch')
             Wait-OnlineStatus 'No Steam guides match.'
             # PR 4b: Change offers the picker again, and another game searches again.
+            # The box kept 'zzz' from the search above; the new game's search uses the title.
+            Set-Text 'SteamQuery' $game
             Invoke-Element (Wait-VisibleById 'SteamChangeGame')
             Wait-Until { Test-Shown 'SteamAppInfo' } 'the picker again'
             Choose-SteamApp @('Online Test Game II (app 1001)', 'Online Test Game Remastered (app 1002)', 'The Online Test Game Collection (app 1003)') 'Online Test Game Remastered (app 1002)'
