@@ -92,4 +92,93 @@ public sealed class NeoseekerAdapterTests
     [Fact]
     public void AChangedLayoutIsNotAGuide() =>
         Assert.Null(adapter.Read(new Uri(Host + "/example-quest/walkthrough"), "<html><body><p>New</p></body></html>"));
+
+    [Fact]
+    public void AnImageLinkedToItsFilePageStaysAnImage()
+    {
+        GuidePageReading page = adapter.Read(new Uri(Host + "/example-quest/walkthrough/Episode_3"), """
+            <html><body><article id="wiki-content"><div class="mw-parser-output">
+            <p><a class="image" href="/example-quest/File:Map.png"><img src="https://cdn.staticneo.com/ew/map.png"></a>
+            <a href="/example-quest/File%3AKey.png">Key</a> <a href="/example-quest/walkthrough/Episode_4">Next</a></p>
+            </div></article></body></html>
+            """)!;
+
+        Assert.Contains("<img src=\"https://cdn.staticneo.com/ew/map.png\">", page.Content);
+        Assert.DoesNotContain("File:", page.Content);
+        Assert.DoesNotContain("File%3A", page.Content);
+        Assert.Contains("Key <a href", page.Content);
+        Assert.Contains("href=\"https://www.neoseeker.com/example-quest/walkthrough/Episode_4\"", page.Content);
+    }
+
+    private static readonly GuidePageMatch WalkthroughItem = new(SourceSite.Neoseeker, "example-quest/walkthrough", "");
+
+    private static GuidePageLink Article(string path, string key) =>
+        new(key, new Uri(Host + "/example-quest/" + path), null, Linked: true);
+
+    [Fact]
+    public void AWalkthroughPageListsTheSameGamesArticlesItLinksTo()
+    {
+        GuidePageReading page = Read("wiki-episode-3.html", "/example-quest/walkthrough/Episode_3");
+
+        Assert.Equal(
+            [("article-quests-stuck-in-a-rut", Host + "/example-quest/Quests/Stuck_in_a_Rut"),
+             ("article-world-intel-gongaga", Host + "/example-quest/World_Intel/Gongaga")],
+            page.Linked.Select(link => (link.PageKey, link.Url.AbsoluteUri)));
+        Assert.All(page.Linked, link => Assert.True(link.Linked));
+    }
+
+    [Fact]
+    public void ATextFaqListsNoArticles() =>
+        Assert.Empty(Read("text-faq.html", "/example-quest/faqs/260078-script.html").Linked);
+
+    [Fact]
+    public void AnArticleIsReadAsAPageOfTheWalkthrough()
+    {
+        GuidePageLink link = Article("Quests/Stuck_in_a_Rut", "article-quests-stuck-in-a-rut");
+        GuidePageReading page = adapter.ReadLinked(link, P3Fixtures.Read("neoseeker/wiki-article-stuck-in-a-rut.html"), WalkthroughItem)!;
+
+        Assert.Equal(WalkthroughItem with { PageKey = "article-quests-stuck-in-a-rut" }, page.Match);
+        Assert.Equal("Stuck in a Rut", page.Title);
+        Assert.Equal(CapturedFormat.Html, page.Format);
+        Assert.Contains("Help the farmer", page.Content);
+        Assert.DoesNotContain("Advertisement", page.Content);
+        Assert.DoesNotContain("File:", page.Content);
+        Assert.Equal([new Uri("https://cdn.staticneo.com/ew/thumb/rut.png")], page.Images);
+        Assert.Empty(page.Linked);
+        Assert.Empty(page.Pages);
+    }
+
+    [Fact]
+    public void ASitePageWithoutWikiContentIsNoArticle()
+    {
+        string html = P3Fixtures.Read("neoseeker/wiki-no-article.html");
+        Assert.Null(adapter.ReadLinked(Article("faqs", "article-faqs"), html, WalkthroughItem));
+        Assert.True(adapter.IsSitePage(html));
+    }
+
+    [Fact]
+    public void AChallengeIsNotASitePage() =>
+        Assert.False(adapter.IsSitePage("<html><body><p>Checking your browser…</p></body></html>"));
+
+    // Final review: a link can land on another page; the canonical address says which.
+    [Theory]
+    [InlineData("/other-game/Quests/Stuck_in_a_Rut")]
+    [InlineData("/example-quest/Category:Quests")]
+    [InlineData("/example-quest/walkthrough/Episode_3")]
+    public void AnArticleLinkThatLandsElsewhereIsNoArticle(string canonical)
+    {
+        string html = P3Fixtures.Read("neoseeker/wiki-article-stuck-in-a-rut.html").Replace(
+            "https://www.neoseeker.com/example-quest/Quests/Stuck_in_a_Rut", Host + canonical, StringComparison.Ordinal);
+        Assert.Null(adapter.ReadLinked(Article("Quests/Stuck_in_a_Rut", "article-quests-stuck-in-a-rut"), html, WalkthroughItem));
+        Assert.True(adapter.IsSitePage(html));
+    }
+
+    [Fact]
+    public void AnArticleLinkRedirectedToAnotherArticleOfTheGameIsRead()
+    {
+        string html = P3Fixtures.Read("neoseeker/wiki-article-stuck-in-a-rut.html").Replace(
+            "/example-quest/Quests/Stuck_in_a_Rut\"", "/example-quest/Quests/Stuck_in_a_Rut_(Quest)\"", StringComparison.Ordinal);
+        Assert.Contains("Stuck_in_a_Rut_(Quest)", html);
+        Assert.NotNull(adapter.ReadLinked(Article("Quests/Stuck_in_a_Rut", "article-quests-stuck-in-a-rut"), html, WalkthroughItem));
+    }
 }

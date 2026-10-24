@@ -1018,6 +1018,34 @@ public sealed class SqliteLibraryRepositoryTests
         Assert.Empty(Directory.GetFiles(directory.Paths.RecoveryRoot));
     }
 
+    // A build checked out with CRLF stores CRLF schema text, one checked out
+    // with LF stores LF; a library made by either opens in the other.
+    [Theory]
+    [InlineData(1)]
+    [InlineData(LibrarySchema.CurrentVersion)]
+    public async Task OpensLibraryWhoseSchemaUsesOtherLineEndings(int version)
+    {
+        using TestLibrary directory = new();
+        directory.Paths.EnsureCreated();
+        using (SqliteConnection connection = OpenWithForeignKeys(directory.Paths.DatabasePath))
+        {
+            foreach ((int nextVersion, string sql) in LibrarySchema.Migrations)
+            {
+                if (nextVersion > version) break;
+                using SqliteCommand migration = connection.CreateCommand();
+                migration.CommandText = sql.Contains("\r\n", StringComparison.Ordinal)
+                    ? sql.Replace("\r\n", "\n", StringComparison.Ordinal)
+                    : sql.Replace("\n", "\r\n", StringComparison.Ordinal);
+                migration.ExecuteNonQuery();
+            }
+        }
+
+        await using SqliteLibraryRepository repository = new(directory.Paths);
+        await repository.InitializeAsync();
+        await repository.AddGameAsync("Kept", null, null);
+        Assert.Equal("Kept", Assert.Single(await repository.ListGamesAsync()).Title);
+    }
+
     [Fact]
     public async Task PersistsWindowMaterialAcrossReopen()
     {

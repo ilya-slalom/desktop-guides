@@ -1,3 +1,4 @@
+using DesktopGuides.Core.Library;
 using System.Text;
 using DesktopGuides.Core.Html;
 using DesktopGuides.Core.Import;
@@ -158,4 +159,117 @@ public sealed class OfflineCopyBuilderTests : IAsyncLifetime
     public void PagesFromTwoItemsAreRefused() =>
         Assert.Throws<ArgumentException>(() => OfflineCopyBuilder.Build(
             [Page(Saga("cairn", "cairn")), Page(Wiki("wiki-hub", ""))], folder, Saved));
+
+    private static GuidePageReading SagaPage(string slug, string content) =>
+        Saga("cairn", "cairn") with
+        {
+            Url = new Uri(SagaUrl + slug),
+            Match = Saga("cairn", "cairn").Match with { PageKey = slug },
+            Pages = [],
+            Content = content,
+        };
+
+    [Fact]
+    public void ALinkSpellingAPageWithOtherHyphensReachesIt()
+    {
+        OfflineCopyBuilder.Build(
+            [Page(SagaPage("arts", $"<a href=\"{SagaUrl}arts-plug-ins#fire\">Fire</a>")), Page(SagaPage("arts-plugins", "<p>Plug-ins</p>"))],
+            folder, Saved);
+        Assert.Contains("href=\"arts-plugins.html#fire\"", Text("guide.html"));
+    }
+
+    [Fact]
+    public void AnExactPageMatchWinsOverASpellingVariant()
+    {
+        OfflineCopyBuilder.Build(
+            [Page(SagaPage("first", $"<a href=\"{SagaUrl}a-b\">A-B</a> <a href=\"{SagaUrl}ab\">AB</a>")),
+             Page(SagaPage("ab", "<p>ab</p>")), Page(SagaPage("a-b", "<p>a-b</p>"))],
+            folder, Saved);
+        string html = Text("guide.html");
+        Assert.Contains("href=\"a-b.html\"", html);
+        Assert.Contains("href=\"ab.html\"", html);
+    }
+
+    [Fact]
+    public void EveryHtmlPageLinksTheSitesStyleSheet()
+    {
+        OfflineCopyBuilder.Build(ThreeSagaPages(), folder, Saved);
+        Assert.Equal(OfflineCopyBuilder.StyleSheet(SourceSite.GameFaqs), Text("guide.css"));
+        foreach (string name in new[] { "guide.html", "cairn.html", "fishing.html" })
+        {
+            string html = Text(name);
+            Assert.Contains("<head><meta charset=\"utf-8\"><link rel=\"stylesheet\" href=\"guide.css\">", html);
+            Assert.Contains("<main class=\"dg-site-gamefaqs\">", html);
+        }
+    }
+
+    [Fact]
+    public void NeoseekerContentSitsInItsWikiWrapper()
+    {
+        OfflineCopyBuilder.Build([Page(Wiki("wiki-hub", ""))], folder, Saved);
+        Assert.Contains("<main class=\"dg-site-neoseeker\"><div class=\"mw-parser-output\">", Text("guide.html"));
+        Assert.Equal(OfflineCopyBuilder.StyleSheet(SourceSite.Neoseeker), Text("guide.css"));
+    }
+
+    [Theory]
+    [InlineData(SourceSite.GameFaqs)]
+    [InlineData(SourceSite.Neoseeker)]
+    public void AStyleSheetCanMakeNoRequest(SourceSite site)
+    {
+        string css = OfflineCopyBuilder.StyleSheet(site);
+        Assert.Contains(".dg-source", css);
+        foreach (string request in new[] { "url(", "@import", "@font-face" })
+        {
+            Assert.DoesNotContain(request, css, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public void TheSitesStyleSheetsDiffer() =>
+        Assert.NotEqual(OfflineCopyBuilder.StyleSheet(SourceSite.GameFaqs), OfflineCopyBuilder.StyleSheet(SourceSite.Neoseeker));
+
+    [Fact]
+    public void ASpoilerCanBeRevealedFromTheKeyboard()
+    {
+        OfflineCopyBuilder.Build([Page(SagaPage("cairn", "<p>Boss: <span class=\"fspoiler\">Gwyn</span></p>"))], folder, Saved);
+        Assert.Contains("<span class=\"fspoiler\" tabindex=\"0\">Gwyn</span>", Text("guide.html"));
+    }
+
+    [Fact]
+    public void ATextCopyHasNoStyleSheet()
+    {
+        GuidePageReading text = new GameFaqsAdapter().Read(
+            new Uri("https://gamefaqs.gamespot.com/ps5/100002-example-saga/faqs/78735"), P3Fixtures.Read("gamefaqs/text-faq.html"))!;
+        OfflineCopyBuilder.Build([Page(text)], folder, Saved);
+        Assert.False(File.Exists(Path.Combine(folder, "guide.css")));
+    }
+
+    private static CapturedPage ArticlePage(string fixture, string path, string key) =>
+        new(new NeoseekerAdapter().ReadLinked(
+                new GuidePageLink(key, new Uri("https://www.neoseeker.com/example-quest/" + path), null, Linked: true),
+                P3Fixtures.Read($"neoseeker/{fixture}.html"),
+                new GuidePageMatch(DesktopGuides.Core.Library.SourceSite.Neoseeker, "example-quest/walkthrough", ""))!,
+            new Dictionary<Uri, string>(), Linked: true);
+
+    [Fact]
+    public void LinksToSavedArticlesOpenOffline()
+    {
+        OfflineCopyBuilder.Build(
+            [Page(Wiki("wiki-hub", "")), Page(Wiki("wiki-episode-3", "/Episode_3")),
+             ArticlePage("wiki-article-stuck-in-a-rut", "Quests/Stuck_in_a_Rut", "article-quests-stuck-in-a-rut"),
+             ArticlePage("wiki-article-gongaga", "World_Intel/Gongaga", "article-world-intel-gongaga")],
+            folder, Saved);
+
+        string episode = Text("episode-3.html");
+        Assert.Contains("href=\"article-quests-stuck-in-a-rut.html\"", episode);
+        Assert.Contains("href=\"article-quests-stuck-in-a-rut.html#Reward\"", episode);
+        Assert.Contains("href=\"article-world-intel-gongaga.html#Activation_Intel_2\"", episode);
+        Assert.Contains("href=\"https://www.neoseeker.com/example-quest/Quests/Deeper_Quest\"",
+            Text("article-quests-stuck-in-a-rut.html"));
+        string contents = episode[episode.IndexOf("dg-pages", StringComparison.Ordinal)..];
+        int heading = contents.IndexOf("<h2>Linked articles</h2>", StringComparison.Ordinal);
+        Assert.True(heading > contents.IndexOf("episode-3.html", StringComparison.Ordinal));
+        Assert.True(contents.IndexOf("article-world-intel-gongaga.html", StringComparison.Ordinal) > heading);
+        Assert.Contains(">Stuck in a Rut</a>", contents);
+    }
 }

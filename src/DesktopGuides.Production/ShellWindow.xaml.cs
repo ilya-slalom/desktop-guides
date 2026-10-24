@@ -172,6 +172,7 @@ public sealed partial class ShellWindow : Window
         ShellRoot.KeyboardAccelerators.Add(back);
         ShellRoot.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
         InitializeKeyboard();
+        InitializeOnline();
         InitializeFind();
         InitializeContents();
         InitializeBookmarks();
@@ -437,6 +438,7 @@ public sealed partial class ShellWindow : Window
                 AppDataRoot.HasPackageIdentity(),
                 () => ApplicationData.Current.LocalCacheFolder.Path,
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+            RecordCrashesForTest();
             mapCache?.CancelAll();
             mapStore = new MapTileStore(cacheRoot);
             mapCache = new MapCacheQueue(mapStore, cacheRoot);
@@ -444,6 +446,8 @@ public sealed partial class ShellWindow : Window
             // The library lease is held, so no live session owns a profile here.
             string sweptRoot = cacheRoot;
             await Task.Run(() => WebView2ProfileSweeper.Sweep(sweptRoot));
+            // S22: unfinished online captures untouched for 7 days.
+            await Task.Run(() => Captures.Sweep());
             // Kept across Retry and a restore: its credentials sit outside
             // the library, and the settings card may still be using it.
             providers ??= new ProviderServices(dataRoot);
@@ -564,6 +568,7 @@ public sealed partial class ShellWindow : Window
                 try
                 {
                     await DisposeProgressTrackingAsync();
+                    await CloseOnlineAsync();
                     // A stage the user didn't replace with; startup would delete it anyway.
                     if (stagedBackup is LibraryRestoreStage stage && restorer is LibraryRestorer active)
                     {
@@ -1894,6 +1899,11 @@ public sealed partial class ShellWindow : Window
     {
         int generation = ++renderGeneration;
         await CloseReaderSessionAsync();
+        // S22: leaving Find online stops a capture; its pages stay in the draft.
+        if (navigator.Current is not OnlineRoute)
+        {
+            await CloseOnlineAsync();
+        }
         if (generation != renderGeneration)
         {
             return false;
@@ -1910,6 +1920,7 @@ public sealed partial class ShellWindow : Window
         GamePanel.Visibility = Visibility.Collapsed;
         ReaderPanel.Visibility = Visibility.Collapsed;
         SettingsPanel.Visibility = Visibility.Collapsed;
+        OnlinePanel.Visibility = Visibility.Collapsed;
         LibraryUnavailablePanel.Visibility = Visibility.Collapsed;
         OpenSelectedGuideButton.Visibility = Visibility.Collapsed;
         RemoveSelectedGuideButton.Visibility = Visibility.Collapsed;
@@ -2269,6 +2280,10 @@ public sealed partial class ShellWindow : Window
                     {
                         return false;
                     }
+                    break;
+
+                case OnlineRoute online:
+                    await ShowOnlineAsync(library, online.GameId, generation);
                     break;
 
                 case SettingsRoute:

@@ -1,3 +1,5 @@
+# Raw string literals carry the checkout's line endings into the build.
+*.cs text eol=lf
 tests/fixtures/p0/** -text
 tests/fixtures/p0/*.pdf -diff
 tests/fixtures/p0/*.txt -diff

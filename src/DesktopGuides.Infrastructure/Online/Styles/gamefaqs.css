@@ -1,0 +1,30 @@
+/* GameFAQs HTML guides. */
+:where(.dg-site-gamefaqs) :where(table.ffaq) {
+  width: auto;
+}
+:where(.dg-site-gamefaqs) :where(.imgnofloat) {
+  display: block;
+  margin: 8px 0;
+}
+:where(.dg-site-gamefaqs) :where(.bigresize) {
+  max-width: 100%;
+}
+/* A spoiler is blurred until hovered or focused, and shown when printed.
+   A blur, not a colour: the reader's dark theme overrides every colour. */
+:where(.dg-site-gamefaqs) :where(.fspoiler) {
+  filter: blur(5px);
+  background: #E0E0E0;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: filter 150ms ease-out;
+}
+:where(.dg-site-gamefaqs) :where(.fspoiler:hover, .fspoiler:focus, .fspoiler:focus-within) {
+  filter: none;
+  background: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(.dg-site-gamefaqs) :where(.fspoiler) { transition: none; }
+}
+@media print {
+  :where(.dg-site-gamefaqs) :where(.fspoiler) { filter: none; background: transparent; }
+}

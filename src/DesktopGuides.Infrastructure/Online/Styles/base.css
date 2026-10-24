@@ -1,0 +1,120 @@
+/* Desktop Guides: the built-in style of a guide saved from a site (S22).
+   Fluent, app-native. Low specificity throughout, so the reader's themes
+   win. It names no address, other sheet or font file, so it can make no
+   request. */
+:where(html) {
+  color-scheme: light;
+}
+:where(body) {
+  margin: 0;
+  padding: 24px 32px 48px;
+  background: #FFFFFF;
+  color: #1B1B1B;
+  font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+}
+:where(body > header, body > nav, body > main) {
+  max-width: 72ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+:where(main) :where(table, pre, figure, .center-div-container) {
+  max-width: none;
+}
+:where(h1, h2, h3, h4, h5, h6) {
+  font-family: "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1.4em 0 0.5em;
+}
+:where(h1) { font-size: 28px; }
+:where(h2) { font-size: 20px; }
+:where(h3) { font-size: 17px; }
+:where(h4, h5, h6) { font-size: 15px; }
+:where(p, ul, ol, dl, blockquote, table, pre) {
+  margin: 0 0 1em;
+}
+:where(ul, ol) { padding-left: 1.5em; }
+:where(a) { color: #005FB8; }
+:where(a:hover) { text-decoration-thickness: 2px; }
+:where(a:focus-visible, [tabindex]:focus-visible) {
+  outline: 2px solid #005FB8;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+:where(img) {
+  max-width: 100%;
+  height: auto;
+}
+:where(pre, code, kbd) {
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 14px;
+}
+:where(pre) {
+  padding: 8px 12px;
+  background: #F9F9F9;
+  border: 1px solid #E0E0E0;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+:where(blockquote) {
+  margin-left: 0;
+  padding: 4px 16px;
+  border-left: 4px solid #E0E0E0;
+  color: #5D5D5D;
+}
+:where(hr) {
+  border: 0;
+  border-top: 1px solid #E0E0E0;
+  margin: 1.5em 0;
+}
+:where(table) {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid #E0E0E0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+:where(th, td) {
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid #E0E0E0;
+}
+:where(tr:last-child > th, tr:last-child > td) { border-bottom: 0; }
+:where(th, thead td) {
+  background: #F3F3F3;
+  font-weight: 600;
+}
+:where(tbody tr:nth-child(even) > td) { background: #FAFAFA; }
+
+/* The source header, the guide's pages and missing images. */
+:where(.dg-source) {
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #E0E0E0;
+  color: #5D5D5D;
+}
+:where(.dg-source h1) {
+  margin: 0 0 4px;
+  color: #1B1B1B;
+}
+:where(.dg-source p) { margin: 0; }
+:where(.dg-pages) {
+  margin-bottom: 24px;
+  padding: 12px 16px;
+  background: #F9F9F9;
+  border: 1px solid #E0E0E0;
+  border-radius: 4px;
+}
+:where(.dg-pages ol, .dg-pages ul) { margin: 0; }
+:where(.dg-pages h2) { margin: 0.8em 0 0.3em; font-size: 15px; }
+:where(.dg-missing-image) {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px dashed #8A8A8A;
+  border-radius: 4px;
+  color: #5D5D5D;
+  font-size: 13px;
+}

@@ -8,8 +8,8 @@ using DesktopGuides.Core.Library;
 
 namespace DesktopGuides.Infrastructure.Online;
 
-/// <summary>A captured page and the image files the caller saved for it, by address.</summary>
-public sealed record CapturedPage(GuidePageReading Reading, IReadOnlyDictionary<Uri, string> ImageFiles);
+/// <summary>A captured page, the image files the caller saved for it by address, and whether a guide page linked to it.</summary>
+public sealed record CapturedPage(GuidePageReading Reading, IReadOnlyDictionary<Uri, string> ImageFiles, bool Linked = false);
 
 public sealed record OfflineCopy(string EntryPath, CapturedFormat Format, int MissingImages);
 
@@ -55,15 +55,34 @@ public static class OfflineCopyBuilder
             keysByUrl.TryAdd(Key(reading.Url), reading.Match.PageKey);
             foreach (GuidePageLink link in reading.Pages) keysByUrl.TryAdd(Key(link.Url), link.PageKey);
         }
+        // A guide's links can spell a page's slug with other hyphens
+        // ("arts-plug-ins" for "arts-plugins"); a spelling two pages share is no match.
+        Dictionary<string, string?> keysBySpelling = new(StringComparer.Ordinal);
+        foreach ((string url, string key) in keysByUrl)
+        {
+            string spelling = Spelling(new Uri(url));
+            keysBySpelling[spelling] = keysBySpelling.TryGetValue(spelling, out string? other) && other != key ? null : key;
+        }
+
+        File.WriteAllText(Path.Combine(folder, "guide.css"), StyleSheet(item.Site), new UTF8Encoding(false));
 
         Dictionary<Uri, string> savedImages = [];
         int missing = 0;
         foreach (CapturedPage page in pages.DistinctBy(page => page.Reading.Match.PageKey))
         {
             IDocument document = new HtmlParser().ParseDocument(
-                "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body><main></main></body></html>");
+                "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><link rel=\"stylesheet\" href=\"guide.css\"></head>" +
+                $"<body><main class=\"{SiteClass(item.Site)}\"></main></body></html>");
             IElement main = document.QuerySelector("main")!;
-            main.InnerHtml = page.Reading.Content;
+            // Neoseeker's content is a MediaWiki page's, and its rules name the wrapper.
+            IElement content = main;
+            if (item.Site == SourceSite.Neoseeker)
+            {
+                content = document.CreateElement("div");
+                content.ClassName = "mw-parser-output";
+                main.AppendChild(content);
+            }
+            content.InnerHtml = page.Reading.Content;
             foreach (IElement element in main.QuerySelectorAll(string.Join(",", Removed)).ToArray()) element.Remove();
             foreach (IElement element in main.QuerySelectorAll("*"))
             {
@@ -72,7 +91,8 @@ public static class OfflineCopyBuilder
                     element.RemoveAttribute(handler.Name);
                 }
             }
-            RewriteLinks(main, page.Reading.Url, keysByUrl, files);
+            foreach (IElement spoiler in main.QuerySelectorAll(".fspoiler")) spoiler.SetAttribute("tabindex", "0");
+            RewriteLinks(main, page.Reading.Url, keysByUrl, keysBySpelling, files);
             missing += SaveImages(document, main, page, folder, savedImages);
 
             string title = page.Reading.Pages.FirstOrDefault(link => link.PageKey == page.Reading.Match.PageKey)?.Title
@@ -87,10 +107,41 @@ public static class OfflineCopyBuilder
         return new OfflineCopy(Path.Combine(folder, "guide.html"), CapturedFormat.Html, missing);
     }
 
+    /// <summary>The copy's stylesheet: the shared base, then the site's own rules if it has any.</summary>
+    internal static string StyleSheet(SourceSite site) => site switch
+    {
+        SourceSite.GameFaqs => Resource("base") + "\n" + Resource("gamefaqs"),
+        SourceSite.Neoseeker => Resource("base") + "\n" + Resource("neoseeker"),
+        _ => Resource("base"),
+    };
+
+    private static string SiteClass(SourceSite site) => site switch
+    {
+        SourceSite.GameFaqs => "dg-site-gamefaqs",
+        SourceSite.Neoseeker => "dg-site-neoseeker",
+        _ => "dg-site",
+    };
+
+    private static string Resource(string name)
+    {
+        using Stream stream = typeof(OfflineCopyBuilder).Assembly.GetManifestResourceStream($"DesktopGuides.Online.Styles.{name}.css")
+            ?? throw new InvalidOperationException($"The {name} stylesheet is missing from the build.");
+        using StreamReader reader = new(stream);
+        return reader.ReadToEnd();
+    }
+
     private static string Key(Uri url) => new Uri(url.GetLeftPart(UriPartial.Query)).AbsoluteUri;
 
+    private static string Spelling(Uri url)
+    {
+        string key = Key(url);
+        int segment = key.LastIndexOf('/') + 1;
+        return key[..segment] + key[segment..].Replace("-", "", StringComparison.Ordinal);
+    }
+
     private static void RewriteLinks(
-        IElement main, Uri pageUrl, Dictionary<string, string> keysByUrl, Dictionary<string, string> files)
+        IElement main, Uri pageUrl, Dictionary<string, string> keysByUrl,
+        Dictionary<string, string?> keysBySpelling, Dictionary<string, string> files)
     {
         foreach (IElement link in main.QuerySelectorAll("a[href]"))
         {
@@ -106,8 +157,10 @@ public static class OfflineCopyBuilder
                 link.RemoveAttribute("href");
                 continue;
             }
+            string? key = keysByUrl.TryGetValue(Key(target), out string? exact) ? exact
+                : keysBySpelling.TryGetValue(Spelling(target), out string? spelled) ? spelled : null;
             link.SetAttribute("href",
-                keysByUrl.TryGetValue(Key(target), out string? key) && files.TryGetValue(key, out string? file)
+                key is not null && files.TryGetValue(key, out string? file)
                     ? file + target.Fragment
                     : target.AbsoluteUri);
         }
@@ -143,19 +196,23 @@ public static class OfflineCopyBuilder
         return missing;
     }
 
-    // The guide's pages in order: the import finds a guide's pages by
-    // following links from its entry, and the site's own contents are dropped.
+    // The guide's pages in order, then the articles they link to: the import
+    // finds a guide's pages by following links from its entry, and the
+    // site's own contents are dropped.
     private static IElement Contents(IDocument document, IReadOnlyList<CapturedPage> pages, Dictionary<string, string> files)
     {
         IElement nav = document.CreateElement("nav");
         nav.ClassName = "dg-pages";
         StringBuilder items = new();
-        foreach (GuidePageReading reading in pages.Select(page => page.Reading).DistinctBy(reading => reading.Match.PageKey))
+        StringBuilder articles = new();
+        foreach (CapturedPage page in pages.DistinctBy(page => page.Reading.Match.PageKey))
         {
+            GuidePageReading reading = page.Reading;
             string name = reading.Pages.FirstOrDefault(link => link.PageKey == reading.Match.PageKey)?.Title ?? reading.Title;
-            items.Append($"<li><a href=\"{files[reading.Match.PageKey]}\">{WebUtility.HtmlEncode(name)}</a></li>");
+            (page.Linked ? articles : items).Append(
+                $"<li><a href=\"{files[reading.Match.PageKey]}\">{WebUtility.HtmlEncode(name)}</a></li>");
         }
-        nav.InnerHtml = $"<ol>{items}</ol>";
+        nav.InnerHtml = $"<ol>{items}</ol>" + (articles.Length > 0 ? $"<h2>Linked articles</h2><ul>{articles}</ul>" : "");
         return nav;
     }
 

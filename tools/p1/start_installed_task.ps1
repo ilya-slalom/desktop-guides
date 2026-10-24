@@ -26,6 +26,7 @@ param(
     [switch] $RcOnly,
     [switch] $NavigationOnly,
     [switch] $MapsOnly,
+    [switch] $OnlineOnly,
     [string[]] $Groups,
     [string[]] $PassFilter,
     [string] $IgdbCredentialFile,

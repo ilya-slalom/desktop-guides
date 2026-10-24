@@ -402,6 +402,7 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="Guides"
                                    Style="{StaticResource DesktopGuidesSectionTitleStyle}" />
@@ -426,6 +427,14 @@
                                 Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
                                 Click="ImportGuideClicked"
                                 AutomationProperties.AutomationId="ImportGuideButton" />
+                        <!-- S22: browse a supported site and save a guide from it. -->
+                        <Button x:Name="FindOnlineButton"
+                                Grid.Column="4"
+                                Content="Find online"
+                                IsEnabled="False"
+                                Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                                Click="FindOnlineClicked"
+                                AutomationProperties.AutomationId="FindOnlineButton" />
                     </Grid>
                     <local:GuideCompletionChoice x:Name="GameCompletionChoice"
                                                  HorizontalAlignment="Left" />
@@ -750,6 +759,103 @@
                 </Grid>
             </Grid>
 
+            <!-- S22: Find online for one game. The browser shows the site as it is. -->
+            <Grid x:Name="OnlinePanel"
+                  Grid.Row="1"
+                  RowSpacing="{StaticResource DesktopGuidesSpacing12}"
+                  Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <TextBlock x:Name="OnlineHeading"
+                           Style="{StaticResource DesktopGuidesPageTitleStyle}"
+                           AutomationProperties.HeadingLevel="Level1"
+                           AutomationProperties.AutomationId="OnlineHeading" />
+                <Grid Grid.Row="1" ColumnSpacing="{StaticResource DesktopGuidesSpacing8}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ComboBox x:Name="OnlineSource"
+                              Header="Site"
+                              MinWidth="160"
+                              VerticalAlignment="Bottom"
+                              SelectionChanged="OnlineSourceChanged"
+                              AutomationProperties.AutomationId="OnlineSource" />
+                    <TextBox x:Name="OnlineAddress"
+                             Grid.Column="1"
+                             Header="Address or guide URL"
+                             PlaceholderText="Paste a guide URL"
+                             VerticalAlignment="Bottom"
+                             KeyDown="OnlineAddressKeyDown"
+                             AutomationProperties.AutomationId="OnlineAddress" />
+                    <Button x:Name="OnlineGo"
+                            Grid.Column="2"
+                            Content="Go"
+                            VerticalAlignment="Bottom"
+                            Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                            Click="OnlineGoClicked"
+                            AutomationProperties.AutomationId="OnlineGo" />
+                    <Button x:Name="OnlineSave"
+                            Grid.Column="3"
+                            Content="Save to library"
+                            IsEnabled="False"
+                            VerticalAlignment="Bottom"
+                            Style="{StaticResource AccentButtonStyle}"
+                            Click="OnlineSaveClicked"
+                            AutomationProperties.AutomationId="OnlineSave" />
+                </Grid>
+                <StackPanel Grid.Row="2" Spacing="{StaticResource DesktopGuidesSpacing8}">
+                    <TextBlock x:Name="OnlineStatus"
+                               TextWrapping="Wrap"
+                               AutomationProperties.LiveSetting="Polite"
+                               AutomationProperties.AutomationId="OnlineStatus" />
+                    <Grid x:Name="OnlineProgressRow" Visibility="Collapsed" ColumnSpacing="{StaticResource DesktopGuidesSpacing8}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ProgressBar x:Name="OnlineProgress" VerticalAlignment="Center"
+                                     AutomationProperties.AutomationId="OnlineProgress" />
+                        <Button x:Name="OnlineCancel"
+                                Grid.Column="1"
+                                Content="Cancel"
+                                Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                                Click="OnlineCancelClicked"
+                                AutomationProperties.AutomationId="OnlineCancel" />
+                    </Grid>
+                </StackPanel>
+                <InfoBar x:Name="OnlineInfo"
+                         Grid.Row="3"
+                         IsClosable="False"
+                         Visibility="Collapsed"
+                         AutomationProperties.AutomationId="OnlineInfo">
+                    <InfoBar.Content>
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="{StaticResource DesktopGuidesSpacing8}"
+                                    Margin="0,0,0,12">
+                            <Button x:Name="OnlineShowPage" Content="Show page" Click="OnlineShowPageClicked" />
+                            <Button x:Name="OnlineResume" Content="Resume" Click="OnlineResumeClicked" />
+                            <Button x:Name="OnlineSavePartial" Content="Save what's captured" Click="OnlineSavePartialClicked" />
+                            <Button x:Name="OnlineDiscard" Content="Discard" Click="OnlineDiscardClicked" />
+                        </StackPanel>
+                    </InfoBar.Content>
+                </InfoBar>
+                <Border x:Name="OnlineBrowserHost"
+                        Grid.Row="4"
+                        CornerRadius="{StaticResource ControlCornerRadius}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        AutomationProperties.Name="Web page"
+                        AutomationProperties.AutomationId="OnlineBrowser" />
+            </Grid>
+
             <Grid x:Name="SettingsPanel"
                   Grid.Row="1"
                   RowSpacing="{StaticResource DesktopGuidesSpacing16}"
@@ -919,6 +1025,23 @@
                             x:Name="KeyboardShortcutsExpander"
                             HorizontalAlignment="Stretch"
                             AutomationProperties.AutomationId="KeyboardShortcutsExpander" />
+                        <!-- S22: last, so nothing above it moves. -->
+                        <TextBlock x:Name="SettingsOnlineHeading"
+                                   Text="Find online"
+                                   Style="{StaticResource DesktopGuidesSettingsSectionStyle}"
+                                   AutomationProperties.AutomationId="SettingsOnlineHeading" />
+                        <toolkit:SettingsCard
+                            x:Name="OnlineDataSettingsCard"
+                            Header="Online data"
+                            Description="Find online keeps cookies and sign-ins for the sites you browse. Clearing signs you out of every site."
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.AutomationId="OnlineDataSettingsCard"
+                            AutomationProperties.Name="Online data. Find online keeps cookies and sign-ins for the sites you browse. Clearing signs you out of every site.">
+                            <Button x:Name="ClearOnlineDataButton"
+                                    Content="Clear online data"
+                                    Click="ClearOnlineDataClicked"
+                                    AutomationProperties.AutomationId="ClearOnlineDataButton" />
+                        </toolkit:SettingsCard>
                     </StackPanel>
                 </ScrollViewer>
             </Grid>

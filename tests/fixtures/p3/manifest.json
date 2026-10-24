@@ -1,0 +1,59 @@
+{
+  "routes": [
+    {
+      "url": "https://gamefaqs.gamespot.com/search?game=Online%20Test%20Game",
+      "status": 200,
+      "file": "online/search.html",
+      "contentType": "text/html"
+    },
+    {
+      "url": "https://gamefaqs.gamespot.com/boards/100002",
+      "status": 200,
+      "file": "online/boards.html",
+      "contentType": "text/html"
+    },
+    {
+      "url": "https://gamefaqs.gamespot.com/ps5/100002-example-saga/faqs/78736/introduction",
+      "status": 200,
+      "file": "gamefaqs/html-slug-intro.html",
+      "contentType": "text/html"
+    },
+    {
+      "url": "https://gamefaqs.gamespot.com/ps5/100002-example-saga/faqs/78736/cairn",
+      "status": 200,
+      "file": "gamefaqs/html-slug-cairn.html",
+      "contentType": "text/html"
+    },
+    {
+      "url": "https://gamefaqs.gamespot.com/ps5/100002-example-saga/faqs/78736/fishing",
+      "status": 200,
+      "file": "gamefaqs/html-slug-fishing.html",
+      "contentType": "text/html"
+    },
+    {
+      "url": "https://gamefaqs.gamespot.com/a/faqs/36/78736-54.png",
+      "status": 200,
+      "file": "online/map.png",
+      "contentType": "image/png"
+    },
+    {
+      "url": "https://gamefaqs.gamespot.com/ps/100001-example-quest/faqs/13639",
+      "status": 200,
+      "file": "gamefaqs/text-faq.html",
+      "contentType": "text/html"
+    },
+    {
+      "url": "https://www.neoseeker.com/",
+      "status": 200,
+      "file": "online/neoseeker-home.html",
+      "contentType": "text/html"
+    },
+    {
+      "url": "https://gamefaqs.gamespot.com/out",
+      "status": 200,
+      "file": "online/out.html",
+      "contentType": "text/html",
+      "location": null
+    }
+  ]
+}

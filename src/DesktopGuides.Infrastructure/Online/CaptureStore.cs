@@ -7,7 +7,8 @@ internal sealed record CapturedEntry(GuidePageReading Reading, Dictionary<string
 
 internal sealed record CaptureFile(
     int SchemaVersion, Guid Id, Guid GameId, SourceSite Site, string ItemId,
-    List<GuidePageLink> Pages, int TotalPages, List<CapturedEntry> Captured, DateTimeOffset TouchedUtc);
+    List<GuidePageLink> Pages, int TotalPages, List<CapturedEntry> Captured, DateTimeOffset TouchedUtc,
+    List<string>? Cut = null, List<string>? Dropped = null);
 
 /// <summary>
 /// S22: unfinished captures, kept outside the library under the cache root
@@ -38,6 +39,13 @@ public sealed class CaptureStore(string root, TimeProvider clock)
             .Select(draft => new CaptureDraft(this, draft.Folder, draft.File!))
             .FirstOrDefault();
 
+    /// <summary>The game's drafts, newest first; damaged drafts are skipped.</summary>
+    public IReadOnlyList<CaptureDraft> ListForGame(Guid gameId) =>
+        Drafts().Where(draft => draft.File is { } file && file.GameId == gameId)
+            .OrderByDescending(draft => draft.File!.TouchedUtc)
+            .Select(draft => new CaptureDraft(this, draft.Folder, draft.File!))
+            .ToArray();
+
     /// <summary>Deletes drafts untouched for 7 days, and damaged ones; returns how many.</summary>
     public int Sweep()
     {
@@ -47,8 +55,15 @@ public sealed class CaptureStore(string root, TimeProvider clock)
         {
             if (file is null || file.TouchedUtc < cutoff)
             {
-                Directory.Delete(folder, recursive: true);
-                removed++;
+                // A draft in use or locked by a scanner waits for the next start.
+                try
+                {
+                    Directory.Delete(folder, recursive: true);
+                    removed++;
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                {
+                }
             }
         }
         return removed;
@@ -107,7 +122,8 @@ public sealed class CaptureDraft
         .Select(page => file.Captured.FirstOrDefault(entry => entry.Reading.Match.PageKey == page.PageKey))
         .OfType<CapturedEntry>()
         .Select(entry => new CapturedPage(entry.Reading, entry.Images.ToDictionary(
-            image => new Uri(image.Key), image => Path.Combine(Folder, image.Value.Replace('/', Path.DirectorySeparatorChar)))))
+            image => new Uri(image.Key), image => Path.Combine(Folder, image.Value.Replace('/', Path.DirectorySeparatorChar))),
+            file.Pages.First(page => page.PageKey == entry.Reading.Match.PageKey).Linked))
         .ToArray();
 
     public IReadOnlyList<GuidePageLink> Remaining =>
@@ -115,6 +131,42 @@ public sealed class CaptureDraft
 
     /// <summary>Every page of the guide is captured; a guide cut at 200 pages never is.</summary>
     public bool IsComplete => file.TotalPages == file.Pages.Count && Remaining.Count == 0;
+
+    /// <summary>
+    /// Adds linked pages after the guide's own, each once, up to 200 pages.
+    /// A page past the cap still counts in <see cref="TotalPages"/>, and a
+    /// page dropped before is not added again.
+    /// </summary>
+    public void Extend(IEnumerable<GuidePageLink> links)
+    {
+        List<GuidePageLink> pages = file.Pages.ToList();
+        List<string> cut = file.Cut?.ToList() ?? [];
+        HashSet<string> seen = new(pages.Select(page => page.PageKey).Concat(cut).Concat(file.Dropped ?? []), StringComparer.Ordinal);
+        int total = file.TotalPages;
+        foreach (GuidePageLink link in links)
+        {
+            if (!seen.Add(link.PageKey)) continue;
+            total++;
+            if (pages.Count < CaptureStore.MaxPages) pages.Add(link with { Linked = true });
+            else cut.Add(link.PageKey);
+        }
+        if (total == file.TotalPages) return;
+        file = file with { Pages = pages, TotalPages = total, Cut = cut };
+        Touch();
+    }
+
+    /// <summary>Removes a linked page that turned out not to be one; its links stay online.</summary>
+    public void Drop(string pageKey)
+    {
+        if (file.Pages.FirstOrDefault(page => page.PageKey == pageKey) is not { Linked: true } dropped) return;
+        file = file with
+        {
+            Pages = file.Pages.Where(page => page != dropped).ToList(),
+            TotalPages = file.TotalPages - 1,
+            Dropped = [.. file.Dropped ?? [], pageKey],
+        };
+        Touch();
+    }
 
     /// <summary>Stores an image's bytes in the draft and returns the file's path.</summary>
     public string SaveImage(Uri url, ReadOnlySpan<byte> bytes)

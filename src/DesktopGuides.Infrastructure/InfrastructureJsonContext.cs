@@ -16,4 +16,5 @@ namespace DesktopGuides.Infrastructure;
 [JsonSerializable(typeof(FixtureProviderHandler.FixtureManifest))]
 [JsonSerializable(typeof(List<FixtureProviderHandler.UnmatchedRequest>))]
 [JsonSerializable(typeof(CaptureFile))]
+[JsonSerializable(typeof(OnlineFixtureManifest))]
 internal sealed partial class InfrastructureJsonContext : JsonSerializerContext;

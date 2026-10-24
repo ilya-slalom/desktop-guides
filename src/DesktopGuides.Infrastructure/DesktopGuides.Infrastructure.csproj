@@ -11,4 +11,7 @@
     <PackageReference Include="PdfPig" />
     <ProjectReference Include="../DesktopGuides.Core/DesktopGuides.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Online/Styles/*.css" LogicalName="DesktopGuides.Online.Styles.%(Filename).css" />
+  </ItemGroup>
 </Project>

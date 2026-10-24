@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark', 'maps-reader', 'maps-popup', 'maps-keyboard',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark', 'maps-reader', 'maps-popup', 'maps-keyboard', 'online-browse', 'online-save', 'online-resave', 'online-pause', 'online-resume',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -1122,31 +1122,29 @@ try {
     # window, so a card can start below the fold; scroll it into view.
     function Show-SettingsCard([string] $id) {
         $deadline = (Get-Date).AddSeconds(15)
+        $tries = 0
         do {
             $element = Find-ById $id
             if ($element -and -not $element.Current.IsOffscreen) { return $element }
             if ($element) {
+                if (++$tries -gt 3) { return Scroll-SettingsUntilVisible $id }
                 $item = $null
                 if ($element.TryGetCurrentPattern(
                         [System.Windows.Automation.ScrollItemPattern]::Pattern, [ref]$item)) {
                     $item.ScrollIntoView()
                 }
                 else {
-                    $scrollable = [System.Windows.Automation.PropertyCondition]::new(
-                        [System.Windows.Automation.AutomationElement]::IsScrollPatternAvailableProperty, $true)
-                    foreach ($viewer in $root.FindAll($scope, $scrollable)) {
-                        $pattern = $viewer.GetCurrentPattern(
-                            [System.Windows.Automation.ScrollPattern]::Pattern)
-                        if ($pattern.Current.VerticallyScrollable) {
-                            $pattern.SetScrollPercent(
-                                [System.Windows.Automation.ScrollPattern]::NoScroll, 100)
-                        }
-                    }
+                    # S22: Settings no longer ends with the shortcut list, so
+                    # the bottom of the page may not show this card; step
+                    # through the page until it is on screen.
+                    return Scroll-SettingsUntilVisible $id
                 }
             }
             Start-Sleep -Milliseconds 200
         } while ((Get-Date) -lt $deadline)
-        throw "Expected visible '$id'."
+        # S22: ScrollIntoView can leave a shortcut row off screen now that
+        # Settings continues below the list; step through the page instead.
+        return Scroll-SettingsUntilVisible $id
     }
 
     # Show-SettingsCard only scrolls down; this brings Settings back to the top.
@@ -3707,9 +3705,10 @@ try {
                     }
                 }
                 Wait-CompletionShown $false 'A guide never completed'
-                # The choice's row follows the header actions in tab order.
-                (Wait-VisibleById 'ImportGuideButton').SetFocus()
-                Wait-FocusedId 'ImportGuideButton'
+                # The choice's row follows the header actions in tab order;
+                # Find online (S22) is the last of them.
+                (Wait-VisibleById 'FindOnlineButton').SetFocus()
+                Wait-FocusedId 'FindOnlineButton'
                 Send-Keys '{TAB}'
                 Wait-FocusedId 'CompletionInProgress'
                 Send-Keys '{RIGHT}'
@@ -6747,6 +6746,8 @@ try {
             ShortcutFocusLibrarySearch = 'Search the library, Ctrl+F'
             ShortcutClearLibrarySearch = 'Clear the search, Esc'
             ShortcutImportGuide = 'Import a guide, Ctrl+O'
+            ShortcutFocusAddress = 'Go to the address box (Find online), Ctrl+L'
+            ShortcutSaveOnline = 'Save the guide to the library (Find online), Ctrl+S'
             ShortcutPreviousPage = 'Previous page (TXT, PDF), Page Up'
             ShortcutNextPage = 'Next page (TXT, PDF), Page Down'
             ShortcutPageStart = 'Go to start (TXT, PDF), Ctrl+Home'
@@ -7941,6 +7942,154 @@ try {
         # Stopping the build waits for at most one band, so removal is prompt.
         if ($removeClock.ElapsedMilliseconds -gt 5000) { throw "Removing a map mid-build took $($removeClock.ElapsedMilliseconds) ms." }
         $report.phases += 'maps-reader-remove-building'
+    }
+    elseif ($Mode -like 'online-*') {
+        # S22: Find online against fixture pages. Each check reads what app
+        # code controls: the screen's names, Save's state, the status and the
+        # InfoBar, and the external-launch record.
+        $game = 'Online Test Game'
+        $saga = 'https://gamefaqs.gamespot.com/ps5/100002-example-saga/faqs/78736/'
+        $textFaq = 'https://gamefaqs.gamespot.com/ps/100001-example-quest/faqs/13639'
+        $sagaTitle = "Example's Saga Walkthrough"
+        function Wait-Until([scriptblock] $test, [string] $what, [int] $seconds = 30) {
+            $deadline = (Get-Date).AddSeconds($seconds)
+            do {
+                try { if (& $test) { return } }
+                catch [System.Windows.Automation.ElementNotAvailableException] { }
+                Start-Sleep -Milliseconds 250
+            } while ((Get-Date) -lt $deadline)
+            try { $report.onlineTimeoutScreenshot = Save-WindowScreenshot 'online-timeout' } catch { }
+            throw "Timed out waiting for $what."
+        }
+        function Open-FindOnline {
+            [void](Wait-Name 'LibraryHeading' 'Library')
+            Select-Element $game
+            [void](Wait-Name 'GameHeading' $game)
+            Invoke-Element (Wait-EnabledById 'FindOnlineButton')
+            [void](Wait-Name 'OnlineHeading' "Find online: $game")
+            Wait-Until { [System.Windows.Automation.AutomationElement]::FocusedElement.Current.AutomationId -eq 'OnlineAddress' } 'focus in the address box'
+        }
+        function Go-Online([string] $url) {
+            # After a save the address box is enabled again a moment after the done message.
+            [void](Wait-EnabledById 'OnlineAddress')
+            Set-Text 'OnlineAddress' $url
+            Invoke-Element (Wait-VisibleById 'OnlineGo')
+        }
+        function Wait-Save([bool] $enabled, [string] $step) {
+            Wait-Until { (Find-ById 'OnlineSave').Current.IsEnabled -eq $enabled } "Save to library $(if ($enabled) { 'enabled' } else { 'disabled' }) on $step"
+        }
+        function Get-OnlineStatus { (Find-ById 'OnlineStatus').Current.Name }
+        function Wait-OnlineStatus([string] $expected, [int] $seconds = 30) {
+            Wait-Until { (Get-OnlineStatus) -eq $expected } "the status '$expected' (was '$(Get-OnlineStatus)')" $seconds
+        }
+        function Wait-OnlineInfo([string] $part, [int] $seconds = 60) {
+            Wait-Until { (Find-ById 'OnlineInfo').Current.Name -like "*$part*" } "the InfoBar to say '$part'" $seconds
+        }
+        function Invoke-Named([string] $name) {
+            Wait-Until { Find-VisibleName $name } "'$name'"
+            Invoke-Element (Find-VisibleName $name)
+        }
+        function Save-Online {
+            Invoke-Element (Wait-EnabledById 'OnlineSave')
+        }
+        function Set-ManifestFile([string] $url, [string] $file) {
+            $manifest = Join-Path $AppDataRoot 'test\online\manifest.json'
+            $json = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
+            @($json.routes | Where-Object { $_.url -eq $url })[0].file = $file
+            [System.IO.File]::WriteAllText($manifest, ($json | ConvertTo-Json -Depth 5))
+        }
+
+        Open-FindOnline
+        if ($Mode -eq 'online-browse') {
+            $source = Get-ComboSelection 'OnlineSource'
+            if ($source -ne 'GameFAQs') { throw "Find online opened on '$source'." }
+            Go-Online 'https://gamefaqs.gamespot.com/boards/100002'
+            Wait-Save $false 'the boards page'
+            Wait-OnlineStatus "This page isn't a guide Desktop Guides can save."
+            Go-Online $textFaq
+            Wait-Save $true 'a text FAQ'
+            Go-Online 'https://www.example.com/'
+            Wait-OnlineStatus 'Desktop Guides can save guides from GameFAQs and Neoseeker. Open other sites in your browser.'
+            # Review Focus 3: a page that leaves the source by script never
+            # loads in the in-app browser, and nothing opens without a click.
+            Go-Online 'https://gamefaqs.gamespot.com/out'
+            Start-Sleep -Seconds 3
+            $launches = Join-Path $AppCacheRoot 'diagnostics\external-launches.json'
+            if ((Test-Path -LiteralPath $launches) -and ((Get-Content -LiteralPath $launches -Raw) -like '*example.com*')) {
+                throw 'A script navigation opened the system browser without a click.'
+            }
+            $address = (Find-ById 'OnlineAddress').GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+            if ($address -like '*example.com*') { throw "The in-app browser left the site for '$address'." }
+            $report.phases += 'online-browse'
+        }
+        elseif ($Mode -eq 'online-save') {
+            Go-Online ($saga + 'cairn')
+            Wait-Save $true 'a guide page'
+            Save-Online
+            Wait-Until { -not (Find-ById 'OnlineProgress').Current.IsOffscreen } 'the save progress'
+            $report.onlineSavingScreenshot = Save-WindowScreenshot 'online-saving'
+            Wait-OnlineStatus "Saved $sagaTitle to $game." 90
+            # A restrictive notice asks first; Cancel saves nothing.
+            Go-Online $textFaq
+            Wait-Save $true 'the text FAQ'
+            Save-Online
+            Wait-Until { Find-VisibleName "This guide's notice limits copies" } 'the notice dialog'
+            Invoke-Named 'Cancel'
+            Wait-Until { -not (Find-VisibleName "This guide's notice limits copies") } 'the notice dialog to close'
+            Start-Sleep -Seconds 2
+            if ((Get-OnlineStatus) -like 'Saved*') { throw 'Cancelling the notice saved the guide.' }
+            Save-Online
+            Wait-Until { Find-VisibleName "This guide's notice limits copies" } 'the notice dialog again'
+            Invoke-Named 'Save for personal reading'
+            Wait-OnlineStatus "Saved Example Quest Walkthrough to $game." 60
+            # Review Focus 4 and 5: both read in the readers, which never reach the network.
+            # The title bar's Back: Alt+Left inside the web page is the page's own back.
+            Go-Back
+            [void](Wait-Name 'GameHeading' $game)
+            Open-GuideFromGame $sagaTitle
+            [void](Wait-Status 'Guide ready.')
+            $report.onlineStyledScreenshot = Save-WindowScreenshot 'online-styled'
+            Go-Back
+            [void](Wait-Name 'GameHeading' $game)
+            Open-GuideFromGame 'Example Quest Walkthrough'
+            [void](Wait-Status 'Guide ready.')
+            [void](Wait-VisibleById 'ReaderTextLines')
+            $report.phases += 'online-save'
+        }
+        elseif ($Mode -eq 'online-resave') {
+            Go-Online ($saga + 'introduction')
+            Wait-Save $true 'the guide'
+            Save-Online
+            Wait-OnlineStatus "Replaced $sagaTitle. Your place is kept." 90
+            $report.phases += 'online-resave'
+        }
+        elseif ($Mode -eq 'online-pause') {
+            Go-Online ($saga + 'introduction')
+            Wait-Save $true 'the guide'
+            Save-Online
+            Wait-OnlineInfo "didn't return page 2 of 3"
+            Invoke-Named 'Show page'
+            Wait-Until { (Find-ById 'OnlineAddress').GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value -eq ($saga + 'cairn') } 'Show page to open page 2'
+            # The site lets the reader through.
+            Set-ManifestFile ($saga + 'cairn') 'gamefaqs/html-slug-cairn.html'
+            Invoke-Named 'Resume'
+            Wait-OnlineStatus "Saved $sagaTitle to $game." 90
+            $report.phases += 'online-pause'
+        }
+        elseif ($Mode -eq 'online-resume') {
+            Go-Online ($saga + 'introduction')
+            Wait-Save $true 'the guide'
+            Save-Online
+            Wait-OnlineStatus "Saving page 2 of 3$([char]0x2026)" 60
+            Go-Back
+            [void](Wait-Name 'GameHeading' $game)
+            Invoke-Element (Wait-EnabledById 'FindOnlineButton')
+            [void](Wait-Name 'OnlineHeading' "Find online: $game")
+            Wait-OnlineInfo 'An unfinished save of'
+            Invoke-Named 'Resume'
+            Wait-OnlineStatus "Saved $sagaTitle to $game." 90
+            $report.phases += 'online-resume'
+        }
     }
     elseif ($Mode -in @('maps-popup', 'maps-keyboard')) {
         # T21.2 PR c: a glance at a map from a text guide, by pointer and by

@@ -163,4 +163,19 @@ public sealed class ShortcutRoutingTests
         Assert.Equal(ShortcutDecision.Ignore,
             ShortcutRouting.Resolve(command, Reader, textInputFocused: false, dialogOpen: true));
     }
+
+    // S22: Ctrl+L and Ctrl+S belong to the Find online screen.
+    [Fact]
+    public void CtrlLAndCtrlSRouteOnlyOnTheOnlineScreen()
+    {
+        ShellRoute online = new OnlineRoute(Guid.NewGuid());
+        foreach (ShortcutCommand command in new[] { ShortcutCommand.FocusAddress, ShortcutCommand.SaveOnline })
+        {
+            Assert.Equal(ShortcutDecision.Run, ShortcutRouting.Resolve(command, online, false, false));
+            Assert.Equal(ShortcutDecision.Ignore, ShortcutRouting.Resolve(command, new GameRoute(Guid.NewGuid()), false, false));
+            Assert.Equal(ShortcutDecision.Ignore, ShortcutRouting.Resolve(command, online, false, true));
+        }
+        Assert.Equal("Ctrl+L", KeyboardShortcuts.For(ShortcutCommand.FocusAddress).Keys);
+        Assert.Equal("Ctrl+S", KeyboardShortcuts.For(ShortcutCommand.SaveOnline).Keys);
+    }
 }

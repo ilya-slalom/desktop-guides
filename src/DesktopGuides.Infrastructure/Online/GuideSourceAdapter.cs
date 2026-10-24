@@ -9,7 +9,11 @@ public enum CapturedFormat { Text, Html }
 /// <summary>A guide page's site item and its page within the guide; "" for a one-page guide.</summary>
 public sealed record GuidePageMatch(SourceSite Site, string ItemId, string PageKey);
 
-public sealed record GuidePageLink(string PageKey, Uri Url, string? Title);
+/// <summary>
+/// A page of a guide. <paramref name="Linked"/> marks a page the guide's own
+/// pages link to, such as a wiki article, which is saved but never followed further.
+/// </summary>
+public sealed record GuidePageLink(string PageKey, Uri Url, string? Title, bool Linked = false);
 
 /// <summary>
 /// One page as read: <paramref name="Content"/> is text for
@@ -27,7 +31,11 @@ public sealed record GuidePageReading(
     DateTimeOffset? SourceUpdated,
     IReadOnlyList<GuidePageLink> Pages,
     string Content,
-    IReadOnlyList<Uri> Images);
+    IReadOnlyList<Uri> Images)
+{
+    /// <summary>The pages this page links to that are saved with the guide, one level deep; usually none.</summary>
+    public IReadOnlyList<GuidePageLink> Linked { get; init; } = [];
+}
 
 public interface IGuideSourceAdapter
 {
@@ -38,4 +46,13 @@ public interface IGuideSourceAdapter
 
     /// <summary>The page read as a guide, or null when it isn't one this adapter can read.</summary>
     GuidePageReading? Read(Uri url, string html);
+
+    /// <summary>A linked page read as a page of <paramref name="item"/>, or null when it isn't one.</summary>
+    GuidePageReading? ReadLinked(GuidePageLink link, string html, GuidePageMatch item) => null;
+
+    /// <summary>
+    /// Whether the HTML is one of the site's own pages, so a linked page
+    /// that isn't readable is no page of the guide rather than a challenge.
+    /// </summary>
+    bool IsSitePage(string html) => false;
 }
