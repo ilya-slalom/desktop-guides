@@ -46,7 +46,8 @@ public sealed class OnlineFixtureHandler(OnlineFixtureRoutes routes, string logF
         {
             string path = Path.Combine(logFolder, UnmatchedName);
             JsonArray lines = File.Exists(path) && JsonNode.Parse(File.ReadAllText(path)) is JsonArray existing ? existing : [];
-            lines.Add(new JsonObject { ["method"] = method.Method, ["host"] = uri.Host, ["path"] = uri.AbsolutePath });
+            // The JsonNode overload: the generic one isn't safe to trim.
+            lines.Add((JsonNode)new JsonObject { ["method"] = method.Method, ["host"] = uri.Host, ["path"] = uri.AbsolutePath });
             File.WriteAllText(path, lines.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         }
     }
