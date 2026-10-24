@@ -8204,9 +8204,9 @@ try {
             # PR 4b: no app ID and no exact match: Steam's game list offers the near ones.
             Wait-Until { Test-Shown 'SteamAppInfo' } "the picker for the game's Steam app"
             if (Test-Shown 'SteamKeyInfo') { throw 'The no-key bar stayed after the key was saved.' }
-            Choose-SteamApp @('Online Test Game II', 'Online Test Game Remastered', 'The Online Test Game Collection') 'Online Test Game II'
+            Choose-SteamApp @('Online Test Game II (app 1001)', 'Online Test Game Remastered (app 1002)', 'The Online Test Game Collection (app 1003)') 'Online Test Game II (app 1001)'
             Wait-OnlineStatus '2 Steam guides.'
-            [void](Wait-Name 'SteamGame' 'Steam game: Online Test Game II')
+            [void](Wait-Name 'SteamGame' 'Steam game: Online Test Game II (app 1001)')
             $report.steamPickerScreenshot = $script:pickerShot
             $resultRow = [System.Windows.Automation.PropertyCondition]::new(
                 [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
@@ -8232,8 +8232,10 @@ try {
             # PR 4b: Change offers the picker again, and another game searches again.
             Invoke-Element (Wait-VisibleById 'SteamChangeGame')
             Wait-Until { Test-Shown 'SteamAppInfo' } 'the picker again'
-            Choose-SteamApp @('Online Test Game II', 'Online Test Game Remastered', 'The Online Test Game Collection') 'Online Test Game Remastered'
-            [void](Wait-Name 'SteamGame' 'Steam game: Online Test Game Remastered')
+            Choose-SteamApp @('Online Test Game II (app 1001)', 'Online Test Game Remastered (app 1002)', 'The Online Test Game Collection (app 1003)') 'Online Test Game Remastered (app 1002)'
+            [void](Wait-Name 'SteamGame' 'Steam game: Online Test Game Remastered (app 1002)')
+            # Review: the search after Change asks for the new app, whose fixture has one guide.
+            Wait-OnlineStatus '1 Steam guide.'
             Set-Text 'SteamQuery' 'zzz'
             Invoke-Element (Wait-VisibleById 'SteamSearch')
             Wait-OnlineStatus 'No Steam guides match.'

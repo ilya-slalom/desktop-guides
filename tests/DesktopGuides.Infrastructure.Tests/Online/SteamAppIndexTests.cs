@@ -30,6 +30,11 @@ public sealed class SteamAppIndexTests : IDisposable
         ("1005", "Online: Test-Game"),
         ("2525", "FINAL FANTASY VII REBIRTH™"),
         ("2526", "Final Fantasy VII Rebirth Soundtrack"),
+        ("3970", "Prey"),
+        ("480490", "Prey"),
+        ("203160", "Tomb Raider"),
+        ("224960", "Tomb Raider I"),
+        ("400", "Portal"),
     ];
 
     private Task<IReadOnlyList<(string, string)>> Fetch(CancellationToken token)
@@ -58,18 +63,24 @@ public sealed class SteamAppIndexTests : IDisposable
     public async Task MarksAndCaseDontMatter()
     {
         SteamAppIndex index = await LoadedAsync();
-        Assert.Equal("2525", index.ExactSingle("Final Fantasy VII Rebirth")?.AppId);
+        Assert.Equal("2525", (await LoadedAsync()).Match("Final Fantasy VII Rebirth")[0].AppId);
         Assert.Equal("FINAL FANTASY VII REBIRTH™", index.NameOf("2525"));
     }
 
+    // Review: a game picks itself only when nothing else could be meant.
     [Fact]
-    public async Task OnlyASingleExactMatchPicksItself()
+    public async Task OnlyAnUnambiguousMatchPicksItself()
     {
         SteamAppIndex index = await LoadedAsync();
         // "Online Test Game" and "Online: Test-Game" are both exact once punctuation goes.
-        Assert.Null(index.ExactSingle("Online Test Game"));
-        Assert.Null(index.ExactSingle("Online Test"));
-        Assert.Equal("620", index.ExactSingle("portal 2")?.AppId);
+        Assert.Null(index.OnlyMatch("Online Test Game"));
+        Assert.Null(index.OnlyMatch("Online Test"));
+        Assert.Null(index.OnlyMatch("Prey"));
+        // "Tomb Raider I" might be the one meant, and "Portal 2" for "Portal".
+        Assert.Null(index.OnlyMatch("Tomb Raider"));
+        Assert.Null(index.OnlyMatch("Portal"));
+        Assert.Equal("620", index.OnlyMatch("portal 2")?.AppId);
+        Assert.Equal("224960", index.OnlyMatch("Tomb Raider I")?.AppId);
     }
 
     [Fact]
@@ -113,7 +124,7 @@ public sealed class SteamAppIndexTests : IDisposable
         System.IO.File.WriteAllText(File, "{ not json");
         await LoadedAsync();
         Assert.Equal(1, fetches);
-        Assert.Equal("620", (await LoadedAsync()).ExactSingle("Portal 2")?.AppId);
+        Assert.Equal("620", (await LoadedAsync()).OnlyMatch("Portal 2")?.AppId);
     }
 
     // A game whose app came from IGDB names it from a list already kept, never fetching one.
@@ -121,11 +132,36 @@ public sealed class SteamAppIndexTests : IDisposable
     public async Task ACachedListLoadsWithoutFetching()
     {
         SteamAppIndex empty = new(File, clock);
-        Assert.False(empty.LoadCached());
+        Assert.False(await empty.LoadCachedAsync(allowStale: true));
         await LoadedAsync();
         SteamAppIndex cached = new(File, clock);
-        Assert.True(cached.LoadCached());
+        Assert.True(await cached.LoadCachedAsync(allowStale: false));
         Assert.Equal("Portal 2", cached.NameOf("620"));
         Assert.Equal(1, fetches);
+    }
+
+    // Review: an old list still names a game; it isn't fresh enough to search.
+    [Fact]
+    public async Task AnOldListStillNamesAGame()
+    {
+        await LoadedAsync();
+        clock.Now += TimeSpan.FromDays(40);
+        SteamAppIndex old = new(File, clock);
+        Assert.True(await old.LoadCachedAsync(allowStale: true));
+        Assert.Equal("Portal 2", old.NameOf("620"));
+        Assert.False(old.IsFresh);
+        SteamAppIndex strict = new(File, clock);
+        Assert.False(await strict.LoadCachedAsync(allowStale: false));
+    }
+
+    // Review: a list that can't be written is still used.
+    [Fact]
+    public async Task AListThatCantBeWrittenIsStillUsed()
+    {
+        Directory.CreateDirectory(File);
+        SteamAppIndex index = new(File, clock);
+        await index.LoadAsync(Fetch, false, CancellationToken.None);
+        Assert.Equal("620", index.OnlyMatch("Portal 2")?.AppId);
+        Assert.True(index.IsFresh);
     }
 }

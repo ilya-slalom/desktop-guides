@@ -55,7 +55,9 @@ public sealed partial class SteamResultItem(SteamGuideSummary guide) : INotifyPr
 public sealed partial class SteamAppItem(SteamApp app)
 {
     public SteamApp App { get; } = app;
-    public string Name => App.Name;
+
+    // Two games can share a name ("Prey" is two apps); the app ID tells them apart.
+    public string Name => $"{App.Name} (app {App.AppId})";
 
     // A list row's accessible name falls back to its item's text.
     public override string ToString() => Name;
@@ -155,7 +157,7 @@ public sealed partial class ShellWindow
             {
                 await LoadSteamAppsAsync(refresh: false, search.Token);
                 if (!ReferenceEquals(search, steamSearch)) return;
-                if (SteamApps.ExactSingle(onlineGameTitle) is { } only)
+                if (SteamApps.OnlyMatch(onlineGameTitle) is { } only)
                 {
                     await library.SetSteamAppIdAsync(onlineGameId, only.AppId, search.Token);
                     appId = only.AppId;
@@ -168,7 +170,7 @@ public sealed partial class ShellWindow
                 }
             }
             SteamAppInfo.IsOpen = false;
-            ShowSteamGame(appId);
+            await ShowSteamGameAsync(appId);
             OnlineStatus.Text = "Searching Steam…";
             SteamGuidePage page = await SteamApi().QueryGuidesAsync(appId, text, 1, search.Token);
             if (!ReferenceEquals(search, steamSearch)) return;
@@ -186,6 +188,15 @@ public sealed partial class ShellWindow
         catch (ProviderException error)
         {
             if (ReferenceEquals(search, steamSearch)) OnlineStatus.Text = ProviderMessages.ForSteam(error.Kind);
+        }
+        catch (Exception) when (ReferenceEquals(search, steamSearch))
+        {
+            // The handlers that await this are async void: nothing may escape.
+            OnlineStatus.Text = "Steam search didn't finish. Try again.";
+        }
+        catch (Exception)
+        {
+            // A newer search took over.
         }
     }
 
@@ -227,7 +238,7 @@ public sealed partial class ShellWindow
 
     private async Task LoadSteamAppsAsync(bool refresh, CancellationToken token)
     {
-        if (!refresh && (SteamApps.IsLoaded || SteamApps.LoadCached())) return;
+        if (!refresh && (SteamApps.IsFresh || await SteamApps.LoadCachedAsync(allowStale: false))) return;
         OnlineStatus.Text = "Loading Steam's game list…";
         await SteamApps.LoadAsync(
             fetchToken => SteamApi().GetAppListAsync(
@@ -236,11 +247,11 @@ public sealed partial class ShellWindow
         OnlineStatus.Text = "";
     }
 
-    private void ShowSteamGame(string appId)
+    // A list past 30 days still names the game; none is fetched just for that.
+    private async Task ShowSteamGameAsync(string appId)
     {
-        if (!SteamApps.IsLoaded) SteamApps.LoadCached();
-        string name = SteamApps.NameOf(appId) ?? $"app {appId}";
-        SteamGame.Text = $"Steam game: {name}";
+        if (!SteamApps.IsLoaded) await SteamApps.LoadCachedAsync(allowStale: true);
+        SteamGame.Text = SteamApps.NameOf(appId) is { } name ? $"Steam game: {name} (app {appId})" : $"Steam game: app {appId}";
         AutomationProperties.SetName(SteamGame, SteamGame.Text);
         SteamGameRow.Visibility = Visibility.Visible;
     }
@@ -276,15 +287,32 @@ public sealed partial class ShellWindow
 
     private async Task FindSteamAppsAsync(bool refresh)
     {
+        if (await LoadSteamAppsOrSayWhyAsync(refresh)) ShowSteamAppMatches();
+    }
+
+    // The list needs the key: without one the no-key bar shows, as for search.
+    private async Task<bool> LoadSteamAppsOrSayWhyAsync(bool refresh)
+    {
         try
         {
             await LoadSteamAppsAsync(refresh, CancellationToken.None);
-            ShowSteamAppMatches();
+            return true;
+        }
+        catch (ProviderException error) when (error.Kind == ProviderErrorKind.NotConfigured)
+        {
+            OnlineStatus.Text = "";
+            SteamAppInfo.IsOpen = false;
+            SteamKeyInfo.IsOpen = true;
         }
         catch (ProviderException error)
         {
             OnlineStatus.Text = $"{ProviderMessages.ForSteam(error.Kind)} Steam's game list couldn't be loaded.";
         }
+        catch (Exception)
+        {
+            OnlineStatus.Text = "Steam's game list couldn't be loaded. Try again.";
+        }
+        return false;
     }
 
     private async void SteamAppChosen(object sender, ItemClickEventArgs args)
@@ -300,20 +328,16 @@ public sealed partial class ShellWindow
             return;
         }
         SteamAppInfo.IsOpen = false;
+        // The picker that held the keyboard has closed.
+        SteamQuery.Focus(FocusState.Programmatic);
         await SearchSteamAsync();
     }
 
     private async void SteamChangeGameClicked(object sender, RoutedEventArgs args)
     {
-        try
-        {
-            await LoadSteamAppsAsync(refresh: false, CancellationToken.None);
-        }
-        catch (ProviderException error)
-        {
-            OnlineStatus.Text = $"{ProviderMessages.ForSteam(error.Kind)} Steam's game list couldn't be loaded.";
-        }
-        ShowSteamPicker(onlineGameTitle);
+        // A guide search still running would answer for the old game.
+        steamSearch?.Cancel();
+        if (await LoadSteamAppsOrSayWhyAsync(refresh: false)) ShowSteamPicker(onlineGameTitle);
     }
 
     private async void SteamUseAppClicked(object sender, RoutedEventArgs args)
@@ -334,6 +358,7 @@ public sealed partial class ShellWindow
             return;
         }
         SteamAppInfo.IsOpen = false;
+        SteamQuery.Focus(FocusState.Programmatic);
         await SearchSteamAsync();
     }
 

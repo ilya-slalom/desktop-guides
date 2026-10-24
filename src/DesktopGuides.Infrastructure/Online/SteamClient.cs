@@ -23,7 +23,7 @@ public sealed class SteamClient(
 {
     private readonly Func<TimeSpan, CancellationToken, Task> delay = delay ?? Task.Delay;
     public const int MaxAppListBytes = 8 * 1024 * 1024;
-    private const int MaxAppListPages = 10;
+    private const int MaxAppListPages = 40;
 
     public const int PageSize = 20;
     private const string Api = "https://api.steampowered.com";
@@ -86,7 +86,8 @@ public sealed class SteamClient(
 
     /// <summary>
     /// Steam's games, without DLC, software, videos or hardware: a page of
-    /// 50,000 at a time, a second apart, reporting each page as it arrives.
+    /// 10,000 at a time, small enough to arrive within one request's
+    /// timeout, a second apart, reporting each page as it arrives.
     /// </summary>
     public async Task<IReadOnlyList<(string AppId, string Name)>> GetAppListAsync(IProgress<int>? pages, CancellationToken token)
     {
@@ -98,7 +99,7 @@ public sealed class SteamClient(
             if (page > 1) await delay(TimeSpan.FromSeconds(1), token);
             Uri uri = new($"{Api}/IStoreService/GetAppList/v1/?key={Uri.EscapeDataString(apiKey)}&include_games=true" +
                 "&include_dlc=false&include_software=false&include_videos=false&include_hardware=false" +
-                $"&max_results=50000&last_appid={last}");
+                $"&max_results=10000&last_appid={last}");
             using JsonDocument json = await GetJsonAsync(HttpMethod.Get, uri, null, token, MaxAppListBytes);
             JsonElement response = Property(json.RootElement, "response");
             if (response.TryGetProperty("apps", out JsonElement list) && list.ValueKind == JsonValueKind.Array)
@@ -112,11 +113,12 @@ public sealed class SteamClient(
             if (!(response.TryGetProperty("have_more_results", out JsonElement more) && more.ValueKind == JsonValueKind.True) ||
                 Text(response, "last_appid") is not { } next || next == last)
             {
-                break;
+                return apps;
             }
             last = next;
         }
-        return apps;
+        // Cut off: a list kept as if whole would hide the games past the cap.
+        throw new ProviderException(ProviderErrorKind.MalformedData, "Steam's game list is longer than the app reads.");
     }
 
     /// <summary>One search, so a key Steam refuses fails here rather than at the first real search.</summary>
