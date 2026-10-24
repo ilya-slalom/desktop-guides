@@ -136,8 +136,13 @@ its own screen. Closing it returns to the game page. It has:
 Steam search needs the game's Steam app ID (design call):
 - IGDB already returns it for artwork. It's now stored on the game, and
   existing games get it on their next metadata refresh.
-- A game without one asks once for its Steam store or guides URL, and
-  keeps the ID it contains.
+- A game without one is matched by name against Steam's game list
+  (changed on 24 October 2026, after the user's live check; it first asked
+  for a store URL):
+  - **The list:** `IStoreService/GetAppList` with the key, games only. It's kept for 30 days in the cache folder.
+  - **Matching:** one exact match, ignoring case, ™ ® © and punctuation, is used without asking. Otherwise a picker lists the matches, and the reader chooses.
+  - **Correcting it:** "Steam game: {name} · Change" lets the reader correct any match, including IGDB's.
+  - **Fallback:** a store or guides URL can still be pasted, for a game the list doesn't have.
 
 Steam search results list title, author, summary, preview image and
 update time. Choosing one shows the guide in the in-app browser, with
