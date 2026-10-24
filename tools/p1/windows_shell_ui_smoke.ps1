@@ -8255,7 +8255,7 @@ try {
             Go-Online $textFaq
             Wait-Save $true 'a text FAQ'
             Go-Online 'https://www.example.com/'
-            Wait-OnlineStatus 'Desktop Guides can save guides from GameFAQs, Neoseeker and Steam. Open other sites in your browser.'
+            Wait-OnlineStatus 'Desktop Guides can save guides from GameFAQs, Neoseeker, Steam and VGMaps. Open other sites in your browser.'
             # Review Focus 3: a page that leaves the source by script never
             # loads in the in-app browser, and nothing opens without a click.
             Go-Online 'https://gamefaqs.gamespot.com/out'

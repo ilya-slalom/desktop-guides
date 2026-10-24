@@ -335,4 +335,15 @@ public sealed class CatalogPresentationTests
         Assert.Equal(["Web page (HTML)", "GameFAQs", "Pages 1–37 of 80", "Not started"], Labels(facts));
         Assert.Equal("Pages 1 to 37 of 80 saved", facts[2].AccessibleLabel);
     }
+
+    // S22 PR 5: a saved map names where it came from, after its kind and size.
+    [Fact]
+    public void ASavedMapNamesItsSourceAndRipper()
+    {
+        Guide map = GuideWith(GuideFormat.Image) with { PixelWidth = 3400, PixelHeight = 1480 };
+        IReadOnlyList<CatalogFact> facts = CatalogPresentation.GuideFacts(
+            new GuideSummary(map, null), AtNow, EnGb, source: Source(SourceSite.VgMaps, "VGCartography"));
+        Assert.Equal("VGMaps · VGCartography", Labels(facts)[^1]);
+        Assert.Equal(3, facts.Count);
+    }
 }

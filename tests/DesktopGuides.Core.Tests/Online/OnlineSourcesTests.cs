@@ -7,8 +7,8 @@ namespace DesktopGuides.Core.Tests.Online;
 public sealed class OnlineSourcesTests
 {
     [Fact]
-    public void OnlineSourcesListGameFaqsNeoseekerThenSteam() =>
-        Assert.Equal([(SourceSite.GameFaqs, "GameFAQs"), (SourceSite.Neoseeker, "Neoseeker"), (SourceSite.Steam, "Steam")],
+    public void OnlineSourcesListGameFaqsNeoseekerSteamThenVgMaps() =>
+        Assert.Equal([(SourceSite.GameFaqs, "GameFAQs"), (SourceSite.Neoseeker, "Neoseeker"), (SourceSite.Steam, "Steam"), (SourceSite.VgMaps, "VGMaps")],
             OnlineSources.Available.Select(source => (source.Site, source.Name)));
 
     [Theory]
@@ -16,6 +16,7 @@ public sealed class OnlineSourcesTests
     [InlineData("https://www.neoseeker.com/x/walkthrough", SourceSite.Neoseeker)]
     [InlineData("https://GAMEFAQS.gamespot.com/", SourceSite.GameFaqs)]
     [InlineData("https://steamcommunity.com/sharedfiles/filedetails/?id=1", SourceSite.Steam)]
+    [InlineData("https://vgmaps.com/Atlas/PSX/index.htm", SourceSite.VgMaps)]
     public void FindMatchesASourcesHosts(string url, SourceSite site) =>
         Assert.Equal(site, OnlineSources.Find(new Uri(url))?.Site);
 

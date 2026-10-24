@@ -59,27 +59,31 @@ public static class CatalogPresentation
             string kind = MapPresentation.KindOf(summary.Guide).Label();
             facts.Add(new(kind, kind));
             facts.Add(MapPresentation.SizeFact(width, height));
+            AddSource(facts, source);
             return facts;
         }
         facts.Add(new(format, format));
-        // S22: design 5.4, where a saved guide came from and who wrote it.
-        if (source is not null)
-        {
-            string site = SiteName(source.Site);
-            facts.Add(source.Author is { } author
-                ? new($"{site} · {author}", $"Saved from {site}, by {author}")
-                : new(site, $"Saved from {site}"));
-            if (source is { CapturedPages: int captured, TotalPages: int total })
-            {
-                facts.Add(new($"Pages 1–{captured} of {total}", $"Pages 1 to {captured} of {total} saved"));
-            }
-        }
+        AddSource(facts, source);
         facts.Add(ReadingStateFact(summary.State));
         if (summary.State?.LastOpenedUtc is DateTimeOffset opened)
         {
             facts.Add(OpenedFact(opened, clock, culture));
         }
         return facts;
+    }
+
+    // S22: design 5.4, where a saved guide or map came from and who wrote or ripped it.
+    private static void AddSource(List<CatalogFact> facts, GuideSource? source)
+    {
+        if (source is null) return;
+        string site = SiteName(source.Site);
+        facts.Add(source.Author is { } author
+            ? new($"{site} · {author}", $"Saved from {site}, by {author}")
+            : new(site, $"Saved from {site}"));
+        if (source is { CapturedPages: int captured, TotalPages: int total })
+        {
+            facts.Add(new($"Pages 1–{captured} of {total}", $"Pages 1 to {captured} of {total} saved"));
+        }
     }
 
     public static string SiteName(SourceSite site) => site switch
