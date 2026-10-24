@@ -835,6 +835,7 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
         WindowMaterial material = WindowMaterial.Mica;
         bool reminderShown = false;
         bool colorfulIcons = false;
+        bool? contentsPaneOpen = null;
         while (reader.Read())
         {
             string key = reader.GetString(0);
@@ -876,8 +877,13 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                 // Anything but "true", such as a value from a newer build, reads as off.
                 colorfulIcons = value == "true";
             }
+            else if (key == "ContentsPaneOpen")
+            {
+                // Anything else, such as a value from a newer build, reads as not chosen.
+                contentsPaneOpen = value switch { "true" => true, "false" => false, _ => null };
+            }
         }
-        return new AppSettings(theme, lastGuide, material, reminderShown, colorfulIcons);
+        return new AppSettings(theme, lastGuide, material, reminderShown, colorfulIcons, contentsPaneOpen);
     }
 
     private static void WriteSettings(
@@ -937,6 +943,18 @@ public sealed class SqliteLibraryRepository : ILibraryRepository
                 """;
             icons.Parameters.AddWithValue("$value", settings.ColorfulIcons ? "true" : "false");
             icons.ExecuteNonQuery();
+        }
+        using (SqliteCommand pane = connection.CreateCommand())
+        {
+            pane.Transaction = transaction;
+            pane.CommandText = settings.ContentsPaneOpen.HasValue
+                ? """
+                  INSERT INTO Settings (Key, Value) VALUES ('ContentsPaneOpen', $value)
+                  ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value
+                  """
+                : "DELETE FROM Settings WHERE Key = 'ContentsPaneOpen'";
+            if (settings.ContentsPaneOpen is bool open) pane.Parameters.AddWithValue("$value", open ? "true" : "false");
+            pane.ExecuteNonQuery();
         }
     }
 

@@ -16,6 +16,8 @@
         </ListView.ItemsPanel>
         <ListView.ItemContainerStyle>
             <Style TargetType="ListViewItem">
+                <!-- T14.5: each block stretches up to the column's width (Apply),
+                     and a stretched block held to its MaxWidth sits centered. -->
                 <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                 <Setter Property="Padding" Value="0,6" />
             </Style>

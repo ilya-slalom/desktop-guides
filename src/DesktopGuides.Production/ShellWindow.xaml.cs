@@ -468,6 +468,7 @@ public sealed partial class ShellWindow : Window
             ApplyTheme(storedTheme);
             ApplyWindowMaterial(requestedMaterial);
             colorfulIcons = committedColorfulIcons = settings?.ColorfulIcons ?? false;
+            paneChoice = settings?.ContentsPaneOpen;
             WindowMaterialSelector.IsEnabled = true;
             AppThemeSelector.IsEnabled = true;
             ready = true;

@@ -35,7 +35,9 @@
                 <Style TargetType="ListViewItem">
                     <Setter Property="Padding" Value="{StaticResource DesktopGuidesTextLinePadding}" />
                     <Setter Property="MinHeight" Value="0" />
-                    <Setter Property="HorizontalContentAlignment" Value="Left" />
+                    <!-- T14.5: every row is as wide as the widest line, so centering
+                         the rows centers the block and keeps its columns. -->
+                    <Setter Property="HorizontalContentAlignment" Value="Center" />
                 </Style>
             </ListView.ItemContainerStyle>
             <ListView.ItemTemplate>

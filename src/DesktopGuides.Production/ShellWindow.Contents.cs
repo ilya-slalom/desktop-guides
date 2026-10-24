@@ -7,11 +7,14 @@ namespace DesktopGuides.Production;
 
 public sealed partial class ShellWindow
 {
-    // T18.2: the Contents pane. Its open state lasts for the app session;
-    // each guide's outline builds in the background once tracking starts.
+    // T18.2: the Contents pane; each guide's outline builds in the
+    // background once tracking starts. T18.3: whether it's open is the
+    // reader's choice, kept across restarts; until they've made one, it
+    // opens for a guide of several HTML pages.
     private const double ContentsOverlayBelow = 720;
     private const double ContentsGap = 12;
-    private bool contentsOpen;
+    private bool? paneChoice;
+    private Task paneSave = Task.CompletedTask;
     private Outline? outline;
     private CancellationTokenSource? outlineCancel;
 
@@ -20,10 +23,10 @@ public sealed partial class ShellWindow
     private void InitializeContents()
     {
         ReaderContents.EntryInvoked += (_, entry) => _ = FollowContentsEntryAsync(entry);
-        ReaderContents.CloseRequested += (_, _) => CloseContents(focusGuide: true);
+        ReaderContents.CloseRequested += (_, _) => CloseContents(focusGuide: true, chosen: true);
         ReaderContents.SearchRequested += (_, _) =>
         {
-            if (ContentsNarrow) CloseContents(focusGuide: false);
+            if (ContentsNarrow) CloseContents(focusGuide: false, chosen: false);
             _ = OpenFindAsync();
         };
         ReaderActions.ContentsRequested += (_, _) => TogglePane(ReaderPaneTab.Contents);
@@ -38,7 +41,8 @@ public sealed partial class ShellWindow
         StartBookmarks(guide, contentSha256, htmlDocuments);
         CancellationTokenSource cancel = new();
         outlineCancel = cancel;
-        if (contentsOpen)
+        bool multiPageHtml = guide.Format == GuideFormat.Html && htmlDocuments is { Count: > 1 };
+        if (ContentsPanePolicy.ShowOnOpen(paneChoice, multiPageHtml, ContentsNarrow))
         {
             ShowContentsHost();
             ReaderContents.ShowTab(paneTab);
@@ -81,7 +85,7 @@ public sealed partial class ShellWindow
     {
         if (ReaderContentsHost.Visibility == Visibility.Visible && ReaderContents.Tab == tab)
         {
-            CloseContents(focusGuide: true);
+            CloseContents(focusGuide: true, chosen: true);
         }
         else
         {
@@ -112,7 +116,7 @@ public sealed partial class ShellWindow
     private async Task OpenContentsAsync()
     {
         if (readerSession is not IOutlineReader || outlineCancel is null) return;
-        contentsOpen = true;
+        ChoosePane(open: true);
         paneTab = ReaderPaneTab.Contents;
         ReaderContents.ShowTab(ReaderPaneTab.Contents);
         ShowContentsHost();
@@ -163,18 +167,41 @@ public sealed partial class ShellWindow
         if (!ReferenceEquals(session, readerSession)) return;
         if (outcome.Kind == RestoreKind.Approximate) ShowReaderNotice(ApproximateRestoreMessage);
         else if (outcome.Kind == RestoreKind.Unavailable) ShowErrorStatus("Couldn't go to that section.");
-        if (ContentsNarrow) CloseContents(focusGuide: false);
+        if (ContentsNarrow) CloseContents(focusGuide: false, chosen: false);
         FocusReaderContent();
     }
 
-    private void CloseContents(bool focusGuide)
+    // A narrow window's pane closes after following an entry or for Find;
+    // that's no choice, so the next wide guide opens it again.
+    private void CloseContents(bool focusGuide, bool chosen)
     {
-        contentsOpen = false;
+        if (chosen) ChoosePane(open: false);
         HideContentsHost();
         if (focusGuide) FocusReaderContent();
     }
 
-    // Also called when the reader closes. The open state is kept, so the
+    // Saves follow the reader's order; a failed save keeps the choice for this session.
+    private void ChoosePane(bool open)
+    {
+        if (paneChoice == open) return;
+        paneChoice = open;
+        Task previous = paneSave;
+        paneSave = SavePaneChoiceAsync(previous, open);
+    }
+
+    private async Task SavePaneChoiceAsync(Task previous, bool open)
+    {
+        await previous;
+        try
+        {
+            if (repository is not null) await repository.UpdateSettingsAsync(s => s with { ContentsPaneOpen = open });
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    // Also called when the reader closes. The choice is kept, so the
     // next guide opens with the pane as the user left it.
     private void StopContents()
     {

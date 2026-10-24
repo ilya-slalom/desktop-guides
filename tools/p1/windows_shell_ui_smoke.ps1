@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark', 'maps-reader', 'maps-popup', 'maps-keyboard', 'online-browse', 'online-save', 'online-resave', 'online-pause', 'online-resume',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'reflow-centered', 'contents-remember-open', 'contents-remember-reopen', 'contents-remember-closed', 'contents-auto', 'contents-auto-narrow', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark', 'maps-reader', 'maps-popup', 'maps-keyboard', 'online-browse', 'online-save', 'online-resave', 'online-pause', 'online-resume',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -1579,7 +1579,7 @@ try {
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'reflow-centered', 'contents-remember-open', 'contents-remember-reopen', 'contents-remember-closed', 'contents-auto', 'contents-auto-narrow', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark',
         'workflow-pdf-exit')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
@@ -4422,6 +4422,12 @@ try {
                 if (-not $tree) { return @() }
                 return @($tree.FindAll([System.Windows.Automation.TreeScope]::Descendants, $treeItem))
             }
+            # The pane on any tab or state: its outline, "Finding sections…",
+            # "No sections found" or Bookmarks.
+            function Test-ContentsShown {
+                $pane = Find-ById 'ReaderContentsPane'
+                return [bool]($pane -and -not $pane.Current.IsOffscreen)
+            }
             function Wait-ContentsSelected([string] $name) {
                 $deadline = (Get-Date).AddSeconds(10)
                 $seen = 'nothing'
@@ -4997,6 +5003,62 @@ try {
                 Assert-FocusInGuide 'closing the pane'
                 $report.phases += 'contents-txt'
             }
+            # T18.3: the pane is as the reader left it, across restarts. The
+            # install script runs these three as separate launches.
+            elseif ($Mode -eq 'contents-remember-open') {
+                Open-TextGuide 'Sections Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Wait-HiddenById 'ReaderContentsTree'
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                # The choice saves in the background.
+                Start-Sleep -Seconds 2
+                $report.phases += 'contents-remember-open'
+            }
+            elseif ($Mode -eq 'contents-remember-reopen') {
+                Open-TextGuide 'Sections Guide'
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                Wait-StatusClosed
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                Wait-HiddenById 'ReaderContentsTree'
+                Start-Sleep -Seconds 2
+                $report.phases += 'contents-remember-reopen'
+            }
+            elseif ($Mode -eq 'contents-remember-closed') {
+                Open-TextGuide 'Sections Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Start-Sleep -Seconds 3
+                if (Test-ContentsShown) { throw 'The pane opened although it was closed last time.' }
+                $report.phases += 'contents-remember-closed'
+            }
+            # T18.3: before the reader has chosen, a guide of several HTML
+            # pages opens with the pane; any other guide doesn't.
+            elseif ($Mode -eq 'contents-auto') {
+                Open-TextGuide 'Pages Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                $report.contentsAutoScreenshot = Save-WindowScreenshot 'contents-auto'
+                Back-ToTextGame
+                Open-TextGuide 'Sections Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Start-Sleep -Seconds 3
+                if (Test-ContentsShown) { throw 'A text guide opened the pane on its own.' }
+                $report.phases += 'contents-auto'
+            }
+            # Narrow, the pane would cover the guide, so it waits.
+            elseif ($Mode -eq 'contents-auto-narrow') {
+                Resize-ShellWindow 700 720
+                Open-TextGuide 'Pages Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Start-Sleep -Seconds 3
+                if (Test-ContentsShown) { throw 'The pane covered the guide in a narrow window.' }
+                $report.phases += 'contents-auto-narrow'
+            }
             elseif ($Mode -eq 'contents-none') {
                 Open-TextGuide 'Numbered Lines Guide'
                 [void](Wait-Status 'Guide ready.')
@@ -5379,6 +5441,8 @@ try {
                 $baseline = Read-Saves
                 [System.Windows.Forms.SendKeys]::SendWait('^+b')
                 [void](Wait-BookmarkNames @('Castle gate, *% through') 'opening the Bookmarks tab')
+                # The list takes the keyboard after it shows; Enter before that follows nothing.
+                Wait-FocusOnBookmark 'opening the Bookmarks tab'
                 [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
                 $report.bookmarkTop = Wait-TopRowLike '*Walkthrough: Castle*' 'following a bookmark'
                 Assert-FocusInGuide 'following a bookmark'
@@ -5496,6 +5560,72 @@ try {
                 [void](Wait-Status 'Bookmark deleted.')
                 [void](Wait-BookmarkNames @('Old place') 'deleting the damaged bookmark')
                 $report.phases += 'bookmark-changed'
+            }
+            # T14.5: a text guide sits centered, in both views. Its rows share
+            # one left edge, so columns keep their alignment.
+            elseif ($Mode -eq 'reflow-centered') {
+                function Get-CenteredBlocks([string] $listId) {
+                    $list = (Find-ById $listId).Current.BoundingRectangle
+                    $items = @((Find-ById $listId).FindAll($scope, $listItem) | Where-Object { -not $_.Current.IsOffscreen })
+                    $blocks = @(foreach ($item in $items) {
+                        $child = $item.FindFirst([System.Windows.Automation.TreeScope]::Children,
+                            [System.Windows.Automation.Condition]::TrueCondition)
+                        if ($child) {
+                            $b = $child.Current.BoundingRectangle
+                            if ($b.Width -gt 0 -and $b.Top -ge $list.Top -and $b.Bottom -le $list.Bottom) { $b }
+                        }
+                    })
+                    if ($blocks.Count -lt 5) { throw "Only $($blocks.Count) visible rows in $listId." }
+                    $lefts = @($blocks | ForEach-Object { $_.Left } | Sort-Object)
+                    $rights = @($blocks | ForEach-Object { $_.Right } | Sort-Object)
+                    # The scroll bar overlays the list's right edge, so the gaps may differ a little.
+                    [pscustomobject]@{
+                        Spread = $lefts[-1] - $lefts[0]
+                        WidthSpread = $rights[-1] - $rights[0]
+                        LeftGap = $lefts[0] - $list.Left
+                        RightGap = $list.Right - $rights[-1]
+                        Width = $rights[-1] - $lefts[0]
+                        ListWidth = $list.Width
+                    }
+                }
+                Open-TextGuide 'Reflow Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Resize-ShellWindow 1024 720
+                Select-TextView 'Original'
+                Wait-TextViewChosen 'Original'
+                Wait-FirstTextRow
+                Start-Sleep -Milliseconds 500
+                $original = Get-CenteredBlocks 'ReaderTextLines'
+                $report.centeredOriginal = $original
+                if ($original.Spread -gt 1 -or $original.WidthSpread -gt 1) { throw "The rows don't share one block: $($original | ConvertTo-Json -Compress)." }
+                if ([Math]::Abs($original.LeftGap - $original.RightGap) -gt 12 -or $original.LeftGap -lt 40) {
+                    throw "The rows aren't centered: $($original | ConvertTo-Json -Compress)."
+                }
+                $report.centeredOriginalScreenshot = Save-WindowScreenshot 'reflow-centered-original'
+                Select-TextView 'Reflow'
+                Wait-TextViewChosen 'Reflow'
+                [void](Wait-VisibleById 'ReaderReflowBlocks')
+                Start-Sleep -Milliseconds 800
+                $reflowed = Get-CenteredBlocks 'ReaderReflowBlocks'
+                $report.centeredReflow = $reflowed
+                if ($reflowed.Spread -gt 1) { throw "The reflowed blocks don't share a left edge: $($reflowed | ConvertTo-Json -Compress)." }
+                if ($reflowed.Width -gt $reflowed.ListWidth - 100 -or [Math]::Abs($reflowed.LeftGap - $reflowed.RightGap) -gt 12) {
+                    throw "The reflowed column isn't capped and centered: $($reflowed | ConvertTo-Json -Compress)."
+                }
+                # Review: the column fits 80 columns of preserved text, as GameFAQs
+                # guides are wrapped; the fixture's 79-column rules don't scroll.
+                $wide = @(foreach ($item in @((Find-ById 'ReaderReflowBlocks').FindAll($scope, $listItem) | Where-Object { -not $_.Current.IsOffscreen })) {
+                    $child = $item.FindFirst([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)
+                    $pattern = $null
+                    if ($child -and $child.TryGetCurrentPattern([System.Windows.Automation.ScrollPattern]::Pattern, [ref]$pattern) -and
+                        $pattern.Current.HorizontallyScrollable) { $item.Current.Name }
+                })
+                if ($wide.Count -gt 0) { throw "Preserved blocks scroll sideways at 1024 px: $(($wide | ForEach-Object { $_.Substring(0, [Math]::Min(40, $_.Length)) }) -join ' | ')." }
+                $report.centeredReflowScreenshot = Save-WindowScreenshot 'reflow-centered-reflow'
+                Select-TextView 'Original'
+                Wait-TextViewChosen 'Original'
+                $report.phases += 'reflow-centered'
             }
             elseif ($Mode -eq 'reflow-switch') {
                 Open-TextGuide 'Reflow Guide'
@@ -5621,6 +5751,7 @@ try {
                 [void](Wait-TextPlace { param($p) $p.view -eq 'Original' -and $p.offset -eq 0 } 'the start')
                 [System.Windows.Forms.SendKeys]::SendWait('^+b')
                 [void](Wait-BookmarkNames @('*') 'opening the bookmarks')
+                Wait-FocusOnBookmark 'opening the bookmarks'
                 [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
                 [void](Wait-TextPlace { param($p) $p.view -eq 'Original' -and $p.offset -eq $marked.offset } 'the bookmark in Original')
                 $report.phases += 'reflow-bookmark'
