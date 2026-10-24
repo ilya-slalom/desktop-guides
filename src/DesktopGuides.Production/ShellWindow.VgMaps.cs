@@ -213,6 +213,9 @@ public sealed partial class ShellWindow
         SetOnlineBrowsing(false);
         VgMapsSaveSelected.IsEnabled = VgMapsSaveAll.IsEnabled = false;
         OnlineStatus.Text = $"Saving map 1 of {maps.Length}…";
+        // Progress reports arrive through the UI thread's queue, so the last can
+        // land after the outcome; once the save has ended they're dropped.
+        bool ended = false;
         try
         {
             VgMapsSaver saver = new(VgMapsApi(), library, publisher, importValidator, new WinRtMapImageConverter(),
@@ -220,21 +223,25 @@ public sealed partial class ShellWindow
             VgMapsSaveResult result = await saver.SaveAsync(onlineGameId, page, maps,
                 new Progress<(int Done, int Total)>(step =>
                 {
+                    if (ended) return;
                     OnlineStatus.Text = $"Saving map {Math.Min(step.Done + 1, step.Total)} of {step.Total}…";
                     OnlineProgress.Maximum = step.Total;
                     OnlineProgress.Value = step.Done;
                 }),
                 token);
+            ended = true;
             OnlineStatus.Text = Saved(result);
             ShowStatus(OnlineStatus.Text, InfoBarSeverity.Success, true, false);
             await RemindToExportAsync();
         }
         catch (OperationCanceledException)
         {
+            ended = true;
             OnlineStatus.Text = "Saving stopped. The maps saved before it are kept.";
         }
         catch (VgMapsSaveException error)
         {
+            ended = true;
             string why = error.Kind is { } kind ? ProviderMessages.ForVgMaps(kind)
                 : error.InnerException is GuideImportException import ? import.Message
                 : "A map couldn't be saved.";
@@ -243,6 +250,7 @@ public sealed partial class ShellWindow
         }
         catch (Exception)
         {
+            ended = true;
             OnlineStatus.Text = "The maps couldn't be saved. Try again.";
         }
         finally

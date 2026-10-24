@@ -391,6 +391,8 @@ public sealed partial class ShellWindow
         OnlineProgress.Value = 0;
         OnlineStatus.Text = "Saving the guide…";
         SetOnlineBrowsing(false);
+        // As for maps: a late progress report mustn't replace the outcome.
+        bool ended = false;
         try
         {
             ProviderHttp http = SteamHttp();
@@ -398,19 +400,23 @@ public sealed partial class ShellWindow
             CaptureDraft draft = await fetcher.FetchAsync(onlineGameId, fileId,
                 new Progress<(int Done, int Total)>(step =>
                 {
+                    if (ended) return;
                     OnlineStatus.Text = $"Saving image {Math.Min(step.Done + 1, step.Total)} of {step.Total}…";
                     OnlineProgress.Maximum = Math.Max(step.Total, 1);
                     OnlineProgress.Value = step.Done;
                 }),
                 token);
+            ended = true;
             await SaveDraftAsync(draft, allowFormatChange: false);
         }
         catch (OperationCanceledException)
         {
+            ended = true;
             OnlineStatus.Text = "Saving stopped. Nothing was saved.";
         }
         catch (SteamFetchException error)
         {
+            ended = true;
             OnlineStatus.Text = $"{ProviderMessages.ForSteam(error.Kind)} The save stopped at {error.Step}. Nothing was saved.";
             AnnounceStatus(OnlineStatus.Text);
         }
@@ -418,6 +424,7 @@ public sealed partial class ShellWindow
         {
             // An async void handler leads here, so nothing may escape: a full
             // disk or a locked file, say. The fetch discarded its draft.
+            ended = true;
             OnlineStatus.Text = "The guide couldn't be saved. Nothing was saved.";
             AnnounceStatus(OnlineStatus.Text);
         }
