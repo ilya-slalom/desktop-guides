@@ -8186,7 +8186,10 @@ try {
             Set-Text 'SteamAppUrl' 'https://store.steampowered.com/app/620/Online_Test_Game/'
             Invoke-Element (Wait-VisibleById 'SteamUseApp')
             Wait-OnlineStatus '2 Steam guides.'
-            $rows = @((Find-ById 'SteamResults').FindAll($scope, $listItem))
+            $resultRow = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::ListItem)
+            $rows = @((Find-ById 'SteamResults').FindAll([System.Windows.Automation.TreeScope]::Descendants, $resultRow))
             if ($rows.Count -ne 2 -or $rows[0].Current.Name -notlike "$steamTitle, By Test Author*") {
                 throw "The results read '$(($rows | ForEach-Object { $_.Current.Name }) -join ' | ')'."
             }
