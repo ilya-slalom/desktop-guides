@@ -14,12 +14,14 @@ public sealed record IgdbCredentials(string ClientId, string ClientSecret)
     public override string ToString() => $"IgdbCredentials {{ ClientId = {ClientId}, ClientSecret = *** }}";
 }
 
-public sealed record ProviderCredentials(IgdbCredentials? Igdb, string? SteamGridDbKey)
+public sealed record ProviderCredentials(IgdbCredentials? Igdb, string? SteamGridDbKey, string? SteamWebApiKey = null)
 {
     public static ProviderCredentials None { get; } = new(null, null);
 
     public override string ToString() =>
-        $"ProviderCredentials {{ Igdb = {(Igdb is null ? "none" : "saved")}, SteamGridDbKey = {(SteamGridDbKey is null ? "none" : "saved")} }}";
+        $"ProviderCredentials {{ Igdb = {Saved(Igdb)}, SteamGridDbKey = {Saved(SteamGridDbKey)}, SteamWebApiKey = {Saved(SteamWebApiKey)} }}";
+
+    private static string Saved(object? value) => value is null ? "none" : "saved";
 }
 
 public interface IGameMetadataProvider

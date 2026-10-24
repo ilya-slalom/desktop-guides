@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'reflow-centered', 'contents-remember-open', 'contents-remember-reopen', 'contents-remember-closed', 'contents-auto', 'contents-auto-narrow', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark', 'maps-reader', 'maps-popup', 'maps-keyboard', 'online-browse', 'online-save', 'online-resave', 'online-pause', 'online-resume',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'reflow-centered', 'contents-remember-open', 'contents-remember-reopen', 'contents-remember-closed', 'contents-auto', 'contents-auto-narrow', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark', 'maps-reader', 'maps-popup', 'maps-keyboard', 'online-browse', 'online-save', 'online-resave', 'online-pause', 'online-resume', 'online-steam-limit', 'online-steam-nokey', 'online-steam-search',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -8130,8 +8130,90 @@ try {
             [System.IO.File]::WriteAllText($manifest, ($json | ConvertTo-Json -Depth 5))
         }
 
+        $steamGuide = 'https://steamcommunity.com/sharedfiles/filedetails/?id=4242'
+        $steamTitle = 'Example Quest Field Notes'
+        function Open-Steam {
+            Select-ComboItem 'OnlineSource' 'Steam'
+            [void](Wait-VisibleById 'SteamQuery')
+        }
+        function Test-Shown([string] $id) {
+            $element = Find-ById $id
+            return [bool]($element -and -not $element.Current.IsOffscreen)
+        }
+
         Open-FindOnline
-        if ($Mode -eq 'online-browse') {
+        # S22 PR 4: Steam. The app fetches a guide itself, so a refused image
+        # stops the save before the library changes.
+        if ($Mode -eq 'online-steam-limit') {
+            Go-Online $steamGuide
+            Wait-Save $true 'the Steam guide'
+            Save-Online
+            Wait-OnlineStatus 'Steam is limiting requests. Try again in a few minutes. The save stopped at image 2 of 3. Nothing was saved.' 60
+            $report.phases += 'online-steam-limit'
+        }
+        # Without a key, search says where to add one; a pasted guide still saves.
+        elseif ($Mode -eq 'online-steam-nokey') {
+            Open-Steam
+            # The element the wait found: a fresh lookup can miss it while the panel lays out.
+            $query = (Wait-VisibleById 'SteamQuery').GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+            if ($query -ne $game) { throw "The Steam search box held '$query', not the game's title." }
+            Invoke-Element (Wait-VisibleById 'SteamSearch')
+            Wait-Until { Test-Shown 'SteamKeyInfo' } 'the no-key bar'
+            $report.steamNoKeyScreenshot = Save-WindowScreenshot 'online-steam-nokey'
+            Go-Online $steamGuide
+            Wait-Save $true 'the pasted Steam guide'
+            Save-Online
+            Wait-OnlineStatus "Saved $steamTitle to $game." 60
+            $report.phases += 'online-steam-nokey'
+        }
+        # With a key: the game's Steam page once, then search, choose and save.
+        elseif ($Mode -eq 'online-steam-search') {
+            Open-Steam
+            Invoke-Element (Wait-VisibleById 'SteamSearch')
+            Wait-Until { Test-Shown 'SteamKeyInfo' } 'the no-key bar'
+            Invoke-Element (Wait-VisibleById 'SteamOpenSettings')
+            Expand-ProviderSettings
+            Enter-Secret 'SteamWebApiKeyInput' 'fake-steam-key-0123'
+            Invoke-Element (Wait-EnabledById 'ProviderSaveButton')
+            [void](Wait-Name 'ProviderSettingsStatus' 'Provider credentials saved.')
+            Go-Back
+            [void](Wait-Name 'OnlineHeading' "Find online: $game")
+            # Find online opens again, its browser too; the site picker waits for it.
+            Wait-Until { [System.Windows.Automation.AutomationElement]::FocusedElement.Current.AutomationId -eq 'OnlineAddress' } 'focus in the address box'
+            Open-Steam
+            Invoke-Element (Wait-VisibleById 'SteamSearch')
+            Wait-Until { Test-Shown 'SteamAppInfo' } "the prompt for the game's Steam page"
+            if (Test-Shown 'SteamKeyInfo') { throw 'The no-key bar stayed after the key was saved.' }
+            Set-Text 'SteamAppUrl' 'https://store.steampowered.com/app/620/Online_Test_Game/'
+            Invoke-Element (Wait-VisibleById 'SteamUseApp')
+            Wait-OnlineStatus '2 Steam guides.'
+            $resultRow = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::ListItem)
+            $rows = @((Find-ById 'SteamResults').FindAll([System.Windows.Automation.TreeScope]::Descendants, $resultRow))
+            if ($rows.Count -ne 2 -or $rows[0].Current.Name -notlike "$steamTitle, By Test Author*") {
+                throw "The results read '$(($rows | ForEach-Object { $_.Current.Name }) -join ' | ')'."
+            }
+            # Review: a page the hidden browser finished loading once set the site back to GameFAQs.
+            if ((Get-ComboSelection 'OnlineSource') -ne 'Steam') { throw "With Steam's results showing, the site read '$(Get-ComboSelection 'OnlineSource')'." }
+            $report.steamResultsScreenshot = Save-WindowScreenshot 'online-steam-results'
+            $rows[0].SetFocus()
+            Start-Sleep -Milliseconds 200
+            [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+            Wait-Save $true 'the chosen Steam guide'
+            Save-Online
+            # online-steam-nokey saved it already: the same guide is up to date.
+            Wait-OnlineStatus "$steamTitle is up to date." 60
+            Invoke-Element (Wait-VisibleById 'SteamSearch')
+            Set-Text 'SteamQuery' 'zzz'
+            Invoke-Element (Wait-VisibleById 'SteamSearch')
+            Wait-OnlineStatus 'No Steam guides match.'
+            # Review Focus 5: the box keeps the search that found nothing.
+            $kept = (Wait-VisibleById 'SteamQuery').GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+            if ($kept -ne 'zzz') { throw "After a search with no results the box held '$kept'." }
+            $report.phases += 'online-steam-search'
+        }
+        elseif ($Mode -eq 'online-browse') {
             $source = Get-ComboSelection 'OnlineSource'
             if ($source -ne 'GameFAQs') { throw "Find online opened on '$source'." }
             Go-Online 'https://gamefaqs.gamespot.com/boards/100002'
@@ -8140,7 +8222,7 @@ try {
             Go-Online $textFaq
             Wait-Save $true 'a text FAQ'
             Go-Online 'https://www.example.com/'
-            Wait-OnlineStatus 'Desktop Guides can save guides from GameFAQs and Neoseeker. Open other sites in your browser.'
+            Wait-OnlineStatus 'Desktop Guides can save guides from GameFAQs, Neoseeker and Steam. Open other sites in your browser.'
             # Review Focus 3: a page that leaves the source by script never
             # loads in the in-app browser, and nothing opens without a click.
             Go-Online 'https://gamefaqs.gamespot.com/out'

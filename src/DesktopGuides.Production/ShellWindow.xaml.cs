@@ -2035,9 +2035,11 @@ public sealed partial class ShellWindow : Window
                         return false;
                     }
                     IReadOnlyList<GuideSummary> summaries = await library.ListGuideSummariesAsync(gameRoute.GameId);
+                    IReadOnlyDictionary<Guid, GuideSource> sources = await library.ListGuideSourcesAsync(gameRoute.GameId);
                     GuideRowItem Row(GuideSummary summary) => new(
                         summary, TimeProvider.System, CultureInfo.CurrentCulture,
-                        guideHealth[summary.Guide.Id], colorfulIcons, themeSettings?.HighContrast == true);
+                        guideHealth[summary.Guide.Id], colorfulIcons, themeSettings?.HighContrast == true,
+                        sources.GetValueOrDefault(summary.Guide.Id));
                     // T21.2: maps have their own section, by title.
                     IReadOnlyList<GuideRowItem> guides = summaries
                         .Where(summary => summary.Guide.Format != GuideFormat.Image).Select(Row).ToList();

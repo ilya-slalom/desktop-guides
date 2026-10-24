@@ -847,13 +847,113 @@
                         </StackPanel>
                     </InfoBar.Content>
                 </InfoBar>
-                <Border x:Name="OnlineBrowserHost"
-                        Grid.Row="4"
-                        CornerRadius="{StaticResource ControlCornerRadius}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        AutomationProperties.Name="Web page"
-                        AutomationProperties.AutomationId="OnlineBrowser" />
+                <!-- S22 PR 4: Steam is searched above; its results, or the
+                     browser with a chosen guide, fill the space below. -->
+                <Grid Grid.Row="4" RowSpacing="{StaticResource DesktopGuidesSpacing8}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <StackPanel x:Name="SteamPanel"
+                                Visibility="Collapsed"
+                                Spacing="{StaticResource DesktopGuidesSpacing8}"
+                                AutomationProperties.AutomationId="SteamPanel">
+                        <Grid ColumnSpacing="{StaticResource DesktopGuidesSpacing8}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="SteamQuery"
+                                     Header="Search Steam guides"
+                                     VerticalAlignment="Bottom"
+                                     KeyDown="SteamQueryKeyDown"
+                                     AutomationProperties.AutomationId="SteamQuery" />
+                            <Button x:Name="SteamSearch"
+                                    Grid.Column="1"
+                                    Content="Search"
+                                    VerticalAlignment="Bottom"
+                                    Style="{StaticResource DesktopGuidesSecondaryActionButtonStyle}"
+                                    Click="SteamSearchClicked"
+                                    AutomationProperties.AutomationId="SteamSearch" />
+                        </Grid>
+                        <InfoBar x:Name="SteamKeyInfo"
+                                 Severity="Informational"
+                                 IsClosable="False"
+                                 Title="Steam search needs your Steam Web API key"
+                                 Message="Add it in Settings. Pasting a guide's URL works without one."
+                                 AutomationProperties.AutomationId="SteamKeyInfo">
+                            <InfoBar.Content>
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource DesktopGuidesSpacing8}" Margin="0,0,0,12">
+                                    <Button Content="Open Settings" Click="SteamOpenSettingsClicked"
+                                            AutomationProperties.AutomationId="SteamOpenSettings" />
+                                    <HyperlinkButton Content="Get a key"
+                                                     NavigateUri="https://steamcommunity.com/dev/apikey"
+                                                     AutomationProperties.AutomationId="SteamGetKey" />
+                                </StackPanel>
+                            </InfoBar.Content>
+                        </InfoBar>
+                        <InfoBar x:Name="SteamAppInfo"
+                                 Severity="Informational"
+                                 IsClosable="False"
+                                 Title="Which game is this on Steam?"
+                                 Message="Paste the game's Steam store or guides page address."
+                                 AutomationProperties.AutomationId="SteamAppInfo">
+                            <InfoBar.Content>
+                                <Grid ColumnSpacing="{StaticResource DesktopGuidesSpacing8}" Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="SteamAppUrl"
+                                             PlaceholderText="https://store.steampowered.com/app/…"
+                                             AutomationProperties.Name="Steam store or guides page address"
+                                             AutomationProperties.AutomationId="SteamAppUrl" />
+                                    <Button Grid.Column="1" Content="Use this game" Click="SteamUseAppClicked"
+                                            AutomationProperties.AutomationId="SteamUseApp" />
+                                </Grid>
+                            </InfoBar.Content>
+                        </InfoBar>
+                    </StackPanel>
+                    <Border x:Name="OnlineBrowserHost"
+                            Grid.Row="1"
+                            CornerRadius="{StaticResource ControlCornerRadius}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            AutomationProperties.Name="Web page"
+                            AutomationProperties.AutomationId="OnlineBrowser" />
+                    <ListView x:Name="SteamResults"
+                              Grid.Row="1"
+                                  Visibility="Collapsed"
+                                  SelectionMode="Single"
+                                  IsItemClickEnabled="True"
+                                  ItemClick="SteamResultClicked"
+                                  AutomationProperties.Name="Steam guides"
+                                  AutomationProperties.AutomationId="SteamResults">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="local:SteamResultItem">
+                                    <Grid ColumnSpacing="{StaticResource DesktopGuidesSpacing12}" Padding="0,8"
+                                          AutomationProperties.Name="{x:Bind AccessibleName}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="64" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="64" Height="64" CornerRadius="4"
+                                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                                            <Image Source="{x:Bind Preview, Mode=OneWay}" Stretch="UniformToFill"
+                                                   AutomationProperties.AccessibilityView="Raw" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock Text="{x:Bind Title}" Style="{StaticResource BodyStrongTextBlockStyle}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{x:Bind Byline}" Style="{StaticResource DesktopGuidesSecondaryBodyStyle}" />
+                                            <TextBlock Text="{x:Bind Summary}" TextWrapping="Wrap" MaxLines="2"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                </Grid>
             </Grid>
 
             <Grid x:Name="SettingsPanel"

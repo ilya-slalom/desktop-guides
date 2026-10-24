@@ -206,4 +206,25 @@ public sealed class CaptureStoreTests : IDisposable
         Assert.Equal(3, found.Pages.Count);
         Assert.All(found.Pages, page => Assert.False(page.Linked));
     }
+
+    // S22 PR 4: Steam's image addresses name no type; the bytes do.
+    [Theory]
+    [InlineData(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }, ".png")]
+    [InlineData(new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 }, ".jpg")]
+    [InlineData(new byte[] { 0x47, 0x49, 0x46, 0x38, 0x39, 0x61 }, ".gif")]
+    [InlineData(new byte[] { 0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50 }, ".webp")]
+    [InlineData(new byte[] { 1, 2, 3 }, ".img")]
+    public void AnImageWithoutATypeInItsAddressTakesItFromItsBytes(byte[] bytes, string extension)
+    {
+        CaptureDraft draft = new CaptureStore(root, clock).Begin(Guid.NewGuid(), Saga("cairn", "cairn"));
+        string path = draft.SaveImage(new Uri("https://images.steamusercontent.com/ugc/2/FULLA/"), bytes);
+        Assert.Equal(extension, Path.GetExtension(path));
+    }
+
+    [Fact]
+    public void AnAddressedTypeStillWins()
+    {
+        CaptureDraft draft = new CaptureStore(root, clock).Begin(Guid.NewGuid(), Saga("cairn", "cairn"));
+        Assert.Equal(".gif", Path.GetExtension(draft.SaveImage(new Uri("https://example.com/a.gif"), new byte[] { 0x89, 0x50, 0x4E, 0x47 })));
+    }
 }

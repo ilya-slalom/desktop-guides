@@ -2017,6 +2017,25 @@ function Run-OnlineScenarios([string] $fixtureRoot) {
     if (@($resumed.Guides).Count -ne 1 -or $resumed.Drafts -ne 0) {
         throw "After resuming, expected one guide and no drafts; got $($resumed | ConvertTo-Json -Depth 4 -Compress)."
     }
+
+    # S22 PR 4: Steam. A refused image saves nothing; then a pasted guide
+    # saves without a key; then search, with a key and the game's Steam page.
+    $steamImage = 'https://images.steamusercontent.com/ugc/3/FULLB/'
+    Set-OnlineRoute $manifest $steamImage 'online/map.png' 429
+    Invoke-OnlineMode 'online-steam-limit' $fixtures
+    $limited = Invoke-ShellSeed @('describe-online', $dataRoot, $cacheRoot) | ConvertFrom-Json
+    if (@($limited.Guides | Where-Object { $_.Site -eq 'Steam' }).Count -ne 0 -or $limited.Drafts -ne 0) {
+        throw "A refused Steam image left a guide or a draft: $($limited | ConvertTo-Json -Depth 4 -Compress)."
+    }
+    Set-OnlineRoute $manifest $steamImage 'online/map.png'
+    Invoke-OnlineMode 'online-steam-nokey' $fixtures
+    Invoke-OnlineMode 'online-steam-search' $fixtures
+    $steam = @((Invoke-ShellSeed @('describe-online', $dataRoot, $cacheRoot) | ConvertFrom-Json).Guides |
+        Where-Object { $_.Site -eq 'Steam' })
+    # The fixture's third image has no route, so it's the copy's placeholder.
+    if ($steam.Count -ne 1 -or $steam[0].ItemId -ne '4242' -or $steam[0].Images -ne 2 -or $steam[0].StyleSheets -ne 1) {
+        throw "Expected one saved Steam guide with its two images and stylesheet; got $($steam | ConvertTo-Json -Depth 4 -Compress)."
+    }
 }
 
 function Run-MapReaderScenario([string] $fixtureRoot) {

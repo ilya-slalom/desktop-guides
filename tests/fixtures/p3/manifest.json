@@ -54,6 +54,54 @@
       "file": "online/out.html",
       "contentType": "text/html",
       "location": null
+    },
+    {
+      "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=4242",
+      "status": 200,
+      "file": "steam/guide.html",
+      "contentType": "text/html; charset=utf-8"
+    },
+    {
+      "url": "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/?itemcount=1&publishedfileids%5B0%5D=4242",
+      "status": 200,
+      "file": "steam/details.json",
+      "contentType": "application/json"
+    },
+    {
+      "url": "https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?appid=620&search_text=Online%20Test%20Game&filetype=10&return_details=true&return_short_description=true&numperpage=20&page=1&query_type=12",
+      "status": 200,
+      "file": "steam/query.json",
+      "contentType": "application/json"
+    },
+    {
+      "url": "https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?appid=620&search_text=zzz&filetype=10&return_details=true&return_short_description=true&numperpage=20&page=1&query_type=12",
+      "status": 200,
+      "file": "steam/query-empty.json",
+      "contentType": "application/json"
+    },
+    {
+      "url": "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?steamids=76561190000000001,76561190000000002",
+      "status": 200,
+      "file": "steam/players.json",
+      "contentType": "application/json"
+    },
+    {
+      "url": "https://images.steamusercontent.com/ugc/1/PREVIEW/?imw=128&imh=128&ima=fit",
+      "status": 200,
+      "file": "online/map.png",
+      "contentType": "image/png"
+    },
+    {
+      "url": "https://images.steamusercontent.com/ugc/2/FULLA/",
+      "status": 200,
+      "file": "online/map.png",
+      "contentType": "image/png"
+    },
+    {
+      "url": "https://images.steamusercontent.com/ugc/3/FULLB/",
+      "status": 200,
+      "file": "online/map.png",
+      "contentType": "image/png"
     }
   ]
 }

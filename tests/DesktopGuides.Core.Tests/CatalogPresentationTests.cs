@@ -310,4 +310,29 @@ public sealed class CatalogPresentationTests
         Assert.Equal(["PNG", "15456 × 10304"], facts.Select(fact => fact.Label));
         Assert.Equal("PNG, 15456 by 10304 pixels", CatalogPresentation.AccessibleText(facts));
     }
+
+    private static GuideSource Source(SourceSite site, string? author, int? captured = null, int? total = null) =>
+        new(site, "1", "https://example.com/", author, null, null, DateTimeOffset.UnixEpoch, null, captured, total);
+
+    // S22 PR 4: design 5.4, the source and author with each saved guide.
+    [Theory]
+    [InlineData(SourceSite.GameFaqs, "Test Author", "GameFAQs · Test Author", "Saved from GameFAQs, by Test Author")]
+    [InlineData(SourceSite.Steam, "Test Author", "Steam Community · Test Author", "Saved from Steam Community, by Test Author")]
+    [InlineData(SourceSite.Neoseeker, null, "Neoseeker", "Saved from Neoseeker")]
+    public void ASavedGuideNamesItsSourceAndAuthor(SourceSite site, string? author, string label, string accessible)
+    {
+        IReadOnlyList<CatalogFact> facts = CatalogPresentation.GuideFacts(
+            new GuideSummary(GuideWith(GuideFormat.Html), null), AtNow, EnGb, source: Source(site, author));
+        Assert.Equal(["Web page (HTML)", label, "Not started"], Labels(facts));
+        Assert.Equal(accessible, facts[1].AccessibleLabel);
+    }
+
+    [Fact]
+    public void APartialSaveSaysWhichPages()
+    {
+        IReadOnlyList<CatalogFact> facts = CatalogPresentation.GuideFacts(
+            new GuideSummary(GuideWith(GuideFormat.Html), null), AtNow, EnGb, source: Source(SourceSite.GameFaqs, null, 37, 80));
+        Assert.Equal(["Web page (HTML)", "GameFAQs", "Pages 1–37 of 80", "Not started"], Labels(facts));
+        Assert.Equal("Pages 1 to 37 of 80 saved", facts[2].AccessibleLabel);
+    }
 }

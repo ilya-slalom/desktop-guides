@@ -1,6 +1,7 @@
 using DesktopGuides.Core.Library;
 using DesktopGuides.Core.Providers;
 using DesktopGuides.Infrastructure.Artwork;
+using DesktopGuides.Infrastructure.Online;
 using DesktopGuides.Infrastructure.Providers;
 
 namespace DesktopGuides.Production.Providers;
@@ -53,6 +54,11 @@ internal sealed partial class ProviderServices : IDisposable
 
     public IgdbClient CreateIgdb(Func<CancellationToken, Task<IgdbCredentials?>> credentials) =>
         new(Http, Tokens, credentials);
+
+    // S22 PR 4: Steam's API through this client, or through another one
+    // (Find online's fixture lane) when given.
+    public SteamClient CreateSteam(Func<CancellationToken, Task<string?>> apiKey, ProviderHttp? http = null) =>
+        new(http ?? Http, apiKey);
 
     public SteamGridDbArtworkSource CreateSteamGridDb(Func<CancellationToken, Task<string?>> apiKey) =>
         new(Http, apiKey);

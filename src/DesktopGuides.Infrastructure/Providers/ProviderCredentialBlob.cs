@@ -11,30 +11,34 @@ public static class ProviderCredentialBlob
     public const int MaxSecretLength = 128;
     private const int Version = 1;
 
-    public static ProviderCredentials Normalize(string? clientId, string? clientSecret, string? steamGridDbKey)
+    public static ProviderCredentials Normalize(
+        string? clientId, string? clientSecret, string? steamGridDbKey, string? steamWebApiKey = null)
     {
         string? id = Field(clientId, MaxClientIdLength, "IGDB client ID");
         string? secret = Field(clientSecret, MaxSecretLength, "IGDB client secret");
         string? key = Field(steamGridDbKey, MaxSecretLength, "SteamGridDB API key");
+        string? steam = Field(steamWebApiKey, MaxSecretLength, "Steam Web API key");
         if ((id is null) != (secret is null))
         {
             throw new ArgumentException(id is null
                 ? "Enter the IGDB client ID with the secret."
                 : "Enter the IGDB client secret with the client ID.");
         }
-        return new ProviderCredentials(id is null ? null : new IgdbCredentials(id, secret!), key);
+        return new ProviderCredentials(id is null ? null : new IgdbCredentials(id, secret!), key, steam);
     }
 
     public static byte[] Format(ProviderCredentials credentials)
     {
         ProviderCredentials valid = Normalize(
-            credentials.Igdb?.ClientId, credentials.Igdb?.ClientSecret, credentials.SteamGridDbKey);
+            credentials.Igdb?.ClientId, credentials.Igdb?.ClientSecret, credentials.SteamGridDbKey, credentials.SteamWebApiKey);
         JsonObject root = new() { ["v"] = Version };
         if (valid.Igdb is { } igdb)
         {
             root["igdb"] = new JsonObject { ["clientId"] = igdb.ClientId, ["clientSecret"] = igdb.ClientSecret };
         }
         if (valid.SteamGridDbKey is { } key) root["steamGridDbKey"] = key;
+        // S22 PR 4: optional, so blobs written before it still read as v1.
+        if (valid.SteamWebApiKey is { } steam) root["steamWebApiKey"] = steam;
         return JsonSerializer.SerializeToUtf8Bytes(root, InfrastructureJsonContext.Default.JsonObject);
     }
 
@@ -58,7 +62,7 @@ public static class ProviderCredentialBlob
                 id = ReadString(igdb, "clientId");
                 secret = ReadString(igdb, "clientSecret");
             }
-            return Normalize(id, secret, ReadString(root, "steamGridDbKey"));
+            return Normalize(id, secret, ReadString(root, "steamGridDbKey"), ReadString(root, "steamWebApiKey"));
         }
         catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException)
         {

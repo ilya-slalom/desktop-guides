@@ -68,4 +68,15 @@ public sealed class ProviderCredentialBlobTests
         Assert.Throws<ArgumentException>(() => ProviderCredentialBlob.Normalize(null, null, new string('k', 129)));
         Assert.NotNull(ProviderCredentialBlob.Normalize(new string('a', 64), new string('s', 128), new string('k', 128)).Igdb);
     }
+
+    [Fact]
+    public void TheSteamKeyRoundTripsAndAnOlderBlobStillReads()
+    {
+        ProviderCredentials withSteam = Full with { SteamWebApiKey = "STEAMKEY0123" };
+        Assert.Equal(withSteam, ProviderCredentialBlob.Parse(ProviderCredentialBlob.Format(withSteam)));
+        Assert.Equal(Full, ProviderCredentialBlob.Parse(Encoding.UTF8.GetBytes(
+            """{"v":1,"igdb":{"clientId":"abc123","clientSecret":"s3cret-value"},"steamGridDbKey":"sgdb-key-1"}""")));
+        Assert.Equal("STEAMKEY0123", ProviderCredentialBlob.Normalize(null, null, null, " STEAMKEY0123 ").SteamWebApiKey);
+        Assert.Throws<ArgumentException>(() => ProviderCredentialBlob.Normalize(null, null, null, new string('k', 129)));
+    }
 }

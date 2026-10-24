@@ -91,7 +91,7 @@ public static class OfflineCopyBuilder
                     element.RemoveAttribute(handler.Name);
                 }
             }
-            foreach (IElement spoiler in main.QuerySelectorAll(".fspoiler")) spoiler.SetAttribute("tabindex", "0");
+            foreach (IElement spoiler in main.QuerySelectorAll(".fspoiler, .bb_spoiler")) spoiler.SetAttribute("tabindex", "0");
             RewriteLinks(main, page.Reading.Url, keysByUrl, keysBySpelling, files);
             missing += SaveImages(document, main, page, folder, savedImages);
 
@@ -112,6 +112,7 @@ public static class OfflineCopyBuilder
     {
         SourceSite.GameFaqs => Resource("base") + "\n" + Resource("gamefaqs"),
         SourceSite.Neoseeker => Resource("base") + "\n" + Resource("neoseeker"),
+        SourceSite.Steam => Resource("base") + "\n" + Resource("steam"),
         _ => Resource("base"),
     };
 
@@ -119,6 +120,7 @@ public static class OfflineCopyBuilder
     {
         SourceSite.GameFaqs => "dg-site-gamefaqs",
         SourceSite.Neoseeker => "dg-site-neoseeker",
+        SourceSite.Steam => "dg-site-steam",
         _ => "dg-site",
     };
 
@@ -230,13 +232,18 @@ public static class OfflineCopyBuilder
             SourceSite.Steam => "Steam Community",
             _ => "VGMaps"
         };
-        string author = guide.Author is { } name ? $"<p>By {WebUtility.HtmlEncode(name)}</p>" : "";
+        string author = guide.Author is not { } name ? ""
+            : guide.AuthorUrl is { } profile
+                ? $"<p>By <a href=\"{WebUtility.HtmlEncode(profile.AbsoluteUri)}\">{WebUtility.HtmlEncode(name)}</a></p>"
+                : $"<p>By {WebUtility.HtmlEncode(name)}</p>";
         string url = guide.Pages.FirstOrDefault()?.Url.AbsoluteUri ?? guide.Url.AbsoluteUri;
         header.InnerHtml =
             // Not a heading: the reader shows the title, and a heading would
             // lead every page's outline in the Contents pane.
             $"<p class=\"dg-title\">{WebUtility.HtmlEncode(guide.Title)}</p>{author}" +
             $"<p>Saved from {site} on {savedUtc.ToString("d MMMM yyyy", CultureInfo.InvariantCulture)}</p>" +
+            // The Web API terms: the app mustn't seem endorsed by Valve.
+            (guide.Match.Site == SourceSite.Steam ? "<p>Not affiliated with Valve.</p>" : "") +
             $"<p><a href=\"{WebUtility.HtmlEncode(url)}\">{WebUtility.HtmlEncode(url)}</a></p>";
         return header;
     }

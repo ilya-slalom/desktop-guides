@@ -1,0 +1,81 @@
+/* Steam Community guides: a section per h2, and Steam's BBCode markup. */
+:where(.dg-site-steam) :where(.dg-summary) {
+  color: #5D5D5D;
+}
+:where(.dg-site-steam) :where(.dg-section) {
+  margin: 0 0 1.5em;
+}
+:where(.dg-site-steam) :where(.bb_h1) {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 1.2em 0 0.5em;
+}
+:where(.dg-site-steam) :where(.bb_h2) {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 1em 0 0.4em;
+}
+:where(.dg-site-steam) :where(.bb_h3) {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0.8em 0 0.3em;
+}
+:where(.dg-site-steam) :where(.bb_ul, .bb_ol) {
+  margin: 0 0 1em;
+}
+:where(.dg-site-steam) :where(.bb_table) {
+  display: table;
+  border: 1px solid #E0E0E0;
+  border-radius: 4px;
+  margin: 0 0 1em;
+}
+:where(.dg-site-steam) :where(.bb_table_tr) { display: table-row; }
+:where(.dg-site-steam) :where(.bb_table_th, .bb_table_td) {
+  display: table-cell;
+  padding: 6px 10px;
+  border-bottom: 1px solid #E0E0E0;
+}
+:where(.dg-site-steam) :where(.bb_table_th) {
+  background: #F3F3F3;
+  font-weight: 600;
+}
+:where(.dg-site-steam) :where(.bb_code) {
+  display: block;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 14px;
+  white-space: pre-wrap;
+  padding: 8px 12px;
+  background: #F9F9F9;
+  border: 1px solid #E0E0E0;
+  border-radius: 4px;
+}
+:where(.dg-site-steam) :where(.bb_blockquote) {
+  padding: 4px 16px;
+  border-left: 4px solid #E0E0E0;
+  color: #5D5D5D;
+  margin: 0 0 1em;
+}
+/* A spoiler is blurred until hovered or focused, as GameFAQs' are. */
+:where(.dg-site-steam) :where(.bb_spoiler) {
+  filter: blur(5px);
+  background: #E0E0E0;
+  border-radius: 2px;
+  transition: filter 150ms ease-out;
+}
+:where(.dg-site-steam) :where(.bb_spoiler:hover, .bb_spoiler:focus, .bb_spoiler:focus-within) {
+  filter: none;
+  background: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(.dg-site-steam) :where(.bb_spoiler) { transition: none; }
+}
+@media print {
+  :where(.dg-site-steam) :where(.bb_spoiler) { filter: none; background: transparent; }
+}
+:where(.dg-site-steam) :where(.sharedFilePreviewImage) {
+  display: block;
+  margin: 8px 0;
+}
+:where(.dg-site-steam) :where(.floatLeft, .floatRight) {
+  float: none;
+}

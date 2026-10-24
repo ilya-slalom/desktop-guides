@@ -214,7 +214,9 @@ session:
 
 **Steam** guides are fetched by the app with an HTTP client:
 - one guide page, plus the images in its content;
-- metadata from `GetPublishedFileDetails`;
+- metadata from `GetPublishedFileDetails` when there's a key, since without one
+  Steam answers a guide as missing; the page gives the author, the author's
+  profile link and the update date either way;
 - a plain user agent naming Desktop Guides;
 - one request at a time;
 - a stop on HTTP 429.
@@ -316,8 +318,8 @@ that game.
 - The test calls `QueryFiles` once.
 - The key is never logged and never sent anywhere except Steam's API.
 - Without a key, Steam search explains where to get one and links to
-  Settings. Pasted Steam URLs still work, since `GetPublishedFileDetails`
-  needs no key.
+  Settings. Pasted Steam URLs still work: the guide is its own page, and
+  the details call is skipped without a key.
 
 ### 5.7 Build switches
 
@@ -472,3 +474,46 @@ PRs in order, each with its own plan:
   - pages come from the live DOM through WebView2, where the same `<pre>` newline rule applies;
   - a capture should start from a page whose navigation lists the whole walkthrough, since a hub may list fewer pages than a chapter page;
   - the live checks on pcsx2-win confirm or correct the archived structure.
+
+## PR 3b verification record
+
+[#148](https://github.com/ilya-slalom/desktop-guides/pull/148), following
+[the PR 3b plan](p3/s22-find-online-plan.md), merged on 24 October 2026,
+with its live-check fixes in [#149](https://github.com/ilya-slalom/desktop-guides/pull/149):
+
+- **Installed `online` group:** passed on both lanes, with the review fixes and the live-check fixes, in run [39978339113](https://github.com/ilya-slalom/desktop-guides/actions/runs/39978339113).
+- **Live checks (the user, on pcsx2-win, 23 and 24 October 2026):**
+  - a GameFAQs text FAQ and HTML guide, and a Neoseeker text FAQ and wiki walkthrough (Final Fantasy VII Rebirth) were saved and read offline;
+  - the first check found:
+    - same-site links that open a new tab leaving the app;
+    - no styling;
+    - Neoseeker article links left online;
+    - image links to `File:` pages;
+    - GameFAQs page spellings;
+    - a library schema check that compared line endings;
+  - all were fixed in [the live-check fixes plan](p3/s22-live-check-fixes-plan.md);
+  - the second check found the guides "downloaded successfully and with all content".
+
+## PR 4 verification record
+
+[#151](https://github.com/ilya-slalom/desktop-guides/pull/151), following
+[the PR 4 plan](p3/s22-steam-plan.md), checked on 24 October 2026:
+
+- **Suites on pcsx2-win:** Core.Tests 1578/1578, Infrastructure.Tests 1105/1105. The Release x64 build is clean under `-warnaserror`.
+- **Installed:** `online-steam-limit`, `-nokey` and `-search`:
+  - without the app's Steam code, run [40072935189](https://github.com/ilya-slalom/desktop-guides/actions/runs/40072935189) failed;
+  - with it, the full run [40082713942](https://github.com/ilya-slalom/desktop-guides/actions/runs/40082713942) passed every job.
+- **Found by the installed checks:**
+  - **Images lost:** Steam's image addresses name no type, so every image was stored as `.img` and dropped by the import. An untyped address is now typed by its bytes.
+  - **Site picker reset:** a site picked while Find online's browser started was undone when the browser was ready.
+  - **Hidden-browser loads:** a page loading behind Steam's results set the site back to GameFAQs.
+- **Review:** a fresh review read the code and checked six public guides and the API live. It found five Important issues, each fixed with a test that failed first:
+  - YouTube embeds were lost;
+  - a non-network failure crashed the app;
+  - the author's profile link was missing;
+  - the status didn't name the step;
+  - `GetPublishedFileDetails` answers guides as missing without a key. It's now asked with the key, and is optional. The source review and section 5.6 were corrected.
+
+  Two Minor findings are deferred: a duplicate draft after a failed library save, and installed coverage of the Valve line, which is unit-tested.
+- **Live check:** to come, by the user, with a real key and real guides.
+
