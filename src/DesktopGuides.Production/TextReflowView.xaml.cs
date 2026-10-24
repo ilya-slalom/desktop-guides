@@ -174,6 +174,9 @@ public sealed partial class TextReflowView : UserControl
         }
     }
 
+    // About 80 characters of prose: 40em of the reading font at its scale.
+    private double ReflowMeasure => 40 * baseFontSize * textScale;
+
     private void BlockContainerChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
     {
         if (args.InRecycleQueue || args.ItemContainer is not ListViewItem item) return;
@@ -182,10 +185,14 @@ public sealed partial class TextReflowView : UserControl
 
     private void Apply(ListViewItem item, int index)
     {
-        if (item.ContentTemplateRoot is not Grid { Children: [TextBlock prose, ScrollViewer { Content: TextBlock preserved } scroll] })
+        if (item.ContentTemplateRoot is not Grid { Children: [TextBlock prose, ScrollViewer { Content: TextBlock preserved } scroll] } root)
         {
             return;
         }
+        // T14.5: one width for every block, so they share a left edge; a
+        // narrower window narrows them all alike.
+        root.HorizontalAlignment = HorizontalAlignment.Stretch;
+        root.MaxWidth = ReflowMeasure;
         ReflowBlock block = plan.Blocks[index];
         bool isProse = block.Kind == ReflowKind.Prose;
         TextBlock text = isProse ? prose : preserved;
