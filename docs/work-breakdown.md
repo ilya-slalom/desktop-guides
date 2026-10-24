@@ -476,7 +476,7 @@ behavior, or high-contrast system colors.
   user's request). The original view centers the block of lines, so every
   line keeps its column and ASCII art stays aligned; the reflow view keeps
   prose to about 80 characters and centers it. Planned in
-  [p3/reader-layout-plan.md](p3/reader-layout-plan.md).
+  [p3/reader-layout-plan.md](p3/reader-layout-plan.md); implemented in PR #150.
 - **TR14.1** Reader preferences are keyed by guide ID and have a bounded,
   accessible size range.
 - **TR14.2** Theme CSS or assets do not require a remote resource.
@@ -638,7 +638,7 @@ sections form a usable table of contents when available.
 - **T18.3** Remember whether the Contents pane is open across restarts,
   and open it on its own for a multi-page HTML guide until the reader
   chooses (added 24 October 2026, the user's request). Planned in
-  [p3/reader-layout-plan.md](p3/reader-layout-plan.md).
+  [p3/reader-layout-plan.md](p3/reader-layout-plan.md); implemented in PR #150.
 - **TR18.1** Search and TOC controls appear only where supported; failures to
   detect sections do not block ordinary scrolling.
 
