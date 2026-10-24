@@ -18,8 +18,13 @@ public sealed record SteamGuidePage(IReadOnlyList<SteamGuideSummary> Items, int 
 /// only to the API as Steam requires; a guide's details need none. Errors
 /// are <see cref="ProviderException"/>s whose messages never hold the key.
 /// </summary>
-public sealed class SteamClient(ProviderHttp http, Func<CancellationToken, Task<string?>> key)
+public sealed class SteamClient(
+    ProviderHttp http, Func<CancellationToken, Task<string?>> key, Func<TimeSpan, CancellationToken, Task>? delay = null)
 {
+    private readonly Func<TimeSpan, CancellationToken, Task> delay = delay ?? Task.Delay;
+    public const int MaxAppListBytes = 8 * 1024 * 1024;
+    private const int MaxAppListPages = 10;
+
     public const int PageSize = 20;
     private const string Api = "https://api.steampowered.com";
 
@@ -79,6 +84,41 @@ public sealed class SteamClient(ProviderHttp http, Func<CancellationToken, Task<
         return Summary(files[0], "consumer_app_id", "description");
     }
 
+    /// <summary>
+    /// Steam's games, without DLC, software, videos or hardware: a page of
+    /// 50,000 at a time, a second apart, reporting each page as it arrives.
+    /// </summary>
+    public async Task<IReadOnlyList<(string AppId, string Name)>> GetAppListAsync(IProgress<int>? pages, CancellationToken token)
+    {
+        string apiKey = await RequireKeyAsync(token);
+        List<(string, string)> apps = [];
+        string last = "0";
+        for (int page = 1; page <= MaxAppListPages; page++)
+        {
+            if (page > 1) await delay(TimeSpan.FromSeconds(1), token);
+            Uri uri = new($"{Api}/IStoreService/GetAppList/v1/?key={Uri.EscapeDataString(apiKey)}&include_games=true" +
+                "&include_dlc=false&include_software=false&include_videos=false&include_hardware=false" +
+                $"&max_results=50000&last_appid={last}");
+            using JsonDocument json = await GetJsonAsync(HttpMethod.Get, uri, null, token, MaxAppListBytes);
+            JsonElement response = Property(json.RootElement, "response");
+            if (response.TryGetProperty("apps", out JsonElement list) && list.ValueKind == JsonValueKind.Array)
+            {
+                foreach (JsonElement app in list.EnumerateArray())
+                {
+                    if (Text(app, "appid") is { } id && Text(app, "name") is { Length: > 0 } name) apps.Add((id, name));
+                }
+            }
+            pages?.Report(page);
+            if (!(response.TryGetProperty("have_more_results", out JsonElement more) && more.ValueKind == JsonValueKind.True) ||
+                Text(response, "last_appid") is not { } next || next == last)
+            {
+                break;
+            }
+            last = next;
+        }
+        return apps;
+    }
+
     /// <summary>One search, so a key Steam refuses fails here rather than at the first real search.</summary>
     public async Task TestKeyAsync(CancellationToken token)
     {
@@ -130,13 +170,14 @@ public sealed class SteamClient(ProviderHttp http, Func<CancellationToken, Task<
 
     // The form is made for each attempt: a request disposes its content,
     // and a retry or a redirect sends a new request.
-    private async Task<JsonDocument> GetJsonAsync(HttpMethod method, Uri uri, Func<HttpContent>? content, CancellationToken token)
+    private async Task<JsonDocument> GetJsonAsync(
+        HttpMethod method, Uri uri, Func<HttpContent>? content, CancellationToken token, int maxBytes = ProviderHttp.MaxJsonBytes)
     {
         ProviderResponse response = await http.SendAsync(method, uri, request =>
         {
             Identify(request);
             if (content is not null) request.Content = content();
-        }, ProviderHttp.MaxJsonBytes, token);
+        }, maxBytes, token);
         switch (response.StatusCode)
         {
             case HttpStatusCode.OK:
