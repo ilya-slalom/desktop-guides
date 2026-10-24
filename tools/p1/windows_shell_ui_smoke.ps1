@@ -5441,6 +5441,8 @@ try {
                 $baseline = Read-Saves
                 [System.Windows.Forms.SendKeys]::SendWait('^+b')
                 [void](Wait-BookmarkNames @('Castle gate, *% through') 'opening the Bookmarks tab')
+                # The list takes the keyboard after it shows; Enter before that follows nothing.
+                Wait-FocusOnBookmark 'opening the Bookmarks tab'
                 [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
                 $report.bookmarkTop = Wait-TopRowLike '*Walkthrough: Castle*' 'following a bookmark'
                 Assert-FocusInGuide 'following a bookmark'
@@ -5749,6 +5751,7 @@ try {
                 [void](Wait-TextPlace { param($p) $p.view -eq 'Original' -and $p.offset -eq 0 } 'the start')
                 [System.Windows.Forms.SendKeys]::SendWait('^+b')
                 [void](Wait-BookmarkNames @('*') 'opening the bookmarks')
+                Wait-FocusOnBookmark 'opening the bookmarks'
                 [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
                 [void](Wait-TextPlace { param($p) $p.view -eq 'Original' -and $p.offset -eq $marked.offset } 'the bookmark in Original')
                 $report.phases += 'reflow-bookmark'
