@@ -15,7 +15,7 @@ public sealed class SteamClientTests
     private const string Players = "api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/";
     private readonly SteamStub stub = new();
 
-    private SteamClient Client(string? key = Key) => new(new ProviderHttp(stub), () => key);
+    private SteamClient Client(string? key = Key) => new(new ProviderHttp(stub), _ => Task.FromResult(key));
 
     [Fact]
     public async Task ASearchAsksForTheAppsGuidesWithTheKey()

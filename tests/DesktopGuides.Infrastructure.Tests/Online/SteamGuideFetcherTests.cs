@@ -48,7 +48,7 @@ public sealed class SteamGuideFetcherTests : IAsyncLifetime
     private SteamGuideFetcher Fetcher()
     {
         ProviderHttp http = new(stub);
-        return new SteamGuideFetcher(new SteamClient(http, () => null), http, store, clock, clock.Delay);
+        return new SteamGuideFetcher(new SteamClient(http, _ => Task.FromResult<string?>(null)), http, store, clock, clock.Delay);
     }
 
     private OnlineGuideSaver Saver() =>

@@ -18,7 +18,7 @@ public sealed record SteamGuidePage(IReadOnlyList<SteamGuideSummary> Items, int 
 /// only to the API as Steam requires; a guide's details need none. Errors
 /// are <see cref="ProviderException"/>s whose messages never hold the key.
 /// </summary>
-public sealed class SteamClient(ProviderHttp http, Func<string?> key)
+public sealed class SteamClient(ProviderHttp http, Func<CancellationToken, Task<string?>> key)
 {
     public const int PageSize = 20;
     private const string Api = "https://api.steampowered.com";
@@ -31,7 +31,7 @@ public sealed class SteamClient(ProviderHttp http, Func<string?> key)
     /// <summary>A page of the app's guides matching the text, newest-ranked as Steam's search orders them.</summary>
     public async Task<SteamGuidePage> QueryGuidesAsync(string appId, string text, int page, CancellationToken token)
     {
-        string apiKey = RequireKey();
+        string apiKey = await RequireKeyAsync(token);
         Uri uri = new($"{Api}/IPublishedFileService/QueryFiles/v1/?key={Uri.EscapeDataString(apiKey)}" +
             $"&appid={Uri.EscapeDataString(appId)}&search_text={Uri.EscapeDataString(text)}" +
             $"&filetype=10&return_details=true&return_short_description=true&numperpage={PageSize}&page={page}&query_type=12");
@@ -77,13 +77,13 @@ public sealed class SteamClient(ProviderHttp http, Func<string?> key)
     /// <summary>One search, so a key Steam refuses fails here rather than at the first real search.</summary>
     public async Task TestKeyAsync(CancellationToken token)
     {
-        string apiKey = RequireKey();
+        string apiKey = await RequireKeyAsync(token);
         using JsonDocument _ = await GetJsonAsync(HttpMethod.Get,
             new Uri($"{Api}/IPublishedFileService/QueryFiles/v1/?key={Uri.EscapeDataString(apiKey)}&appid=620&filetype=10&numperpage=1"),
             null, token);
     }
 
-    private string RequireKey() => key() is { Length: > 0 } value ? value
+    private async Task<string> RequireKeyAsync(CancellationToken token) => await key(token) is { Length: > 0 } value ? value
         : throw new ProviderException(ProviderErrorKind.NotConfigured, "Steam search needs your Steam Web API key.");
 
     private async Task<IReadOnlyDictionary<string, string>> AuthorsAsync(
