@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Web;
 using AngleSharp.Dom;
 using AngleSharp.Html.Parser;
@@ -13,7 +15,7 @@ namespace DesktopGuides.Infrastructure.Online;
 /// Images are their full size, links leave Steam's link filter, and an
 /// emoticon is its text.
 /// </summary>
-public sealed class SteamGuideAdapter : IGuideSourceAdapter
+public sealed partial class SteamGuideAdapter : IGuideSourceAdapter
 {
     public SourceSite Site => SourceSite.Steam;
 
@@ -49,9 +51,46 @@ public sealed class SteamGuideAdapter : IGuideSourceAdapter
             ? heading : "Untitled guide";
         string? author = document.QuerySelector("div.guideAuthors")?.TextContent.Trim() is { Length: > 0 } by
             ? (by.StartsWith("By ", StringComparison.Ordinal) ? by[3..].Trim() : by) : null;
+        Uri? profile = document.QuerySelector(".creatorsBlock a.friendBlockLinkOverlay[href]")?.GetAttribute("href") is { } href &&
+            Uri.TryCreate(href, UriKind.Absolute, out Uri? link) && link.Scheme == Uri.UriSchemeHttps &&
+            link.Host.Equals("steamcommunity.com", StringComparison.OrdinalIgnoreCase) ? link : null;
+        // Posted, then updated when it was: the last date the page gives.
+        DateTimeOffset? updated = document.QuerySelectorAll(".detailsStatRight")
+            .Select(stat => PageDate(stat.TextContent.Trim(), DateTimeOffset.UtcNow.Year)).LastOrDefault(date => date is not null);
         return new GuidePageReading(match, url, CapturedFormat.Html, guideTitle, author,
-            NoticeRules.Find(text), null, [], built.Body!.InnerHtml, images);
+            NoticeRules.Find(text), updated, [], built.Body!.InnerHtml, images)
+        {
+            AuthorUrl = profile,
+        };
     }
+
+    /// <summary>
+    /// A page date as Steam writes it, read as UTC: "9 Jul, 2024 @ 9:51am",
+    /// "Dec 1, 2023 @ 12:00pm", or this year's "3 Mar @ 4:05pm". Null for anything else.
+    /// </summary>
+    internal static DateTimeOffset? PageDate(string text, int currentYear)
+    {
+        if (PageDateText().Match(text) is not { Success: true } date) return null;
+        string day = date.Groups["d1"].Success ? date.Groups["d1"].Value : date.Groups["d2"].Value;
+        string month = date.Groups["m1"].Success ? date.Groups["m1"].Value : date.Groups["m2"].Value;
+        string year = date.Groups["y"].Success ? date.Groups["y"].Value : currentYear.ToString(CultureInfo.InvariantCulture);
+        return DateTime.TryParseExact($"{day} {month} {year} {date.Groups["time"].Value}", "d MMM yyyy h:mmtt",
+            CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTime parsed)
+            ? new DateTimeOffset(parsed, TimeSpan.Zero) : null;
+    }
+
+    [GeneratedRegex(@"^(?:(?<d1>\d{1,2}) (?<m1>[A-Z][a-z]{2})|(?<m2>[A-Z][a-z]{2}) (?<d2>\d{1,2}))(?:, (?<y>\d{4}))? @ (?<time>\d{1,2}:\d{2}[ap]m)$",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex PageDateText();
+
+    private const string ImageHost = "images.steamusercontent.com";
+
+    // steamuserimages-a.akamaihd.net/ugc/… is served as images.steamusercontent.com/ugc/…
+    private static Uri? CurrentImageHost(Uri image) =>
+        image.Host.Equals("steamuserimages-a.akamaihd.net", StringComparison.OrdinalIgnoreCase) &&
+        image.AbsolutePath.StartsWith("/ugc/", StringComparison.Ordinal)
+            ? new UriBuilder(image) { Scheme = Uri.UriSchemeHttps, Host = ImageHost, Port = -1 }.Uri
+            : null;
 
     private static IElement Clean(IElement element, Uri url)
     {
@@ -61,13 +100,39 @@ public sealed class SteamGuideAdapter : IGuideSourceAdapter
         {
             emoticon.Replace(element.Owner!.CreateTextNode(emoticon.GetAttribute("alt") ?? ""));
         }
+        // A video is an empty frame Steam's script fills; offline it's a link to it.
+        foreach (IElement video in element.QuerySelectorAll("div.sharedFilePreviewYouTubeVideo[id]").ToArray())
+        {
+            IElement link = element.Owner!.CreateElement("a");
+            link.SetAttribute("href", "https://www.youtube.com/watch?v=" + Uri.EscapeDataString(video.Id!));
+            link.TextContent = "Video on YouTube";
+            IElement paragraph = element.Owner.CreateElement("p");
+            paragraph.AppendChild(link);
+            video.Replace(paragraph);
+        }
+        // Older guides name the image host Steam has since replaced; the path still serves.
+        foreach (IElement image in element.QuerySelectorAll("img[src]"))
+        {
+            if (OnlineHtml.Web(url, image.GetAttribute("src")) is { } source && CurrentImageHost(source) is { } current)
+            {
+                image.SetAttribute("src", current.AbsoluteUri);
+            }
+        }
         // A thumbnail links to its full image: keep the full image, unlinked.
+        // One that links anywhere else, another guide say, keeps its link.
         foreach (IElement link in element.QuerySelectorAll("a.modalContentLink").ToArray())
         {
-            if (link.QuerySelector("img") is { } image && OnlineHtml.Web(url, link.GetAttribute("href")) is { } full)
+            if (link.QuerySelector("img") is { } image && OnlineHtml.Web(url, link.GetAttribute("href")) is { } target &&
+                (CurrentImageHost(target) ?? target) is { Host: ImageHost } full)
             {
                 image.SetAttribute("src", full.AbsoluteUri);
                 link.Replace(image);
+            }
+            else
+            {
+                // Steam's popup class means nothing offline.
+                link.RemoveAttribute("class");
+                link.RemoveAttribute("data-modal-content-popup-url");
             }
         }
         OnlineHtml.Absolutize(element, url);

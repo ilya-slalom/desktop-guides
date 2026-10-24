@@ -56,7 +56,7 @@ Also [the source review](source-review.md), whose Steam section sets the terms a
   - It never appears in logs, `ToString`, diagnostics, `unmatched.json` or exceptions. `OnlineFixtureHandler` records unmatched requests by host and path only.
 - **Without a key:**
   - Search shows "Steam search needs your Steam Web API key." with an **Open Settings** link and a link to `https://steamcommunity.com/dev/apikey`.
-  - Pasted guide URLs still work, since `GetPublishedFileDetails` needs no key.
+  - Pasted guide URLs still work, since the guide is its own page. (Corrected after the review: `GetPublishedFileDetails` answers guides as missing without a key, so it's skipped then.)
 - **Attribution:**
   - The saved copy's header names the author and links the guide.
   - Steam guides' guide details add "Not affiliated with Valve."

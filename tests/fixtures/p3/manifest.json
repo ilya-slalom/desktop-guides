@@ -86,7 +86,7 @@
       "contentType": "application/json"
     },
     {
-      "url": "https://images.steamusercontent.com/ugc/1/PREVIEW/",
+      "url": "https://images.steamusercontent.com/ugc/1/PREVIEW/?imw=128&imh=128&ima=fit",
       "status": 200,
       "file": "online/map.png",
       "contentType": "image/png"

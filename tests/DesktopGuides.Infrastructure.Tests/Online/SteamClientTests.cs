@@ -72,14 +72,15 @@ public sealed class SteamClientTests
         Assert.DoesNotContain(Key, error.ToString());
     }
 
+    // Review: without a key Steam answers guides with result 9, so details ask with the key.
     [Fact]
-    public async Task DetailsNeedNoKey()
+    public async Task DetailsAskWithTheKey()
     {
         stub.Json(Details, "details.json");
-        SteamGuideSummary details = (await Client(key: null).GetDetailsAsync("4242", CancellationToken.None))!;
+        SteamGuideSummary details = (await Client().GetDetailsAsync("4242", CancellationToken.None))!;
 
         Assert.Equal(HttpMethod.Post, stub.Requests[0].Method);
-        Assert.Equal("itemcount=1&publishedfileids%5B0%5D=4242", stub.Requests[0].Body);
+        Assert.Equal($"key={Key}&itemcount=1&publishedfileids%5B0%5D=4242", stub.Requests[0].Body);
         Assert.DoesNotContain("key=", stub.Requests[0].Uri.Query);
         Assert.Equal(("4242", "620", "Example Quest Field Notes", null), (details.FileId, details.AppId, details.Title, details.Author));
         Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1720543880), details.Updated);
@@ -109,5 +110,25 @@ public sealed class SteamClientTests
         stub.Json(Details, "details.json");
         await Client().GetDetailsAsync("4242", CancellationToken.None);
         Assert.StartsWith("DesktopGuides/", Assert.Single(stub.Requests).UserAgent);
+    }
+
+    [Fact]
+    public async Task WithoutAKeyDetailsAreNotAsked()
+    {
+        Assert.Null(await Client(key: null).GetDetailsAsync("4242", CancellationToken.None));
+        Assert.Empty(stub.Requests);
+    }
+
+    // Review: a retry after a short limit resent a disposed form.
+    [Fact]
+    public async Task ARetriedDetailsRequestSendsItsFormAgain()
+    {
+        int calls = 0;
+        stub.Routes[Details] = _ => ++calls == 1
+            ? (HttpStatusCode.TooManyRequests, [])
+            : (HttpStatusCode.OK, System.Text.Encoding.UTF8.GetBytes(P3Fixtures.Read("steam/details.json")));
+        stub.RetryAfter = TimeSpan.FromMilliseconds(1);
+        Assert.NotNull(await Client().GetDetailsAsync("4242", CancellationToken.None));
+        Assert.All(stub.Requests, request => Assert.Contains("publishedfileids", request.Body));
     }
 }

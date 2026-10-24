@@ -302,6 +302,7 @@ public sealed class OfflineCopyBuilderTests : IAsyncLifetime
         string html = Text("guide.html");
         Assert.Contains("Saved from Steam Community", html);
         Assert.Contains("Not affiliated with Valve.", html);
+        Assert.Contains("<p>By <a href=\"https://steamcommunity.com/id/testauthor\">Test Author</a></p>", html);
         Assert.Contains("<main class=\"dg-site-steam\">", html);
         Assert.Equal(OfflineCopyBuilder.StyleSheet(SourceSite.Steam), Text("guide.css"));
         Assert.NotEqual(OfflineCopyBuilder.StyleSheet(SourceSite.Neoseeker), Text("guide.css"));

@@ -87,6 +87,8 @@ public sealed partial class ShellWindow
         OnlineBrowserHost.Visibility = selected && results ? Visibility.Collapsed : Visibility.Visible;
         if (!selected)
         {
+            // A search still running would write to another site's view.
+            steamSearch?.Cancel();
             SteamKeyInfo.IsOpen = false;
             SteamAppInfo.IsOpen = false;
         }
@@ -118,6 +120,7 @@ public sealed partial class ShellWindow
         OnlineSave.IsEnabled = false;
         string text = SteamQuery.Text.Trim();
         steamSearch?.Cancel();
+        steamSearch?.Dispose();
         CancellationTokenSource search = steamSearch = new CancellationTokenSource();
         try
         {
@@ -164,7 +167,9 @@ public sealed partial class ShellWindow
         ProviderHttp http = SteamHttp();
         foreach (SteamResultItem item in items)
         {
-            if (item.Guide.Preview is not { } url) continue;
+            if (item.Guide.Preview is not { } preview) continue;
+            // Steam's image server sizes its images; a row needs 64 px.
+            Uri url = preview.Query.Length > 0 ? preview : new Uri(preview, "?imw=128&imh=128&ima=fit");
             try
             {
                 ProviderResponse response = await http.SendAsync(
@@ -178,6 +183,10 @@ public sealed partial class ShellWindow
                 item.Preview = image;
             }
             catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (ProviderException error) when (error.Kind == ProviderErrorKind.RateLimited)
             {
                 return;
             }
@@ -256,9 +265,16 @@ public sealed partial class ShellWindow
         {
             OnlineStatus.Text = "Saving stopped. Nothing was saved.";
         }
-        catch (ProviderException error)
+        catch (SteamFetchException error)
         {
-            OnlineStatus.Text = $"{ProviderMessages.ForSteam(error.Kind)} Nothing was saved.";
+            OnlineStatus.Text = $"{ProviderMessages.ForSteam(error.Kind)} The save stopped at {error.Step}. Nothing was saved.";
+            AnnounceStatus(OnlineStatus.Text);
+        }
+        catch (Exception)
+        {
+            // An async void handler leads here, so nothing may escape: a full
+            // disk or a locked file, say. The fetch discarded its draft.
+            OnlineStatus.Text = "The guide couldn't be saved. Nothing was saved.";
             AnnounceStatus(OnlineStatus.Text);
         }
         finally
@@ -274,6 +290,7 @@ public sealed partial class ShellWindow
     private void CloseSteam()
     {
         steamSearch?.Cancel();
+        steamSearch?.Dispose();
         steamSearch = null;
         steamFixtureHttp?.Dispose();
         steamFixtureHttp = null;

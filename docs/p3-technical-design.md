@@ -214,7 +214,9 @@ session:
 
 **Steam** guides are fetched by the app with an HTTP client:
 - one guide page, plus the images in its content;
-- metadata from `GetPublishedFileDetails`;
+- metadata from `GetPublishedFileDetails` when there's a key, since without one
+  Steam answers a guide as missing; the page gives the author, the author's
+  profile link and the update date either way;
 - a plain user agent naming Desktop Guides;
 - one request at a time;
 - a stop on HTTP 429.
@@ -316,8 +318,8 @@ that game.
 - The test calls `QueryFiles` once.
 - The key is never logged and never sent anywhere except Steam's API.
 - Without a key, Steam search explains where to get one and links to
-  Settings. Pasted Steam URLs still work, since `GetPublishedFileDetails`
-  needs no key.
+  Settings. Pasted Steam URLs still work: the guide is its own page, and
+  the details call is skipped without a key.
 
 ### 5.7 Build switches
 

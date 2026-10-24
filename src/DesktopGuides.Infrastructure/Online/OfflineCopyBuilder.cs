@@ -232,7 +232,10 @@ public static class OfflineCopyBuilder
             SourceSite.Steam => "Steam Community",
             _ => "VGMaps"
         };
-        string author = guide.Author is { } name ? $"<p>By {WebUtility.HtmlEncode(name)}</p>" : "";
+        string author = guide.Author is not { } name ? ""
+            : guide.AuthorUrl is { } profile
+                ? $"<p>By <a href=\"{WebUtility.HtmlEncode(profile.AbsoluteUri)}\">{WebUtility.HtmlEncode(name)}</a></p>"
+                : $"<p>By {WebUtility.HtmlEncode(name)}</p>";
         string url = guide.Pages.FirstOrDefault()?.Url.AbsoluteUri ?? guide.Url.AbsoluteUri;
         header.InnerHtml =
             // Not a heading: the reader shows the title, and a heading would

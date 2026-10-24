@@ -37,7 +37,7 @@ public sealed class SteamGuideFetcherTests : IAsyncLifetime
         stub.Clock = () => clock.Now;
         stub.Json(Details, "details.json");
         stub.Routes[Page] = _ => (HttpStatusCode.OK, Encoding.UTF8.GetBytes(P3Fixtures.Read("steam/guide.html")));
-        foreach (string image in new[] { "images.steamusercontent.com/ugc/2/FULLA/", "images.steamusercontent.com/ugc/3/FULLB/" })
+        foreach (string image in new[] { "images.steamusercontent.com/ugc/2/FULLA/", "images.steamusercontent.com/ugc/3/FULLB/", "images.steamusercontent.com/ugc/9/OTHER/" })
         {
             stub.Routes[image] = _ => (HttpStatusCode.OK, MapBytes.WholePng(4, 4));
         }
@@ -45,10 +45,10 @@ public sealed class SteamGuideFetcherTests : IAsyncLifetime
 
     public async Task DisposeAsync() => await harness.DisposeAsync();
 
-    private SteamGuideFetcher Fetcher()
+    private SteamGuideFetcher Fetcher(string? key = "FAKEKEY")
     {
         ProviderHttp http = new(stub);
-        return new SteamGuideFetcher(new SteamClient(http, _ => Task.FromResult<string?>(null)), http, store, clock, clock.Delay);
+        return new SteamGuideFetcher(new SteamClient(http, _ => Task.FromResult(key)), http, store, clock, clock.Delay);
     }
 
     private OnlineGuideSaver Saver() =>
@@ -60,11 +60,12 @@ public sealed class SteamGuideFetcherTests : IAsyncLifetime
         CaptureDraft draft = await Fetcher().FetchAsync(harness.Game.Id, "4242", null, CancellationToken.None);
 
         Assert.Equal(
-            [Page, Details, "images.steamusercontent.com/ugc/2/FULLA/", "images.steamusercontent.com/ugc/3/FULLB/"],
+            [Page, Details, "images.steamusercontent.com/ugc/2/FULLA/", "images.steamusercontent.com/ugc/3/FULLB/",
+             "images.steamusercontent.com/ugc/9/OTHER/"],
             stub.Requests.Select(r => r.Uri.Host + r.Uri.AbsolutePath));
         Assert.All(stub.Requests.Zip(stub.Requests.Skip(1)), pair => Assert.True(pair.Second.At - pair.First.At >= TimeSpan.FromSeconds(1)));
         CapturedPage page = Assert.Single(draft.Captured);
-        Assert.Equal(2, page.ImageFiles.Count);
+        Assert.Equal(3, page.ImageFiles.Count);
         Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1720543880), page.Reading.SourceUpdated);
         Assert.True(draft.IsComplete);
     }
@@ -74,7 +75,7 @@ public sealed class SteamGuideFetcherTests : IAsyncLifetime
     public async Task ALimitPartWayLeavesNoDraftAndNoGuide()
     {
         stub.Status("images.steamusercontent.com/ugc/3/FULLB/", HttpStatusCode.TooManyRequests);
-        ProviderException error = await Assert.ThrowsAsync<ProviderException>(
+        SteamFetchException error = await Assert.ThrowsAsync<SteamFetchException>(
             () => Fetcher().FetchAsync(harness.Game.Id, "4242", null, CancellationToken.None));
         Assert.Equal(ProviderErrorKind.RateLimited, error.Kind);
         Assert.Empty(store.ListForGame(harness.Game.Id));
@@ -86,14 +87,14 @@ public sealed class SteamGuideFetcherTests : IAsyncLifetime
     {
         stub.Status("images.steamusercontent.com/ugc/3/FULLB/", HttpStatusCode.NotFound);
         CaptureDraft draft = await Fetcher().FetchAsync(harness.Game.Id, "4242", null, CancellationToken.None);
-        Assert.Single(Assert.Single(draft.Captured).ImageFiles);
+        Assert.Equal(2, Assert.Single(draft.Captured).ImageFiles.Count);
     }
 
     [Fact]
     public async Task APageTheAdapterCannotReadSavesNothing()
     {
         stub.Routes[Page] = _ => (HttpStatusCode.OK, Encoding.UTF8.GetBytes(P3Fixtures.Read("steam/guide-no-sections.html")));
-        Assert.Equal(ProviderErrorKind.MalformedData, (await Assert.ThrowsAsync<ProviderException>(
+        Assert.Equal(ProviderErrorKind.MalformedData, (await Assert.ThrowsAsync<SteamFetchException>(
             () => Fetcher().FetchAsync(harness.Game.Id, "4242", null, CancellationToken.None))).Kind);
         Assert.Empty(store.ListForGame(harness.Game.Id));
     }
@@ -102,7 +103,7 @@ public sealed class SteamGuideFetcherTests : IAsyncLifetime
     public async Task APageOverFourMegabytesIsRefused()
     {
         stub.Routes[Page] = _ => (HttpStatusCode.OK, new byte[4 * 1024 * 1024 + 1]);
-        Assert.Equal(ProviderErrorKind.MalformedData, (await Assert.ThrowsAsync<ProviderException>(
+        Assert.Equal(ProviderErrorKind.MalformedData, (await Assert.ThrowsAsync<SteamFetchException>(
             () => Fetcher().FetchAsync(harness.Game.Id, "4242", null, CancellationToken.None))).Kind);
     }
 
@@ -119,7 +120,7 @@ public sealed class SteamGuideFetcherTests : IAsyncLifetime
             (source.Site, source.ItemId, source.Url, source.Author));
         Assert.Contains(await harness.Repository.GetGuideAssetsAsync(id), asset => asset.Kind == GuideAssetKind.StyleSheet);
         // Review: Steam's image addresses name no type, and an untyped image wasn't imported.
-        Assert.Equal(2, (await harness.Repository.GetGuideAssetsAsync(id)).Count(asset => asset.Kind == GuideAssetKind.Image));
+        Assert.Equal(3, (await harness.Repository.GetGuideAssetsAsync(id)).Count(asset => asset.Kind == GuideAssetKind.Image));
 
         Assert.Equal(new OnlineSaveResult.UpToDate(id), await Saver().SaveAsync(
             await Fetcher().FetchAsync(harness.Game.Id, "4242", null, CancellationToken.None), false, null, CancellationToken.None));
@@ -127,5 +128,33 @@ public sealed class SteamGuideFetcherTests : IAsyncLifetime
             P3Fixtures.Read("steam/guide.html").Replace("Bring a torch.", "Bring two torches.", StringComparison.Ordinal)));
         Assert.Equal(new OnlineSaveResult.Replaced(id), await Saver().SaveAsync(
             await Fetcher().FetchAsync(harness.Game.Id, "4242", null, CancellationToken.None), false, null, CancellationToken.None));
+    }
+
+    // Review: the details are a nicety; their failure mustn't cost the save.
+    [Fact]
+    public async Task FailedDetailsLeaveThePagesDate()
+    {
+        stub.Status(Details, HttpStatusCode.InternalServerError);
+        CaptureDraft draft = await Fetcher().FetchAsync(harness.Game.Id, "4242", null, CancellationToken.None);
+        Assert.Equal(new DateTimeOffset(DateTimeOffset.UtcNow.Year, 3, 3, 16, 5, 0, TimeSpan.Zero),
+            Assert.Single(draft.Captured).Reading.SourceUpdated);
+    }
+
+    [Fact]
+    public async Task WithoutAKeyNoDetailsAreAsked()
+    {
+        await Fetcher(key: null).FetchAsync(harness.Game.Id, "4242", null, CancellationToken.None);
+        Assert.DoesNotContain(stub.Requests, request => request.Uri.AbsolutePath.Contains("GetPublishedFileDetails"));
+    }
+
+    // Review Focus 1: the status names the step.
+    [Fact]
+    public async Task AFailureNamesTheImage()
+    {
+        stub.Status("images.steamusercontent.com/ugc/3/FULLB/", HttpStatusCode.TooManyRequests);
+        SteamFetchException error = await Assert.ThrowsAsync<SteamFetchException>(
+            () => Fetcher().FetchAsync(harness.Game.Id, "4242", null, CancellationToken.None));
+        Assert.Equal("image 2 of 3", error.Step);
+        Assert.Equal(DesktopGuides.Core.Providers.ProviderErrorKind.RateLimited, error.Kind);
     }
 }

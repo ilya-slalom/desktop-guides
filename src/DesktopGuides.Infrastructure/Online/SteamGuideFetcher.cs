@@ -6,6 +6,14 @@ using DesktopGuides.Infrastructure.Providers;
 
 namespace DesktopGuides.Infrastructure.Online;
 
+/// <summary>A fetch that stopped: why, and at which step ("the guide page", "image 3 of 12").</summary>
+public sealed class SteamFetchException(ProviderErrorKind kind, string step, Exception inner)
+    : Exception($"The Steam fetch stopped at {step}.", inner)
+{
+    public ProviderErrorKind Kind { get; } = kind;
+    public string Step { get; } = step;
+}
+
 /// <summary>
 /// S22 PR 4: Steam guides are fetched by the app, not captured through the
 /// browser: the page, its details and its images, one request at a time
@@ -29,18 +37,30 @@ public sealed class SteamGuideFetcher(
         Guid gameId, string fileId, IProgress<(int Done, int Total)>? progress, CancellationToken token)
     {
         Uri url = SteamUrls.Guide(fileId);
-        await PaceAsync(token);
-        ProviderResponse page = await http.SendAsync(HttpMethod.Get, url, SteamClient.Identify, MaxPageBytes, token);
-        if (page.StatusCode != HttpStatusCode.OK)
+        GuidePageReading reading = await StepAsync("the guide page", async () =>
         {
-            throw new ProviderException(ProviderErrorKind.Unavailable, $"Steam answered {(int)page.StatusCode} for the guide.");
+            await PaceAsync(token);
+            ProviderResponse page = await http.SendAsync(HttpMethod.Get, url, SteamClient.Identify, MaxPageBytes, token);
+            if (page.StatusCode != HttpStatusCode.OK)
+            {
+                throw new ProviderException(ProviderErrorKind.Unavailable, $"Steam answered {(int)page.StatusCode} for the guide.");
+            }
+            return adapter.Read(url, Encoding.UTF8.GetString(page.Body))
+                ?? throw new ProviderException(ProviderErrorKind.MalformedData, "This Steam page couldn't be read as a guide.");
+        });
+        // The details only refine the update time; anything but a limit
+        // leaves the page's own date.
+        try
+        {
+            await PaceAsync(token);
+            if (await client.GetDetailsAsync(fileId, token) is { Updated: { } updated }) reading = reading with { SourceUpdated = updated };
         }
-        GuidePageReading reading = adapter.Read(url, Encoding.UTF8.GetString(page.Body))
-            ?? throw new ProviderException(ProviderErrorKind.MalformedData, "This Steam page couldn't be read as a guide.");
-        await PaceAsync(token);
-        if (await client.GetDetailsAsync(fileId, token) is { } details)
+        catch (ProviderException error) when (error.Kind != ProviderErrorKind.RateLimited)
         {
-            reading = reading with { SourceUpdated = details.Updated };
+        }
+        catch (ProviderException error)
+        {
+            throw new SteamFetchException(error.Kind, "the guide's details", error);
         }
 
         CaptureDraft draft = store.Begin(gameId, reading);
@@ -50,8 +70,17 @@ public sealed class SteamGuideFetcher(
             Uri[] images = reading.Images.Take(MaxImages).ToArray();
             for (int index = 0; index < images.Length; index++)
             {
-                await PaceAsync(token);
-                if (await ImageAsync(images[index], token) is { } bytes) files[images[index]] = draft.SaveImage(images[index], bytes);
+                Uri image = images[index];
+                // An image on a host the app doesn't contact is the copy's placeholder, without a wait.
+                if (ProviderHttp.AllowedHosts.Contains(image.IdnHost))
+                {
+                    byte[]? bytes = await StepAsync($"image {index + 1} of {images.Length}", async () =>
+                    {
+                        await PaceAsync(token);
+                        return await ImageAsync(image, token);
+                    });
+                    if (bytes is not null) files[image] = draft.SaveImage(image, bytes);
+                }
                 progress?.Report((index + 1, images.Length));
             }
             draft.Add(reading, files);
@@ -59,8 +88,27 @@ public sealed class SteamGuideFetcher(
         }
         catch
         {
-            draft.Discard();
+            try
+            {
+                draft.Discard();
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                // Swept at a later start; the fetch's own failure is the one to report.
+            }
             throw;
+        }
+    }
+
+    private static async Task<T> StepAsync<T>(string step, Func<Task<T>> action)
+    {
+        try
+        {
+            return await action();
+        }
+        catch (ProviderException error)
+        {
+            throw new SteamFetchException(error.Kind, step, error);
         }
     }
 
@@ -71,13 +119,8 @@ public sealed class SteamGuideFetcher(
         try
         {
             ProviderResponse response = await http.SendAsync(HttpMethod.Get, image, SteamClient.Identify, ProviderHttp.MaxImageBytes, token);
-            return response.StatusCode switch
-            {
-                HttpStatusCode.OK => response.Body,
-                HttpStatusCode.TooManyRequests => throw new ProviderException(
-                    ProviderErrorKind.RateLimited, "Steam is limiting requests. Try again in a few minutes."),
-                _ => null,
-            };
+            // A 429 is thrown by ProviderHttp itself.
+            return response.StatusCode == HttpStatusCode.OK ? response.Body : null;
         }
         catch (ProviderException error) when (error.Kind is ProviderErrorKind.Unavailable or ProviderErrorKind.MalformedData)
         {

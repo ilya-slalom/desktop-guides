@@ -28,7 +28,7 @@ public sealed class SteamClient(ProviderHttp http, Func<CancellationToken, Task<
 
     public static void Identify(HttpRequestMessage request) => request.Headers.TryAddWithoutValidation("User-Agent", UserAgent);
 
-    /// <summary>A page of the app's guides matching the text, newest-ranked as Steam's search orders them.</summary>
+    /// <summary>A page of the app's guides matching the text, ranked by Steam's text search.</summary>
     public async Task<SteamGuidePage> QueryGuidesAsync(string appId, string text, int page, CancellationToken token)
     {
         string apiKey = await RequireKeyAsync(token);
@@ -59,12 +59,17 @@ public sealed class SteamClient(ProviderHttp http, Func<CancellationToken, Task<
             total);
     }
 
-    /// <summary>A guide's details, which need no key; null when Steam has no such visible guide.</summary>
+    /// <summary>
+    /// A guide's details; null when Steam has no such visible guide, or
+    /// when there's no key: Steam answers a guide asked without one as missing.
+    /// </summary>
     public async Task<SteamGuideSummary?> GetDetailsAsync(string fileId, CancellationToken token)
     {
-        using FormUrlEncodedContent form = new([new("itemcount", "1"), new("publishedfileids[0]", fileId)]);
+        if (await key(token) is not { Length: > 0 } apiKey) return null;
         using JsonDocument json = await GetJsonAsync(
-            HttpMethod.Post, new Uri($"{Api}/ISteamRemoteStorage/GetPublishedFileDetails/v1/"), form, token);
+            HttpMethod.Post, new Uri($"{Api}/ISteamRemoteStorage/GetPublishedFileDetails/v1/"),
+            () => new FormUrlEncodedContent([new("key", apiKey), new("itemcount", "1"), new("publishedfileids[0]", fileId)]),
+            token);
         JsonElement response = Property(json.RootElement, "response");
         if (!response.TryGetProperty("publishedfiledetails", out JsonElement files) || files.ValueKind != JsonValueKind.Array ||
             files.GetArrayLength() == 0)
@@ -123,12 +128,14 @@ public sealed class SteamClient(ProviderHttp http, Func<CancellationToken, Task<
         return new SteamGuideSummary(id, Text(file, appProperty) ?? "", title, null, Text(file, summaryProperty) ?? "", preview, updated);
     }
 
-    private async Task<JsonDocument> GetJsonAsync(HttpMethod method, Uri uri, HttpContent? content, CancellationToken token)
+    // The form is made for each attempt: a request disposes its content,
+    // and a retry or a redirect sends a new request.
+    private async Task<JsonDocument> GetJsonAsync(HttpMethod method, Uri uri, Func<HttpContent>? content, CancellationToken token)
     {
         ProviderResponse response = await http.SendAsync(method, uri, request =>
         {
             Identify(request);
-            if (content is not null) request.Content = content;
+            if (content is not null) request.Content = content();
         }, ProviderHttp.MaxJsonBytes, token);
         switch (response.StatusCode)
         {

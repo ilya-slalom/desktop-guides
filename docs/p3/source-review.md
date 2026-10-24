@@ -99,9 +99,11 @@ Store submission milestone (T17.5).
 - **API:**
   - `IPublishedFileService/QueryFiles` searches guides for an app
     (`filetype` 10 = all guides, `search_text`). It needs a Web API key.
-  - `ISteamRemoteStorage/GetPublishedFileDetails` works without a key. It
-    returns the title, author SteamID, app, summary, preview image and
-    update time.
+  - `ISteamRemoteStorage/GetPublishedFileDetails` returns the title, author
+    SteamID, app, summary, preview image and update time. Corrected on
+    24 October 2026: without a key it answers Workshop items, but it
+    answers guides as missing (`result` 9). So it's asked with the key,
+    and a guide pasted without one takes its date from the page.
   - Neither returns the guide's body. That is only in the page HTML.
 - **Defences:** a plain fetch of a guide page got 200, with no challenge.
   Bursts reportedly get HTTP 429.

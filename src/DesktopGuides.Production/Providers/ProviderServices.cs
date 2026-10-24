@@ -60,10 +60,6 @@ internal sealed partial class ProviderServices : IDisposable
     public SteamClient CreateSteam(Func<CancellationToken, Task<string?>> apiKey, ProviderHttp? http = null) =>
         new(http ?? Http, apiKey);
 
-    public SteamClient Steam => steam ??= CreateSteam(async token => (await Credentials.LoadAsync(token)).SteamWebApiKey);
-
-    private SteamClient? steam;
-
     public SteamGridDbArtworkSource CreateSteamGridDb(Func<CancellationToken, Task<string?>> apiKey) =>
         new(Http, apiKey);
 

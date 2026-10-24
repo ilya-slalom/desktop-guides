@@ -8208,6 +8208,9 @@ try {
             Set-Text 'SteamQuery' 'zzz'
             Invoke-Element (Wait-VisibleById 'SteamSearch')
             Wait-OnlineStatus 'No Steam guides match.'
+            # Review Focus 5: the box keeps the search that found nothing.
+            $kept = (Wait-VisibleById 'SteamQuery').GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+            if ($kept -ne 'zzz') { throw "After a search with no results the box held '$kept'." }
             $report.phases += 'online-steam-search'
         }
         elseif ($Mode -eq 'online-browse') {

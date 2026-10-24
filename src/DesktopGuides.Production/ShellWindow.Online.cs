@@ -132,9 +132,17 @@ public sealed partial class ShellWindow
             OnlineBrowserHost.Child = onlineBrowser.View;
         }
         SelectOnlineSource(OnlineSources.Available[0]);
-        ShowSteam(selected: false, results: false);
         OnlineSource.IsEnabled = OnlineAddress.IsEnabled = OnlineGo.IsEnabled = true;
-        onlineBrowser.Navigate(OnlineSources.StartUrl(OnlineSources.Available[0], onlineGameTitle));
+        // A build whose first site is Steam starts at its search.
+        if (SteamSelected)
+        {
+            ShowSteamSearch();
+        }
+        else
+        {
+            ShowSteam(selected: false, results: false);
+            onlineBrowser.Navigate(OnlineSources.StartUrl(OnlineSources.Available[0], onlineGameTitle));
+        }
         if (Captures.ListForGame(gameId).FirstOrDefault() is { } waiting)
         {
             ShowWaitingDraft(waiting);
@@ -306,7 +314,8 @@ public sealed partial class ShellWindow
         // S22 PR 4: the app fetches a Steam guide itself.
         if (reading.Match.Site == SourceSite.Steam)
         {
-            await SaveSteamGuideAsync(reading.Match.ItemId);
+            // Closing Find online waits for it, as for a capture.
+            await (onlineCaptureRun = SaveSteamGuideAsync(reading.Match.ItemId));
             return;
         }
         CaptureDraft draft = Captures.Find(onlineGameId, reading.Match.Site, reading.Match.ItemId)

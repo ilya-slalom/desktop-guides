@@ -35,6 +35,9 @@ public sealed record GuidePageReading(
 {
     /// <summary>The pages this page links to that are saved with the guide, one level deep; usually none.</summary>
     public IReadOnlyList<GuidePageLink> Linked { get; init; } = [];
+
+    /// <summary>The author's profile, where the site gives one, for the copy's attribution.</summary>
+    public Uri? AuthorUrl { get; init; }
 }
 
 public interface IGuideSourceAdapter
