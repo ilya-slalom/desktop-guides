@@ -2032,6 +2032,7 @@ function Run-OnlineScenarios([string] $fixtureRoot) {
     Invoke-OnlineMode 'online-steam-search' $fixtures
     $steam = @((Invoke-ShellSeed @('describe-online', $dataRoot, $cacheRoot) | ConvertFrom-Json).Guides |
         Where-Object { $_.Site -eq 'Steam' })
+    # The fixture's third image has no route, so it's the copy's placeholder.
     if ($steam.Count -ne 1 -or $steam[0].ItemId -ne '4242' -or $steam[0].Images -ne 2 -or $steam[0].StyleSheets -ne 1) {
         throw "Expected one saved Steam guide with its two images and stylesheet; got $($steam | ConvertTo-Json -Depth 4 -Compress)."
     }

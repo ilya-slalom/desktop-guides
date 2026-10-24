@@ -8148,7 +8148,7 @@ try {
             Go-Online $steamGuide
             Wait-Save $true 'the Steam guide'
             Save-Online
-            Wait-OnlineStatus 'Steam is limiting requests. Try again in a few minutes. Nothing was saved.' 60
+            Wait-OnlineStatus 'Steam is limiting requests. Try again in a few minutes. The save stopped at image 2 of 3. Nothing was saved.' 60
             $report.phases += 'online-steam-limit'
         }
         # Without a key, search says where to add one; a pasted guide still saves.
