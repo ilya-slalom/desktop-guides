@@ -30,6 +30,13 @@
                              AutomationProperties.AutomationId="SteamGridDbKeyInput"
                              AutomationProperties.Name="SteamGridDB API key" />
             </toolkit:SettingsCard>
+            <toolkit:SettingsCard Header="Steam Web API key"
+                                  Description="Optional. Used to search Steam Community guides in Find online.">
+                <PasswordBox x:Name="SteamWebApiKeyInput"
+                             MinWidth="{StaticResource DesktopGuidesCredentialInputMinWidth}" MaxLength="128"
+                             AutomationProperties.AutomationId="SteamWebApiKeyInput"
+                             AutomationProperties.Name="Steam Web API key" />
+            </toolkit:SettingsCard>
             <toolkit:SettingsCard ContentAlignment="Left">
                 <StackPanel Spacing="{StaticResource DesktopGuidesSpacing8}">
                     <InfoBar x:Name="ProviderSettingsStatus"
@@ -65,6 +72,9 @@
                         <HyperlinkButton Content="SteamGridDB terms"
                                          NavigateUri="https://www.steamgriddb.com/terms"
                                          AutomationProperties.AutomationId="SteamGridDbTermsLink" />
+                        <HyperlinkButton Content="Steam Web API terms"
+                                         NavigateUri="https://steamcommunity.com/dev/apiterms"
+                                         AutomationProperties.AutomationId="SteamApiTermsLink" />
                     </StackPanel>
                 </StackPanel>
             </toolkit:SettingsCard>

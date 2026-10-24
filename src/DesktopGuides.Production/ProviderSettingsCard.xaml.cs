@@ -82,7 +82,7 @@ public sealed partial class ProviderSettingsCard : UserControl
     private void TestClicked(object sender, RoutedEventArgs args) => _ = RunAsync(async token =>
     {
         ProviderCredentials test = Pending();
-        if (test.Igdb is null && test.SteamGridDbKey is null)
+        if (test.Igdb is null && test.SteamGridDbKey is null && test.SteamWebApiKey is null)
         {
             Show(InfoBarSeverity.Informational, "Enter credentials to test them.");
             return;
@@ -115,6 +115,19 @@ public sealed partial class ProviderSettingsCard : UserControl
                 results.Add(ProviderMessages.ForSteamGridDb(error.Kind));
             }
         }
+        if (test.SteamWebApiKey is { } steamKey)
+        {
+            try
+            {
+                await services!.CreateSteam(_ => Task.FromResult<string?>(steamKey)).TestKeyAsync(token);
+                results.Add("Steam connected.");
+            }
+            catch (ProviderException error)
+            {
+                failed = true;
+                results.Add(ProviderMessages.ForSteam(error.Kind));
+            }
+        }
         Show(failed ? InfoBarSeverity.Error : InfoBarSeverity.Success, string.Join(" ", results));
     });
 
@@ -122,7 +135,8 @@ public sealed partial class ProviderSettingsCard : UserControl
     private ProviderCredentials Pending() => ProviderCredentialBlob.Normalize(
         Entered(IgdbClientIdInput) ?? saved.Igdb?.ClientId,
         Entered(IgdbClientSecretInput) ?? saved.Igdb?.ClientSecret,
-        Entered(SteamGridDbKeyInput) ?? saved.SteamGridDbKey);
+        Entered(SteamGridDbKeyInput) ?? saved.SteamGridDbKey,
+        Entered(SteamWebApiKeyInput) ?? saved.SteamWebApiKey);
 
     private static string? Entered(PasswordBox box) =>
         string.IsNullOrWhiteSpace(box.Password) ? null : box.Password;
@@ -158,10 +172,12 @@ public sealed partial class ProviderSettingsCard : UserControl
 
     private void ShowSaved()
     {
-        IgdbClientIdInput.Password = IgdbClientSecretInput.Password = SteamGridDbKeyInput.Password = string.Empty;
+        IgdbClientIdInput.Password = IgdbClientSecretInput.Password = SteamGridDbKeyInput.Password =
+            SteamWebApiKeyInput.Password = string.Empty;
         IgdbClientIdInput.PlaceholderText = saved.Igdb is null ? "Not set" : "Saved";
         IgdbClientSecretInput.PlaceholderText = saved.Igdb is null ? "Not set" : "Saved";
         SteamGridDbKeyInput.PlaceholderText = saved.SteamGridDbKey is null ? "Not set" : "Saved";
+        SteamWebApiKeyInput.PlaceholderText = saved.SteamWebApiKey is null ? "Not set" : "Saved";
         string description = saved.Igdb is null
             ? "Add your IGDB credentials to search for games."
             : "IGDB credentials saved.";

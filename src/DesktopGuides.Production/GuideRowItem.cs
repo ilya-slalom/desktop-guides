@@ -9,11 +9,12 @@ public sealed partial class GuideRowItem : CatalogRowItem
 {
     internal GuideRowItem(
         GuideSummary summary, TimeProvider clock, CultureInfo culture,
-        GuideFileStatus fileStatus = GuideFileStatus.Ok, bool colorful = false, bool highContrast = false)
+        GuideFileStatus fileStatus = GuideFileStatus.Ok, bool colorful = false, bool highContrast = false,
+        GuideSource? source = null)
         : base(
             summary.Guide.Title,
             AppIconCatalog.ForGuide(summary.Guide.Format, fileStatus != GuideFileStatus.Ok, colorful, highContrast),
-            CatalogPresentation.GuideFacts(summary, clock, culture, fileStatus))
+            CatalogPresentation.GuideFacts(summary, clock, culture, fileStatus, source))
     {
         Guide = summary.Guide;
         CompletedUtc = summary.State?.CompletedUtc;

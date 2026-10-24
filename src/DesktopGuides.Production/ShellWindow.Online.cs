@@ -23,6 +23,7 @@ public sealed partial class ShellWindow
         {
             [SourceSite.GameFaqs] = new GameFaqsAdapter(),
             [SourceSite.Neoseeker] = new NeoseekerAdapter(),
+            [SourceSite.Steam] = new SteamGuideAdapter(),
         };
 
     private OnlineBrowser? onlineBrowser;
@@ -129,6 +130,7 @@ public sealed partial class ShellWindow
             OnlineBrowserHost.Child = onlineBrowser.View;
         }
         SelectOnlineSource(OnlineSources.Available[0]);
+        ShowSteam(selected: false, results: false);
         onlineBrowser.Navigate(OnlineSources.StartUrl(OnlineSources.Available[0], onlineGameTitle));
         if (Captures.ListForGame(gameId).FirstOrDefault() is { } waiting)
         {
@@ -173,6 +175,7 @@ public sealed partial class ShellWindow
             onlineBrowser = null;
         }
         onlineReading = null;
+        CloseSteam();
         OnlinePanel.Visibility = Visibility.Collapsed;
     }
 
@@ -186,6 +189,13 @@ public sealed partial class ShellWindow
     private void OnlineSourceChanged(object sender, SelectionChangedEventArgs args)
     {
         if (onlineSourceSuppressed || onlineBrowser is null || OnlineSource.SelectedIndex < 0) return;
+        // S22 PR 4: Steam starts at its search, not a page.
+        if (SteamSelected)
+        {
+            ShowSteamSearch();
+            return;
+        }
+        ShowSteam(selected: false, results: false);
         onlineBrowser.Navigate(OnlineSources.StartUrl(OnlineSources.Available[OnlineSource.SelectedIndex], onlineGameTitle));
     }
 
@@ -204,12 +214,18 @@ public sealed partial class ShellWindow
         string text = OnlineAddress.Text.Trim();
         if (!Uri.TryCreate(text, UriKind.Absolute, out Uri? url) || OnlineSources.Find(url) is not { } source)
         {
-            OnlineStatus.Text = "Desktop Guides can save guides from " +
-                string.Join(" and ", OnlineSources.Available.Select(available => available.Name)) +
-                ". Open other sites in your browser.";
+            string[] names = OnlineSources.Available.Select(available => available.Name).ToArray();
+            string sites = names.Length < 2 ? string.Concat(names) : string.Join(", ", names[..^1]) + " and " + names[^1];
+            OnlineStatus.Text = $"Desktop Guides can save guides from {sites}. Open other sites in your browser.";
             return;
         }
         SelectOnlineSource(source);
+        if (source.Site == SourceSite.Steam)
+        {
+            OpenSteamGuide(url);
+            return;
+        }
+        ShowSteam(selected: false, results: false);
         onlineBrowser.Navigate(url);
     }
 
@@ -223,6 +239,12 @@ public sealed partial class ShellWindow
         }
         if (OnlineSources.Find(url) is { } source) SelectOnlineSource(source);
         if (onlineCapture is not null) return;
+        // Steam's results are showing; the hidden browser's page isn't the reader's.
+        if (SteamResults.Visibility == Visibility.Visible)
+        {
+            OnlineSave.IsEnabled = false;
+            return;
+        }
         GuidePageReading? reading = await ReadCurrentPageAsync();
         onlineReading = reading;
         OnlineSave.IsEnabled = reading is not null;
@@ -275,6 +297,12 @@ public sealed partial class ShellWindow
         }
         if (NoticeRules.Classify(reading.Notice) == NoticeKind.Restrictive && !await ConfirmNoticeAsync(reading.Notice!))
         {
+            return;
+        }
+        // S22 PR 4: the app fetches a Steam guide itself.
+        if (reading.Match.Site == SourceSite.Steam)
+        {
+            await SaveSteamGuideAsync(reading.Match.ItemId);
             return;
         }
         CaptureDraft draft = Captures.Find(onlineGameId, reading.Match.Site, reading.Match.ItemId)
@@ -384,6 +412,9 @@ public sealed partial class ShellWindow
         OnlineSource.IsEnabled = enabled;
         OnlineAddress.IsEnabled = enabled;
         OnlineGo.IsEnabled = enabled;
+        SteamQuery.IsEnabled = enabled;
+        SteamSearch.IsEnabled = enabled;
+        SteamResults.IsEnabled = enabled;
         OnlineBrowserHost.IsHitTestVisible = enabled;
     }
 
