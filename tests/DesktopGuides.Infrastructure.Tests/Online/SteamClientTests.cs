@@ -131,4 +131,46 @@ public sealed class SteamClientTests
         Assert.NotNull(await Client().GetDetailsAsync("4242", CancellationToken.None));
         Assert.All(stub.Requests, request => Assert.Contains("publishedfileids", request.Body));
     }
+
+    private const string AppList = "api.steampowered.com/IStoreService/GetAppList/v1/";
+
+    [Fact]
+    public async Task TheGameListPagesThroughWithTheKey()
+    {
+        stub.Routes[AppList] = request => (HttpStatusCode.OK, System.Text.Encoding.UTF8.GetBytes(P3Fixtures.Read(
+            HttpUtility.ParseQueryString(request.RequestUri!.Query)["last_appid"] == "1002" ? "steam/applist-2.json" : "steam/applist-1.json")));
+
+        IReadOnlyList<(string AppId, string Name)> apps = await Client().GetAppListAsync(null, CancellationToken.None);
+
+        Assert.Equal(["620", "1001", "1002", "1003", "2525"], apps.Select(app => app.AppId));
+        var first = HttpUtility.ParseQueryString(stub.Requests[0].Uri.Query);
+        Assert.Equal((Key, "true", "false", "false", "false", "false", "10000", "0"),
+            (first["key"], first["include_games"], first["include_dlc"], first["include_software"], first["include_videos"],
+             first["include_hardware"], first["max_results"], first["last_appid"]));
+        // Review: a page must arrive within one request's timeout, so pages are small.
+        Assert.Equal("10000", first["max_results"]);
+        Assert.Equal("1002", HttpUtility.ParseQueryString(stub.Requests[1].Uri.Query)["last_appid"]);
+    }
+
+    [Fact]
+    public async Task ALimitPartWayThroughTheListStopsIt()
+    {
+        stub.Routes[AppList] = request => HttpUtility.ParseQueryString(request.RequestUri!.Query)["last_appid"] == "1002"
+            ? (HttpStatusCode.TooManyRequests, [])
+            : (HttpStatusCode.OK, System.Text.Encoding.UTF8.GetBytes(P3Fixtures.Read("steam/applist-1.json")));
+        Assert.Equal(ProviderErrorKind.RateLimited, (await Assert.ThrowsAsync<ProviderException>(
+            () => Client().GetAppListAsync(null, CancellationToken.None))).Kind);
+    }
+
+    // Review: a list cut off by the page cap isn't kept as if whole.
+    [Fact]
+    public async Task AListLongerThanThePageCapIsRefused()
+    {
+        int page = 0;
+        stub.Routes[AppList] = _ => (HttpStatusCode.OK, System.Text.Encoding.UTF8.GetBytes(
+            $"{{\"response\":{{\"apps\":[{{\"appid\":{++page},\"name\":\"G{page}\"}}],\"have_more_results\":true,\"last_appid\":{page}}}}}"));
+        SteamClient client = new(new ProviderHttp(stub), _ => Task.FromResult<string?>(Key), (_, _) => Task.CompletedTask);
+        Assert.Equal(ProviderErrorKind.MalformedData, (await Assert.ThrowsAsync<ProviderException>(
+            () => client.GetAppListAsync(null, CancellationToken.None))).Kind);
+    }
 }

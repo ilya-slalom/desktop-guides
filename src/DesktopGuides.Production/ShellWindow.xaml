@@ -892,25 +892,72 @@
                                 </StackPanel>
                             </InfoBar.Content>
                         </InfoBar>
+                        <StackPanel x:Name="SteamGameRow"
+                                    Orientation="Horizontal"
+                                    Spacing="{StaticResource DesktopGuidesSpacing8}"
+                                    Visibility="Collapsed">
+                            <TextBlock x:Name="SteamGame"
+                                       VerticalAlignment="Center"
+                                       Style="{StaticResource DesktopGuidesSecondaryBodyStyle}"
+                                       AutomationProperties.AutomationId="SteamGame" />
+                            <HyperlinkButton x:Name="SteamChangeGame"
+                                             Content="Change"
+                                             Click="SteamChangeGameClicked"
+                                             AutomationProperties.Name="Change the Steam game"
+                                             AutomationProperties.AutomationId="SteamChangeGame" />
+                        </StackPanel>
+                        <!-- PR 4b: which Steam game this is, chosen by name from Steam's list. -->
                         <InfoBar x:Name="SteamAppInfo"
                                  Severity="Informational"
                                  IsClosable="False"
                                  Title="Which game is this on Steam?"
-                                 Message="Paste the game's Steam store or guides page address."
+                                 Message="Choose it from Steam's games."
                                  AutomationProperties.AutomationId="SteamAppInfo">
                             <InfoBar.Content>
-                                <Grid ColumnSpacing="{StaticResource DesktopGuidesSpacing8}" Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="SteamAppUrl"
-                                             PlaceholderText="https://store.steampowered.com/app/…"
-                                             AutomationProperties.Name="Steam store or guides page address"
-                                             AutomationProperties.AutomationId="SteamAppUrl" />
-                                    <Button Grid.Column="1" Content="Use this game" Click="SteamUseAppClicked"
-                                            AutomationProperties.AutomationId="SteamUseApp" />
-                                </Grid>
+                                <StackPanel Spacing="{StaticResource DesktopGuidesSpacing8}" Margin="0,0,0,12">
+                                    <Grid ColumnSpacing="{StaticResource DesktopGuidesSpacing8}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="SteamAppQuery"
+                                                 KeyDown="SteamAppQueryKeyDown"
+                                                 AutomationProperties.Name="Game name on Steam"
+                                                 AutomationProperties.AutomationId="SteamAppQuery" />
+                                        <Button Grid.Column="1" Content="Find" Click="SteamAppFindClicked"
+                                                AutomationProperties.AutomationId="SteamAppFind" />
+                                        <HyperlinkButton Grid.Column="2" Content="Refresh list" Click="SteamAppRefreshClicked"
+                                                         AutomationProperties.AutomationId="SteamAppRefresh" />
+                                    </Grid>
+                                    <ListView x:Name="SteamAppResults"
+                                              MaxHeight="240"
+                                              SelectionMode="Single"
+                                              IsItemClickEnabled="True"
+                                              ItemClick="SteamAppChosen"
+                                              AutomationProperties.Name="Steam games"
+                                              AutomationProperties.AutomationId="SteamAppResults">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="local:SteamAppItem">
+                                                <TextBlock Text="{x:Bind Name}" Padding="0,4" />
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                    <TextBlock Text="Or paste the game's Steam store or guides page address:"
+                                               Style="{StaticResource DesktopGuidesSecondaryBodyStyle}" />
+                                    <Grid ColumnSpacing="{StaticResource DesktopGuidesSpacing8}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="SteamAppUrl"
+                                                 PlaceholderText="https://store.steampowered.com/app/…"
+                                                 AutomationProperties.Name="Steam store or guides page address"
+                                                 AutomationProperties.AutomationId="SteamAppUrl" />
+                                        <Button Grid.Column="1" Content="Use this game" Click="SteamUseAppClicked"
+                                                AutomationProperties.AutomationId="SteamUseApp" />
+                                    </Grid>
+                                </StackPanel>
                             </InfoBar.Content>
                         </InfoBar>
                     </StackPanel>

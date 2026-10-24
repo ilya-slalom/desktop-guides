@@ -136,8 +136,13 @@ its own screen. Closing it returns to the game page. It has:
 Steam search needs the game's Steam app ID (design call):
 - IGDB already returns it for artwork. It's now stored on the game, and
   existing games get it on their next metadata refresh.
-- A game without one asks once for its Steam store or guides URL, and
-  keeps the ID it contains.
+- A game without one is matched by name against Steam's game list
+  (changed on 24 October 2026, after the user's live check; it first asked
+  for a store URL):
+  - **The list:** `IStoreService/GetAppList` with the key, games only. It's kept for 30 days in the cache folder.
+  - **Matching:** one exact match, ignoring case, ™ ® © and punctuation, is used without asking. Otherwise a picker lists the matches, and the reader chooses.
+  - **Correcting it:** "Steam game: {name} · Change" lets the reader correct any match, including IGDB's.
+  - **Fallback:** a store or guides URL can still be pasted, for a game the list doesn't have.
 
 Steam search results list title, author, summary, preview image and
 update time. Choosing one shows the guide in the in-app browser, with
@@ -515,5 +520,8 @@ with its live-check fixes in [#149](https://github.com/ilya-slalom/desktop-guide
   - `GetPublishedFileDetails` answers guides as missing without a key. It's now asked with the key, and is optional. The source review and section 5.6 were corrected.
 
   Two Minor findings are deferred: a duplicate draft after a failed library save, and installed coverage of the Valve line, which is unit-tested.
-- **Live check:** to come, by the user, with a real key and real guides.
+- **Live check (the user, on pcsx2-win, 24 October 2026):**
+  - A game with one clear Steam match (Final Fantasy VII Rebirth) searched, saved and read as expected.
+  - Games IGDB gave no single Steam app asked for a store URL, so the user asked to pick from Steam's matches instead. That's the game picker of [#152](https://github.com/ilya-slalom/desktop-guides/pull/152) ([plan](p3/s22-steam-game-picker-plan.md)).
+  - With the picker's build, the user found Steam guide search and import "now works as expected".
 
