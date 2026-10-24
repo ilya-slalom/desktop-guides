@@ -1871,6 +1871,15 @@ function Run-NavigationScenarios {
     if ($null -eq (& $estimateOf 'Outline PDF Guide')) {
         throw 'Following a PDF outline entry stored no place.'
     }
+    # T18.3: the pane reopens as it was left, and opens on its own for a
+    # guide of several HTML pages until the reader chooses.
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.contentsRememberOpen = Invoke-ProgressPass 'contents-remember-open' 0
+    $report.contentsRememberReopen = Invoke-ProgressPass 'contents-remember-reopen' 0 -ContentsPane keep
+    $report.contentsRememberClosed = Invoke-ProgressPass 'contents-remember-closed' 0 -ContentsPane keep
+    Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
+    $report.contentsAuto = Invoke-ProgressPass 'contents-auto' 0 -HtmlPosition -ContentsPane unset
+    $report.contentsAutoNarrow = Invoke-ProgressPass 'contents-auto-narrow' 0 -HtmlPosition -ContentsPane unset
 
     # T19.1: bookmarks.
     Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
@@ -2070,7 +2079,10 @@ function Run-MapReaderScenario([string] $fixtureRoot) {
 }
 
 function Invoke-ProgressPass([string] $mode, [int] $expectedTopLine, [switch] $Kill, [string] $resultName = $mode,
-    [switch] $HtmlPosition, [switch] $HtmlDiagnostics) {
+    [switch] $HtmlPosition, [switch] $HtmlDiagnostics, [ValidateSet('false', 'true', 'unset', 'keep')] [string] $ContentsPane = 'false') {
+    # T18.3: the pane's state lasts across launches; each pass starts with it
+    # closed, as every launch did before, unless the pass tests that state.
+    if ($ContentsPane -ne 'keep') { Invoke-ShellSeed @('set-contents-pane', $dataRoot, $ContentsPane) | Out-Null }
     Start-InstalledShell
     $processId = $report.launchedProcessId
     $names = @('ProgressDiagnostics', 'ProgressOverride')

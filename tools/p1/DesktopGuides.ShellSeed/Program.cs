@@ -113,6 +113,21 @@ if (args.Length == 3 && args[0] == "set-colorful-icons")
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "set-contents-pane")
+{
+    // T18.3: "unset" is a reader who hasn't chosen yet.
+    if (args[2] is not ("true" or "false" or "unset"))
+    {
+        Console.Error.WriteLine("The pane state must be true, false or unset.");
+        return 2;
+    }
+    bool? pane = args[2] == "unset" ? null : args[2] == "true";
+    await using SqliteLibraryRepository paneRepository = new(new ManagedPathResolver(args[1]));
+    await paneRepository.InitializeAsync();
+    await paneRepository.UpdateSettingsAsync(settings => settings with { ContentsPaneOpen = pane });
+    return 0;
+}
+
 if (args.Length == 2 && args[0] == "describe-theme")
 {
     await using SqliteLibraryRepository themeRepository =

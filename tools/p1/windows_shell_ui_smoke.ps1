@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark', 'maps-reader', 'maps-popup', 'maps-keyboard', 'online-browse', 'online-save', 'online-resave', 'online-pause', 'online-resume',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'contents-remember-open', 'contents-remember-reopen', 'contents-remember-closed', 'contents-auto', 'contents-auto-narrow', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark', 'maps-reader', 'maps-popup', 'maps-keyboard', 'online-browse', 'online-save', 'online-resave', 'online-pause', 'online-resume',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -4422,6 +4422,10 @@ try {
                 if (-not $tree) { return @() }
                 return @($tree.FindAll([System.Windows.Automation.TreeScope]::Descendants, $treeItem))
             }
+            function Test-ContentsShown {
+                $tree = Find-ById 'ReaderContentsTree'
+                return [bool]($tree -and -not $tree.Current.IsOffscreen)
+            }
             function Wait-ContentsSelected([string] $name) {
                 $deadline = (Get-Date).AddSeconds(10)
                 $seen = 'nothing'
@@ -4996,6 +5000,62 @@ try {
                 Wait-HiddenById 'ReaderContentsTree'
                 Assert-FocusInGuide 'closing the pane'
                 $report.phases += 'contents-txt'
+            }
+            # T18.3: the pane is as the reader left it, across restarts. The
+            # install script runs these three as separate launches.
+            elseif ($Mode -eq 'contents-remember-open') {
+                Open-TextGuide 'Sections Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Wait-HiddenById 'ReaderContentsTree'
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                # The choice saves in the background.
+                Start-Sleep -Seconds 2
+                $report.phases += 'contents-remember-open'
+            }
+            elseif ($Mode -eq 'contents-remember-reopen') {
+                Open-TextGuide 'Sections Guide'
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                Wait-StatusClosed
+                [System.Windows.Forms.SendKeys]::SendWait('^+c')
+                Wait-HiddenById 'ReaderContentsTree'
+                Start-Sleep -Seconds 2
+                $report.phases += 'contents-remember-reopen'
+            }
+            elseif ($Mode -eq 'contents-remember-closed') {
+                Open-TextGuide 'Sections Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Start-Sleep -Seconds 3
+                if (Test-ContentsShown) { throw 'The pane opened although it was closed last time.' }
+                $report.phases += 'contents-remember-closed'
+            }
+            # T18.3: before the reader has chosen, a guide of several HTML
+            # pages opens with the pane; any other guide doesn't.
+            elseif ($Mode -eq 'contents-auto') {
+                Open-TextGuide 'Pages Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                [void](Wait-VisibleById 'ReaderContentsTree')
+                $report.contentsAutoScreenshot = Save-WindowScreenshot 'contents-auto'
+                Back-ToTextGame
+                Open-TextGuide 'Sections Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Start-Sleep -Seconds 3
+                if (Test-ContentsShown) { throw 'A text guide opened the pane on its own.' }
+                $report.phases += 'contents-auto'
+            }
+            # Narrow, the pane would cover the guide, so it waits.
+            elseif ($Mode -eq 'contents-auto-narrow') {
+                Resize-ShellWindow 700 720
+                Open-TextGuide 'Pages Web Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Start-Sleep -Seconds 3
+                if (Test-ContentsShown) { throw 'The pane covered the guide in a narrow window.' }
+                $report.phases += 'contents-auto-narrow'
             }
             elseif ($Mode -eq 'contents-none') {
                 Open-TextGuide 'Numbered Lines Guide'
