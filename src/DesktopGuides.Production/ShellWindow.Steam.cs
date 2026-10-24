@@ -7,6 +7,7 @@ using DesktopGuides.Infrastructure.Online;
 using DesktopGuides.Infrastructure.Providers;
 using DesktopGuides.Infrastructure.Storage;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -50,6 +51,16 @@ public sealed partial class SteamResultItem(SteamGuideSummary guide) : INotifyPr
     public event PropertyChangedEventHandler? PropertyChanged;
 }
 
+/// <summary>One of Steam's games in the picker.</summary>
+public sealed partial class SteamAppItem(SteamApp app)
+{
+    public SteamApp App { get; } = app;
+    public string Name => App.Name;
+
+    // A list row's accessible name falls back to its item's text.
+    public override string ToString() => Name;
+}
+
 // S22 PR 4: Steam Community guides. The reader searches the game's guides
 // with their own Web API key, or pastes a guide's address, which needs
 // none; a chosen guide shows in the in-app browser, and Save fetches it
@@ -57,6 +68,10 @@ public sealed partial class SteamResultItem(SteamGuideSummary guide) : INotifyPr
 public sealed partial class ShellWindow
 {
     private ProviderHttp? steamFixtureHttp;
+    private SteamAppIndex? steamApps;
+
+    private SteamAppIndex SteamApps => steamApps ??=
+        new SteamAppIndex(Path.Combine(cacheRoot!, "steam-apps.json"), TimeProvider.System);
     private CancellationTokenSource? steamSearch;
 
     private bool SteamSelected =>
@@ -91,6 +106,7 @@ public sealed partial class ShellWindow
             steamSearch?.Cancel();
             SteamKeyInfo.IsOpen = false;
             SteamAppInfo.IsOpen = false;
+            SteamGameRow.Visibility = Visibility.Collapsed;
         }
     }
 
@@ -133,14 +149,26 @@ public sealed partial class ShellWindow
                 return;
             }
             string? appId = await library.GetSteamAppIdAsync(onlineGameId, search.Token);
-            SteamAppInfo.IsOpen = appId is null;
+            // PR 4b: a game with no Steam app yet is matched by name: one
+            // exact match is used, anything else is the reader's to choose.
             if (appId is null)
             {
-                SteamResults.ItemsSource = null;
-                OnlineStatus.Text = "";
-                SteamAppUrl.Focus(FocusState.Programmatic);
-                return;
+                await LoadSteamAppsAsync(refresh: false, search.Token);
+                if (!ReferenceEquals(search, steamSearch)) return;
+                if (SteamApps.ExactSingle(onlineGameTitle) is { } only)
+                {
+                    await library.SetSteamAppIdAsync(onlineGameId, only.AppId, search.Token);
+                    appId = only.AppId;
+                }
+                else
+                {
+                    SteamResults.ItemsSource = null;
+                    ShowSteamPicker(onlineGameTitle);
+                    return;
+                }
             }
+            SteamAppInfo.IsOpen = false;
+            ShowSteamGame(appId);
             OnlineStatus.Text = "Searching Steam…";
             SteamGuidePage page = await SteamApi().QueryGuidesAsync(appId, text, 1, search.Token);
             if (!ReferenceEquals(search, steamSearch)) return;
@@ -195,6 +223,97 @@ public sealed partial class ShellWindow
                 // An image WinUI can't decode, or one Steam didn't send.
             }
         }
+    }
+
+    private async Task LoadSteamAppsAsync(bool refresh, CancellationToken token)
+    {
+        if (!refresh && (SteamApps.IsLoaded || SteamApps.LoadCached())) return;
+        OnlineStatus.Text = "Loading Steam's game list…";
+        await SteamApps.LoadAsync(
+            fetchToken => SteamApi().GetAppListAsync(
+                new Progress<int>(page => OnlineStatus.Text = $"Loading Steam's game list… (part {page})"), fetchToken),
+            refresh, token);
+        OnlineStatus.Text = "";
+    }
+
+    private void ShowSteamGame(string appId)
+    {
+        if (!SteamApps.IsLoaded) SteamApps.LoadCached();
+        string name = SteamApps.NameOf(appId) ?? $"app {appId}";
+        SteamGame.Text = $"Steam game: {name}";
+        AutomationProperties.SetName(SteamGame, SteamGame.Text);
+        SteamGameRow.Visibility = Visibility.Visible;
+    }
+
+    private void ShowSteamPicker(string query)
+    {
+        SteamAppInfo.IsOpen = true;
+        SteamAppQuery.Text = query;
+        ShowSteamAppMatches();
+        SteamAppQuery.Focus(FocusState.Programmatic);
+    }
+
+    private void ShowSteamAppMatches()
+    {
+        List<SteamAppItem> matches = SteamApps.Match(SteamAppQuery.Text).Select(app => new SteamAppItem(app)).ToList();
+        SteamAppResults.ItemsSource = matches;
+        OnlineStatus.Text = matches.Count == 0
+            ? "No Steam games match. Try another name, or paste the game's store page."
+            : "Choose the game on Steam.";
+        AnnounceStatus(OnlineStatus.Text);
+    }
+
+    private void SteamAppQueryKeyDown(object sender, KeyRoutedEventArgs args)
+    {
+        if (args.Key != VirtualKey.Enter) return;
+        args.Handled = true;
+        _ = FindSteamAppsAsync(refresh: false);
+    }
+
+    private void SteamAppFindClicked(object sender, RoutedEventArgs args) => _ = FindSteamAppsAsync(refresh: false);
+
+    private void SteamAppRefreshClicked(object sender, RoutedEventArgs args) => _ = FindSteamAppsAsync(refresh: true);
+
+    private async Task FindSteamAppsAsync(bool refresh)
+    {
+        try
+        {
+            await LoadSteamAppsAsync(refresh, CancellationToken.None);
+            ShowSteamAppMatches();
+        }
+        catch (ProviderException error)
+        {
+            OnlineStatus.Text = $"{ProviderMessages.ForSteam(error.Kind)} Steam's game list couldn't be loaded.";
+        }
+    }
+
+    private async void SteamAppChosen(object sender, ItemClickEventArgs args)
+    {
+        if (args.ClickedItem is not SteamAppItem item || repository is not SqliteLibraryRepository library) return;
+        try
+        {
+            await library.SetSteamAppIdAsync(onlineGameId, item.App.AppId);
+        }
+        catch (Exception)
+        {
+            OnlineStatus.Text = "Couldn't remember the game's Steam app. Try again.";
+            return;
+        }
+        SteamAppInfo.IsOpen = false;
+        await SearchSteamAsync();
+    }
+
+    private async void SteamChangeGameClicked(object sender, RoutedEventArgs args)
+    {
+        try
+        {
+            await LoadSteamAppsAsync(refresh: false, CancellationToken.None);
+        }
+        catch (ProviderException error)
+        {
+            OnlineStatus.Text = $"{ProviderMessages.ForSteam(error.Kind)} Steam's game list couldn't be loaded.";
+        }
+        ShowSteamPicker(onlineGameTitle);
     }
 
     private async void SteamUseAppClicked(object sender, RoutedEventArgs args)

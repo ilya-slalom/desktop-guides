@@ -33,6 +33,14 @@ public sealed class SteamAppIndex(string cacheFile, TimeProvider clock)
         Write(fetched);
     }
 
+    /// <summary>Reads a list under 30 days old, if one is kept; never fetches.</summary>
+    public bool LoadCached()
+    {
+        if (Read() is not { } cached) return false;
+        apps = cached;
+        return true;
+    }
+
     public IReadOnlyList<SteamApp> Match(string query, int max = 20)
     {
         string key = Normalize(query);

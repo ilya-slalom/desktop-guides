@@ -115,4 +115,17 @@ public sealed class SteamAppIndexTests : IDisposable
         Assert.Equal(1, fetches);
         Assert.Equal("620", (await LoadedAsync()).ExactSingle("Portal 2")?.AppId);
     }
+
+    // A game whose app came from IGDB names it from a list already kept, never fetching one.
+    [Fact]
+    public async Task ACachedListLoadsWithoutFetching()
+    {
+        SteamAppIndex empty = new(File, clock);
+        Assert.False(empty.LoadCached());
+        await LoadedAsync();
+        SteamAppIndex cached = new(File, clock);
+        Assert.True(cached.LoadCached());
+        Assert.Equal("Portal 2", cached.NameOf("620"));
+        Assert.Equal(1, fetches);
+    }
 }
