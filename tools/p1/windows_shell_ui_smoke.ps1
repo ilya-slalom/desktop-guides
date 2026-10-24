@@ -8136,6 +8136,25 @@ try {
             Select-ComboItem 'OnlineSource' 'Steam'
             [void](Wait-VisibleById 'SteamQuery')
         }
+        # Waits for the picker's rows, checks their names and order, and chooses one by keyboard.
+        function Choose-SteamApp([string[]] $expected, [string] $choice) {
+            $appRow = [System.Windows.Automation.PropertyCondition]::new(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::ListItem)
+            $script:pickerRows = @()
+            Wait-Until {
+                $list = Find-ById 'SteamAppResults'
+                $script:pickerRows = if ($list) { @($list.FindAll([System.Windows.Automation.TreeScope]::Descendants, $appRow)) } else { @() }
+                $script:pickerRows.Count -ge $expected.Count
+            } "the picker's $($expected.Count) games"
+            $names = @($script:pickerRows | ForEach-Object { $_.Current.Name })
+            if (($names -join '|') -ne ($expected -join '|')) { throw "The picker listed '$($names -join ' | ')'." }
+            $script:pickerShot = Save-WindowScreenshot 'online-steam-picker'
+            $row = @($script:pickerRows | Where-Object { $_.Current.Name -eq $choice })[0]
+            $row.SetFocus()
+            Start-Sleep -Milliseconds 200
+            [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        }
         function Test-Shown([string] $id) {
             $element = Find-ById $id
             return [bool]($element -and -not $element.Current.IsOffscreen)
@@ -8182,11 +8201,13 @@ try {
             Wait-Until { [System.Windows.Automation.AutomationElement]::FocusedElement.Current.AutomationId -eq 'OnlineAddress' } 'focus in the address box'
             Open-Steam
             Invoke-Element (Wait-VisibleById 'SteamSearch')
-            Wait-Until { Test-Shown 'SteamAppInfo' } "the prompt for the game's Steam page"
+            # PR 4b: no app ID and no exact match: Steam's game list offers the near ones.
+            Wait-Until { Test-Shown 'SteamAppInfo' } "the picker for the game's Steam app"
             if (Test-Shown 'SteamKeyInfo') { throw 'The no-key bar stayed after the key was saved.' }
-            Set-Text 'SteamAppUrl' 'https://store.steampowered.com/app/620/Online_Test_Game/'
-            Invoke-Element (Wait-VisibleById 'SteamUseApp')
+            Choose-SteamApp @('Online Test Game II', 'Online Test Game Remastered', 'The Online Test Game Collection') 'Online Test Game II'
             Wait-OnlineStatus '2 Steam guides.'
+            [void](Wait-Name 'SteamGame' 'Steam game: Online Test Game II')
+            $report.steamPickerScreenshot = $script:pickerShot
             $resultRow = [System.Windows.Automation.PropertyCondition]::new(
                 [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
                 [System.Windows.Automation.ControlType]::ListItem)
@@ -8205,6 +8226,14 @@ try {
             # online-steam-nokey saved it already: the same guide is up to date.
             Wait-OnlineStatus "$steamTitle is up to date." 60
             Invoke-Element (Wait-VisibleById 'SteamSearch')
+            Set-Text 'SteamQuery' 'zzz'
+            Invoke-Element (Wait-VisibleById 'SteamSearch')
+            Wait-OnlineStatus 'No Steam guides match.'
+            # PR 4b: Change offers the picker again, and another game searches again.
+            Invoke-Element (Wait-VisibleById 'SteamChangeGame')
+            Wait-Until { Test-Shown 'SteamAppInfo' } 'the picker again'
+            Choose-SteamApp @('Online Test Game II', 'Online Test Game Remastered', 'The Online Test Game Collection') 'Online Test Game Remastered'
+            [void](Wait-Name 'SteamGame' 'Steam game: Online Test Game Remastered')
             Set-Text 'SteamQuery' 'zzz'
             Invoke-Element (Wait-VisibleById 'SteamSearch')
             Wait-OnlineStatus 'No Steam guides match.'

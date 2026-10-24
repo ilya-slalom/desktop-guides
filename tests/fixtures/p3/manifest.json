@@ -102,6 +102,42 @@
       "status": 200,
       "file": "online/map.png",
       "contentType": "image/png"
+    },
+    {
+      "url": "https://api.steampowered.com/IStoreService/GetAppList/v1/?include_games=true&include_dlc=false&include_software=false&include_videos=false&include_hardware=false&max_results=50000&last_appid=0",
+      "status": 200,
+      "file": "steam/applist-1.json",
+      "contentType": "application/json"
+    },
+    {
+      "url": "https://api.steampowered.com/IStoreService/GetAppList/v1/?include_games=true&include_dlc=false&include_software=false&include_videos=false&include_hardware=false&max_results=50000&last_appid=1002",
+      "status": 200,
+      "file": "steam/applist-2.json",
+      "contentType": "application/json"
+    },
+    {
+      "url": "https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?appid=1001&search_text=Online%20Test%20Game&filetype=10&return_details=true&return_short_description=true&numperpage=20&page=1&query_type=12",
+      "status": 200,
+      "file": "steam/query.json",
+      "contentType": "application/json"
+    },
+    {
+      "url": "https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?appid=1001&search_text=zzz&filetype=10&return_details=true&return_short_description=true&numperpage=20&page=1&query_type=12",
+      "status": 200,
+      "file": "steam/query-empty.json",
+      "contentType": "application/json"
+    },
+    {
+      "url": "https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?appid=1002&search_text=Online%20Test%20Game&filetype=10&return_details=true&return_short_description=true&numperpage=20&page=1&query_type=12",
+      "status": 200,
+      "file": "steam/query.json",
+      "contentType": "application/json"
+    },
+    {
+      "url": "https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?appid=1002&search_text=zzz&filetype=10&return_details=true&return_short_description=true&numperpage=20&page=1&query_type=12",
+      "status": 200,
+      "file": "steam/query-empty.json",
+      "contentType": "application/json"
     }
   ]
 }
