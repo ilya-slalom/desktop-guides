@@ -216,6 +216,7 @@ public sealed class OfflineCopyBuilderTests : IAsyncLifetime
     [Theory]
     [InlineData(SourceSite.GameFaqs)]
     [InlineData(SourceSite.Neoseeker)]
+    [InlineData(SourceSite.Steam)]
     public void AStyleSheetCanMakeNoRequest(SourceSite site)
     {
         string css = OfflineCopyBuilder.StyleSheet(site);
@@ -290,5 +291,19 @@ public sealed class OfflineCopyBuilderTests : IAsyncLifetime
         Guid id = await harness.PublishAsync(harness.Publisher(), await harness.InspectAsync(copy.EntryPath));
         Assert.Equal(["guide.html", "cairn.html", "fishing.html"],
             (await harness.Repository.GetGuidePagesAsync(id)).Select(page => page.RequestPath));
+    }
+
+    [Fact]
+    public void ASteamCopySaysItIsNotAffiliatedWithValve()
+    {
+        GuidePageReading steam = new SteamGuideAdapter().Read(
+            new Uri("https://steamcommunity.com/sharedfiles/filedetails/?id=4242"), P3Fixtures.Read("steam/guide.html"))!;
+        OfflineCopyBuilder.Build([Page(steam)], folder, Saved);
+        string html = Text("guide.html");
+        Assert.Contains("Saved from Steam Community", html);
+        Assert.Contains("Not affiliated with Valve.", html);
+        Assert.Contains("<main class=\"dg-site-steam\">", html);
+        Assert.Equal(OfflineCopyBuilder.StyleSheet(SourceSite.Steam), Text("guide.css"));
+        Assert.NotEqual(OfflineCopyBuilder.StyleSheet(SourceSite.Neoseeker), Text("guide.css"));
     }
 }
