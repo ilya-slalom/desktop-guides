@@ -198,11 +198,14 @@ public static class OfflineCopyBuilder
 
     // The guide's pages in order, then the articles they link to: the import
     // finds a guide's pages by following links from its entry, and the
-    // site's own contents are dropped.
+    // site's own contents are dropped. Headings here would join the outline.
     private static IElement Contents(IDocument document, IReadOnlyList<CapturedPage> pages, Dictionary<string, string> files)
     {
         IElement nav = document.CreateElement("nav");
         nav.ClassName = "dg-pages";
+        // Hidden: the reader's Contents pane lists the pages, and the import
+        // follows the links regardless.
+        nav.SetAttribute("hidden", "");
         StringBuilder items = new();
         StringBuilder articles = new();
         foreach (CapturedPage page in pages.DistinctBy(page => page.Reading.Match.PageKey))
@@ -212,7 +215,7 @@ public static class OfflineCopyBuilder
             (page.Linked ? articles : items).Append(
                 $"<li><a href=\"{files[reading.Match.PageKey]}\">{WebUtility.HtmlEncode(name)}</a></li>");
         }
-        nav.InnerHtml = $"<ol>{items}</ol>" + (articles.Length > 0 ? $"<h2>Linked articles</h2><ul>{articles}</ul>" : "");
+        nav.InnerHtml = $"<ol>{items}</ol>" + (articles.Length > 0 ? $"<p class=\"dg-pages-heading\">Linked articles</p><ul>{articles}</ul>" : "");
         return nav;
     }
 
@@ -230,7 +233,9 @@ public static class OfflineCopyBuilder
         string author = guide.Author is { } name ? $"<p>By {WebUtility.HtmlEncode(name)}</p>" : "";
         string url = guide.Pages.FirstOrDefault()?.Url.AbsoluteUri ?? guide.Url.AbsoluteUri;
         header.InnerHtml =
-            $"<h1>{WebUtility.HtmlEncode(guide.Title)}</h1>{author}" +
+            // Not a heading: the reader shows the title, and a heading would
+            // lead every page's outline in the Contents pane.
+            $"<p class=\"dg-title\">{WebUtility.HtmlEncode(guide.Title)}</p>{author}" +
             $"<p>Saved from {site} on {savedUtc.ToString("d MMMM yyyy", CultureInfo.InvariantCulture)}</p>" +
             $"<p><a href=\"{WebUtility.HtmlEncode(url)}\">{WebUtility.HtmlEncode(url)}</a></p>";
         return header;

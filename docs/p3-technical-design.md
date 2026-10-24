@@ -237,6 +237,10 @@ whole page:
   a header with the title, author, source, URL and date saved;
 - what's dropped: site navigation, ads and scripts, which wouldn't work
   offline anyway. The copy is still ordinary static HTML;
+- the copy's list of its pages is hidden (24 October 2026, by the user's
+  choice): the reader's Contents pane lists them, and the import still
+  follows its links. The header's title is no heading, so each page's
+  outline in the pane starts with the page's own sections;
 - links between captured pages are rewritten to point at each other.
   Other links stay as external links, which the reader already opens in
   the system browser on request;
