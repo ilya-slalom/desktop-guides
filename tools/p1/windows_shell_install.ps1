@@ -1908,6 +1908,8 @@ function Run-NavigationScenarios {
     Invoke-ShellSeed @('clear-reading-locations', $dataRoot) | Out-Null
     Invoke-ShellSeed @('clear-bookmarks', $dataRoot) | Out-Null
     $report.reflowBookmark = Invoke-ProgressPass 'reflow-bookmark' 0
+    # T14.5: centered in both views.
+    $report.reflowCentered = Invoke-ProgressPass 'reflow-centered' 0
 }
 
 # T21.2 PR b: a map zooms, pans and reopens at its view; a strip over 16384

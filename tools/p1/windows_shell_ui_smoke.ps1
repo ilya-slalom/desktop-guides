@@ -26,7 +26,7 @@ param(
         'restore-clean', 'restore-replace', 'restore-corrupt', 'restore-missing-artwork',
         'restore-cancel', 'restore-interrupted',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'contents-remember-open', 'contents-remember-reopen', 'contents-remember-closed', 'contents-auto', 'contents-auto-narrow', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark', 'maps-reader', 'maps-popup', 'maps-keyboard', 'online-browse', 'online-save', 'online-resave', 'online-pause', 'online-resume',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'reflow-centered', 'contents-remember-open', 'contents-remember-reopen', 'contents-remember-closed', 'contents-auto', 'contents-auto-narrow', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark', 'maps-reader', 'maps-popup', 'maps-keyboard', 'online-browse', 'online-save', 'online-resave', 'online-pause', 'online-resume',
         'workflow-pdf-exit')]
     [string] $Mode,
 
@@ -1579,7 +1579,7 @@ try {
         'text-size-steps', 'text-size-whitespace', 'text-size-restart', 'text-size-restart-after',
         'text-size-pdf', 'text-size-error-prepare', 'text-size-error', 'text-size-error-retry',
         'workflow-build', 'workflow-read', 'workflow-resume', 'workflow-offline', 'workflow-export', 'workflow-restore',
-        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark',
+        'find-txt', 'find-back', 'find-html', 'find-html-text', 'find-html-close', 'find-pdf', 'find-pdf-scan', 'find-pdf-wait', 'find-pdf-lines', 'contents-txt', 'contents-none', 'contents-narrow', 'contents-html', 'contents-html-headings', 'contents-pdf', 'bookmark-txt', 'bookmark-restart', 'bookmark-html', 'bookmark-pdf', 'bookmark-changed', 'reflow-switch', 'reflow-restart', 'reflow-none', 'reflow-find', 'reflow-bookmark', 'reflow-centered', 'contents-remember-open', 'contents-remember-reopen', 'contents-remember-closed', 'contents-auto', 'contents-auto-narrow', 'html-pages-links', 'html-pages-style', 'html-pages-restart', 'html-pages-reopen', 'html-pages-contents', 'html-pages-find', 'html-pages-find-again', 'html-pages-bookmark',
         'workflow-pdf-exit')) {
         $textGame = if ($Mode -in @('html-reader', 'html-runtime-missing')) { 'Web Reader Game' }
             elseif ($Mode -eq 'html-position') { 'Web Position Game' }
@@ -5556,6 +5556,63 @@ try {
                 [void](Wait-Status 'Bookmark deleted.')
                 [void](Wait-BookmarkNames @('Old place') 'deleting the damaged bookmark')
                 $report.phases += 'bookmark-changed'
+            }
+            # T14.5: a text guide sits centered, in both views. Its rows share
+            # one left edge, so columns keep their alignment.
+            elseif ($Mode -eq 'reflow-centered') {
+                function Get-CenteredBlocks([string] $listId) {
+                    $list = (Find-ById $listId).Current.BoundingRectangle
+                    $items = @((Find-ById $listId).FindAll($scope, $listItem) | Where-Object { -not $_.Current.IsOffscreen })
+                    $blocks = @(foreach ($item in $items) {
+                        $child = $item.FindFirst([System.Windows.Automation.TreeScope]::Children,
+                            [System.Windows.Automation.Condition]::TrueCondition)
+                        if ($child) {
+                            $b = $child.Current.BoundingRectangle
+                            if ($b.Width -gt 0 -and $b.Top -ge $list.Top -and $b.Bottom -le $list.Bottom) { $b }
+                        }
+                    })
+                    if ($blocks.Count -lt 5) { throw "Only $($blocks.Count) visible rows in $listId." }
+                    $lefts = @($blocks | ForEach-Object { $_.Left } | Sort-Object)
+                    $rights = @($blocks | ForEach-Object { $_.Right } | Sort-Object)
+                    # The scroll bar overlays the list's right edge, so the gaps may differ a little.
+                    [pscustomobject]@{
+                        Spread = $lefts[-1] - $lefts[0]
+                        WidthSpread = $rights[-1] - $rights[0]
+                        LeftGap = $lefts[0] - $list.Left
+                        RightGap = $list.Right - $rights[-1]
+                        Width = $rights[-1] - $lefts[0]
+                        ListWidth = $list.Width
+                    }
+                }
+                Open-TextGuide 'Reflow Guide'
+                [void](Wait-Status 'Guide ready.')
+                Wait-StatusClosed
+                Resize-ShellWindow 1024 720
+                Select-TextView 'Original'
+                Wait-TextViewChosen 'Original'
+                Wait-FirstTextRow
+                Start-Sleep -Milliseconds 500
+                $original = Get-CenteredBlocks 'ReaderTextLines'
+                $report.centeredOriginal = $original
+                if ($original.Spread -gt 1 -or $original.WidthSpread -gt 1) { throw "The rows don't share one block: $($original | ConvertTo-Json -Compress)." }
+                if ([Math]::Abs($original.LeftGap - $original.RightGap) -gt 12 -or $original.LeftGap -lt 40) {
+                    throw "The rows aren't centered: $($original | ConvertTo-Json -Compress)."
+                }
+                $report.centeredOriginalScreenshot = Save-WindowScreenshot 'reflow-centered-original'
+                Select-TextView 'Reflow'
+                Wait-TextViewChosen 'Reflow'
+                [void](Wait-VisibleById 'ReaderReflowBlocks')
+                Start-Sleep -Milliseconds 800
+                $reflowed = Get-CenteredBlocks 'ReaderReflowBlocks'
+                $report.centeredReflow = $reflowed
+                if ($reflowed.Spread -gt 1) { throw "The reflowed blocks don't share a left edge: $($reflowed | ConvertTo-Json -Compress)." }
+                if ($reflowed.Width -gt $reflowed.ListWidth - 100 -or [Math]::Abs($reflowed.LeftGap - $reflowed.RightGap) -gt 12) {
+                    throw "The reflowed column isn't capped and centered: $($reflowed | ConvertTo-Json -Compress)."
+                }
+                $report.centeredReflowScreenshot = Save-WindowScreenshot 'reflow-centered-reflow'
+                Select-TextView 'Original'
+                Wait-TextViewChosen 'Original'
+                $report.phases += 'reflow-centered'
             }
             elseif ($Mode -eq 'reflow-switch') {
                 Open-TextGuide 'Reflow Guide'
