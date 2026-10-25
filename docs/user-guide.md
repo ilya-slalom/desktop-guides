@@ -18,7 +18,7 @@ guide covers version 1.2.
 ## Installing
 
 Download a release from the
-[GitHub Releases page](https://github.com/ilya-slalom/desktop-guides/releases).
+[GitHub Releases page](https://github.com/ilyalissoboi/desktop-guides/releases).
 Releases are x64 only, and are tested on Windows 11 x64 (see the
 [tested matrix](release/tested-matrix.md)). Each release has an MSIX
 package and a portable build. The two keep separate libraries.

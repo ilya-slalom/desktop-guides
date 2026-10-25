@@ -29,7 +29,7 @@ public sealed class SteamClient(
     private const string Api = "https://api.steampowered.com";
 
     public static string UserAgent { get; } =
-        $"DesktopGuides/{typeof(SteamClient).Assembly.GetName().Version?.ToString(3) ?? "0"} (+https://github.com/ilya-slalom/desktop-guides)";
+        $"DesktopGuides/{typeof(SteamClient).Assembly.GetName().Version?.ToString(3) ?? "0"} (+https://github.com/ilyalissoboi/desktop-guides)";
 
     public static void Identify(HttpRequestMessage request) => request.Headers.TryAddWithoutValidation("User-Agent", UserAgent);
 
