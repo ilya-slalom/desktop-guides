@@ -179,7 +179,7 @@ function Write-Leftovers {
         $left += 'a DesktopGuides.Production process is running'
     }
     $found = if ($left.Count -gt 0) { $left -join '; ' } else { 'nothing found' }
-    Write-Note "the installer's cleanup did not run. May be left: $found. Remove them by hand; see docs/p1/e2e-testing.md."
+    Write-Note "the installer's cleanup did not run. May be left: $found. Remove them by hand; see docs/testing.md."
 }
 
 $code = 97

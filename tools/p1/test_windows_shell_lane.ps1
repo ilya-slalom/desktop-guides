@@ -35,7 +35,7 @@ Assert-True (-not (Test-InstalledLaneExecutable 'C:\Users\me\DesktopGuides.Produ
     'A portable exe is refused.'
 
 # The real pin, and a broken one.
-$pinPath = Join-Path $PSScriptRoot '..\..\docs\p1\release\release-certificate.json'
+$pinPath = Join-Path $PSScriptRoot '..\..\docs\release\release-certificate.json'
 Assert-True ((Get-ReleasePin $pinPath) -eq 'BAA638E4DCFA4E1C5A2F65E3DC838BA7B3B59EB6') 'The release pin is read.'
 $scratch = Join-Path ([IO.Path]::GetTempPath()) "desktop-guides-lane-$([Guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $scratch | Out-Null

@@ -6,7 +6,6 @@
 **/TestResults/
 artifacts/
 tests/fixtures/p0/generated/
-docs/p0/traces/
 *.user
 *.pfx
 __pycache__/

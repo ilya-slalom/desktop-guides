@@ -153,7 +153,7 @@ else {
         $lines.Add((Line ([bool] (Field $report 'sourcePackageSha256')) "Source MSIX SHA-256 ``$(Field $report 'sourcePackageSha256')``"))
         $lines.Add((Line ([bool] (Field $report 'signedPackageSha256')) "Signed MSIX SHA-256 ``$(Field $report 'signedPackageSha256')``"))
         if (Field $report 'releaseSigned') {
-            $pin = Get-ReleasePin (Join-Path $PSScriptRoot '..\..\docs\p1\release\release-certificate.json')
+            $pin = Get-ReleasePin (Join-Path $PSScriptRoot '..\..\docs\release\release-certificate.json')
             $signer = Field $report 'certificateThumbprint'
             $lines.Add((Line ($signer -eq $pin) "Release signer ``$signer`` matches the pin"))
             if (Field $report 'previousPackageSha256') {
