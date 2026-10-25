@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 # Resolved here: Windows PowerShell leaves $PSScriptRoot empty in parameter
 # defaults when the script runs with -File.
-if (-not $PinFile) { $PinFile = Join-Path $PSScriptRoot '..\..\docs\p1\release\release-certificate.json' }
+if (-not $PinFile) { $PinFile = Join-Path $PSScriptRoot '..\..\docs\release\release-certificate.json' }
 $pin = Get-Content -LiteralPath $PinFile -Raw | ConvertFrom-Json
 if ($Thumbprint -ne $pin.thumbprint) {
     throw "The signing certificate $Thumbprint is not the pinned release certificate $($pin.thumbprint)."

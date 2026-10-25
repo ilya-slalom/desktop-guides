@@ -1,7 +1,7 @@
 """Generate the T17.6 app icon assets from the two master images.
 
 Usage: python generate_app_icon_assets.py <output folder>
-Needs Pillow. The masters are docs/p1/app-icon/app-icon-master.png (the full
+Needs Pillow. The masters are docs/assets/app-icon-master.png (the full
 icon) and app-icon-small-master.png (the small-size drawing for 16 to 32 px).
 """
 
@@ -11,7 +11,7 @@ from pathlib import Path
 from PIL import Image
 
 REPO = Path(__file__).resolve().parents[2]
-MASTERS = REPO / "docs" / "p1" / "app-icon"
+MASTERS = REPO / "docs" / "assets"
 SCALES = (100, 125, 150, 200, 400)
 TARGET_SIZES = (16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 256)
 ICO_SIZES = (16, 20, 24, 32, 40, 48, 64, 256)

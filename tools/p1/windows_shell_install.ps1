@@ -62,7 +62,7 @@ param(
     [string] $Lane = 'Preview',
 
     # T17.3: install packages already signed with the release certificate,
-    # checked against docs/p1/release/release-certificate.json; nothing is
+    # checked against docs/release/release-certificate.json; nothing is
     # re-signed.
     [switch] $ReleaseSigned,
 
@@ -3348,7 +3348,7 @@ try {
         $report.sourcePackageSha256 = (Get-FileHash $PackagePath -Algorithm SHA256).Hash
         if ($ReleaseSigned) {
             # T17.3: the bytes under test are the release's own; nothing is re-signed.
-            $releaseRoot = Join-Path $PSScriptRoot '..\..\docs\p1\release'
+            $releaseRoot = Join-Path $PSScriptRoot '..\..\docs\release'
             $releaseThumbprint = Get-ReleasePin (Join-Path $releaseRoot 'release-certificate.json')
             $releaseCertificate = Join-Path $releaseRoot 'desktop-guides-release.cer'
             if ((Get-PfxCertificate -FilePath $releaseCertificate).Thumbprint -ne $releaseThumbprint) {

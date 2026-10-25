@@ -113,9 +113,9 @@ jobs:
           $ErrorActionPreference = 'Stop'
           if (-not $env:RELEASE_SIGNING_PFX -or -not $env:RELEASE_SIGNING_PASSWORD) { throw 'The release signing secrets are not set.' }
           # SignTool's verify needs the self-signed release certificate trusted.
-          $pin = Get-Content docs/p1/release/release-certificate.json -Raw | ConvertFrom-Json
+          $pin = Get-Content docs/release/release-certificate.json -Raw | ConvertFrom-Json
           if (-not (Test-Path -LiteralPath "Cert:\LocalMachine\TrustedPeople\$($pin.thumbprint)")) {
-            Import-Certificate -FilePath docs/p1/release/desktop-guides-release.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
+            Import-Certificate -FilePath docs/release/desktop-guides-release.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
             "trusted=$($pin.thumbprint)" >> $env:GITHUB_OUTPUT
           }
           $pfx = Join-Path $env:RUNNER_TEMP 'release.pfx'
@@ -158,7 +158,7 @@ jobs:
           $seed = @(Get-ChildItem tools/p1/DesktopGuides.ShellSeed/bin/Release -Recurse -Filter 'DesktopGuides.ShellSeed.dll')[0].FullName
           ./tools/p1/windows_package_upgrade.ps1 -OldPackage '${{ steps.package.outputs.previous }}' `
             -NewPackage "artifacts/release/DesktopGuides-$env:VERSION-x64.msix" `
-            -Certificate docs/p1/release/desktop-guides-release.cer `
+            -Certificate docs/release/desktop-guides-release.cer `
             -SeedTool $seed -ResultPath artifacts/upgrade.json
       - name: Remove the certificate trust
         if: always()
@@ -205,7 +205,7 @@ jobs:
           [IO.File]::WriteAllText("$($msix.FullName).sha256", "$msixHash  $($msix.Name)`n", [Text.UTF8Encoding]::new($false))
           $portable = Get-Item "artifacts/release/DesktopGuides-portable-x64-$short.zip"
           $signing = Get-Content artifacts/release/signing.json -Raw | ConvertFrom-Json
-          $pin = Get-Content docs/p1/release/release-certificate.json -Raw | ConvertFrom-Json
+          $pin = Get-Content docs/release/release-certificate.json -Raw | ConvertFrom-Json
           $windowsAppSdk = ([xml](Get-Content Directory.Packages.props -Raw)).Project.ItemGroup.PackageVersion |
             Where-Object Include -eq 'Microsoft.WindowsAppSDK' | ForEach-Object Version
           [ordered]@{
@@ -226,8 +226,8 @@ jobs:
             }
             previousRelease = '${{ steps.package.outputs.previous }}' -ne ''
           } | ConvertTo-Json -Depth 6 | Set-Content artifacts/release/release-manifest.json -Encoding utf8
-          Copy-Item docs/p1/release/desktop-guides-release.cer artifacts/release/
-          $notes = Get-Content docs/p1/release/release-notes-template.md -Raw
+          Copy-Item docs/release/desktop-guides-release.cer artifacts/release/
+          $notes = Get-Content docs/release/release-notes-template.md -Raw
           $notes = $notes -replace '(?s)^<!--.*?-->\s*', ''
           foreach ($pair in @(
               @('{{VERSION}}', $short), @('{{COMMIT}}', $env:COMMIT), @('{{MSIX}}', $msix.Name),
