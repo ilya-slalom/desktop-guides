@@ -45,7 +45,14 @@ site: its fixtures are synthetic.
 **Not tested:**
 - **MSIX live:** the live checks used the portable build.
 - **ARM64 installed:** ARM64 isn't released.
-- **A release candidate of P3's version:** the next tested-matrix row comes from that release's own run on its draft assets ([how a row is made](../p1/release/tested-matrix.md#how-a-row-is-made)).
+
+## The release
+
+v1.2.0 passed its release-candidate run on 25 October 2026, on its draft
+assets: the previous release's library upgraded in place, schema 8 to 9,
+and read, resumed, opened offline, exported and restored ([tested
+matrix](../p1/release/tested-matrix.md#120)). The run is P1's journey; P3's
+features are covered by the installed `online` group and the live checks.
 
 ## Deferred
 
