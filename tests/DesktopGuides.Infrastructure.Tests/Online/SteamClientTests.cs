@@ -109,7 +109,9 @@ public sealed class SteamClientTests
     {
         stub.Json(Details, "details.json");
         await Client().GetDetailsAsync("4242", CancellationToken.None);
-        Assert.StartsWith("DesktopGuides/", Assert.Single(stub.Requests).UserAgent);
+        string agent = Assert.Single(stub.Requests).UserAgent;
+        Assert.StartsWith("DesktopGuides/", agent);
+        Assert.EndsWith("(+https://github.com/ilyalissoboi/desktop-guides)", agent);
     }
 
     [Fact]

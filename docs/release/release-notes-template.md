@@ -69,7 +69,7 @@ page guides.
 - Image maps are PNG or JPEG files, at most 256 MiB and 32,768 pixels on a
   side. A large map is prepared in the background after import; opened
   before that, it shows "Preparing the map…" first.
-- Tested on Windows 11 x64; see the [tested matrix](https://github.com/ilya-slalom/desktop-guides/blob/main/docs/release/tested-matrix.md). Clean-machine and Windows 10 support aren't claimed yet.
+- Tested on Windows 11 x64; see the [tested matrix](https://github.com/ilyalissoboi/desktop-guides/blob/main/docs/release/tested-matrix.md). Clean-machine and Windows 10 support aren't claimed yet.
 - Scanned (image-only) PDF pages show the page image only, marked "Image-only page; OCR is unavailable." They have no text to select, search or read aloud.
 - Uninstalling the app deletes its library. Back it up from
   **Settings → Back up library** before uninstalling or testing a pre-release.

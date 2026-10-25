@@ -47,5 +47,5 @@ $quoted = $base.Replace("'", "''")
     notBefore = $cert.NotBefore.ToUniversalTime().ToString('o')
     notAfter = $cert.NotAfter.ToUniversalTime().ToString('o')
 } | ConvertTo-Json -Compress
-"Get-Content -Raw '$quoted.pfx.base64.txt' | gh secret set RELEASE_SIGNING_PFX --repo ilya-slalom/desktop-guides"
-"Get-Content -Raw '$quoted.password.txt' | gh secret set RELEASE_SIGNING_PASSWORD --repo ilya-slalom/desktop-guides"
+"Get-Content -Raw '$quoted.pfx.base64.txt' | gh secret set RELEASE_SIGNING_PFX --repo ilyalissoboi/desktop-guides"
+"Get-Content -Raw '$quoted.password.txt' | gh secret set RELEASE_SIGNING_PASSWORD --repo ilyalissoboi/desktop-guides"

@@ -40,7 +40,7 @@ release was tested on.
 ## Install
 
 Download the latest release from the
-[GitHub Releases page](https://github.com/ilya-slalom/desktop-guides/releases).
+[GitHub Releases page](https://github.com/ilyalissoboi/desktop-guides/releases).
 Each release has two builds:
 
 - **The MSIX package** installs the app. It's signed with the project's
@@ -79,4 +79,4 @@ For coding agents:
 
 The design documents, plans and results written while the app was built
 were removed on 25 October 2026. They're kept under the git tag
-[`docs-history-2026-10-25`](https://github.com/ilya-slalom/desktop-guides/tree/docs-history-2026-10-25).
+[`docs-history-2026-10-25`](https://github.com/ilyalissoboi/desktop-guides/tree/docs-history-2026-10-25).

@@ -190,9 +190,11 @@ TMPDIR=/private/tmp/dg/ dotnet test tests/DesktopGuides.Infrastructure.Tests/Des
 - `TMPDIR` must not cross a symbolic link. The default `/var/folders/...`
   goes through `/var -> /private/var`, which the managed-path checks reject.
   The short path also keeps local socket names under the macOS length limit.
-- Tests that need Windows (the static HTML boundary, file locks, package
-  identity) return early elsewhere. A green macOS run doesn't replace the
-  Windows run.
+- Some tests that need Windows return early elsewhere (the static HTML
+  boundary, file locks, package identity). Others fail on macOS: the NTFS
+  fault-injection matrices, Windows path rules and Windows backup folders,
+  about 85 in all. On macOS, compare your run's failures with `main`'s; only
+  the Windows run in CI is the record.
 
 The PowerShell harness has its own tests, `tools/p1/test_*.ps1`, which CI
 runs in `core-tests`. Run the one for a script you change.
