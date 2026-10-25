@@ -17,6 +17,39 @@ assets ([design](../t17-3-release-candidate-design.md)):
 
 Every stage must pass.
 
+## 1.2.0
+
+Tested on 25 October 2026, on the draft release's own assets, built from
+`400cf69` by release run
+[40152534142](https://github.com/ilya-slalom/desktop-guides/actions/runs/40152534142).
+
+| Target | Windows | CPU | Windows App Runtime | WebView2 Runtime | Package | Result |
+| --- | --- | --- | --- | --- | --- | --- |
+| Windows 11 x64 | Windows 11 Enterprise, build 10.0.26200.0 | AMD Ryzen 7 7800X3D (x64) | `Microsoft.WindowsAppRuntime.2` 2.5.1.0 | 155.0.4283.62 | `DesktopGuides-1.2.0.0-x64.msix`, SHA-256 `F1792A25242E253B04D31BBB3F53FFD9FAEBE2D93A4CE07510086B246D579EF6`, signer `BAA638E4DCFA4E1C5A2F65E3DC838BA7B3B59EB6` | Passed |
+
+The stages, all passed:
+1. **Install the previous release:** v1.1.0, SHA-256
+   `1FC55F9FBBCC41DB7B9C2BA0E30E17B2F00E454060F7635DEC308D6AA053ED0B`.
+2. **`workflow-build`** (7.6 s): add a game, and import TXT, HTML and PDF
+   through the UI. Then the originals were removed.
+3. **The upgrade:** from 1.1.0.0 to 1.2.0.0 in place, with the same family
+   and the library intact. The library's schema moved from 8 to 9 (P3's
+   guide source fields) on the way.
+4. **`workflow-read`** (14.1 s) and **`workflow-resume`** (8.8 s), with
+   completion.
+5. **`workflow-offline`** (9.6 s): with a firewall rule blocking the app,
+   every guide opened at its place, and no non-loopback connection was
+   made. The rule was then removed.
+6. **`workflow-export`** (2.7 s) and **`workflow-restore`** (12.7 s).
+7. **Cleanup:** the package was removed, the certificate wasn't left
+   trusted, no tasks or processes remained, and no crash entries were
+   logged.
+
+The journey is P1's: it doesn't exercise P2's or P3's features. Those are
+covered by the installed CI groups on every change: `navigation` and
+`maps` for P2, and `online` for P3 (against synthetic fixtures; the live
+sites were checked by hand, see the [P3 results](../../p3/results.md#live-checks)).
+
 ## 1.1.0
 
 Tested on 20 October 2026, on the draft release's own assets, built from
