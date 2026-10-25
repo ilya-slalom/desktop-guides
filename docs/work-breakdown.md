@@ -693,14 +693,21 @@ capture behavior, and recovery for failed downloads. A saved guide remains
 readable offline.
 
 - **T22.1** Review one source at a time for API/usage terms and attribution.
+  Done in #145: the [source review](p3/source-review.md) and the
+  [P3 technical design](p3-technical-design.md).
 - **T22.2** Build source adapter, preview, download/capture, and import through
   the existing staging pipeline. Consider Toolkit `RichSuggestBox` only for a
   source that supports cancellable incremental suggestions without creating
   excessive or confidential client-side requests; otherwise use the native
   explicit-search pattern from T04.4.
-- **TR22.1** Network failures cannot corrupt existing local library data.
+  Implemented in #146, #147, #148, #149, #151, #152 and #153, for GameFAQs,
+  Neoseeker, Steam Community and VGMaps; see the [P3 results](p3/results.md).
+- **TR22.1** Network failures cannot corrupt existing local library data. Met: a failed save or capture leaves the library unchanged (the
+  failure-safety tests of #146, #147 and the online saver, fetcher and map
+  saver).
 - **TR22.2** Online browsing and previously imported offline reading remain
-  separate capabilities.
+  separate capabilities. Met: the reader never reaches the network,
+  and Find online never opens a saved guide.
 
 ## Final milestone — accessibility audit and Store submission
 
