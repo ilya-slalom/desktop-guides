@@ -7,7 +7,7 @@ public sealed record OnlineSource(SourceSite Site, string Name, IReadOnlyList<st
 
 /// <summary>
 /// S22: the sources this build includes. Each is a build switch
-/// (IncludeGameFaqs, IncludeNeoseeker, IncludeSteam), so a build can leave one out.
+/// (IncludeGameFaqs, IncludeNeoseeker, IncludeSteam, IncludeVgMaps), so a build can leave one out.
 /// </summary>
 public static class OnlineSources
 {
@@ -24,6 +24,9 @@ public static class OnlineSources
 #endif
 #if SOURCE_STEAM
         sources.Add(new(SourceSite.Steam, "Steam", ["steamcommunity.com"], new Uri("https://steamcommunity.com/")));
+#endif
+#if SOURCE_VGMAPS
+        sources.Add(new(SourceSite.VgMaps, "VGMaps", ["vgmaps.com"], new Uri("https://vgmaps.com/Atlas/index.htm")));
 #endif
         return sources.ToArray();
     }

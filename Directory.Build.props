@@ -5,6 +5,7 @@
     <IncludeGameFaqs Condition="'$(IncludeGameFaqs)' == ''">true</IncludeGameFaqs>
     <IncludeNeoseeker Condition="'$(IncludeNeoseeker)' == ''">true</IncludeNeoseeker>
     <IncludeSteam Condition="'$(IncludeSteam)' == ''">true</IncludeSteam>
+    <IncludeVgMaps Condition="'$(IncludeVgMaps)' == ''">true</IncludeVgMaps>
   </PropertyGroup>
   <!-- `-p:Portable=true` builds the unpackaged, self-contained app. Its outputs
        live outside the project folders so neither build globs the other's files. -->

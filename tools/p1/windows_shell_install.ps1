@@ -2036,6 +2036,15 @@ function Run-OnlineScenarios([string] $fixtureRoot) {
     if ($steam.Count -ne 1 -or $steam[0].ItemId -ne '4242' -or $steam[0].Images -ne 2 -or $steam[0].StyleSheets -ne 1) {
         throw "Expected one saved Steam guide with its two images and stylesheet; got $($steam | ConvertTo-Json -Depth 4 -Compress)."
     }
+
+    # S22 PR 5: VGMaps. Two maps saved, one of them a GIF made PNG; saved again, both are up to date.
+    Invoke-OnlineMode 'online-vgmaps' $fixtures
+    $maps = @((Invoke-ShellSeed @('describe-online', $dataRoot, $cacheRoot) | ConvertFrom-Json).Guides |
+        Where-Object { $_.Site -eq 'VgMaps' })
+    if ($maps.Count -ne 2 -or @($maps | Where-Object { $_.Format -ne 'Image' }).Count -ne 0 -or
+        (@($maps.ItemId | Sort-Object) -join '|') -ne 'PSX/OnlineTestGame-Cave.gif|PSX/OnlineTestGame-World.png') {
+        throw "Expected two saved VGMaps maps; got $($maps | ConvertTo-Json -Depth 4 -Compress)."
+    }
 }
 
 function Run-MapReaderScenario([string] $fixtureRoot) {

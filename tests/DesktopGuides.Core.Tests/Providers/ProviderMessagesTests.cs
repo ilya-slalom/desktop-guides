@@ -45,4 +45,12 @@ public sealed class ProviderMessagesTests
     [InlineData(ProviderErrorKind.Unavailable, "Can't reach Steam. Check your connection.")]
     public void SteamFailuresSayWhatToDo(ProviderErrorKind kind, string message) =>
         Assert.Equal(message, ProviderMessages.ForSteam(kind));
+
+    [Theory]
+    [InlineData(ProviderErrorKind.RateLimited, "VGMaps is limiting requests. Try again in a few minutes.")]
+    [InlineData(ProviderErrorKind.Timeout, "VGMaps took too long to respond.")]
+    [InlineData(ProviderErrorKind.MalformedData, "VGMaps sent something the app couldn't read.")]
+    [InlineData(ProviderErrorKind.Unavailable, "Can't reach VGMaps. Check your connection.")]
+    public void VgMapsFailuresSayWhatToDo(ProviderErrorKind kind, string message) =>
+        Assert.Equal(message, ProviderMessages.ForVgMaps(kind));
 }

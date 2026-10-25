@@ -138,6 +138,36 @@
       "status": 200,
       "file": "steam/query-empty.json",
       "contentType": "application/json"
+    },
+    {
+      "url": "https://vgmaps.com/Atlas/index.htm",
+      "status": 200,
+      "file": "vgmaps/index.htm",
+      "contentType": "text/html; charset=windows-1252"
+    },
+    {
+      "url": "https://vgmaps.com/Atlas/PSX/index.htm",
+      "status": 200,
+      "file": "vgmaps/system.htm",
+      "contentType": "text/html; charset=windows-1252"
+    },
+    {
+      "url": "https://vgmaps.com/Atlas/PSX/OnlineTestGame-World.png",
+      "status": 200,
+      "file": "vgmaps/map.png",
+      "contentType": "image/png"
+    },
+    {
+      "url": "https://vgmaps.com/Atlas/PSX/OnlineTestGame-Town.png",
+      "status": 200,
+      "file": "vgmaps/map.png",
+      "contentType": "image/png"
+    },
+    {
+      "url": "https://vgmaps.com/Atlas/PSX/OnlineTestGame-Cave.gif",
+      "status": 200,
+      "file": "vgmaps/map.gif",
+      "contentType": "image/gif"
     }
   ]
 }

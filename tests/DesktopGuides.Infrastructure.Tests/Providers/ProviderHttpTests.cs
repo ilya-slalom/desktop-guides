@@ -145,6 +145,84 @@ public sealed class ProviderHttpTests
         Assert.DoesNotContain("igdb-secret", credentials.Igdb!.ToString());
         Assert.DoesNotContain("sgdb-key", credentials.ToString());
     }
+    // S22 PR 5: a map streams to its file; the timeout is for silence, not the whole download.
+    private sealed class TrickleStream(int chunks, TimeSpan every, TimeSpan? stallAt = null) : Stream
+    {
+        private int sent;
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => sent; set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token = default)
+        {
+            if (sent >= chunks) return 0;
+            await Task.Delay(sent == chunks / 2 && stallAt is { } stall ? stall : every, token);
+            buffer.Span[0] = (byte)sent++;
+            return 1;
+        }
+    }
+
+    private static readonly Uri Map = new("https://vgmaps.com/Atlas/PSX/Game-World.png");
+
+    private static FakeHandler Streaming(Stream body) =>
+        FakeHandler.Returning(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(body) });
+
+    [Fact]
+    public async Task ALongDownloadThatKeepsArrivingFinishes()
+    {
+        string file = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            // About 2 s in all against a 1 s timeout, each gap far inside it: a busy runner still passes.
+            ProviderHttp http = Create(Streaming(new TrickleStream(40, TimeSpan.FromMilliseconds(50))), TimeSpan.FromSeconds(1));
+            Assert.Equal(HttpStatusCode.OK, await http.DownloadAsync(Map, file, _ => { }, 1024, CancellationToken.None));
+            Assert.Equal(40, new FileInfo(file).Length);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public async Task ADownloadThatGoesSilentTimesOutAndLeavesNoFile()
+    {
+        string file = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        ProviderHttp http = Create(Streaming(new TrickleStream(10, TimeSpan.FromMilliseconds(10), TimeSpan.FromSeconds(5))),
+            TimeSpan.FromSeconds(1));
+        Assert.Equal(ProviderErrorKind.Timeout, (await Assert.ThrowsAsync<ProviderException>(
+            () => http.DownloadAsync(Map, file, _ => { }, 1024, CancellationToken.None))).Kind);
+        Assert.False(File.Exists(file));
+    }
+
+    [Fact]
+    public async Task ADownloadPastItsLimitIsRefusedAndLeavesNoFile()
+    {
+        string file = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        ProviderHttp http = Create(Streaming(new TrickleStream(10, TimeSpan.Zero)));
+        Assert.Equal(ProviderErrorKind.MalformedData, (await Assert.ThrowsAsync<ProviderException>(
+            () => http.DownloadAsync(Map, file, _ => { }, 4, CancellationToken.None))).Kind);
+        Assert.False(File.Exists(file));
+    }
+
+    [Fact]
+    public async Task ARefusedDownloadWritesNothing()
+    {
+        string file = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        ProviderHttp http = Create(FakeHandler.Returning(new HttpResponseMessage(HttpStatusCode.NotFound)));
+        Assert.Equal(HttpStatusCode.NotFound, await http.DownloadAsync(Map, file, _ => { }, 1024, CancellationToken.None));
+        Assert.False(File.Exists(file));
+        ProviderHttp limited = Create(FakeHandler.Returning(new HttpResponseMessage(HttpStatusCode.TooManyRequests)));
+        Assert.Equal(ProviderErrorKind.RateLimited, (await Assert.ThrowsAsync<ProviderException>(
+            () => limited.DownloadAsync(Map, file, _ => { }, 1024, CancellationToken.None))).Kind);
+    }
 }
 
 internal sealed class FailingStream : Stream

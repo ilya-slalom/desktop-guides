@@ -65,7 +65,7 @@ public sealed class SteamAppIndex(string cacheFile, TimeProvider clock)
         string prefix = key + " ";
         string[] words = key.Split(' ').Select(word => " " + word + " ").ToArray();
         return apps
-            .Select(entry => (entry.App, entry.Key, Rank: Rank(entry.Key, key, prefix, words)))
+            .Select(entry => (entry.App, entry.Key, Rank: OnlineNames.Rank(entry.Key, key, prefix, words)))
             .Where(entry => entry.Rank >= 0)
             .OrderBy(entry => entry.Rank).ThenBy(entry => entry.Key.Length).ThenBy(entry => entry.App.Name.Length)
             .ThenBy(entry => long.TryParse(entry.App.AppId, out long id) ? id : long.MaxValue)
@@ -96,36 +96,7 @@ public sealed class SteamAppIndex(string cacheFile, TimeProvider clock)
 
     public string? NameOf(string appId) => apps.FirstOrDefault(entry => entry.App.AppId == appId).App?.Name;
 
-    private static int Rank(string name, string key, string prefix, string[] words)
-    {
-        if (name == key) return 0;
-        if (name.StartsWith(prefix, StringComparison.Ordinal)) return 1;
-        string spaced = " " + name + " ";
-        return words.All(word => spaced.Contains(word, StringComparison.Ordinal)) ? 2 : -1;
-    }
-
-    internal static string Normalize(string name)
-    {
-        StringBuilder key = new(name.Length);
-        bool space = true;
-        // The marks go first: compatibility normalizing turns ™ into "TM".
-        string plain = name.Replace("™", "", StringComparison.Ordinal).Replace("®", "", StringComparison.Ordinal)
-            .Replace("©", "", StringComparison.Ordinal);
-        foreach (char c in plain.Normalize(NormalizationForm.FormKC).ToLowerInvariant())
-        {
-            if (char.IsLetterOrDigit(c))
-            {
-                key.Append(c);
-                space = false;
-            }
-            else if (!space)
-            {
-                key.Append(' ');
-                space = true;
-            }
-        }
-        return key.ToString().TrimEnd();
-    }
+    internal static string Normalize(string name) => OnlineNames.Normalize(name);
 
     private static (SteamApp, string)[] Index(IEnumerable<(string AppId, string Name)> list) =>
         list.Select(app => (new SteamApp(app.AppId, app.Name), Normalize(app.Name))).Where(entry => entry.Item2.Length > 0).ToArray();

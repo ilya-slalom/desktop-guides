@@ -525,3 +525,29 @@ with its live-check fixes in [#149](https://github.com/ilya-slalom/desktop-guide
   - Games IGDB gave no single Steam app asked for a store URL, so the user asked to pick from Steam's matches instead. That's the game picker of [#152](https://github.com/ilya-slalom/desktop-guides/pull/152) ([plan](p3/s22-steam-game-picker-plan.md)).
   - With the picker's build, the user found Steam guide search and import "now works as expected".
 
+## PR 5 verification record
+
+[#153](https://github.com/ilya-slalom/desktop-guides/pull/153), following
+[the PR 5 plan](p3/s22-vgmaps-plan.md), checked on 25 October 2026:
+
+- **Suites on pcsx2-win:** Core.Tests 1584/1584 and Infrastructure.Tests 1140/1140. The Release x64 build is clean under `-warnaserror`.
+- **Installed `online-vgmaps`:**
+  - without the VGMaps panel, run [40102814247](https://github.com/ilya-slalom/desktop-guides/actions/runs/40102814247) failed;
+  - with it, run [40105622397](https://github.com/ilya-slalom/desktop-guides/actions/runs/40105622397) passed on both lanes.
+- **Found by the installed check:** a save's last progress report landed after its outcome and replaced it, in the VGMaps and Steam saves.
+- **Review:** a fresh review found four Important issues, all fixed:
+  - closing Find online didn't wait for a map save;
+  - a late load could take over another view, or save one game's maps into another;
+  - large maps timed out, because the 15 s timeout covered the whole download. Maps now stream to a file, with a silence timeout per read;
+  - the index was parsed on the UI thread.
+
+  Cheaper Minor issues were fixed too:
+  - a real file past the limit reads as too large;
+  - thousands separators;
+  - unnamed maps;
+  - the converter's codec, now chosen by the bytes.
+
+  Seven are deferred, among them fixed column positions, which fail safe.
+- **Live check (the user, on pcsx2-win, 25 October 2026):** with the final run's build, searching the atlas, opening a game, saving maps and saving them again all worked as expected.
+- **CI:** run [40109540370](https://github.com/ilya-slalom/desktop-guides/actions/runs/40109540370) passed every job.
+
