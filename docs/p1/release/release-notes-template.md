@@ -4,27 +4,28 @@
 
 A pre-release for testing. Built from {{COMMIT}}.
 
-## What's new in 1.1
+## What's new in 1.2
 
-- **Search inside a guide** (Ctrl+F) for text, web page and PDF guides, with
-  a match count and Next and Previous (F3, Shift+F3).
-- **Contents** (Ctrl+Shift+C): a guide's sections or headings in a side
-  pane, including a PDF's own outline. Choosing one goes there.
-- **Bookmarks:** add one at the current place (Ctrl+D), name it, and come
-  back to it from the Bookmarks tab (Ctrl+Shift+B). Bookmarks are included
-  in backups.
-- **A reflow view for text guides**, which rewraps prose to the window
-  while keeping tables and ASCII art as they are.
-- **Web guides of several pages:** a guide saved as several pages imports
-  as one guide. Links between its pages work offline, and contents, search
-  and bookmarks cover every page.
-- **Image maps:**
-  - import a game's PNG and JPEG maps, several at once, into their own
-    Maps section;
-  - open a map to zoom and pan, even on maps far larger than the screen;
-    it reopens where you left it;
-  - glance at a map from any guide with **Maps** (Alt+M), then go back to
-    reading without losing your place.
+- **Find online** on a game's page saves guides from four sites for
+  offline reading, credited to their authors:
+  - **GameFAQs and Neoseeker:** browse the site in the app, with its ads as
+    they are, and press **Save to library** on a guide. Its pages and images
+    are saved one at a time, at least 2 s apart; a wiki walkthrough brings
+    the articles it links to. If a site asks you to confirm you're a person,
+    the save pauses until you do.
+  - **Steam Community:** search a game's guides with your own Steam Web API
+    key (Settings → Game data providers), or paste a guide's address, which
+    needs no key. Find online picks the game's Steam app by name, and
+    **Change** corrects it.
+  - **The Video Game Atlas (VGMaps):** search the atlas, open the game, and
+    save the maps you pick as image maps.
+- **Saving again** replaces the copy saved before, and keeps your place,
+  bookmarks and completion; an unchanged guide is up to date.
+- **Saved web guides** get a clean built-in style, and the game page names
+  each guide's source and author.
+- **Text guides sit centered,** with ASCII art and tables kept aligned,
+  and the **Contents** pane opens as you left it, and on its own for a
+  guide of several pages.
 
 ## Install
 
@@ -58,6 +59,13 @@ page guides.
 ## Limits
 
 - x64 only.
+- Find online depends on the sites as they are. A site that changes its
+  pages can stop a save; your saved guides are unaffected. A guide is
+  saved with at most 200 pages, and a longer one is marked as partial.
+- Steam search needs your own Steam Web API key. Desktop Guides isn't
+  affiliated with Valve or with any of the sites.
+- Maps from VGMaps over the image-map limits are listed as too large to
+  save, and SWF and other non-image maps as not saveable.
 - Image maps are PNG or JPEG files, at most 256 MiB and 32,768 pixels on a
   side. A large map is prepared in the background after import; opened
   before that, it shows "Preparing the map…" first.
