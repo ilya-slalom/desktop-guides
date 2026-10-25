@@ -548,4 +548,6 @@ with its live-check fixes in [#149](https://github.com/ilya-slalom/desktop-guide
   - the converter's codec, now chosen by the bytes.
 
   Seven are deferred, among them fixed column positions, which fail safe.
+- **Live check (the user, on pcsx2-win, 25 October 2026):** with the final run's build, searching the atlas, opening a game, saving maps and saving them again all worked as expected.
+- **CI:** run [40109540370](https://github.com/ilya-slalom/desktop-guides/actions/runs/40109540370) passed every job.
 
